@@ -1,0 +1,13 @@
+# Node modules
+node_modules/
+
+# Local database file
+/db.json
+
+# Package manager lockfiles
+package-lock.json
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
