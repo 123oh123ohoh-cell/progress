@@ -282,14 +282,24 @@ const Progress = {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password })
       });
-      if (!payload || payload.error) return { ok: false, error: "That username and password don't match." };
-      const user = { ...payload, password };
-      const existing = this.db.users.find(u => u.username === user.username);
-      if (existing) Object.assign(existing, user);
-      else this.db.users.push(user);
-      this.db.currentUser = user.username;
-      this.persist();
-      return { ok: true, user };
+      if (payload && !payload.error) {
+        const user = { ...payload, password };
+        const existing = this.db.users.find(u => u.username === user.username);
+        if (existing) Object.assign(existing, user);
+        else this.db.users.push(user);
+        this.db.currentUser = user.username;
+        this.persist();
+        return { ok: true, user };
+      }
+      // fallback to local login when API is unavailable
+      if (!payload) {
+        const user = this.db.users.find(u => u.username.toLowerCase() === username.toLowerCase());
+        if (!user || user.password !== password) return { ok: false, error: "That username and password don't match." };
+        this.db.currentUser = user.username;
+        this.persist();
+        return { ok: true, user };
+      }
+      return { ok: false, error: payload?.error || "That username and password don't match." };
     }
 
     const user = this.db.users.find(u => u.username.toLowerCase() === username.toLowerCase());
@@ -311,12 +321,25 @@ const Progress = {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, name: name.trim(), password, timezone: DEFAULT_TIMEZONE })
       });
-      if (!payload || payload.error) return { ok: false, error: payload?.error || "Could not create account." };
-      const user = { ...payload, password };
-      this.db.users.push(user);
-      this.db.currentUser = user.username;
-      this.persist();
-      return { ok: true, user };
+      if (payload && !payload.error) {
+        const user = { ...payload, password };
+        this.db.users.push(user);
+        this.db.currentUser = user.username;
+        this.persist();
+        return { ok: true, user };
+      }
+      if (!payload) {
+        // fallback to local signup if API is unavailable
+        if (this.db.users.some(u => u.username.toLowerCase() === username)) {
+          return { ok: false, error: "That username is already taken." };
+        }
+        const user = { id: "u" + Date.now(), username, name: name.trim(), password, avatar: null, joined: new Date().toISOString().slice(0, 10), timezone: DEFAULT_TIMEZONE, following: [], followers: [] };
+        this.db.users.push(user);
+        this.db.currentUser = user.username;
+        this.persist();
+        return { ok: true, user };
+      }
+      return { ok: false, error: payload?.error || "Could not create account." };
     }
 
     if (this.db.users.some(u => u.username.toLowerCase() === username)) {
