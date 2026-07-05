@@ -25,17 +25,22 @@
 <script src="data.js"></script>
 <script src="app.js"></script>
 <script>
-  const wrap = document.getElementById("editorWrap");
-  const user = Progress.getCurrentUser();
-  let coverData = null;
+  async function start() {
+    await Progress.loadFromApi().catch(() => {});
+    initShell("write");
+    const wrap = document.getElementById("editorWrap");
+    const user = Progress.getCurrentUser();
+    let coverData = null;
 
-  if (!user) {
-    wrap.innerHTML = `
-      <div class="feed-empty" style="padding-top:80px;">
-        <h3>Log in to write an entry</h3>
-        <p>Use the account menu in the top right to log in or create an account.</p>
-      </div>`;
-  } else {
+    if (!user) {
+      wrap.innerHTML = `
+        <div class="feed-empty" style="padding-top:80px;">
+          <h3>Log in to write an entry</h3>
+          <p>Use the account menu in the top right to log in or create an account.</p>
+        </div>`;
+      return;
+    }
+
     wrap.innerHTML = `
       <div class="editor-cover-drop" id="coverDrop">
         <div class="cover-hint">Click to add a cover image (optional)</div>
@@ -126,20 +131,24 @@
       if (confirm("Discard this entry?")) location.href = "index.html";
     });
 
-    document.getElementById("publishBtn").addEventListener("click", () => {
+    document.getElementById("publishBtn").addEventListener("click", async () => {
       const title = document.getElementById("titleInput").value.trim();
       const content = document.getElementById("canvas").innerHTML.trim();
       if (!title) { showToast("Give your entry a title first."); return; }
       if (!content) { showToast("Write something before publishing."); return; }
       const plain = document.getElementById("canvas").innerText.trim();
       const excerpt = plain.slice(0, 140) + (plain.length > 140 ? "…" : "");
-      const post = Progress.createPost({ title, content, cover: coverData, excerpt });
+      const post = await Progress.createPost({ title, content, cover: coverData, excerpt });
+      if (!post) {
+        showToast("Could not publish your entry. Try again.");
+        return;
+      }
       showToast("Published.");
       setTimeout(() => location.href = "post.html?id=" + post.id, 500);
     });
   }
 
-  initShell("write");
+  start();
 </script>
 
 </body>

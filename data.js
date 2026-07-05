@@ -6,11 +6,23 @@
 
 const DB_KEY = "progress:db:v1";
 const DEFAULT_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+const API_ENABLED = true;
+
+async function apiFetch(path, options = {}) {
+  try {
+    const res = await fetch(path, options);
+    if (!res.ok) return null;
+    if (res.status === 204) return {};
+    return await res.json();
+  } catch (e) {
+    return null;
+  }
+}
 
 const SEED = {
   currentUser: null, // null = logged out
   users: [
-    { username: "mara", name: "Mara Studios", password: "demo1234", avatar: "https://images.unsplash.com/photo-1502685104226-ee32379fefbe?q=80&w=200&auto=format&fit=crop", joined: "2026-02-01", timezone: DEFAULT_TIMEZONE, following: [], followers: [], bio: "Building progress one note at a time." }
+    { id: "u1", username: "mara", name: "Mara Studios", password: "demo1234", avatar: "https://images.unsplash.com/photo-1502685104226-ee32379fefbe?q=80&w=200&auto=format&fit=crop", joined: "2026-02-01", timezone: DEFAULT_TIMEZONE, following: [], followers: [], bio: "" }
   ],
   posts: [
     {
@@ -68,6 +80,7 @@ function loadDB() {
     parsed.users = (parsed.users || []).map(u => ({
       ...u,
       timezone: u.timezone || DEFAULT_TIMEZONE,
+      joined: u.joined || new Date().toISOString().slice(0, 10),
       following: u.following || [],
       followers: u.followers || [],
       bio: u.bio || ""
@@ -91,7 +104,58 @@ const Progress = {
   db: loadDB(),
 
   refresh() { this.db = loadDB(); return this.db; },
-  persist() { saveDB(this.db); },
+  persist() {
+    saveDB(this.db);
+  },
+
+  async loadFromApi() {
+    if (!API_ENABLED) return this.db;
+    const savedCurrent = this.getCurrentUser();
+    const [users, posts, notifications] = await Promise.all([
+      apiFetch("/api/users"),
+      apiFetch("/api/posts"),
+      savedCurrent ? apiFetch(`/api/notifications?recipient=${encodeURIComponent(savedCurrent.username)}`) : Promise.resolve(null)
+    ]);
+    if (users) {
+      this.db.users = users.map(u => {
+        const existing = this.db.users.find(x => x.username === u.username);
+        const normalized = {
+          ...u,
+          timezone: u.timezone || DEFAULT_TIMEZONE,
+          following: u.following || [],
+          followers: u.followers || [],
+          bio: u.bio || ""
+        };
+        if (existing && existing.bio && !normalized.bio) {
+          normalized.bio = existing.bio;
+        }
+        return normalized;
+      });
+      if (savedCurrent && !this.db.users.some(u => u.username === savedCurrent.username)) {
+        this.db.users.push(savedCurrent);
+      }
+    }
+    if (posts) this.db.posts = posts;
+    if (notifications) this.db.notifications = notifications;
+    this.persist();
+    return this.db;
+  },
+
+  async loadComments(postId) {
+    if (!API_ENABLED) {
+      return this.db.comments
+        .filter(c => c.postId === postId)
+        .sort((a, b) => new Date(a.time) - new Date(b.time));
+    }
+    const comments = await apiFetch(`/api/posts/${postId}/comments`);
+    if (comments) {
+      this.db.comments = (this.db.comments || []).filter(c => c.postId !== postId).concat(comments);
+      return comments.sort((a, b) => new Date(a.time) - new Date(b.time));
+    }
+    return this.db.comments
+      .filter(c => c.postId === postId)
+      .sort((a, b) => new Date(a.time) - new Date(b.time));
+  },
 
   getCurrentUser() {
     if (!this.db.currentUser) return null;
@@ -114,6 +178,7 @@ const Progress = {
   },
 
   createNotification(payload) {
+    if (API_ENABLED) return;
     this.db.notifications.unshift({
       id: "n" + Date.now(),
       seen: false,
@@ -129,16 +194,28 @@ const Progress = {
       .sort((a, b) => new Date(a.time) - new Date(b.time));
   },
 
-  createComment(postId, body) {
+  async createComment(postId, body, image) {
     const user = this.getCurrentUser();
     if (!user) return null;
     const post = this.getPost(postId);
     if (!post) return null;
+    if (API_ENABLED) {
+      const payload = await apiFetch(`/api/posts/${postId}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ author: user.username, body, image })
+      });
+      if (!payload) return null;
+      await this.loadComments(postId);
+      await this.loadFromApi();
+      return payload;
+    }
     const comment = {
       id: "c" + Date.now(),
       postId,
       author: user.username,
       body,
+      image: image || null,
       time: new Date().toISOString()
     };
     this.db.comments.push(comment);
@@ -156,11 +233,26 @@ const Progress = {
     return comment;
   },
 
-  toggleFollow(targetUsername) {
+  async toggleFollow(targetUsername) {
     const user = this.getCurrentUser();
     if (!user || user.username === targetUsername) return null;
     const target = this.getUser(targetUsername);
     if (!target) return null;
+
+    const isFollowing = user.following.includes(targetUsername);
+    if (API_ENABLED) {
+      const endpoint = `/api/users/${encodeURIComponent(target.id)}/${isFollowing ? "unfollow" : "follow"}`;
+      const payload = await apiFetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ followerId: user.id })
+      });
+      if (!payload) return null;
+      await this.loadFromApi();
+      const refreshedUser = this.getCurrentUser();
+      const refreshedTarget = this.getUser(targetUsername);
+      return refreshedUser && refreshedTarget ? { following: refreshedUser.following, followers: refreshedTarget.followers } : null;
+    }
 
     const followingIndex = user.following.indexOf(targetUsername);
     if (followingIndex === -1) {
@@ -183,7 +275,23 @@ const Progress = {
     return { following: user.following, followers: target.followers };
   },
 
-  login(username, password) {
+  async login(username, password) {
+    if (API_ENABLED) {
+      const payload = await apiFetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password })
+      });
+      if (!payload || payload.error) return { ok: false, error: "That username and password don't match." };
+      const user = { ...payload, password };
+      const existing = this.db.users.find(u => u.username === user.username);
+      if (existing) Object.assign(existing, user);
+      else this.db.users.push(user);
+      this.db.currentUser = user.username;
+      this.persist();
+      return { ok: true, user };
+    }
+
     const user = this.db.users.find(u => u.username.toLowerCase() === username.toLowerCase());
     if (!user || user.password !== password) return { ok: false, error: "That username and password don't match." };
     this.db.currentUser = user.username;
@@ -191,13 +299,30 @@ const Progress = {
     return { ok: true, user };
   },
 
-  signup(username, name, password) {
+  async signup(username, name, password) {
     username = username.trim().toLowerCase();
     if (!username || !name.trim() || !password) return { ok: false, error: "Fill in every field to continue." };
+    if (!API_ENABLED && this.db.users.some(u => u.username.toLowerCase() === username)) {
+      return { ok: false, error: "That username is already taken." };
+    }
+    if (API_ENABLED) {
+      const payload = await apiFetch("/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, name: name.trim(), password, timezone: DEFAULT_TIMEZONE })
+      });
+      if (!payload || payload.error) return { ok: false, error: payload?.error || "Could not create account." };
+      const user = { ...payload, password };
+      this.db.users.push(user);
+      this.db.currentUser = user.username;
+      this.persist();
+      return { ok: true, user };
+    }
+
     if (this.db.users.some(u => u.username.toLowerCase() === username)) {
       return { ok: false, error: "That username is already taken." };
     }
-    const user = { id: `u${Date.now()}`, username, name: name.trim(), password, avatar: null, joined: new Date().toISOString().slice(0, 10), timezone: DEFAULT_TIMEZONE, following: [], followers: [], bio: "" };
+    const user = { id: "u" + Date.now(), username, name: name.trim(), password, avatar: null, joined: new Date().toISOString().slice(0, 10), timezone: DEFAULT_TIMEZONE, following: [], followers: [] };
     this.db.users.push(user);
     this.db.currentUser = user.username;
     this.persist();
@@ -209,11 +334,25 @@ const Progress = {
     this.persist();
   },
 
-  updateProfile(fields) {
+  async updateProfile(fields) {
     const user = this.getCurrentUser();
-    if (!user) return;
+    if (!user) return null;
     Object.assign(user, fields);
+    if (API_ENABLED) {
+      const payload = await apiFetch(`/api/users/${user.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(fields)
+      });
+      if (!payload) {
+        this.persist();
+        return user;
+      }
+      await this.loadFromApi();
+      return this.getCurrentUser();
+    }
     this.persist();
+    return user;
   },
 
   getPosts() {
@@ -224,13 +363,24 @@ const Progress = {
     return this.db.posts.find(p => p.id === id) || null;
   },
 
-  createPost({ title, content, cover, excerpt }) {
+  async createPost({ title, content, cover, excerpt }) {
     const user = this.getCurrentUser();
+    if (!user) return null;
+    if (API_ENABLED) {
+      const payload = await apiFetch("/api/posts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ author: user.username, title, content, cover, excerpt })
+      });
+      if (!payload) return null;
+      await this.loadFromApi();
+      return payload;
+    }
     const id = "p" + (Date.now());
     const createdAt = new Date().toISOString();
     const post = {
       id,
-      author: user ? user.username : "mara",
+      author: user.username,
       title: title || "Untitled entry",
       date: createdAt.slice(0, 10),
       createdAt,
@@ -245,11 +395,41 @@ const Progress = {
     return post;
   },
 
-  toggleLike(postId) {
+  async deletePost(postId) {
+    const user = this.getCurrentUser();
+    if (!user) return false;
+    const post = this.getPost(postId);
+    if (!post || post.author !== user.username) return false;
+    if (API_ENABLED) {
+      const res = await apiFetch(`/api/posts/${postId}`, { method: "DELETE" });
+      if (!res) return false;
+      await this.loadFromApi();
+      return true;
+    }
+    const index = this.db.posts.findIndex(p => p.id === postId);
+    if (index === -1) return false;
+    this.db.posts.splice(index, 1);
+    this.db.comments = (this.db.comments || []).filter(c => c.postId !== postId);
+    this.db.notifications = (this.db.notifications || []).filter(n => n.postId !== postId);
+    this.persist();
+    return true;
+  },
+
+  async toggleLike(postId) {
     const user = this.getCurrentUser();
     const post = this.getPost(postId);
-    if (!post) return;
-    const who = user ? user.username : "guest";
+    if (!post || !user) return;
+    if (API_ENABLED) {
+      const payload = await apiFetch(`/api/posts/${postId}/like`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: user.username })
+      });
+      if (!payload) return null;
+      await this.loadFromApi();
+      return payload;
+    }
+    const who = user.username;
     const idx = post.likedBy.indexOf(who);
     if (idx === -1) {
       post.likedBy.push(who);
@@ -285,9 +465,18 @@ const Progress = {
     return this.db.notifications.filter(n => (!n.recipient || n.recipient === user.username) && !n.seen).length;
   },
 
-  markAllSeen() {
+  async markAllSeen() {
     const user = this.getCurrentUser();
     if (!user) return;
+    if (API_ENABLED) {
+      await apiFetch("/api/notifications/mark-seen", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recipient: user.username })
+      });
+      await this.loadFromApi();
+      return;
+    }
     this.db.notifications.forEach(n => {
       if (!n.recipient || n.recipient === user.username) n.seen = true;
     });
@@ -304,7 +493,9 @@ const Progress = {
   },
 
   formatDate(iso) {
-    const date = iso && iso.includes("T") ? new Date(iso) : new Date(iso + "T00:00:00");
+    if (!iso) return "Unknown";
+    const date = iso.includes("T") ? new Date(iso) : new Date(iso + "T00:00:00");
+    if (isNaN(date.getTime())) return iso;
     return date.toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" });
   },
 

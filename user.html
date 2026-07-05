@@ -13,90 +13,118 @@
 <div id="nav-root"></div>
 <div id="modal-root"></div>
 
-<main class="container" id="userRoot">
-  <div class="feed-empty" style="padding-top:100px; text-align:center;">
-    <h3>Loading user profile...</h3>
-  </div>
+<main class="container">
+  <div id="publicProfile"></div>
 </main>
 
 <script src="data.js"></script>
 <script src="app.js"></script>
 <script>
+  const params = new URLSearchParams(location.search);
+  const userId = params.get('id');
+  const username = params.get('username');
+  const root = document.getElementById('publicProfile');
+
   function escapeHTML(str) {
     const div = document.createElement('div');
-    div.textContent = str || '';
+    div.textContent = str;
     return div.innerHTML;
   }
 
-  const params = new URLSearchParams(location.search);
-  const username = params.get('u');
-  const user = username ? Progress.getUser(username) : null;
-  const root = document.getElementById('userRoot');
-  const currentUser = Progress.getCurrentUser();
+  function renderBio(text) {
+    const emoticonNames = ["computer", "dead", "two"];
+    const escaped = escapeHTML(text || "");
+    return escaped.replace(/:([a-z0-9_]+):/g, (match, name) => {
+      if (!emoticonNames.includes(name)) return match;
+      return `<img class="bio-emoticon" src="images/emoticons/${name}.png" alt="${name}">`;
+    });
+  }
 
-  if (!user) {
-    root.innerHTML = `
-      <div class="feed-empty" style="padding-top:100px; text-align:center;">
-        <h3>User not found</h3>
-        <p><a href="index.html" style="text-decoration:underline;">Back to the journal</a></p>
-      </div>`;
-  } else {
-    const isFollowing = currentUser ? currentUser.following.includes(user.username) : false;
-    const followingCount = user.following ? user.following.length : 0;
-    const followerCount = user.followers ? user.followers.length : 0;
-    root.innerHTML = `
-      <div class="post-head">
-        <a class="post-back" href="index.html">&larr; all entries</a>
-        <span class="post-date">Public profile</span>
-        <h1 class="post-title">${escapeHTML(user.name)}</h1>
-        <div class="post-byline">
-          ${user.avatar ? `<img src="${user.avatar}" alt="Avatar">` : `<div class="initials">${escapeHTML(user.name.split(' ').map(p => p[0]).join('').slice(0,2).toUpperCase())}</div>`}
-          <div>
-            <div style="font-size:14px; color:var(--muted);">@${user.username}</div>
-            <div style="font-size:13px; color:var(--muted);">ID: ${user.id}</div>
+  function renderPublicProfile(user) {
+    if (!user) {
+      root.innerHTML = `
+        <div class="feed-empty" style="padding-top:80px; text-align:center;">
+          <div class="error-illustration" style="margin-bottom:28px; max-width:360px; margin-left:auto; margin-right:auto;">
+            <img src="images/404page.png" alt="User not found illustration">
           </div>
-        </div>
-        <div class="settings-section" style="margin:22px 0 12px;">
-          <p style="margin:0; color:var(--mocha-dark);">${user.bio ? escapeHTML(user.bio) : 'No bio yet.'}</p>
-        </div>
-        <div class="settings-section" style="display:flex; gap:24px; flex-wrap:wrap; align-items:center; margin-bottom:24px;">
-          <span style="font-family:var(--font-mono); font-size:12px; color:var(--muted);">${followerCount} followers</span>
-          <span style="font-family:var(--font-mono); font-size:12px; color:var(--muted);">${followingCount} following</span>
-          ${currentUser && currentUser.username !== user.username ? `<button class="btn primary" id="followBtn">${isFollowing ? 'Following' : 'Follow'}</button>` : ''}
-        </div>
-      `;
+          <h3>User not found</h3>
+          <p><a href="index.html">Back to home</a></p>
+        </div>`;
+      return;
+    }
 
-    const posts = Progress.getPosts().filter(p => p.author === user.username);
-    root.innerHTML += `
-      <div class="settings-section">
-        <h3>Entries (${posts.length})</h3>
-        ${posts.length ? posts.map(p => `
-          <a href="post.html?id=${p.id}" style="display:block; padding:12px 0; border-bottom:1px solid var(--mocha-wash); font-size:14.5px;">
-            <span style="font-family:var(--font-mono); font-size:11px; color:var(--muted); text-transform:uppercase; margin-right:10px;">${Progress.formatDateShort(p.date)}</span>
-            ${escapeHTML(p.title)}
-          </a>
-        `).join('') : `<p style="color:var(--muted); font-size:14px; margin:0;">No entries published yet.</p>`}
+    root.innerHTML = `
+      <div class="settings-avatar-row" style="margin-top:40px;">
+        ${user.avatar ? `<img src="${user.avatar}" alt="${user.name}">` : `<div class="initials-lg">${initials(user.name)}</div>`}
+        <div>
+          <div style="font-family:var(--font-display); font-size:24px; margin-bottom:6px;">${user.name}</div>
+          <div style="color:var(--muted); font-size:14px; margin-bottom:12px;">@${user.username}</div>
+          <div style="display:flex; gap:18px; color:var(--muted); font-size:14px; margin-bottom:10px;">
+            <span>${user.followers.length} followers</span>
+            <span>${user.following.length} following</span>
+            <span>Joined ${Progress.formatDate(user.joined)}</span>
+          </div>
+          <div class="bio-text" style="margin-top:12px;">${user.bio ? renderBio(user.bio) : `<span style="color:var(--muted);">No bio yet.</span>`}</div>
+        </div>
+      </div>
+      <div class="settings-section" style="margin-top:24px;">
+        <h3>Latest posts</h3>
+        <div id="publicPosts"></div>
       </div>
     `;
 
-    const followBtn = document.getElementById('followBtn');
-    if (followBtn) {
-      followBtn.addEventListener('click', () => {
-        if (!currentUser) {
-          showModal('login');
-          return;
-        }
-        const result = Progress.toggleFollow(user.username);
-        followBtn.textContent = Progress.isFollowing(user.username) ? 'Following' : 'Follow';
-        followBtn.classList.toggle('primary', Progress.isFollowing(user.username));
-        followBtn.classList.toggle('secondary', !Progress.isFollowing(user.username));
-        followBtn.textContent = Progress.isFollowing(user.username) ? 'Following' : 'Follow';
-        showToast(Progress.isFollowing(user.username) ? 'You are now following this user.' : 'Unfollowed this user.');
+    fetch(`/api/posts?author=${encodeURIComponent(user.username)}`)
+      .then(r => r.json())
+      .then(posts => {
+        const list = document.getElementById('publicPosts');
+        list.innerHTML = posts.length ? posts.map(post => `
+          <a class="entry" href="post.html?id=${post.id}">
+            <div class="entry-body">
+              <span class="entry-date">${Progress.formatDateShort(post.date)}</span>
+              <h2 class="entry-title"><span class="underline">${post.title}</span></h2>
+              <p class="entry-excerpt">${post.excerpt || ''}</p>
+            </div>
+          </a>
+        `).join('') : '<p style="color:var(--muted);">No posts yet.</p>';
       });
-    }
   }
 
-  initShell();
+  async function start() {
+    await Progress.loadFromApi().catch(() => {});
+    initShell();
+
+    let fetchedUser = null;
+    try {
+      if (userId) {
+        const res = await fetch(`/api/users/${userId}`);
+        if (res.ok) fetchedUser = await res.json();
+      } else if (username) {
+        const res = await fetch(`/api/users?username=${encodeURIComponent(username)}`);
+        if (res.ok) {
+          const users = await res.json();
+          fetchedUser = Array.isArray(users) ? users[0] || null : users;
+        }
+      }
+    } catch (e) {
+      fetchedUser = null;
+    }
+
+    const localUser = Progress.db.users.find(u => u.id === userId) || null;
+    const effectiveUser = localUser ? { ...localUser, ...(fetchedUser || {}) } : fetchedUser;
+    if (effectiveUser && localUser) {
+      effectiveUser.bio = (fetchedUser && fetchedUser.bio !== undefined && fetchedUser.bio !== "") ? fetchedUser.bio : localUser.bio || "";
+      effectiveUser.name = fetchedUser?.name || localUser.name;
+      effectiveUser.avatar = (fetchedUser && fetchedUser.avatar) ? fetchedUser.avatar : localUser.avatar;
+      effectiveUser.followers = fetchedUser?.followers || localUser.followers || [];
+      effectiveUser.following = fetchedUser?.following || localUser.following || [];
+      effectiveUser.joined = fetchedUser?.joined || localUser.joined;
+      effectiveUser.timezone = fetchedUser?.timezone || localUser.timezone;
+    }
+
+    renderPublicProfile(effectiveUser);
+  }
+
+  start();
 </script>
 </body>
 </html>

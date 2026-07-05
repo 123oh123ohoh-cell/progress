@@ -23,8 +23,6 @@
 <script>
   const params = new URLSearchParams(location.search);
   const postId = params.get("id");
-  const post = Progress.getPost(postId);
-  const comments = Progress.getComments(postId);
   const root = document.getElementById("postRoot");
 
   function escapeHTML(str) {
@@ -33,13 +31,34 @@
     return div.innerHTML;
   }
 
-  if (!post) {
+  function renderCommentBody(text) {
+    const emoticonNames = ["computer", "dead", "two"];
+    const escaped = escapeHTML(text || "");
+    return escaped.replace(/:([a-z0-9_]+):/g, (match, name) => {
+      if (!emoticonNames.includes(name)) return match;
+      return `<img class="reply-emoticon" src="images/emoticons/${name}.png" alt="${name}">`;
+    });
+  }
+
+  function renderNotFound() {
     root.innerHTML = `
-      <div class="feed-empty" style="padding-top:100px;">
+      <div class="feed-empty" style="padding-top:80px; text-align:center;">
+        <div class="error-illustration" style="margin-bottom:28px; max-width:360px; margin-left:auto; margin-right:auto;">
+          <img src="images/404page.png" alt="Not found illustration">
+        </div>
         <h3>This entry doesn't exist</h3>
         <p><a href="index.html" style="text-decoration:underline;">Back to the journal</a></p>
       </div>`;
-  } else {
+  }
+
+  async function renderPost() {
+    await Progress.loadFromApi().catch(() => {});
+    const post = Progress.getPost(postId);
+    const comments = await Progress.loadComments(postId);
+    if (!post) {
+      renderNotFound();
+      return;
+    }
     const user = Progress.getCurrentUser();
     const likedByMe = post.likedBy.includes(user ? user.username : "guest");
     const author = Progress.getUser(post.author);
@@ -51,7 +70,7 @@
         <h1 class="post-title">${post.title}</h1>
         <div class="post-byline">
           ${avatarHTML(author, 30)}
-          <span>Written by @${post.author}</span>
+          <span>Written by <a class="username-link" href="user.html?id=${author ? author.id : ""}">@${post.author}</a></span>
         </div>
       </div>
       ${post.cover ? `<img class="post-cover" src="${post.cover}" alt="">` : ""}
@@ -61,6 +80,8 @@
           ${ICONS.heart} <span id="likeCount">${post.likes}</span>
         </button>
         <button class="react-btn" id="replyBtn">${ICONS.reply} Reply</button>
+        ${user && user.username !== post.author ? `<button class="react-btn" id="followBtn">${Progress.isFollowing(post.author) ? "Following" : "Follow author"}</button>` : ""}
+        ${user && user.username === post.author ? `<button class="react-btn danger" id="deleteBtn">Delete entry</button>` : ""}
       </div>
       <section class="replies-section">
         <div class="replies-header">
@@ -74,8 +95,9 @@
               <div class="reply-item">
                 <div class="reply-avatar">${avatarHTML(author, 32)}</div>
                 <div class="reply-content">
-                  <div class="reply-meta"><strong>@${comment.author}</strong><span>${Progress.formatDateTime(comment.time)}</span></div>
-                  <p class="reply-body">${escapeHTML(comment.body)}</p>
+                  <div class="reply-meta"><strong><a class="username-link" href="user.html?id=${author ? author.id : ""}">@${comment.author}</a></strong><span>${Progress.formatDateTime(comment.time)}</span></div>
+                  <p class="reply-body">${renderCommentBody(comment.body)}</p>
+                  ${comment.image ? `<div class="reply-image"><img src="${comment.image}" alt="Reply image"></div>` : ""}
                 </div>
               </div>
             `;
@@ -84,6 +106,12 @@
         ${user ? `
           <form id="replyForm" class="reply-form">
             <textarea id="replyInput" placeholder="Leave a reply..."></textarea>
+            <div class="reply-controls">
+              <button type="button" class="btn secondary" id="attachImageBtn">Attach image</button>
+              <div class="emoji-picker" id="emojiPicker"></div>
+            </div>
+            <div id="replyImagePreview" class="reply-image-preview"></div>
+            <input type="file" id="replyImageInput" accept="image/*" style="display:none;">
             <button type="submit" class="btn primary">Post reply</button>
           </form>
         ` : `
@@ -92,35 +120,172 @@
       </section>
     `;
 
-    document.getElementById("likeBtn").addEventListener("click", () => {
-      const updated = Progress.toggleLike(post.id);
+    document.getElementById("likeBtn").addEventListener("click", async () => {
+      if (!user) { showModal("login"); return; }
+      const updated = await Progress.toggleLike(post.id);
+      if (!updated) return;
       document.getElementById("likeCount").textContent = updated.likes;
-      document.getElementById("likeBtn").classList.toggle("liked");
+      document.getElementById("likeBtn").classList.toggle("liked", updated.likedBy.includes(user.username));
     });
 
     document.getElementById("replyBtn").addEventListener("click", () => {
       if (!Progress.getCurrentUser()) { showModal("login"); return; }
       const form = document.getElementById("replyForm");
-      if (form) {
-        document.getElementById("replyInput").focus();
-      }
+      if (form) document.getElementById("replyInput").focus();
     });
+
+    const followBtn = document.getElementById("followBtn");
+    if (followBtn) {
+      followBtn.addEventListener("click", async () => {
+        if (!Progress.getCurrentUser()) { showModal("login"); return; }
+        const result = await Progress.toggleFollow(post.author);
+        if (result) {
+          followBtn.textContent = Progress.isFollowing(post.author) ? "Following" : "Follow author";
+          showToast(Progress.isFollowing(post.author) ? "You are now following this author." : "Unfollowed the author.");
+        }
+      });
+    }
+
+    const deleteBtn = document.getElementById("deleteBtn");
+    if (deleteBtn) {
+      deleteBtn.addEventListener("click", async () => {
+        if (!confirm("Delete this entry? This cannot be undone.")) return;
+        const deleted = await Progress.deletePost(post.id);
+        if (deleted) {
+          showToast("Entry deleted.");
+          setTimeout(() => location.href = "index.html", 400);
+        } else {
+          showToast("Could not delete this entry.");
+        }
+      });
+    }
+
+    let replyImageData = null;
+    let replyImageLoading = false;
+    const imageInput = document.getElementById("replyImageInput");
+    const imagePreview = document.getElementById("replyImagePreview");
+    const attachImageBtn = document.getElementById("attachImageBtn");
+    const emojiPicker = document.getElementById("emojiPicker");
+    const replySubmitBtn = document.querySelector("#replyForm button[type='submit']");
+
+    function setReplySubmitEnabled(enabled) {
+      if (replySubmitBtn) replySubmitBtn.disabled = !enabled;
+    }
+
+    if (attachImageBtn && imageInput) {
+      attachImageBtn.addEventListener("click", () => imageInput.click());
+      imageInput.addEventListener("change", () => {
+        const file = imageInput.files && imageInput.files[0];
+        if (!file) return;
+        replyImageLoading = true;
+        setReplySubmitEnabled(false);
+        if (imagePreview) imagePreview.innerHTML = `<div class="reply-image-loading">Loading image...</div>`;
+        const reader = new FileReader();
+        reader.onload = () => {
+          replyImageData = reader.result;
+          replyImageLoading = false;
+          setReplySubmitEnabled(true);
+          if (imagePreview) {
+            imagePreview.innerHTML = `
+              <div class="reply-image-preview-card">
+                <img src="${reader.result}" alt="Reply attachment">
+                <button type="button" class="btn secondary" id="removeImageBtn">Remove</button>
+              </div>`;
+            const removeButton = document.getElementById("removeImageBtn");
+            removeButton && removeButton.addEventListener("click", () => {
+              replyImageData = null;
+              imageInput.value = "";
+              if (imagePreview) imagePreview.innerHTML = "";
+            });
+          }
+        };
+        reader.onerror = () => {
+          replyImageLoading = false;
+          setReplySubmitEnabled(true);
+          showToast("Could not load the selected image.");
+          if (imagePreview) imagePreview.innerHTML = "";
+          replyImageData = null;
+          imageInput.value = "";
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    const emoticonNames = ["computer", "dead", "two"];
+    if (emojiPicker) {
+      emojiPicker.innerHTML = emoticonNames.map(name => `
+        <button type="button" class="emoji-btn" data-name="${name}">
+          <img src="images/emoticons/${name}.png" alt="${name}">
+        </button>
+      `).join("");
+
+      const emojiTooltip = document.createElement("div");
+      emojiTooltip.className = "emoji-tooltip hidden";
+      document.body.appendChild(emojiTooltip);
+
+      const attachEmoticonTooltip = (element, name) => {
+        const small = element.classList.contains("reply-emoticon");
+        element.addEventListener("mouseenter", () => {
+          emojiTooltip.innerHTML = `
+            <img src="images/emoticons/${name}.png" alt="${name}">
+            <div class="emoji-tooltip-label">:${name}:</div>
+          `;
+          emojiTooltip.classList.toggle("small", small);
+          emojiTooltip.classList.remove("hidden");
+          const rect = element.getBoundingClientRect();
+          const tooltipWidth = small ? 90 : 120;
+          const left = Math.min(window.innerWidth - tooltipWidth - 12, Math.max(12, rect.left + rect.width / 2 - tooltipWidth / 2));
+          const top = small ? rect.top - 76 : rect.top - 98;
+          emojiTooltip.style.left = `${left}px`;
+          emojiTooltip.style.top = `${top < 12 ? rect.bottom + 12 : top}px`;
+        });
+        element.addEventListener("mouseleave", () => {
+          emojiTooltip.classList.add("hidden");
+          emojiTooltip.classList.remove("small");
+        });
+      };
+
+      emojiPicker.querySelectorAll(".emoji-btn").forEach(btn => {
+        const name = btn.dataset.name || "";
+        btn.addEventListener("click", () => {
+          const textarea = document.getElementById("replyInput");
+          if (!textarea) return;
+          const placeholder = `:${name}:`;
+          const start = textarea.selectionStart;
+          const end = textarea.selectionEnd;
+          const value = textarea.value;
+          textarea.value = value.slice(0, start) + placeholder + value.slice(end);
+          textarea.focus();
+          textarea.selectionStart = textarea.selectionEnd = start + placeholder.length;
+        });
+
+        attachEmoticonTooltip(btn, name);
+      });
+
+      document.querySelectorAll('.reply-emoticon').forEach(img => {
+        const name = img.alt || img.src.split('/').pop().replace('.png', '');
+        attachEmoticonTooltip(img, name);
+      });
+    }
 
     const replyForm = document.getElementById("replyForm");
     if (replyForm) {
-      replyForm.addEventListener("submit", (event) => {
+      replyForm.addEventListener("submit", async (event) => {
         event.preventDefault();
         const body = document.getElementById("replyInput").value.trim();
-        if (!body) {
-          showToast("Write a reply before posting.");
+        if (!body && !replyImageData) {
+          showToast("Write a reply or attach an image before posting.");
           return;
         }
-        const comment = Progress.createComment(post.id, body);
+        const comment = await Progress.createComment(post.id, body, replyImageData);
         if (!comment) {
           showToast("Log in to reply.");
           return;
         }
         document.getElementById("replyInput").value = "";
+        replyImageData = null;
+        if (imageInput) imageInput.value = "";
+        if (imagePreview) imagePreview.innerHTML = "";
         showToast("Reply posted.");
         setTimeout(() => location.reload(), 300);
       });
@@ -132,6 +297,8 @@
       document.getElementById("progressFill").style.width = Math.min(100, scrolled) + "%";
     });
   }
+
+  renderPost();
 
   initShell("post");
 </script>

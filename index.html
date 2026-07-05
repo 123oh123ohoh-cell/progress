@@ -15,7 +15,7 @@
 
 <main class="container">
   <header class="feed-header">
-    <h1>Progress</h1>
+    <h1><img class="header-icon" src="images/etc1.png" alt="Progress icon"> Progress</h1>
     <p>A running record of things made, fixed, rebuilt, and understood a little better than yesterday.</p>
   </header>
 
@@ -43,20 +43,28 @@
     timeline.innerHTML = posts.map(p => {
       const author = Progress.getUser(p.author);
       return `
-      <a class="entry" href="post.html?id=${p.id}">
+      <div class="entry" data-post-href="post.html?id=${p.id}">
         <div class="entry-body">
           <span class="entry-date">${Progress.formatDateShort(p.date)}</span>
-          <h2 class="entry-title"><span class="underline">${escapeHTML(p.title)}</span></h2>
+          <h2 class="entry-title"><a class="entry-link" href="post.html?id=${p.id}"><span class="underline">${escapeHTML(p.title)}</span></a></h2>
           <p class="entry-excerpt">${escapeHTML(p.excerpt)}</p>
           <div class="entry-meta">
             <span>${ICONS.heart.replace('viewBox="0 0 24 24"','viewBox="0 0 24 24" width="13" height="13"')} ${p.likes}</span>
-            <span class="entry-author">${avatarHTML(author, 22)}<span>@${p.author}</span></span>
+            <span class="entry-author">${avatarHTML(author, 22)}<a class="username-link" href="user.html?id=${author ? author.id : ""}" onclick="event.stopPropagation()">@${p.author}</a></span>
           </div>
         </div>
         ${p.cover ? `<div class="entry-thumb"><img src="${p.cover}" alt="" loading="lazy"></div>` : ""}
-      </a>
+      </div>
     `;
     }).join("");
+
+    timeline.querySelectorAll('.entry').forEach(entry => {
+      entry.addEventListener('click', event => {
+        if (event.target.closest('a.username-link')) return;
+        const href = entry.dataset.postHref;
+        if (href) location.href = href;
+      });
+    });
   }
 
   function escapeHTML(str) {
@@ -65,8 +73,13 @@
     return div.innerHTML;
   }
 
-  initShell("feed");
-  renderFeed();
+  async function start() {
+    await Progress.loadFromApi().catch(() => {});
+    initShell("feed");
+    renderFeed();
+  }
+
+  start();
 </script>
 
 </body>

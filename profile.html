@@ -25,12 +25,7 @@
   const wrap = document.getElementById("settingsWrap");
   const params = new URLSearchParams(location.search);
   let activeTab = params.get("tab") === "settings" ? "settings" : "profile";
-
-  function escapeHTML(str) {
-    const div = document.createElement("div");
-    div.textContent = str || "";
-    return div.innerHTML;
-  }
+  let user;
   const timezoneOptions = [
     { value: "America/Los_Angeles", label: "Pacific Time - US & Canada" },
     { value: "America/Denver", label: "Mountain Time - US & Canada" },
@@ -64,16 +59,36 @@
     }
   }
 
-  const user = Progress.getCurrentUser();
-  if (!user) {
-    wrap.innerHTML = `
-      <div class="feed-empty" style="padding-top:60px;">
-        <h3>Log in to view your profile</h3>
-        <p>Use the account menu in the top right to log in or create an account.</p>
-      </div>`;
-  } else {
+  function escapeHTML(str) {
+    const div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function renderBio(text) {
+    const emoticonNames = ["computer", "dead", "two"];
+    const escaped = escapeHTML(text || "");
+    return escaped.replace(/:([a-z0-9_]+):/g, (match, name) => {
+      if (!emoticonNames.includes(name)) return match;
+      return `<img class="bio-emoticon" src="images/emoticons/${name}.png" alt="${name}">`;
+    });
+  }
+
+  async function start() {
+    await Progress.loadFromApi().catch(() => {});
+    user = Progress.getCurrentUser();
+    if (!user) {
+      wrap.innerHTML = `
+        <div class="feed-empty" style="padding-top:60px;">
+          <h3>Log in to view your profile</h3>
+          <p>Use the account menu in the top right to log in or create an account.</p>
+        </div>`;
+      return;
+    }
     render();
   }
+
+  start();
 
   function render() {
     const myPosts = Progress.getPosts().filter(p => p.author === user.username);
@@ -86,14 +101,13 @@
         <div>
           <div style="font-family:var(--font-display); font-size:19px; margin-bottom:4px;">${user.name}</div>
           <div style="color:var(--muted); font-size:13.5px; margin-bottom:8px;">@${user.username}</div>
-          <div style="color:var(--muted); font-size:12px; margin-bottom:10px;">User ID: ${user.id}</div>
-          <div style="display:flex; flex-wrap:wrap; gap:16px; font-size:13px; color:var(--muted); margin-bottom:10px;">
+          <div style="display:flex; gap:16px; font-size:13px; color:var(--muted); margin-bottom:10px;">
             <span>${user.followers?.length || 0} followers</span>
             <span>${user.following?.length || 0} following</span>
           </div>
-          <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
-            <a href="user.html?u=${user.username}" class="btn secondary" style="padding:8px 14px; font-size:13px;">View public profile</a>
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
             <button class="upload-btn" id="changeAvatarBtn">Change photo</button>
+            <a class="upload-btn" href="user.html?id=${user.id}" style="text-decoration:none;">View profile</a>
           </div>
         </div>
       </div>
@@ -121,27 +135,15 @@
       content.innerHTML = `
         <div class="settings-section">
           <h3>Joined</h3>
-          <p style="margin:0;">${Progress.formatDate(user.joined)}</p>
+          <p style="margin:0;">${Progress.formatDate(user.joined || "Unknown")}</p>
+        </div>
+        <div class="settings-section">
+          <h3>Bio</h3>
+          <div class="bio-text">${user.bio ? renderBio(user.bio) : `<span style="color:var(--muted);">No bio yet.</span>`}</div>
         </div>
         <div class="settings-section">
           <h3>Timezone</h3>
           <p style="margin:0;">${user.timezone || Progress.getTimeZone()}</p>
-        </div>
-        <div class="settings-section">
-          <h3>Bio</h3>
-          <p style="margin:0; color: var(--mocha-dark);">${user.bio ? escapeHTML(user.bio) : "No bio yet. Add one in Settings."}</p>
-        </div>
-        <div class="settings-section">
-          <h3>Followers</h3>
-          ${user.followers && user.followers.length ? user.followers.map(f => `
-            <a href="user.html?u=${f}" style="display:inline-block; margin-right:10px; margin-bottom:8px; padding:8px 10px; border:1px solid var(--mocha-light); border-radius:999px; color:var(--ink); text-decoration:none; font-size:13px;">@${f}</a>
-          `).join("") : `<p style="color:var(--muted); font-size:14px; margin:0;">You have no followers yet.</p>`}
-        </div>
-        <div class="settings-section">
-          <h3>Following</h3>
-          ${user.following && user.following.length ? user.following.map(f => `
-            <a href="user.html?u=${f}" style="display:inline-block; margin-right:10px; margin-bottom:8px; padding:8px 10px; border:1px solid var(--mocha-light); border-radius:999px; color:var(--ink); text-decoration:none; font-size:13px;">@${f}</a>
-          `).join("") : `<p style="color:var(--muted); font-size:14px; margin:0;">You are not following anyone yet.</p>`}
         </div>
         <div class="settings-section">
           <h3>Entries (${myPosts.length})</h3>
@@ -164,7 +166,11 @@
         </div>
         <div class="settings-section">
           <h3>Bio</h3>
-          <div class="field"><textarea id="bioField" rows="4" placeholder="Write a short bio...">${escapeHTML(user.bio || "")}</textarea></div>
+          <div class="field bio-field">
+            <textarea id="bioField" rows="5" placeholder="Tell people about yourself... (bios are work in progress!! they might not work.)">${escapeHTML(user.bio || "")}</textarea>
+          </div>
+          <div class="emoji-picker" id="profileEmojiPicker"></div>
+          <div class="field-note">Use <code>:computer:</code>, <code>:dead:</code>, <code>:two:</code> for custom emoticons.</div>
         </div>
         <div class="settings-section">
           <h3>Timezone</h3>
@@ -180,15 +186,46 @@
         </div>
         <button class="btn primary" id="saveSettingsBtn">Save changes</button>
       `;
-      document.getElementById("saveSettingsBtn").addEventListener("click", () => {
+      document.getElementById("saveSettingsBtn").addEventListener("click", async () => {
         const name = document.getElementById("nameField").value.trim();
         const bio = document.getElementById("bioField").value.trim();
         const timezone = document.getElementById("timezoneField").value;
         if (!name) { showToast("Display name can't be empty."); return; }
-        Progress.updateProfile({ name, bio, timezone });
+        const updated = await Progress.updateProfile({ name, bio, timezone });
+        if (!updated) {
+          showToast("Could not save settings.");
+          return;
+        }
+        user = updated || Progress.getCurrentUser() || user;
+        user.name = name;
+        user.bio = bio;
+        user.timezone = timezone;
+        render();
         showToast("Settings saved.");
-        setTimeout(() => location.reload(), 500);
       });
+
+      const profileEmojiPicker = document.getElementById("profileEmojiPicker");
+      if (profileEmojiPicker) {
+        profileEmojiPicker.innerHTML = ["computer", "dead", "two"].map(name => `
+          <button type="button" class="emoji-btn" data-name="${name}">
+            <img src="images/emoticons/${name}.png" alt="${name}">
+          </button>
+        `).join("");
+        profileEmojiPicker.querySelectorAll(".emoji-btn").forEach(btn => {
+          btn.addEventListener("click", () => {
+            const textarea = document.getElementById("bioField");
+            if (!textarea) return;
+            const name = btn.dataset.name || "";
+            const placeholder = `:${name}:`;
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const value = textarea.value;
+            textarea.value = value.slice(0, start) + placeholder + value.slice(end);
+            textarea.focus();
+            textarea.selectionStart = textarea.selectionEnd = start + placeholder.length;
+          });
+        });
+      }
 
       const timezoneField = document.getElementById("timezoneField");
       const timezonePreview = document.getElementById("timezonePreview");
@@ -202,8 +239,8 @@
     const file = document.getElementById("avatarInput").files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => {
-      Progress.updateProfile({ avatar: reader.result });
+    reader.onload = async () => {
+      await Progress.updateProfile({ avatar: reader.result });
       showToast("Photo updated.");
       setTimeout(() => location.reload(), 400);
     };

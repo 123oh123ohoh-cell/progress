@@ -18,8 +18,15 @@ function initials(name) {
 
 function avatarHTML(user, size) {
   if (user && user.avatar) return `<img src="${user.avatar}" alt="Avatar">`;
-  const label = user ? initials(user.name) : "";
+  if (!user) return `<img src="images/default.jpg" alt="Avatar">`;
+  const label = initials(user.name);
   return `<span class="initials" style="font-size:${size ? size * 0.4 + 'px' : ''}">${label}</span>`;
+}
+
+function escapeHTML(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
 }
 
 function renderNav(activePage) {
@@ -65,13 +72,24 @@ function renderNotifDropdown() {
 
   const rows = notifs.length
     ? notifs.map(n => {
+        const actorUser = Progress.getUser(n.actor);
+        const actorHref = actorUser ? `user.html?id=${actorUser.id}` : `user.html?username=${encodeURIComponent(n.actor)}`;
+        const actorText = `<strong><span class="username-link" data-href="${actorHref}">@${escapeHTML(n.actor)}</span></strong>`;
+        const postHref = n.postId ? `post.html?id=${n.postId}` : "";
         let text;
-        if (n.type === "like") text = `<strong>@${n.actor}</strong> liked your post "${n.postTitle}"`;
-        else if (n.type === "reply") text = `<strong>@${n.actor}</strong> replied: "${n.body}"`;
-        else if (n.type === "follow") text = `<strong>@${n.actor}</strong> started following you`;
-        else text = `<strong>@${n.actor}</strong> did something`;
+
+        if (n.type === "like") {
+          text = `${actorText} liked your post "${escapeHTML(n.postTitle)}"`;
+        } else if (n.type === "reply") {
+          text = `${actorText} replied: "${escapeHTML(n.body)}"`;
+        } else if (n.type === "follow") {
+          text = `${actorText} started following you`;
+        } else {
+          text = `${actorText} did something`;
+        }
+
         return `
-          <div class="notif-item">
+          <div class="notif-item" data-post-href="${postHref}">
             <span class="dot-unread ${n.seen ? "seen" : ""}"></span>
             <div>
               <p>${text}</p>
@@ -82,6 +100,22 @@ function renderNotifDropdown() {
     : `<div class="notif-empty">Nothing yet. Publish something and come back.</div>`;
 
   el.innerHTML = `<div class="dropdown-header">Notifications</div>${rows}`;
+
+  el.querySelectorAll('.username-link').forEach(link => {
+    link.addEventListener('click', event => {
+      event.preventDefault();
+      event.stopPropagation();
+      const href = link.dataset.href;
+      if (href) location.href = href;
+    });
+  });
+
+  el.querySelectorAll('.notif-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const href = item.dataset.postHref;
+      if (href) location.href = href;
+    });
+  });
 }
 
 function renderAccountDropdown(user, activePage) {
@@ -218,10 +252,10 @@ function mountModals() {
   document.getElementById("toSignup").addEventListener("click", () => showModal("signup"));
   document.getElementById("toLogin").addEventListener("click", () => showModal("login"));
 
-  document.getElementById("loginSubmit").addEventListener("click", () => {
+  document.getElementById("loginSubmit").addEventListener("click", async () => {
     const username = document.getElementById("loginUsername").value;
     const password = document.getElementById("loginPassword").value;
-    const res = Progress.login(username, password);
+    const res = await Progress.login(username, password);
     const errEl = document.getElementById("loginError");
     if (!res.ok) {
       errEl.textContent = res.error;
@@ -233,11 +267,11 @@ function mountModals() {
     setTimeout(() => location.reload(), 500);
   });
 
-  document.getElementById("signupSubmit").addEventListener("click", () => {
+  document.getElementById("signupSubmit").addEventListener("click", async () => {
     const name = document.getElementById("signupName").value;
     const username = document.getElementById("signupUsername").value;
     const password = document.getElementById("signupPassword").value;
-    const res = Progress.signup(username, name, password);
+    const res = await Progress.signup(username, name, password);
     const errEl = document.getElementById("signupError");
     if (!res.ok) {
       errEl.textContent = res.error;
@@ -311,7 +345,11 @@ function attachNavScrollWatcher() {
 
 /* Call this once per page after DOM is ready */
 function initShell(activePage) {
-  renderNav(activePage);
-  mountModals();
-  attachNavScrollWatcher();
+  Progress.loadFromApi()
+    .catch(() => {})
+    .finally(() => {
+      renderNav(activePage);
+      mountModals();
+      attachNavScrollWatcher();
+    });
 }
