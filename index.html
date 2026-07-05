@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Progress — a journal for what you're building</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;1,500;1,600&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="nav-root"></div>
+<div id="modal-root"></div>
+
+<main class="container">
+  <header class="feed-header">
+    <h1>Progress</h1>
+    <p>A running record of things made, fixed, rebuilt, and understood a little better than yesterday.</p>
+  </header>
+
+  <div class="timeline" id="timeline">
+    <!-- entries injected by JS -->
+  </div>
+</main>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+<script>
+  function renderFeed() {
+    const posts = Progress.getPosts();
+    const timeline = document.getElementById("timeline");
+
+    if (!posts.length) {
+      timeline.innerHTML = `
+        <div class="feed-empty">
+          <h3>Nothing here yet</h3>
+          <p>The first entry is always the hardest one to publish.</p>
+        </div>`;
+      return;
+    }
+
+    timeline.innerHTML = posts.map(p => {
+      const author = Progress.getUser(p.author);
+      return `
+      <a class="entry" href="post.html?id=${p.id}">
+        <div class="entry-body">
+          <span class="entry-date">${Progress.formatDateShort(p.date)}</span>
+          <h2 class="entry-title"><span class="underline">${escapeHTML(p.title)}</span></h2>
+          <p class="entry-excerpt">${escapeHTML(p.excerpt)}</p>
+          <div class="entry-meta">
+            <span>${ICONS.heart.replace('viewBox="0 0 24 24"','viewBox="0 0 24 24" width="13" height="13"')} ${p.likes}</span>
+            <span class="entry-author">${avatarHTML(author, 22)}<span>@${p.author}</span></span>
+          </div>
+        </div>
+        ${p.cover ? `<div class="entry-thumb"><img src="${p.cover}" alt="" loading="lazy"></div>` : ""}
+      </a>
+    `;
+    }).join("");
+  }
+
+  function escapeHTML(str) {
+    const div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  initShell("feed");
+  renderFeed();
+</script>
+
+</body>
+</html>

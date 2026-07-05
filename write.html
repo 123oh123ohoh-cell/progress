@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Write — Progress</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;1,500;1,600&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="nav-root"></div>
+<div id="modal-root"></div>
+
+<main class="container">
+  <div class="editor-wrap" id="editorWrap">
+    <!-- filled by JS: either the editor, or a "please log in" state -->
+  </div>
+</main>
+
+<input type="file" id="coverInput" accept="image/*" style="display:none;">
+<input type="file" id="imageInput" accept="image/*" style="display:none;">
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+<script>
+  const wrap = document.getElementById("editorWrap");
+  const user = Progress.getCurrentUser();
+  let coverData = null;
+
+  if (!user) {
+    wrap.innerHTML = `
+      <div class="feed-empty" style="padding-top:80px;">
+        <h3>Log in to write an entry</h3>
+        <p>Use the account menu in the top right to log in or create an account.</p>
+      </div>`;
+  } else {
+    wrap.innerHTML = `
+      <div class="editor-cover-drop" id="coverDrop">
+        <div class="cover-hint">Click to add a cover image (optional)</div>
+      </div>
+      <input class="editor-title-input" id="titleInput" placeholder="Give this entry a title">
+
+      <div class="toolbar" id="toolbar">
+        <button class="tb-btn" data-cmd="bold" title="Bold"><strong>B</strong></button>
+        <button class="tb-btn" data-cmd="italic" title="Italic"><em>I</em></button>
+        <button class="tb-btn" data-cmd="underline" title="Underline"><u>U</u></button>
+        <div class="tb-sep"></div>
+        <button class="tb-btn" data-cmd="formatBlock" data-value="H2" title="Heading">H2</button>
+        <button class="tb-btn" data-cmd="formatBlock" data-value="BLOCKQUOTE" title="Quote">&ldquo;</button>
+        <button class="tb-btn" data-cmd="formatBlock" data-value="P" title="Paragraph">&para;</button>
+        <div class="tb-sep"></div>
+        <button class="tb-btn" data-cmd="insertUnorderedList" title="Bulleted list">&bull;&equiv;</button>
+        <button class="tb-btn" data-cmd="createLink" title="Link">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1.5 1.5"/><path d="M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1.5-1.5"/></svg>
+        </button>
+        <button class="tb-btn" id="insertImageBtn" title="Insert image">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5-9 9"/></svg>
+        </button>
+      </div>
+
+      <div class="editor-canvas" id="canvas" contenteditable="true" data-placeholder="Start writing..."></div>
+
+      <div class="editor-actions">
+        <button class="btn" id="cancelBtn">Cancel</button>
+        <button class="btn primary" id="publishBtn">Publish</button>
+      </div>
+    `;
+
+    const coverDrop = document.getElementById("coverDrop");
+    const coverInput = document.getElementById("coverInput");
+    coverDrop.addEventListener("click", () => coverInput.click());
+    coverInput.addEventListener("change", () => {
+      const file = coverInput.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        coverData = reader.result;
+        coverDrop.innerHTML = `<img src="${coverData}" alt="">`;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    document.getElementById("toolbar").addEventListener("click", (e) => {
+      const btn = e.target.closest(".tb-btn");
+      if (!btn) return;
+      document.getElementById("canvas").focus();
+      const cmd = btn.dataset.cmd;
+      if (cmd === "createLink") {
+        const url = prompt("Link URL:");
+        if (url) document.execCommand(cmd, false, url);
+      } else if (cmd === "formatBlock") {
+        document.execCommand(cmd, false, btn.dataset.value);
+      } else {
+        document.execCommand(cmd, false, null);
+      }
+      updateToolbarState();
+    });
+
+    const imageInput = document.getElementById("imageInput");
+    document.getElementById("insertImageBtn").addEventListener("click", () => imageInput.click());
+    imageInput.addEventListener("change", () => {
+      const file = imageInput.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        document.getElementById("canvas").focus();
+        document.execCommand("insertImage", false, reader.result);
+      };
+      reader.readAsDataURL(file);
+      imageInput.value = "";
+    });
+
+    function updateToolbarState() {
+      ["bold", "italic", "underline"].forEach(cmd => {
+        const btn = document.querySelector(`.tb-btn[data-cmd="${cmd}"]`);
+        if (!btn) return;
+        btn.classList.toggle("active", document.queryCommandState(cmd));
+      });
+    }
+    document.getElementById("canvas").addEventListener("keyup", updateToolbarState);
+    document.getElementById("canvas").addEventListener("mouseup", updateToolbarState);
+
+    document.getElementById("cancelBtn").addEventListener("click", () => {
+      if (confirm("Discard this entry?")) location.href = "index.html";
+    });
+
+    document.getElementById("publishBtn").addEventListener("click", () => {
+      const title = document.getElementById("titleInput").value.trim();
+      const content = document.getElementById("canvas").innerHTML.trim();
+      if (!title) { showToast("Give your entry a title first."); return; }
+      if (!content) { showToast("Write something before publishing."); return; }
+      const plain = document.getElementById("canvas").innerText.trim();
+      const excerpt = plain.slice(0, 140) + (plain.length > 140 ? "…" : "");
+      const post = Progress.createPost({ title, content, cover: coverData, excerpt });
+      showToast("Published.");
+      setTimeout(() => location.href = "post.html?id=" + post.id, 500);
+    });
+  }
+
+  initShell("write");
+</script>
+
+</body>
+</html>

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Progress</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;1,500;1,600&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="nav-root"></div>
+<div id="modal-root"></div>
+<div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+
+<main class="container" id="postRoot">
+  <!-- post injected by JS -->
+</main>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+<script>
+  const params = new URLSearchParams(location.search);
+  const postId = params.get("id");
+  const post = Progress.getPost(postId);
+  const comments = Progress.getComments(postId);
+  const root = document.getElementById("postRoot");
+
+  function escapeHTML(str) {
+    const div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  if (!post) {
+    root.innerHTML = `
+      <div class="feed-empty" style="padding-top:100px;">
+        <h3>This entry doesn't exist</h3>
+        <p><a href="index.html" style="text-decoration:underline;">Back to the journal</a></p>
+      </div>`;
+  } else {
+    const user = Progress.getCurrentUser();
+    const likedByMe = post.likedBy.includes(user ? user.username : "guest");
+    const author = Progress.getUser(post.author);
+
+    root.innerHTML = `
+      <div class="post-head">
+        <a class="post-back" href="index.html">&larr; all entries</a>
+        <span class="post-date">${Progress.formatDateTime(post.createdAt || post.date + "T00:00:00")}</span>
+        <h1 class="post-title">${post.title}</h1>
+        <div class="post-byline">
+          ${avatarHTML(author, 30)}
+          <span>Written by @${post.author}</span>
+        </div>
+      </div>
+      ${post.cover ? `<img class="post-cover" src="${post.cover}" alt="">` : ""}
+      <article class="post-content">${post.content}</article>
+      <div class="post-footer">
+        <button class="react-btn ${likedByMe ? "liked" : ""}" id="likeBtn">
+          ${ICONS.heart} <span id="likeCount">${post.likes}</span>
+        </button>
+        <button class="react-btn" id="replyBtn">${ICONS.reply} Reply</button>
+      </div>
+      <section class="replies-section">
+        <div class="replies-header">
+          <h2>Replies</h2>
+          <span class="replies-count">${comments.length} ${comments.length === 1 ? "reply" : "replies"}</span>
+        </div>
+        <div id="repliesRoot">
+          ${comments.length ? comments.map(comment => {
+            const author = Progress.getUser(comment.author);
+            return `
+              <div class="reply-item">
+                <div class="reply-avatar">${avatarHTML(author, 32)}</div>
+                <div class="reply-content">
+                  <div class="reply-meta"><strong>@${comment.author}</strong><span>${Progress.formatDateTime(comment.time)}</span></div>
+                  <p class="reply-body">${escapeHTML(comment.body)}</p>
+                </div>
+              </div>
+            `;
+          }).join("") : `<div class="reply-empty">No replies yet. Be the first to reply.</div>`}
+        </div>
+        ${user ? `
+          <form id="replyForm" class="reply-form">
+            <textarea id="replyInput" placeholder="Leave a reply..."></textarea>
+            <button type="submit" class="btn primary">Post reply</button>
+          </form>
+        ` : `
+          <div class="reply-empty">Log in to leave a reply.</div>
+        `}
+      </section>
+    `;
+
+    document.getElementById("likeBtn").addEventListener("click", () => {
+      const updated = Progress.toggleLike(post.id);
+      document.getElementById("likeCount").textContent = updated.likes;
+      document.getElementById("likeBtn").classList.toggle("liked");
+    });
+
+    document.getElementById("replyBtn").addEventListener("click", () => {
+      if (!Progress.getCurrentUser()) { showModal("login"); return; }
+      const form = document.getElementById("replyForm");
+      if (form) {
+        document.getElementById("replyInput").focus();
+      }
+    });
+
+    const replyForm = document.getElementById("replyForm");
+    if (replyForm) {
+      replyForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const body = document.getElementById("replyInput").value.trim();
+        if (!body) {
+          showToast("Write a reply before posting.");
+          return;
+        }
+        const comment = Progress.createComment(post.id, body);
+        if (!comment) {
+          showToast("Log in to reply.");
+          return;
+        }
+        document.getElementById("replyInput").value = "";
+        showToast("Reply posted.");
+        setTimeout(() => location.reload(), 300);
+      });
+    }
+
+    window.addEventListener("scroll", () => {
+      const h = document.documentElement;
+      const scrolled = (h.scrollTop) / (h.scrollHeight - h.clientHeight) * 100;
+      document.getElementById("progressFill").style.width = Math.min(100, scrolled) + "%";
+    });
+  }
+
+  initShell("post");
+</script>
+
+</body>
+</html>

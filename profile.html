@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Profile — Progress</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;1,500;1,600&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="nav-root"></div>
+<div id="modal-root"></div>
+
+<main class="container">
+  <div class="settings-wrap" id="settingsWrap"></div>
+</main>
+
+<input type="file" id="avatarInput" accept="image/*" style="display:none;">
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+<script>
+  const wrap = document.getElementById("settingsWrap");
+  const params = new URLSearchParams(location.search);
+  let activeTab = params.get("tab") === "settings" ? "settings" : "profile";
+  const timezoneOptions = [
+    { value: "America/Los_Angeles", label: "Pacific Time - US & Canada" },
+    { value: "America/Denver", label: "Mountain Time - US & Canada" },
+    { value: "America/Chicago", label: "Central Time - US & Canada" },
+    { value: "America/New_York", label: "Eastern Time - US & Canada" },
+    { value: "America/Anchorage", label: "Alaska Time - US & Canada" },
+    { value: "Pacific/Honolulu", label: "Hawaii Time - US & Canada" },
+    { value: "Europe/London", label: "London" },
+    { value: "Europe/Berlin", label: "Central Europe" },
+    { value: "Asia/Tokyo", label: "Tokyo" },
+    { value: "Asia/Seoul", label: "Seoul" },
+    { value: "Asia/Kolkata", label: "India" },
+    { value: "Australia/Sydney", label: "Sydney" },
+    { value: "UTC", label: "UTC" }
+  ];
+
+  function formatZonePreview(zone) {
+    if (!zone) return "";
+    try {
+      return new Intl.DateTimeFormat(undefined, {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        timeZone: zone,
+        timeZoneName: "short"
+      }).format(new Date());
+    } catch (e) {
+      return zone;
+    }
+  }
+
+  const user = Progress.getCurrentUser();
+  if (!user) {
+    wrap.innerHTML = `
+      <div class="feed-empty" style="padding-top:60px;">
+        <h3>Log in to view your profile</h3>
+        <p>Use the account menu in the top right to log in or create an account.</p>
+      </div>`;
+  } else {
+    render();
+  }
+
+  function render() {
+    const myPosts = Progress.getPosts().filter(p => p.author === user.username);
+
+    wrap.innerHTML = `
+      <h1>Your account</h1>
+
+      <div class="settings-avatar-row">
+        ${user.avatar ? `<img src="${user.avatar}" alt="">` : `<div class="initials-lg">${initials(user.name)}</div>`}
+        <div>
+          <div style="font-family:var(--font-display); font-size:19px; margin-bottom:4px;">${user.name}</div>
+          <div style="color:var(--muted); font-size:13.5px; margin-bottom:10px;">@${user.username}</div>
+          <button class="upload-btn" id="changeAvatarBtn">Change photo</button>
+        </div>
+      </div>
+
+      <div class="tab-row">
+        <button class="tab-btn ${activeTab === "profile" ? "active" : ""}" data-tab="profile">Profile</button>
+        <button class="tab-btn ${activeTab === "settings" ? "active" : ""}" data-tab="settings">Settings</button>
+      </div>
+
+      <div id="tabContent"></div>
+    `;
+
+    document.getElementById("changeAvatarBtn").addEventListener("click", () => document.getElementById("avatarInput").click());
+
+    document.querySelectorAll(".tab-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        activeTab = btn.dataset.tab;
+        history.replaceState(null, "", "profile.html?tab=" + activeTab);
+        render();
+      });
+    });
+
+    const content = document.getElementById("tabContent");
+    if (activeTab === "profile") {
+      content.innerHTML = `
+        <div class="settings-section">
+          <h3>Joined</h3>
+          <p style="margin:0;">${Progress.formatDate(user.joined)}</p>
+        </div>
+        <div class="settings-section">
+          <h3>Timezone</h3>
+          <p style="margin:0;">${user.timezone || Progress.getTimeZone()}</p>
+        </div>
+        <div class="settings-section">
+          <h3>Entries (${myPosts.length})</h3>
+          ${myPosts.length ? myPosts.map(p => `
+            <a href="post.html?id=${p.id}" style="display:block; padding:12px 0; border-bottom:1px solid var(--mocha-wash); font-size:14.5px;">
+              <span style="font-family:var(--font-mono); font-size:11px; color:var(--muted); text-transform:uppercase; margin-right:10px;">${Progress.formatDateShort(p.date)}</span>
+              ${p.title}
+            </a>`).join("") : `<p style="color:var(--muted); font-size:14px;">No entries published yet.</p>`}
+        </div>
+      `;
+    } else {
+      content.innerHTML = `
+        <div class="settings-section">
+          <h3>Display name</h3>
+          <div class="field"><input id="nameField" value="${user.name}"></div>
+        </div>
+        <div class="settings-section">
+          <h3>Username</h3>
+          <div class="field"><input id="usernameField" value="${user.username}" disabled style="opacity:.6;"></div>
+        </div>
+        <div class="settings-section">
+          <h3>Timezone</h3>
+          <div class="field">
+            <select id="timezoneField">
+              ${timezoneOptions.map(option => `
+                <option value="${option.value}" ${user.timezone === option.value ? "selected" : ""}>${option.label}</option>
+              `).join("")}
+            </select>
+          </div>
+          <p class="field-note">Sample time in this zone: <span id="timezonePreview">${formatZonePreview(user.timezone)}</span></p>
+          <p class="field-note">Your timestamps will now display in the selected timezone.</p>
+        </div>
+        <button class="btn primary" id="saveSettingsBtn">Save changes</button>
+      `;
+      document.getElementById("saveSettingsBtn").addEventListener("click", () => {
+        const name = document.getElementById("nameField").value.trim();
+        const timezone = document.getElementById("timezoneField").value;
+        if (!name) { showToast("Display name can't be empty."); return; }
+        Progress.updateProfile({ name, timezone });
+        showToast("Settings saved.");
+        setTimeout(() => location.reload(), 500);
+      });
+
+      const timezoneField = document.getElementById("timezoneField");
+      const timezonePreview = document.getElementById("timezonePreview");
+      timezoneField.addEventListener("change", () => {
+        timezonePreview.textContent = formatZonePreview(timezoneField.value);
+      });
+    }
+  }
+
+  document.getElementById("avatarInput").addEventListener("change", () => {
+    const file = document.getElementById("avatarInput").files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      Progress.updateProfile({ avatar: reader.result });
+      showToast("Photo updated.");
+      setTimeout(() => location.reload(), 400);
+    };
+    reader.readAsDataURL(file);
+  });
+
+  initShell("profile");
+</script>
+
+</body>
+</html>
