@@ -1,0 +1,8 @@
+services:
+  - type: web
+    name: progress
+    env: node
+    branch: main
+    root: .
+    buildCommand: yarn install
+    startCommand: yarn start
