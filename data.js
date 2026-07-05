@@ -10,7 +10,7 @@ const DEFAULT_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || "UT
 const SEED = {
   currentUser: null, // null = logged out
   users: [
-    { username: "mara", name: "Mara Studios", password: "demo1234", avatar: "https://images.unsplash.com/photo-1502685104226-ee32379fefbe?q=80&w=200&auto=format&fit=crop", joined: "2026-02-01", timezone: DEFAULT_TIMEZONE }
+    { username: "mara", name: "Mara Studios", password: "demo1234", avatar: "https://images.unsplash.com/photo-1502685104226-ee32379fefbe?q=80&w=200&auto=format&fit=crop", joined: "2026-02-01", timezone: DEFAULT_TIMEZONE, following: [], followers: [], bio: "Building progress one note at a time." }
   ],
   posts: [
     {
@@ -67,7 +67,10 @@ function loadDB() {
     // Normalize old saved DB shapes so missing arrays don't break the app.
     parsed.users = (parsed.users || []).map(u => ({
       ...u,
-      timezone: u.timezone || DEFAULT_TIMEZONE
+      timezone: u.timezone || DEFAULT_TIMEZONE,
+      following: u.following || [],
+      followers: u.followers || [],
+      bio: u.bio || ""
     }));
     parsed.posts = parsed.posts || [];
     parsed.notifications = parsed.notifications || [];
@@ -104,6 +107,22 @@ const Progress = {
     return user && user.timezone ? user.timezone : DEFAULT_TIMEZONE;
   },
 
+  isFollowing(username) {
+    const user = this.getCurrentUser();
+    if (!user) return false;
+    return user.following.includes(username);
+  },
+
+  createNotification(payload) {
+    this.db.notifications.unshift({
+      id: "n" + Date.now(),
+      seen: false,
+      time: new Date().toISOString(),
+      ...payload
+    });
+    this.persist();
+  },
+
   getComments(postId) {
     return this.db.comments
       .filter(c => c.postId === postId)
@@ -124,19 +143,44 @@ const Progress = {
     };
     this.db.comments.push(comment);
     if (post.author !== user.username) {
-      this.db.notifications.unshift({
-        id: "n" + Date.now(),
+      this.createNotification({
         type: "reply",
         actor: user.username,
         postId,
         postTitle: post.title,
         body,
-        time: new Date().toISOString(),
-        seen: false
+        recipient: post.author
       });
     }
     this.persist();
     return comment;
+  },
+
+  toggleFollow(targetUsername) {
+    const user = this.getCurrentUser();
+    if (!user || user.username === targetUsername) return null;
+    const target = this.getUser(targetUsername);
+    if (!target) return null;
+
+    const followingIndex = user.following.indexOf(targetUsername);
+    if (followingIndex === -1) {
+      user.following.push(targetUsername);
+      target.followers = target.followers || [];
+      if (!target.followers.includes(user.username)) {
+        target.followers.push(user.username);
+      }
+      this.createNotification({
+        type: "follow",
+        actor: user.username,
+        recipient: targetUsername
+      });
+    } else {
+      user.following.splice(followingIndex, 1);
+      const followerIndex = target.followers.indexOf(user.username);
+      if (followerIndex !== -1) target.followers.splice(followerIndex, 1);
+    }
+    this.persist();
+    return { following: user.following, followers: target.followers };
   },
 
   login(username, password) {
@@ -153,7 +197,7 @@ const Progress = {
     if (this.db.users.some(u => u.username.toLowerCase() === username)) {
       return { ok: false, error: "That username is already taken." };
     }
-    const user = { username, name: name.trim(), password, avatar: null, joined: new Date().toISOString().slice(0, 10), timezone: DEFAULT_TIMEZONE };
+    const user = { username, name: name.trim(), password, avatar: null, joined: new Date().toISOString().slice(0, 10), timezone: DEFAULT_TIMEZONE, following: [], followers: [], bio: "" };
     this.db.users.push(user);
     this.db.currentUser = user.username;
     this.persist();
@@ -210,6 +254,15 @@ const Progress = {
     if (idx === -1) {
       post.likedBy.push(who);
       post.likes += 1;
+      if (post.author !== who) {
+        this.createNotification({
+          type: "like",
+          actor: who,
+          postId,
+          postTitle: post.title,
+          recipient: post.author
+        });
+      }
     } else {
       post.likedBy.splice(idx, 1);
       post.likes = Math.max(0, post.likes - 1);
@@ -219,15 +272,25 @@ const Progress = {
   },
 
   getNotifications() {
-    return [...this.db.notifications].sort((a, b) => new Date(b.time) - new Date(a.time));
+    const user = this.getCurrentUser();
+    if (!user) return [];
+    return [...this.db.notifications]
+      .filter(n => !n.recipient || n.recipient === user.username)
+      .sort((a, b) => new Date(b.time) - new Date(a.time));
   },
 
   unseenCount() {
-    return this.db.notifications.filter(n => !n.seen).length;
+    const user = this.getCurrentUser();
+    if (!user) return 0;
+    return this.db.notifications.filter(n => (!n.recipient || n.recipient === user.username) && !n.seen).length;
   },
 
   markAllSeen() {
-    this.db.notifications.forEach(n => n.seen = true);
+    const user = this.getCurrentUser();
+    if (!user) return;
+    this.db.notifications.forEach(n => {
+      if (!n.recipient || n.recipient === user.username) n.seen = true;
+    });
     this.persist();
   },
 

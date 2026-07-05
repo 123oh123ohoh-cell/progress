@@ -79,7 +79,11 @@
         ${user.avatar ? `<img src="${user.avatar}" alt="">` : `<div class="initials-lg">${initials(user.name)}</div>`}
         <div>
           <div style="font-family:var(--font-display); font-size:19px; margin-bottom:4px;">${user.name}</div>
-          <div style="color:var(--muted); font-size:13.5px; margin-bottom:10px;">@${user.username}</div>
+          <div style="color:var(--muted); font-size:13.5px; margin-bottom:8px;">@${user.username}</div>
+          <div style="display:flex; gap:16px; font-size:13px; color:var(--muted); margin-bottom:10px;">
+            <span>${user.followers?.length || 0} followers</span>
+            <span>${user.following?.length || 0} following</span>
+          </div>
           <button class="upload-btn" id="changeAvatarBtn">Change photo</button>
         </div>
       </div>
@@ -114,6 +118,22 @@
           <p style="margin:0;">${user.timezone || Progress.getTimeZone()}</p>
         </div>
         <div class="settings-section">
+          <h3>Bio</h3>
+          <p style="margin:0; color: var(--mocha-dark);">${user.bio ? escapeHTML(user.bio) : "No bio yet. Add one in Settings."}</p>
+        </div>
+        <div class="settings-section">
+          <h3>Followers</h3>
+          ${user.followers && user.followers.length ? user.followers.map(f => `
+            <a href="profile.html?tab=profile" style="display:inline-block; margin-right:10px; margin-bottom:8px; padding:8px 10px; border:1px solid var(--mocha-light); border-radius:999px; color:var(--ink); text-decoration:none; font-size:13px;">@${f}</a>
+          `).join("") : `<p style="color:var(--muted); font-size:14px; margin:0;">You have no followers yet.</p>`}
+        </div>
+        <div class="settings-section">
+          <h3>Following</h3>
+          ${user.following && user.following.length ? user.following.map(f => `
+            <a href="profile.html?tab=profile" style="display:inline-block; margin-right:10px; margin-bottom:8px; padding:8px 10px; border:1px solid var(--mocha-light); border-radius:999px; color:var(--ink); text-decoration:none; font-size:13px;">@${f}</a>
+          `).join("") : `<p style="color:var(--muted); font-size:14px; margin:0;">You are not following anyone yet.</p>`}
+        </div>
+        <div class="settings-section">
           <h3>Entries (${myPosts.length})</h3>
           ${myPosts.length ? myPosts.map(p => `
             <a href="post.html?id=${p.id}" style="display:block; padding:12px 0; border-bottom:1px solid var(--mocha-wash); font-size:14.5px;">
@@ -133,6 +153,10 @@
           <div class="field"><input id="usernameField" value="${user.username}" disabled style="opacity:.6;"></div>
         </div>
         <div class="settings-section">
+          <h3>Bio</h3>
+          <div class="field"><textarea id="bioField" rows="4" placeholder="Write a short bio...">${escapeHTML(user.bio || "")}</textarea></div>
+        </div>
+        <div class="settings-section">
           <h3>Timezone</h3>
           <div class="field">
             <select id="timezoneField">
@@ -148,9 +172,10 @@
       `;
       document.getElementById("saveSettingsBtn").addEventListener("click", () => {
         const name = document.getElementById("nameField").value.trim();
+        const bio = document.getElementById("bioField").value.trim();
         const timezone = document.getElementById("timezoneField").value;
         if (!name) { showToast("Display name can't be empty."); return; }
-        Progress.updateProfile({ name, timezone });
+        Progress.updateProfile({ name, bio, timezone });
         showToast("Settings saved.");
         setTimeout(() => location.reload(), 500);
       });
