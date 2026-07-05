@@ -687,6 +687,8 @@ button { font-family: inherit; cursor: pointer; }
 .btn:hover { background: var(--mocha-wash); }
 .btn.primary { background: var(--ink); color: var(--cream); }
 .btn.primary:hover { background: var(--mocha-dark); }
+.btn.secondary { background: var(--paper); color: var(--ink); border-color: var(--mocha-light); }
+.btn.secondary:hover { background: var(--mocha-wash); }
 
 /* ============================================================
    MODALS (auth)

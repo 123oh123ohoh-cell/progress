@@ -25,6 +25,12 @@
   const wrap = document.getElementById("settingsWrap");
   const params = new URLSearchParams(location.search);
   let activeTab = params.get("tab") === "settings" ? "settings" : "profile";
+
+  function escapeHTML(str) {
+    const div = document.createElement("div");
+    div.textContent = str || "";
+    return div.innerHTML;
+  }
   const timezoneOptions = [
     { value: "America/Los_Angeles", label: "Pacific Time - US & Canada" },
     { value: "America/Denver", label: "Mountain Time - US & Canada" },
@@ -80,11 +86,15 @@
         <div>
           <div style="font-family:var(--font-display); font-size:19px; margin-bottom:4px;">${user.name}</div>
           <div style="color:var(--muted); font-size:13.5px; margin-bottom:8px;">@${user.username}</div>
-          <div style="display:flex; gap:16px; font-size:13px; color:var(--muted); margin-bottom:10px;">
+          <div style="color:var(--muted); font-size:12px; margin-bottom:10px;">User ID: ${user.id}</div>
+          <div style="display:flex; flex-wrap:wrap; gap:16px; font-size:13px; color:var(--muted); margin-bottom:10px;">
             <span>${user.followers?.length || 0} followers</span>
             <span>${user.following?.length || 0} following</span>
           </div>
-          <button class="upload-btn" id="changeAvatarBtn">Change photo</button>
+          <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
+            <a href="user.html?u=${user.username}" class="btn secondary" style="padding:8px 14px; font-size:13px;">View public profile</a>
+            <button class="upload-btn" id="changeAvatarBtn">Change photo</button>
+          </div>
         </div>
       </div>
 
@@ -124,13 +134,13 @@
         <div class="settings-section">
           <h3>Followers</h3>
           ${user.followers && user.followers.length ? user.followers.map(f => `
-            <a href="profile.html?tab=profile" style="display:inline-block; margin-right:10px; margin-bottom:8px; padding:8px 10px; border:1px solid var(--mocha-light); border-radius:999px; color:var(--ink); text-decoration:none; font-size:13px;">@${f}</a>
+            <a href="user.html?u=${f}" style="display:inline-block; margin-right:10px; margin-bottom:8px; padding:8px 10px; border:1px solid var(--mocha-light); border-radius:999px; color:var(--ink); text-decoration:none; font-size:13px;">@${f}</a>
           `).join("") : `<p style="color:var(--muted); font-size:14px; margin:0;">You have no followers yet.</p>`}
         </div>
         <div class="settings-section">
           <h3>Following</h3>
           ${user.following && user.following.length ? user.following.map(f => `
-            <a href="profile.html?tab=profile" style="display:inline-block; margin-right:10px; margin-bottom:8px; padding:8px 10px; border:1px solid var(--mocha-light); border-radius:999px; color:var(--ink); text-decoration:none; font-size:13px;">@${f}</a>
+            <a href="user.html?u=${f}" style="display:inline-block; margin-right:10px; margin-bottom:8px; padding:8px 10px; border:1px solid var(--mocha-light); border-radius:999px; color:var(--ink); text-decoration:none; font-size:13px;">@${f}</a>
           `).join("") : `<p style="color:var(--muted); font-size:14px; margin:0;">You are not following anyone yet.</p>`}
         </div>
         <div class="settings-section">

@@ -197,7 +197,7 @@ const Progress = {
     if (this.db.users.some(u => u.username.toLowerCase() === username)) {
       return { ok: false, error: "That username is already taken." };
     }
-    const user = { username, name: name.trim(), password, avatar: null, joined: new Date().toISOString().slice(0, 10), timezone: DEFAULT_TIMEZONE, following: [], followers: [], bio: "" };
+    const user = { id: `u${Date.now()}`, username, name: name.trim(), password, avatar: null, joined: new Date().toISOString().slice(0, 10), timezone: DEFAULT_TIMEZONE, following: [], followers: [], bio: "" };
     this.db.users.push(user);
     this.db.currentUser = user.username;
     this.persist();

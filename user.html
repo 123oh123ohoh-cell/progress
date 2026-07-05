@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>User profile — Progress</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;1,500;1,600&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="nav-root"></div>
+<div id="modal-root"></div>
+
+<main class="container" id="userRoot">
+  <div class="feed-empty" style="padding-top:100px; text-align:center;">
+    <h3>Loading user profile...</h3>
+  </div>
+</main>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+<script>
+  function escapeHTML(str) {
+    const div = document.createElement('div');
+    div.textContent = str || '';
+    return div.innerHTML;
+  }
+
+  const params = new URLSearchParams(location.search);
+  const username = params.get('u');
+  const user = username ? Progress.getUser(username) : null;
+  const root = document.getElementById('userRoot');
+  const currentUser = Progress.getCurrentUser();
+
+  if (!user) {
+    root.innerHTML = `
+      <div class="feed-empty" style="padding-top:100px; text-align:center;">
+        <h3>User not found</h3>
+        <p><a href="index.html" style="text-decoration:underline;">Back to the journal</a></p>
+      </div>`;
+  } else {
+    const isFollowing = currentUser ? currentUser.following.includes(user.username) : false;
+    const followingCount = user.following ? user.following.length : 0;
+    const followerCount = user.followers ? user.followers.length : 0;
+    root.innerHTML = `
+      <div class="post-head">
+        <a class="post-back" href="index.html">&larr; all entries</a>
+        <span class="post-date">Public profile</span>
+        <h1 class="post-title">${escapeHTML(user.name)}</h1>
+        <div class="post-byline">
+          ${user.avatar ? `<img src="${user.avatar}" alt="Avatar">` : `<div class="initials">${escapeHTML(user.name.split(' ').map(p => p[0]).join('').slice(0,2).toUpperCase())}</div>`}
+          <div>
+            <div style="font-size:14px; color:var(--muted);">@${user.username}</div>
+            <div style="font-size:13px; color:var(--muted);">ID: ${user.id}</div>
+          </div>
+        </div>
+        <div class="settings-section" style="margin:22px 0 12px;">
+          <p style="margin:0; color:var(--mocha-dark);">${user.bio ? escapeHTML(user.bio) : 'No bio yet.'}</p>
+        </div>
+        <div class="settings-section" style="display:flex; gap:24px; flex-wrap:wrap; align-items:center; margin-bottom:24px;">
+          <span style="font-family:var(--font-mono); font-size:12px; color:var(--muted);">${followerCount} followers</span>
+          <span style="font-family:var(--font-mono); font-size:12px; color:var(--muted);">${followingCount} following</span>
+          ${currentUser && currentUser.username !== user.username ? `<button class="btn primary" id="followBtn">${isFollowing ? 'Following' : 'Follow'}</button>` : ''}
+        </div>
+      `;
+
+    const posts = Progress.getPosts().filter(p => p.author === user.username);
+    root.innerHTML += `
+      <div class="settings-section">
+        <h3>Entries (${posts.length})</h3>
+        ${posts.length ? posts.map(p => `
+          <a href="post.html?id=${p.id}" style="display:block; padding:12px 0; border-bottom:1px solid var(--mocha-wash); font-size:14.5px;">
+            <span style="font-family:var(--font-mono); font-size:11px; color:var(--muted); text-transform:uppercase; margin-right:10px;">${Progress.formatDateShort(p.date)}</span>
+            ${escapeHTML(p.title)}
+          </a>
+        `).join('') : `<p style="color:var(--muted); font-size:14px; margin:0;">No entries published yet.</p>`}
+      </div>
+    `;
+
+    const followBtn = document.getElementById('followBtn');
+    if (followBtn) {
+      followBtn.addEventListener('click', () => {
+        if (!currentUser) {
+          showModal('login');
+          return;
+        }
+        const result = Progress.toggleFollow(user.username);
+        followBtn.textContent = Progress.isFollowing(user.username) ? 'Following' : 'Follow';
+        followBtn.classList.toggle('primary', Progress.isFollowing(user.username));
+        followBtn.classList.toggle('secondary', !Progress.isFollowing(user.username));
+        followBtn.textContent = Progress.isFollowing(user.username) ? 'Following' : 'Follow';
+        showToast(Progress.isFollowing(user.username) ? 'You are now following this user.' : 'Unfollowed this user.');
+      });
+    }
+  }
+
+  initShell();
+</script>
+</body>
+</html>
