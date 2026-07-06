@@ -30,20 +30,6 @@ const DEFAULT_SEED = {
       followers: [],
       bio: "",
       badges: ["dexterity"]
-    },
-
-    {
-      _id: "u3",
-      username: "817x2",
-      name: "817x2",
-      password: "test1234",
-      avatar: null,
-      joined: "2026-02-01",
-      timezone: "UTC",
-      following: [],
-      followers: [],
-      bio: "",
-      badges: ["dexterity", "817x2"]
     }
   ],
   posts: [
@@ -174,22 +160,12 @@ async function seedIfNeeded() {
 
   if (!(await users.findOne({ username: "mara" }))) {
     await users.insertOne(DEFAULT_SEED.users[0]);
-  }
-
-  if (!(await users.findOne({ username: "817x2" }))) {
-    await users.insertOne({
-      _id: "u3",
-      username: "817x2",
-      name: "817x2",
-      password: "demo1234",
-      avatar: null,
-      joined: "2026-02-01",
-      timezone: "UTC",
-      following: [],
-      followers: [],
-      bio: "",
-      badges: ["dexterity"]
-    });
+  } else {
+    // Ensure mara has correct password (fix corrupted data)
+    await users.updateOne(
+      { username: "mara" },
+      { $set: { password: "demo1234", badges: ["dexterity"] } }
+    );
   }
 
   for (const seedPost of DEFAULT_SEED.posts) {
@@ -286,28 +262,35 @@ app.delete("/api/users/:id", asyncHandler(async (req, res) => {
 
   const username = user.username;
 
-  // Delete all user's posts
+  // Delete all user's posts and comments on other posts
   await posts.deleteMany({ author: username });
-
-  // Delete all user's comments
   await comments.deleteMany({ author: username });
 
-  // Delete notifications about this user
+  // Remove user from all likedBy arrays on remaining posts
+  await posts.updateMany(
+    { likedBy: username },
+    { 
+      $pull: { likedBy: username },
+      $inc: { likes: -1 }
+    }
+  );
+
+  // Delete all notifications about or by this user
   await notifications.deleteMany({ $or: [{ actor: username }, { recipient: username }] });
 
-  // Remove user from other users' following lists
+  // Remove user from all other users' following lists
   await users.updateMany(
     { following: username },
     { $pull: { following: username } }
   );
 
-  // Remove user from other users' followers lists
+  // Remove user from all other users' followers lists
   await users.updateMany(
     { followers: username },
     { $pull: { followers: username } }
   );
 
-  // Delete the user
+  // Delete the user account
   await users.deleteOne({ _id: req.params.id });
 
   res.status(204).end();
@@ -516,7 +499,7 @@ app.post("/api/login", asyncHandler(async (req, res) => {
   if (!username || !password) return res.status(400).json({ error: "username and password are required" });
   const user = await db.collection("users").findOne({ username: { $regex: `^${escapeRegex(username)}$`, $options: "i" } });
   if (!user || user.password !== password) return res.status(401).json({ error: "Invalid credentials" });
-  res.json({ id: user._id, username: user.username, name: user.name, avatar: user.avatar, timezone: user.timezone, joined: user.joined });
+  res.json(publicUser(normalizeUser(user)));
 }));
 
 app.get("/api/current-user", (req, res) => {

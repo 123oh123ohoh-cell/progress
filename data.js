@@ -41,8 +41,7 @@ async function apiFetch(path, options = {}) {
 const SEED = {
   currentUser: null, // null = logged out
   users: [
-    { id: "u1", username: "mara", name: "Mara Studios", password: "demo1234", avatar: "https://images.unsplash.com/photo-1502685104226-ee32379fefbe?q=80&w=200&auto=format&fit=crop", joined: "2026-02-01", timezone: DEFAULT_TIMEZONE, following: [], followers: [], bio: "", badges: ["dexterity"] },
-    { id: "u3", username: "817x2", name: "817x2", password: "test1234", avatar: null, joined: "2026-02-01", timezone: DEFAULT_TIMEZONE, following: [], followers: [], bio: "Testing account.", badges: ["dexterity", "817x2"] }
+    { id: "u1", username: "mara", name: "Mara Studios", password: "demo1234", avatar: "https://images.unsplash.com/photo-1502685104226-ee32379fefbe?q=80&w=200&auto=format&fit=crop", joined: "2026-02-01", timezone: DEFAULT_TIMEZONE, following: [], followers: [], bio: "", badges: ["dexterity"] }
   ],
   posts: [
     {
@@ -137,8 +136,7 @@ function loadDB() {
     }
 
     const badgeAssignments = {
-      mara: ["dexterity"],
-      "817x2": ["dexterity", "817x2"]
+      mara: ["dexterity"]
     };
     parsed.users.forEach(u => {
       const awarded = badgeAssignments[u.username] || [];
@@ -168,7 +166,16 @@ function loadDB() {
 }
 
 function saveDB(db) {
-  localStorage.setItem(DB_KEY, JSON.stringify(db));
+  // Only save minimal data locally: currentUser and user list.
+  // Posts/comments/notifications come from API to avoid localStorage quota issues.
+  const minimalDb = {
+    currentUser: db.currentUser,
+    users: db.users,
+    posts: [],
+    comments: [],
+    notifications: []
+  };
+  localStorage.setItem(DB_KEY, JSON.stringify(minimalDb));
 }
 
 const Progress = {
