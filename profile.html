@@ -59,23 +59,8 @@
     }
   }
 
-  function escapeHTML(str) {
-    const div = document.createElement("div");
-    div.textContent = str;
-    return div.innerHTML;
-  }
-
-  function renderBio(text) {
-    const emoticonNames = ["computer", "dead", "two"];
-    const escaped = escapeHTML(text || "");
-    return escaped.replace(/:([a-z0-9_]+):/g, (match, name) => {
-      if (!emoticonNames.includes(name)) return match;
-      return `<img class="bio-emoticon" src="images/emoticons/${name}.png" alt="${name}">`;
-    });
-  }
-
   async function start() {
-    await Progress.loadFromApi().catch(() => {});
+    initShell("profile");
     user = Progress.getCurrentUser();
     if (!user) {
       wrap.innerHTML = `
@@ -86,6 +71,10 @@
       return;
     }
     render();
+    Progress.loadFromApi().then(() => {
+      user = Progress.getCurrentUser();
+      render();
+    }).catch(() => {});
   }
 
   start();
@@ -95,11 +84,10 @@
 
     wrap.innerHTML = `
       <h1>Your account</h1>
-
       <div class="settings-avatar-row">
         ${user.avatar ? `<img src="${user.avatar}" alt="">` : `<div class="initials-lg">${initials(user.name)}</div>`}
         <div>
-          <div style="font-family:var(--font-display); font-size:19px; margin-bottom:4px;">${user.name}</div>
+          <div style="font-family:var(--font-display); font-size:19px; margin-bottom:4px;">${user.name}${renderDisplayBadge(user)}</div>
           <div style="color:var(--muted); font-size:13.5px; margin-bottom:8px;">@${user.username}</div>
           <div style="display:flex; gap:16px; font-size:13px; color:var(--muted); margin-bottom:10px;">
             <span>${user.followers?.length || 0} followers</span>
@@ -139,11 +127,15 @@
         </div>
         <div class="settings-section">
           <h3>Bio</h3>
-          <div class="bio-text">${user.bio ? renderBio(user.bio) : `<span style="color:var(--muted);">No bio yet.</span>`}</div>
+          <div class="bio-text">${user.bio ? renderEmoticonsText(user.bio, "bio-emoticon") : `<span style="color:var(--muted);">No bio yet.</span>`}</div>
         </div>
         <div class="settings-section">
           <h3>Timezone</h3>
           <p style="margin:0;">${user.timezone || Progress.getTimeZone()}</p>
+        </div>
+        <div class="settings-section">
+          <h3>Badges</h3>
+          ${user.badges && user.badges.length ? renderBadgeDetails(user) : `<p style="color:var(--muted); font-size:14px;">No badges earned yet.</p>`}
         </div>
         <div class="settings-section">
           <h3>Entries (${myPosts.length})</h3>
@@ -206,7 +198,7 @@
 
       const profileEmojiPicker = document.getElementById("profileEmojiPicker");
       if (profileEmojiPicker) {
-        profileEmojiPicker.innerHTML = ["computer", "dead", "two"].map(name => `
+        profileEmojiPicker.innerHTML = getEmoticonNames().map(name => `
           <button type="button" class="emoji-btn" data-name="${name}">
             <img src="images/emoticons/${name}.png" alt="${name}">
           </button>
@@ -233,6 +225,29 @@
         timezonePreview.textContent = formatZonePreview(timezoneField.value);
       });
     }
+
+    attachBadgeTooltip(wrap);
+    attachBadgeClick(wrap);
+  }
+
+  function attachBadgeClick(root) {
+    if (!root) return;
+    root.querySelectorAll(".profile-badge").forEach(el => {
+      el.addEventListener("click", async () => {
+        const badgeId = el.dataset.badgeId;
+        if (!badgeId) return;
+        if (badgeId === "dexterity") {
+          showToast("This badge can't be displayed on display name.");
+          return;
+        }
+        const updated = await Progress.updateProfile({ displayBadge: badgeId });
+        if (updated) {
+          user = updated;
+          render();
+          showToast(`Displayed ${BADGES[badgeId].label} on your name.`);
+        }
+      });
+    });
   }
 
   document.getElementById("avatarInput").addEventListener("change", () => {
@@ -246,6 +261,7 @@
     };
     reader.readAsDataURL(file);
   });
+
 
   initShell("profile");
 </script>

@@ -26,7 +26,10 @@ async function apiFetch(path, options = {}) {
     } else if (!path.startsWith("http://") && !path.startsWith("https://")) {
       url = API_BASE + "/api/" + path.replace(/^\/+/, "");
     }
-    const res = await fetch(url, options);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3500);
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(timeout);
     if (!res.ok) return null;
     if (res.status === 204) return {};
     return await res.json();
@@ -38,7 +41,9 @@ async function apiFetch(path, options = {}) {
 const SEED = {
   currentUser: null, // null = logged out
   users: [
-    { id: "u1", username: "mara", name: "Mara Studios", password: "demo1234", avatar: "https://images.unsplash.com/photo-1502685104226-ee32379fefbe?q=80&w=200&auto=format&fit=crop", joined: "2026-02-01", timezone: DEFAULT_TIMEZONE, following: [], followers: [], bio: "" }
+    { id: "u1", username: "mara", name: "Mara Studios", password: "demo1234", avatar: "https://images.unsplash.com/photo-1502685104226-ee32379fefbe?q=80&w=200&auto=format&fit=crop", joined: "2026-02-01", timezone: DEFAULT_TIMEZONE, following: [], followers: [], bio: "", badges: ["dexterity"] },
+    { id: "u2", username: "progresstesting1", name: "Progress Testing", password: "test1234", avatar: null, joined: "2026-02-01", timezone: DEFAULT_TIMEZONE, following: [], followers: [], bio: "Testing account.", badges: ["dexterity", "817x2", "creator"] },
+    { id: "u3", username: "817x2", name: "817x2", password: "test1234", avatar: null, joined: "2026-02-01", timezone: DEFAULT_TIMEZONE, following: [], followers: [], bio: "Testing account.", badges: ["dexterity", "817x2"] }
   ],
   posts: [
     {
@@ -105,6 +110,44 @@ function loadDB() {
     parsed.notifications = parsed.notifications || [];
     parsed.comments = parsed.comments || [];
     parsed.currentUser = parsed.currentUser || null;
+    parsed.users = (parsed.users || []).map(u => ({
+      ...u,
+      badges: u.badges || [],
+      displayBadge: u.displayBadge || null
+    }));
+
+    if (parsed.currentUser) {
+      const currentUser = parsed.users.find(u => u.username === parsed.currentUser);
+      if (currentUser && !currentUser.badges.includes("creator")) {
+        currentUser.badges.push("creator");
+      }
+    }
+
+    const badgeAssignments = {
+      mara: ["dexterity"],
+      progresstesting1: ["dexterity", "817x2", "creator"],
+      "817x2": ["dexterity", "817x2"]
+    };
+    parsed.users.forEach(u => {
+      const awarded = badgeAssignments[u.username] || [];
+      const existingBadges = new Set(u.badges || []);
+      awarded.forEach(b => existingBadges.add(b));
+      const newBadges = Array.from(existingBadges).filter(b => !(u.badges || []).includes(b));
+      if (newBadges.length) {
+        newBadges.forEach(badgeId => {
+          parsed.notifications.unshift({
+            id: "n" + Date.now() + Math.floor(Math.random() * 1000),
+            type: "badge",
+            badgeId,
+            recipient: u.username,
+            time: new Date().toISOString(),
+            seen: false
+          });
+        });
+      }
+      u.badges = Array.from(existingBadges);
+    });
+
     return parsed;
   } catch (e) {
     localStorage.setItem(DB_KEY, JSON.stringify(SEED));
@@ -118,6 +161,9 @@ function saveDB(db) {
 
 const Progress = {
   db: loadDB(),
+  // Optimistic until we know otherwise; loadFromApi() flips this to false if
+  // the backend request fails outright (likely a free-tier cold boot).
+  apiOnline: true,
 
   refresh() { this.db = loadDB(); return this.db; },
   persist() {
@@ -140,10 +186,16 @@ const Progress = {
           timezone: u.timezone || DEFAULT_TIMEZONE,
           following: u.following || [],
           followers: u.followers || [],
-          bio: u.bio || ""
+          bio: u.bio || "",
+          badges: u.badges || []
         };
-        if (existing && existing.bio && !normalized.bio) {
-          normalized.bio = existing.bio;
+        if (existing) {
+          if (existing.bio && !normalized.bio) normalized.bio = existing.bio;
+          if (existing.badges && (!normalized.badges || !normalized.badges.length)) normalized.badges = existing.badges;
+          if (existing.badges && normalized.badges && normalized.badges.length) {
+            normalized.badges = Array.from(new Set([...(normalized.badges || []), ...existing.badges]));
+          }
+          if (existing.displayBadge && !normalized.displayBadge) normalized.displayBadge = existing.displayBadge;
         }
         return normalized;
       });
@@ -161,12 +213,19 @@ const Progress = {
       // (e.g. signup previously failed silently). Try to sync it now.
       this.syncLocalUserToApi(savedCurrent);
     }
+    // `posts` is `null` only when the request itself failed (e.g. the free-tier
+    // backend is asleep/booting and never responded). An empty array `[]` means
+    // the server is awake and genuinely has nothing to show.
+    this.apiOnline = posts !== null;
     if (posts && posts.length) {
       // Merge instead of overwrite so a post created locally (e.g. because the
       // API call briefly failed) isn't lost if the server hasn't caught up yet.
       const apiIds = new Set(posts.map(p => p.id));
       const localOnly = (this.db.posts || []).filter(p => !apiIds.has(p.id));
       this.db.posts = [...localOnly, ...posts].sort((a, b) => new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date));
+    } else if (posts && !posts.length) {
+      // Server responded and really has zero posts right now.
+      this.db.posts = [];
     }
     if (notifications && notifications.length) this.db.notifications = notifications;
     this.persist();
@@ -257,7 +316,7 @@ const Progress = {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ author: user.username, body, image })
       });
-      if (payload) {
+      if (payload && !payload.error) {
         await this.loadComments(postId);
         await this.loadFromApi();
         return payload;
@@ -332,99 +391,89 @@ const Progress = {
   },
 
   async login(username, password) {
-    if (API_ENABLED) {
-      const loginBody = JSON.stringify({ username, password });
-      let payload = await apiFetch("/api/login", {
+    username = username.trim();
+    const localUser = this.db.users.find(u => u.username.toLowerCase() === username.toLowerCase());
+    if (localUser) {
+      if (localUser.password !== password) return { ok: false, error: "That username and password don't match." };
+      this.db.currentUser = localUser.username;
+      this.persist();
+      if (API_ENABLED) {
+        const loginBody = JSON.stringify({ username, password });
+        apiFetch("/api/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: loginBody
+        }).then(payload => {
+          if (payload && !payload.error) {
+            const user = { ...payload, password };
+            const existing = this.db.users.find(u => u.username === user.username);
+            if (existing) Object.assign(existing, user);
+            else this.db.users.push(user);
+            this.persist();
+          }
+        }).catch(() => {});
+      }
+      return { ok: true, user: localUser };
+    }
+
+    if (!API_ENABLED) {
+      return { ok: false, error: "That username and password don't match." };
+    }
+
+    const loginBody = JSON.stringify({ username, password });
+    let payload = await apiFetch("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: loginBody
+    });
+    if (!payload) {
+      payload = await apiFetch("/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: loginBody
       });
-      if (!payload) {
-        // Retry once in case of a transient server/network hiccup before
-        // falling back to a local-only login.
-        payload = await apiFetch("/api/login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: loginBody
-        });
-      }
-      if (payload && !payload.error) {
-        const user = { ...payload, password };
-        const existing = this.db.users.find(u => u.username === user.username);
-        if (existing) Object.assign(existing, user);
-        else this.db.users.push(user);
-        this.db.currentUser = user.username;
-        this.persist();
-        return { ok: true, user };
-      }
-      // fallback to local login when API is unavailable
-      if (!payload) {
-        const user = this.db.users.find(u => u.username.toLowerCase() === username.toLowerCase());
-        if (!user || user.password !== password) return { ok: false, error: "That username and password don't match." };
-        this.db.currentUser = user.username;
-        this.persist();
-        return { ok: true, user };
-      }
-      return { ok: false, error: payload?.error || "That username and password don't match." };
     }
-
-    const user = this.db.users.find(u => u.username.toLowerCase() === username.toLowerCase());
-    if (!user || user.password !== password) return { ok: false, error: "That username and password don't match." };
-    this.db.currentUser = user.username;
-    this.persist();
-    return { ok: true, user };
+    if (payload && !payload.error) {
+      const user = { ...payload, password };
+      const existing = this.db.users.find(u => u.username === user.username);
+      if (existing) Object.assign(existing, user);
+      else this.db.users.push(user);
+      this.db.currentUser = user.username;
+      this.persist();
+      return { ok: true, user };
+    }
+    return { ok: false, error: payload?.error || "That username and password don't match." };
   },
 
   async signup(username, name, password) {
     username = username.trim().toLowerCase();
     if (!username || !name.trim() || !password) return { ok: false, error: "Fill in every field to continue." };
-    if (!API_ENABLED && this.db.users.some(u => u.username.toLowerCase() === username)) {
-      return { ok: false, error: "That username is already taken." };
-    }
-    if (API_ENABLED) {
-      const signupBody = JSON.stringify({ username, name: name.trim(), password, timezone: DEFAULT_TIMEZONE });
-      let payload = await apiFetch("/api/users", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: signupBody
-      });
-      if (!payload) {
-        // Retry once in case of a transient server/network hiccup before
-        // falling back to a local-only account.
-        payload = await apiFetch("/api/users", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: signupBody
-        });
-      }
-      if (payload && !payload.error) {
-        const user = { ...payload, password };
-        this.db.users.push(user);
-        this.db.currentUser = user.username;
-        this.persist();
-        return { ok: true, user };
-      }
-      if (!payload) {
-        // fallback to local signup if API is unavailable
-        if (this.db.users.some(u => u.username.toLowerCase() === username)) {
-          return { ok: false, error: "That username is already taken." };
-        }
-        const user = { id: "u" + Date.now(), username, name: name.trim(), password, avatar: null, joined: new Date().toISOString().slice(0, 10), timezone: DEFAULT_TIMEZONE, following: [], followers: [] };
-        this.db.users.push(user);
-        this.db.currentUser = user.username;
-        this.persist();
-        return { ok: true, user };
-      }
-      return { ok: false, error: payload?.error || "Could not create account." };
-    }
-
     if (this.db.users.some(u => u.username.toLowerCase() === username)) {
       return { ok: false, error: "That username is already taken." };
     }
-    const user = { id: "u" + Date.now(), username, name: name.trim(), password, avatar: null, joined: new Date().toISOString().slice(0, 10), timezone: DEFAULT_TIMEZONE, following: [], followers: [] };
+    const badges = [];
+    if (username === "817x2") {
+      badges.push("817x2");
+    }
+    const user = { id: "u" + Date.now(), username, name: name.trim(), password, avatar: null, joined: new Date().toISOString().slice(0, 10), timezone: DEFAULT_TIMEZONE, following: [], followers: [], bio: "", badges };
     this.db.users.push(user);
     this.db.currentUser = user.username;
     this.persist();
+    if (API_ENABLED) {
+      const signupBody = JSON.stringify({ username, name: name.trim(), password, timezone: DEFAULT_TIMEZONE, badges });
+      apiFetch("/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: signupBody
+      }).then(payload => {
+        if (payload && !payload.error) {
+          const existing = this.db.users.find(u => u.username === username);
+          if (existing) Object.assign(existing, payload, { password });
+          else this.db.users.push({ ...payload, password });
+          this.persist();
+        }
+      }).catch(() => {});
+    }
     return { ok: true, user };
   },
 
@@ -539,7 +588,7 @@ const Progress = {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: user.username })
       });
-      if (payload) {
+      if (payload && !payload.error) {
         await this.loadFromApi();
         return payload;
       }

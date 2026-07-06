@@ -11,6 +11,80 @@ const ICONS = {
   clock: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>`
 };
 
+const BADGES = {
+  reader: { label: "Avid Reader", description: "Enjoys reading entries and exploring the community.", icon: "📚" },
+  supporter: { label: "Community Supporter", description: "Leaves thoughtful feedback and encourages others.", icon: "🤝" },
+  early: { label: "Early Adopter", description: "Joined early and helped shape the experience.", icon: "🚀" },
+  dexterity: { label: "Dexterity", description: "Awarded for playing during the Valorant ban on July 4th.", image: "images/emoticons/dexterity.png" },
+  "817x2": { label: "817x2", description: "Awarded for 817x2, OurSpawn easter egg!", image: "images/emoticons/817x2.png" },
+  creator: { label: "Creator", description: "Awarded for creator contributions.", image: "images/creator.png" }
+};
+
+function renderBadgeChip(id) {
+  const badge = BADGES[id];
+  if (!badge) return "";
+  if (badge.image) {
+    const extraClass = id === "creator" ? " creator-badge" : "";
+    return `<img class="profile-badge profile-badge-image${extraClass}" src="${badge.image}" alt="${badge.label}" title="${badge.label}" data-badge-id="${id}" tabindex="0" />`;
+  }
+  return `<span class="profile-badge" data-badge-id="${id}" tabindex="0" aria-label="${badge.label}">${badge.icon}</span>`;
+}
+
+function renderDisplayBadge(user) {
+  if (!user || !user.displayBadge) return "";
+  const badge = BADGES[user.displayBadge];
+  if (!badge) return "";
+  const extraClass = user.displayBadge === "creator" ? " creator-badge" : "";
+  if (badge.image) {
+    return `<img class="display-badge-image${extraClass}" src="${badge.image}" alt="${badge.label}" title="${badge.label}" data-badge-id="${user.displayBadge}" tabindex="0">`;
+  }
+  return `<span class="display-badge-text" data-badge-id="${user.displayBadge}" tabindex="0">${badge.icon}</span>`;
+}
+
+function renderBadges(user) {
+  if (!user || !user.badges || !user.badges.length) return "";
+  return user.badges.map(id => renderBadgeChip(id)).join(" ");
+}
+
+function renderBadgeDetails(user) {
+  if (!user || !user.badges || !user.badges.length) return "";
+  return `<div class="profile-badges-inventory">${user.badges.map(id => renderBadgeChip(id)).join(" ")}</div>`;
+}
+
+function attachBadgeTooltip(root) {
+  if (!root) return;
+  let tooltip = document.getElementById("badge-tooltip");
+  if (!tooltip) {
+    tooltip = document.createElement("div");
+    tooltip.id = "badge-tooltip";
+    tooltip.className = "emoji-tooltip hidden";
+    document.body.appendChild(tooltip);
+  }
+  root.querySelectorAll(".profile-badge, .display-badge-image, .display-badge-text").forEach(el => {
+    const id = el.dataset.badgeId;
+    const badge = BADGES[id];
+    if (!badge) return;
+    const show = () => {
+      const icon = badge.image ? `<img src="${badge.image}" alt="${badge.label}" class="tooltip-badge-image">` : badge.icon;
+      const note = id === "dexterity" ? `<div style="margin-top:8px; font-size:11px; color:var(--muted);">This badge can't be displayed on display name.</div>` : "";
+      tooltip.innerHTML = `<div class="emoji-tooltip-label">${icon} ${badge.label}</div><div style="font-size:12px; color:var(--ink); line-height:1.4;">${badge.description}</div>${note}`;
+      tooltip.classList.remove("hidden");
+      const rect = el.getBoundingClientRect();
+      const left = Math.min(window.innerWidth - tooltip.offsetWidth - 12, Math.max(12, rect.left + rect.width / 2 - tooltip.offsetWidth / 2));
+      const top = rect.top - tooltip.offsetHeight - 10;
+      tooltip.style.left = `${left}px`;
+      tooltip.style.top = `${top < 12 ? rect.bottom + 10 : top}px`;
+    };
+    el.addEventListener("mouseenter", show);
+    el.addEventListener("focus", show);
+    el.addEventListener("mouseleave", () => tooltip.classList.add("hidden"));
+    el.addEventListener("blur", () => tooltip.classList.add("hidden"));
+  });
+}
+
+const EMOTICON_NAMES = ["computer", "dead", "two"];
+const EMOTICON_NAME_SET = new Set(EMOTICON_NAMES);
+
 function initials(name) {
   if (!name) return "?";
   return name.trim().split(/\s+/).map(w => w[0]).slice(0, 2).join("").toUpperCase();
@@ -27,6 +101,94 @@ function escapeHTML(str) {
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
+}
+
+function getEmoticonNames() {
+  return [...EMOTICON_NAMES];
+}
+
+function shouldSkipEmoticonNode(node) {
+  let current = node.parentNode;
+  while (current && current.nodeType === Node.ELEMENT_NODE) {
+    const tag = current.tagName;
+    if (tag === "CODE" || tag === "PRE" || tag === "SCRIPT" || tag === "STYLE" || tag === "TEXTAREA") {
+      return true;
+    }
+    current = current.parentNode;
+  }
+  return false;
+}
+
+function renderEmoticonsInHTML(html, cssClass = "inline-emoticon") {
+  if (!html) return "";
+
+  const template = document.createElement("template");
+  template.innerHTML = html;
+  const walker = document.createTreeWalker(template.content, NodeFilter.SHOW_TEXT);
+  const textNodes = [];
+  let current;
+
+  while ((current = walker.nextNode())) {
+    if (!shouldSkipEmoticonNode(current)) textNodes.push(current);
+  }
+
+  const tokenRE = /:([a-z0-9_]+):/gi;
+
+  textNodes.forEach(node => {
+    const raw = node.nodeValue || "";
+    tokenRE.lastIndex = 0;
+    if (!tokenRE.test(raw)) return;
+
+    tokenRE.lastIndex = 0;
+    const frag = document.createDocumentFragment();
+    let lastIndex = 0;
+    let match;
+
+    while ((match = tokenRE.exec(raw))) {
+      const full = match[0];
+      const name = (match[1] || "").toLowerCase();
+      if (!EMOTICON_NAME_SET.has(name)) continue;
+
+      if (match.index > lastIndex) {
+        frag.appendChild(document.createTextNode(raw.slice(lastIndex, match.index)));
+      }
+
+      const img = document.createElement("img");
+      img.className = cssClass;
+      img.src = `images/emoticons/${name}.png`;
+      img.alt = name;
+      frag.appendChild(img);
+
+      lastIndex = match.index + full.length;
+    }
+
+    if (!lastIndex) return;
+    if (lastIndex < raw.length) {
+      frag.appendChild(document.createTextNode(raw.slice(lastIndex)));
+    }
+    node.replaceWith(frag);
+  });
+
+  return template.innerHTML;
+}
+
+function renderEmoticonsText(text, cssClass = "inline-emoticon") {
+  return renderEmoticonsInHTML(escapeHTML(text || ""), cssClass);
+}
+
+/* Shown instead of an empty/"nothing here" state whenever we can't tell if
+   there's really no content, or if it's just that our free-tier backend is
+   still waking up from a nap. */
+function bootingUpHTML(opts) {
+  const { title = "Waking up the server\u2026 \u{1F634}", padding = "80px 20px" } = opts || {};
+  return `
+    <div class="feed-empty" style="padding:${padding}; text-align:center;">
+      <div class="error-illustration" style="max-width:280px;">
+        <img src="images/404page.png" alt="Sleepy server illustration">
+      </div>
+      <h3>${title}</h3>
+      <p>We run on free servers that snooze when nobody's around, so they need a minute or two to stretch and boot back up. Sorry for the wait &mdash; hang tight and try refreshing shortly!</p>
+    </div>`;
 }
 
 function renderNav(activePage) {
@@ -58,6 +220,10 @@ function renderNav(activePage) {
         </div>
       </div>
     </nav>
+    ${user && activePage !== "write" ? `
+    <a href="write.html" class="mobile-fab" aria-label="New entry">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+    </a>` : ""}
   `;
 
   renderNotifDropdown();
@@ -79,11 +245,15 @@ function renderNotifDropdown() {
         let text;
 
         if (n.type === "like") {
-          text = `${actorText} liked your post "${escapeHTML(n.postTitle)}"`;
+          text = `${actorText} liked your post "${renderEmoticonsText(n.postTitle, "notif-emoticon")}"`;
         } else if (n.type === "reply") {
-          text = `${actorText} replied: "${escapeHTML(n.body)}"`;
+          text = `${actorText} replied: "${renderEmoticonsText(n.body, "notif-emoticon")}"`;
         } else if (n.type === "follow") {
           text = `${actorText} started following you`;
+        } else if (n.type === "badge") {
+          const badge = BADGES[n.badgeId];
+          const badgeName = badge ? badge.label : n.badgeId;
+          text = `You've been awarded with '${escapeHTML(badgeName)}'!`;
         } else {
           text = `${actorText} did something`;
         }
@@ -252,11 +422,23 @@ function mountModals() {
   document.getElementById("toSignup").addEventListener("click", () => showModal("signup"));
   document.getElementById("toLogin").addEventListener("click", () => showModal("login"));
 
+  const loginSubmit = document.getElementById("loginSubmit");
+  const signupSubmit = document.getElementById("signupSubmit");
+  function setModalButtonState(button, enabled, label) {
+    if (!button) return;
+    button.disabled = !enabled;
+    if (label) button.textContent = label;
+  }
+
   document.getElementById("loginSubmit").addEventListener("click", async () => {
     const username = document.getElementById("loginUsername").value;
     const password = document.getElementById("loginPassword").value;
-    const res = await Progress.login(username, password);
     const errEl = document.getElementById("loginError");
+    errEl.classList.remove("show");
+    errEl.textContent = "";
+    setModalButtonState(loginSubmit, false, "Logging in...");
+    const res = await Progress.login(username, password);
+    setModalButtonState(loginSubmit, true, "Log in");
     if (!res.ok) {
       errEl.textContent = res.error;
       errEl.classList.add("show");
@@ -271,8 +453,12 @@ function mountModals() {
     const name = document.getElementById("signupName").value;
     const username = document.getElementById("signupUsername").value;
     const password = document.getElementById("signupPassword").value;
-    const res = await Progress.signup(username, name, password);
     const errEl = document.getElementById("signupError");
+    errEl.classList.remove("show");
+    errEl.textContent = "";
+    setModalButtonState(signupSubmit, false, "Creating...");
+    const res = await Progress.signup(username, name, password);
+    setModalButtonState(signupSubmit, true, "Create account");
     if (!res.ok) {
       errEl.textContent = res.error;
       errEl.classList.add("show");
@@ -358,11 +544,21 @@ function attachNavScrollWatcher() {
 function initShell(activePage) {
   setDeviceMode();
   window.addEventListener("resize", setDeviceMode);
-  Progress.loadFromApi()
+  renderNav(activePage);
+  mountModals();
+  attachNavScrollWatcher();
+  return Progress.loadFromApi()
     .catch(() => {})
-    .finally(() => {
-      renderNav(activePage);
-      mountModals();
-      attachNavScrollWatcher();
+    .then(() => {
+      const badge = document.getElementById("bellBadge");
+      if (badge) {
+        const unseen = Progress.unseenCount();
+        badge.textContent = unseen;
+        badge.classList.toggle("hidden", !unseen);
+      }
+      const notifDD = document.getElementById("notifDropdown");
+      if (notifDD && notifDD.classList.contains("open")) {
+        renderNotifDropdown();
+      }
     });
 }

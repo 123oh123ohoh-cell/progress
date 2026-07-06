@@ -26,9 +26,9 @@
 <script src="app.js"></script>
 <script>
   async function start() {
-    await Progress.loadFromApi().catch(() => {});
     initShell("write");
     const wrap = document.getElementById("editorWrap");
+    Progress.loadFromApi().catch(() => {});
     const user = Progress.getCurrentUser();
     let coverData = null;
 

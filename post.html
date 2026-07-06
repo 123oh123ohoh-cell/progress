@@ -25,21 +25,6 @@
   const postId = params.get("id");
   const root = document.getElementById("postRoot");
 
-  function escapeHTML(str) {
-    const div = document.createElement("div");
-    div.textContent = str;
-    return div.innerHTML;
-  }
-
-  function renderCommentBody(text) {
-    const emoticonNames = ["computer", "dead", "two"];
-    const escaped = escapeHTML(text || "");
-    return escaped.replace(/:([a-z0-9_]+):/g, (match, name) => {
-      if (!emoticonNames.includes(name)) return match;
-      return `<img class="reply-emoticon" src="images/emoticons/${name}.png" alt="${name}">`;
-    });
-  }
-
   function renderNotFound() {
     root.innerHTML = `
       <div class="feed-empty" style="padding-top:80px; text-align:center;">
@@ -52,13 +37,18 @@
   }
 
   async function renderPost() {
-    await Progress.loadFromApi().catch(() => {});
     const post = Progress.getPost(postId);
-    const comments = await Progress.loadComments(postId);
+    const comments = Progress.getComments(postId);
     if (!post) {
-      renderNotFound();
-      return;
+      await Progress.loadFromApi().catch(() => {});
+      const refreshed = Progress.getPost(postId);
+      if (!refreshed) {
+        renderNotFound();
+        return;
+      }
+      return renderPost();
     }
+    Progress.loadFromApi().then(() => renderPost()).catch(() => {});
     const user = Progress.getCurrentUser();
     const likedByMe = post.likedBy.includes(user ? user.username : "guest");
     const author = Progress.getUser(post.author);
@@ -67,14 +57,14 @@
       <div class="post-head">
         <a class="post-back" href="index.html">&larr; all entries</a>
         <span class="post-date">${Progress.formatDateTime(post.createdAt || post.date + "T00:00:00")}</span>
-        <h1 class="post-title">${post.title}</h1>
+        <h1 class="post-title">${renderEmoticonsText(post.title, "inline-emoticon")}</h1>
         <div class="post-byline">
           ${avatarHTML(author, 30)}
           <span>Written by <a class="username-link" href="user.html?id=${author ? author.id : ""}">@${post.author}</a></span>
         </div>
       </div>
       ${post.cover ? `<img class="post-cover" src="${post.cover}" alt="">` : ""}
-      <article class="post-content">${post.content}</article>
+      <article class="post-content">${renderEmoticonsInHTML(post.content, "inline-emoticon")}</article>
       <div class="post-footer">
         <button class="react-btn ${likedByMe ? "liked" : ""}" id="likeBtn">
           ${ICONS.heart} <span id="likeCount">${post.likes}</span>
@@ -96,7 +86,7 @@
                 <div class="reply-avatar">${avatarHTML(author, 32)}</div>
                 <div class="reply-content">
                   <div class="reply-meta"><strong><a class="username-link" href="user.html?id=${author ? author.id : ""}">@${comment.author}</a></strong><span>${Progress.formatDateTime(comment.time)}</span></div>
-                  <p class="reply-body">${renderCommentBody(comment.body)}</p>
+                  <p class="reply-body">${renderEmoticonsText(comment.body, "reply-emoticon")}</p>
                   ${comment.image ? `<div class="reply-image"><img src="${comment.image}" alt="Reply image"></div>` : ""}
                 </div>
               </div>
@@ -211,7 +201,7 @@
       });
     }
 
-    const emoticonNames = ["computer", "dead", "two"];
+    const emoticonNames = getEmoticonNames();
     if (emojiPicker) {
       emojiPicker.innerHTML = emoticonNames.map(name => `
         <button type="button" class="emoji-btn" data-name="${name}">
@@ -277,7 +267,9 @@
           showToast("Write a reply or attach an image before posting.");
           return;
         }
+        setReplySubmitEnabled(false);
         const comment = await Progress.createComment(post.id, body, replyImageData);
+        setReplySubmitEnabled(true);
         if (!comment) {
           showToast("Log in to reply.");
           return;

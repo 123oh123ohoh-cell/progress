@@ -20,7 +20,7 @@
   </header>
 
   <div class="timeline" id="timeline">
-    <!-- entries injected by JS -->
+    <div class="feed-empty" id="feedLoading"><h3>Loading&hellip;</h3></div>
   </div>
 </main>
 
@@ -32,7 +32,9 @@
     const timeline = document.getElementById("timeline");
 
     if (!posts.length) {
-      timeline.innerHTML = `
+      timeline.innerHTML = Progress.apiOnline === false
+        ? bootingUpHTML()
+        : `
         <div class="feed-empty">
           <h3>Nothing here yet</h3>
           <p>The first entry is always the hardest one to publish.</p>
@@ -46,8 +48,8 @@
       <div class="entry" data-post-href="post.html?id=${p.id}">
         <div class="entry-body">
           <span class="entry-date">${Progress.formatDateShort(p.date)}</span>
-          <h2 class="entry-title"><a class="entry-link" href="post.html?id=${p.id}"><span class="underline">${escapeHTML(p.title)}</span></a></h2>
-          <p class="entry-excerpt">${escapeHTML(p.excerpt)}</p>
+          <h2 class="entry-title"><a class="entry-link" href="post.html?id=${p.id}"><span class="underline">${renderEmoticonsText(p.title, "inline-emoticon")}</span></a></h2>
+          <p class="entry-excerpt">${renderEmoticonsText(p.excerpt, "inline-emoticon")}</p>
           <div class="entry-meta">
             <span>${ICONS.heart.replace('viewBox="0 0 24 24"','viewBox="0 0 24 24" width="13" height="13"')} ${p.likes}</span>
             <span class="entry-author">${avatarHTML(author, 22)}<a class="username-link" href="user.html?id=${author ? author.id : ""}" onclick="event.stopPropagation()">@${p.author}</a></span>
@@ -67,16 +69,10 @@
     });
   }
 
-  function escapeHTML(str) {
-    const div = document.createElement("div");
-    div.textContent = str;
-    return div.innerHTML;
-  }
-
   async function start() {
-    await Progress.loadFromApi().catch(() => {});
     initShell("feed");
     renderFeed();
+    Progress.loadFromApi().then(renderFeed).catch(() => {});
   }
 
   start();

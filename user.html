@@ -25,22 +25,11 @@
   const username = params.get('username');
   const root = document.getElementById('publicProfile');
 
-  function escapeHTML(str) {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
-  }
-
-  function renderBio(text) {
-    const emoticonNames = ["computer", "dead", "two"];
-    const escaped = escapeHTML(text || "");
-    return escaped.replace(/:([a-z0-9_]+):/g, (match, name) => {
-      if (!emoticonNames.includes(name)) return match;
-      return `<img class="bio-emoticon" src="images/emoticons/${name}.png" alt="${name}">`;
-    });
-  }
-
   function renderPublicProfile(user) {
+    if (user && user.loading) {
+      root.innerHTML = bootingUpHTML({ title: "Waking up the server…", padding: "80px 20px" });
+      return;
+    }
     if (!user) {
       root.innerHTML = `
         <div class="feed-empty" style="padding-top:80px; text-align:center;">
@@ -57,14 +46,14 @@
       <div class="settings-avatar-row" style="margin-top:40px;">
         ${user.avatar ? `<img src="${user.avatar}" alt="${user.name}">` : `<div class="initials-lg">${initials(user.name)}</div>`}
         <div>
-          <div style="font-family:var(--font-display); font-size:24px; margin-bottom:6px;">${user.name}</div>
+          <div style="font-family:var(--font-display); font-size:24px; margin-bottom:6px;">${user.name}${renderDisplayBadge(user)}</div>
           <div style="color:var(--muted); font-size:14px; margin-bottom:12px;">@${user.username}</div>
           <div style="display:flex; gap:18px; color:var(--muted); font-size:14px; margin-bottom:10px;">
             <span>${user.followers.length} followers</span>
             <span>${user.following.length} following</span>
             <span>Joined ${Progress.formatDate(user.joined)}</span>
           </div>
-          <div class="bio-text" style="margin-top:12px;">${user.bio ? renderBio(user.bio) : `<span style="color:var(--muted);">No bio yet.</span>`}</div>
+          <div class="bio-text" style="margin-top:12px;">${user.bio ? renderEmoticonsText(user.bio, "bio-emoticon") : `<span style="color:var(--muted);">No bio yet.</span>`}</div>
         </div>
       </div>
       <div class="settings-section" style="margin-top:24px;">
@@ -74,24 +63,29 @@
     `;
 
     (async () => {
-      const posts = await apiFetch(`/api/posts?author=${encodeURIComponent(user.username)}`) || [];
+      const result = await apiFetch(`/api/posts?author=${encodeURIComponent(user.username)}`);
+      const posts = result || [];
       const list = document.getElementById('publicPosts');
-      list.innerHTML = posts.length ? posts.map(post => `
+      if (!posts.length) {
+        list.innerHTML = '<p style="color:var(--muted);">No posts yet.</p>';
+        return;
+      }
+      list.innerHTML = posts.map(post => `
         <a class="entry" href="post.html?id=${post.id}">
           <div class="entry-body">
             <span class="entry-date">${Progress.formatDateShort(post.date)}</span>
-            <h2 class="entry-title"><span class="underline">${post.title}</span></h2>
-            <p class="entry-excerpt">${post.excerpt || ''}</p>
+            <h2 class="entry-title"><span class="underline">${renderEmoticonsText(post.title, "inline-emoticon")}</span></h2>
+            <p class="entry-excerpt">${renderEmoticonsText(post.excerpt || '', "inline-emoticon")}</p>
           </div>
         </a>
-      `).join('') : '<p style="color:var(--muted);">No posts yet.</p>';
+      `).join('');
     })();
   }
 
   async function start() {
-    await Progress.loadFromApi().catch(() => {});
     initShell();
-
+    renderPublicProfile({ loading: true });
+    await Progress.loadFromApi().catch(() => {});
     let fetchedUser = null;
     try {
       if (userId) {
@@ -114,9 +108,11 @@
       effectiveUser.following = fetchedUser?.following || localUser.following || [];
       effectiveUser.joined = fetchedUser?.joined || localUser.joined;
       effectiveUser.timezone = fetchedUser?.timezone || localUser.timezone;
+      effectiveUser.badges = fetchedUser?.badges || localUser.badges || [];
     }
 
     renderPublicProfile(effectiveUser);
+    attachBadgeTooltip(root);
   }
 
   start();
