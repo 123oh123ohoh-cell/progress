@@ -1057,6 +1057,8 @@ body.mobile .mobile-fab { display: flex; }
 }
 .btn.primary { background: var(--ink); color: var(--cream); }
 .btn.primary:hover { background: var(--mocha-dark); }
+.btn.danger { background: #dc3545; color: var(--cream); }
+.btn.danger:hover { background: #c82333; }
 
 /* ============================================================
    MODALS (auth)

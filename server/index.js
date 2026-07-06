@@ -275,6 +275,44 @@ app.patch("/api/users/:id", asyncHandler(async (req, res) => {
   res.json(publicUser(normalizeUser(updated)));
 }));
 
+app.delete("/api/users/:id", asyncHandler(async (req, res) => {
+  const users = db.collection("users");
+  const posts = db.collection("posts");
+  const comments = db.collection("comments");
+  const notifications = db.collection("notifications");
+
+  const user = await users.findOne({ _id: req.params.id });
+  if (!user) return res.status(404).json({ error: "User not found" });
+
+  const username = user.username;
+
+  // Delete all user's posts
+  await posts.deleteMany({ author: username });
+
+  // Delete all user's comments
+  await comments.deleteMany({ author: username });
+
+  // Delete notifications about this user
+  await notifications.deleteMany({ $or: [{ actor: username }, { recipient: username }] });
+
+  // Remove user from other users' following lists
+  await users.updateMany(
+    { following: username },
+    { $pull: { following: username } }
+  );
+
+  // Remove user from other users' followers lists
+  await users.updateMany(
+    { followers: username },
+    { $pull: { followers: username } }
+  );
+
+  // Delete the user
+  await users.deleteOne({ _id: req.params.id });
+
+  res.status(204).end();
+}));
+
 app.post("/api/users/:id/follow", asyncHandler(async (req, res) => {
   const users = db.collection("users");
   const target = await users.findOne({ _id: req.params.id });

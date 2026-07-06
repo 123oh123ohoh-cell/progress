@@ -177,6 +177,11 @@
           <p class="field-note">Your timestamps will now display in the selected timezone.</p>
         </div>
         <button class="btn primary" id="saveSettingsBtn">Save changes</button>
+        <div class="settings-section" style="margin-top:40px; padding-top:40px; border-top:1px solid var(--border-color);">
+          <h3 style="color:var(--error);">Danger Zone</h3>
+          <p style="color:var(--muted); font-size:14px; margin-bottom:12px;">Delete your account and all associated data permanently. This action cannot be undone.</p>
+          <button class="btn danger" id="deleteAccountBtn">Delete account</button>
+        </div>
       `;
       document.getElementById("saveSettingsBtn").addEventListener("click", async () => {
         const name = document.getElementById("nameField").value.trim();
@@ -194,6 +199,25 @@
         user.timezone = timezone;
         render();
         showToast("Settings saved.");
+      });
+
+      document.getElementById("deleteAccountBtn").addEventListener("click", async () => {
+        if (!confirm("Are you sure? This will delete your account and all your posts. This cannot be undone.")) return;
+        if (!confirm("Really? Type 'delete' to confirm...")) {
+          const confirmText = prompt("Type 'delete' to permanently delete your account:");
+          if (confirmText !== "delete") {
+            showToast("Account deletion cancelled.");
+            return;
+          }
+        }
+        showToast("Deleting account...");
+        const deleted = await Progress.deleteAccount();
+        if (deleted) {
+          showToast("Account deleted.");
+          setTimeout(() => location.href = "index.html", 500);
+        } else {
+          showToast("Could not delete account.");
+        }
       });
 
       const profileEmojiPicker = document.getElementById("profileEmojiPicker");

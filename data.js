@@ -590,6 +590,29 @@ const Progress = {
     return true;
   },
 
+  async deleteAccount() {
+    const user = this.getCurrentUser();
+    if (!user) return false;
+    if (API_ENABLED) {
+      const res = await apiFetch(`/api/users/${user.id}`, { method: "DELETE" });
+      if (res !== null) {
+        this.db.currentUser = null;
+        this.db.users = this.db.users.filter(u => u.username !== user.username);
+        this.db.posts = this.db.posts.filter(p => p.author !== user.username);
+        this.db.comments = this.db.comments.filter(c => c.author !== user.username);
+        this.persist();
+        return true;
+      }
+    }
+    // Fallback to local deletion
+    this.db.currentUser = null;
+    this.db.users = this.db.users.filter(u => u.username !== user.username);
+    this.db.posts = this.db.posts.filter(p => p.author !== user.username);
+    this.db.comments = this.db.comments.filter(c => c.author !== user.username);
+    this.persist();
+    return true;
+  },
+
   async toggleLike(postId) {
     const user = this.getCurrentUser();
     const post = this.getPost(postId);
