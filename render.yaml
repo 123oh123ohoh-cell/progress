@@ -4,5 +4,5 @@ services:
     env: node
     branch: main
     root: .
-    buildCommand: yarn install
-    startCommand: yarn start
+    buildCommand: npm install
+    startCommand: npm start

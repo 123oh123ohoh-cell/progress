@@ -6,11 +6,27 @@
 
 const DB_KEY = "progress:db:v1";
 const DEFAULT_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+const BACKEND_RENDER_URL = "https://progress-351h.onrender.com";
+const BACKEND_LOCAL_URL = "http://127.0.0.1:3000";
 const API_ENABLED = true;
+const API_BASE = (() => {
+  if (typeof window === "undefined") return BACKEND_RENDER_URL;
+  if (window.PROGRESS_API_BASE) return window.PROGRESS_API_BASE;
+  if (window.location.protocol === "file:" || window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+    return BACKEND_LOCAL_URL;
+  }
+  return BACKEND_RENDER_URL;
+})();
 
 async function apiFetch(path, options = {}) {
   try {
-    const res = await fetch(path, options);
+    let url = path;
+    if (path.startsWith("/api/")) {
+      url = API_BASE + path;
+    } else if (!path.startsWith("http://") && !path.startsWith("https://")) {
+      url = API_BASE + "/api/" + path.replace(/^\/+/, "");
+    }
+    const res = await fetch(url, options);
     if (!res.ok) return null;
     if (res.status === 204) return {};
     return await res.json();
@@ -116,7 +132,7 @@ const Progress = {
       apiFetch("/api/posts"),
       savedCurrent ? apiFetch(`/api/notifications?recipient=${encodeURIComponent(savedCurrent.username)}`) : Promise.resolve(null)
     ]);
-    if (users) {
+    if (users && users.length) {
       this.db.users = users.map(u => {
         const existing = this.db.users.find(x => x.username === u.username);
         const normalized = {
@@ -135,8 +151,8 @@ const Progress = {
         this.db.users.push(savedCurrent);
       }
     }
-    if (posts) this.db.posts = posts;
-    if (notifications) this.db.notifications = notifications;
+    if (posts && posts.length) this.db.posts = posts;
+    if (notifications && notifications.length) this.db.notifications = notifications;
     this.persist();
     return this.db;
   },
@@ -205,10 +221,12 @@ const Progress = {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ author: user.username, body, image })
       });
-      if (!payload) return null;
-      await this.loadComments(postId);
-      await this.loadFromApi();
-      return payload;
+      if (payload) {
+        await this.loadComments(postId);
+        await this.loadFromApi();
+        return payload;
+      }
+      // fallback to local comment creation when the API is unavailable
     }
     const comment = {
       id: "c" + Date.now(),
@@ -247,11 +265,13 @@ const Progress = {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ followerId: user.id })
       });
-      if (!payload) return null;
-      await this.loadFromApi();
-      const refreshedUser = this.getCurrentUser();
-      const refreshedTarget = this.getUser(targetUsername);
-      return refreshedUser && refreshedTarget ? { following: refreshedUser.following, followers: refreshedTarget.followers } : null;
+      if (payload) {
+        await this.loadFromApi();
+        const refreshedUser = this.getCurrentUser();
+        const refreshedTarget = this.getUser(targetUsername);
+        return refreshedUser && refreshedTarget ? { following: refreshedUser.following, followers: refreshedTarget.followers } : null;
+      }
+      // fallback to local follow/unfollow when the API is unavailable
     }
 
     const followingIndex = user.following.indexOf(targetUsername);
@@ -395,9 +415,12 @@ const Progress = {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ author: user.username, title, content, cover, excerpt })
       });
-      if (!payload) return null;
-      await this.loadFromApi();
-      return payload;
+      if (payload) {
+        await this.loadFromApi();
+        return payload;
+      }
+      // Fallback when the API is unavailable or returns an error.
+      // This keeps the editor working in static/demo mode.
     }
     const id = "p" + (Date.now());
     const createdAt = new Date().toISOString();
@@ -425,9 +448,11 @@ const Progress = {
     if (!post || post.author !== user.username) return false;
     if (API_ENABLED) {
       const res = await apiFetch(`/api/posts/${postId}`, { method: "DELETE" });
-      if (!res) return false;
-      await this.loadFromApi();
-      return true;
+      if (res) {
+        await this.loadFromApi();
+        return true;
+      }
+      // fallback to local deletion when the API is unavailable
     }
     const index = this.db.posts.findIndex(p => p.id === postId);
     if (index === -1) return false;
@@ -448,9 +473,11 @@ const Progress = {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: user.username })
       });
-      if (!payload) return null;
-      await this.loadFromApi();
-      return payload;
+      if (payload) {
+        await this.loadFromApi();
+        return payload;
+      }
+      // fallback to local like toggling when the API is unavailable
     }
     const who = user.username;
     const idx = post.likedBy.indexOf(who);
@@ -492,13 +519,16 @@ const Progress = {
     const user = this.getCurrentUser();
     if (!user) return;
     if (API_ENABLED) {
-      await apiFetch("/api/notifications/mark-seen", {
+      const payload = await apiFetch("/api/notifications/mark-seen", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ recipient: user.username })
       });
-      await this.loadFromApi();
-      return;
+      if (payload) {
+        await this.loadFromApi();
+        return;
+      }
+      // fallback to local notification state when the API is unavailable
     }
     this.db.notifications.forEach(n => {
       if (!n.recipient || n.recipient === user.username) n.seen = true;

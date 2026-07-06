@@ -7,34 +7,187 @@ const port = process.env.PORT || 3000;
 const publicPath = path.join(__dirname, "..");
 const dbPath = path.join(__dirname, "../db.json");
 
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ limit: "50mb", extended: true }));
-app.use(express.static(publicPath));
+const DEFAULT_SEED = {
+  users: [
+    {
+      id: "u1",
+      username: "mara",
+      name: "Mara Studios",
+      password: "demo1234",
+      avatar: "https://images.unsplash.com/photo-1502685104226-ee32379fefbe?q=80&w=200&auto=format&fit=crop",
+      joined: "2026-02-01",
+      timezone: "UTC",
+      following: [],
+      followers: [],
+      bio: ""
+    }
+  ],
+  posts: [
+    {
+      id: "p1",
+      author: "mara",
+      title: "Slowing down the shipping cadence, on purpose",
+      date: "2026-06-28",
+      createdAt: "2026-06-28T10:00:00.000Z",
+      cover: "https://images.unsplash.com/photo-1499750310107-5fef28a66643?q=80&w=1200&auto=format&fit=crop",
+      excerpt: "For a year I measured progress in commits. This month I started measuring it in questions I stopped asking too early.",
+      content: "<p>For a year I measured progress in commits. This month I started measuring it in questions I stopped asking too early.</p><p>The habit crept in quietly. Every sprint became a race to close tickets, and every retro became a scoreboard. It worked, in the sense that the graphs went up and to the right. But somewhere in there the work stopped teaching me anything.</p><h2>What changed</h2><p>I started leaving one hour a week with nothing scheduled. Not a break, not admin time &mdash; just space to sit with a problem before reaching for the obvious fix.</p><blockquote>The fastest way to solve the wrong problem is still the wrong problem, just faster.</blockquote><p>Three weeks in, the backlog looks about the same. But two of the last four decisions I made were ones I would have gotten wrong under the old pace.</p>",
+      likes: 12,
+      likedBy: []
+    },
+    {
+      id: "p2",
+      author: "mara",
+      title: "A small kitchen table, rebuilt from a door",
+      date: "2026-06-14",
+      createdAt: "2026-06-14T10:00:00.000Z",
+      cover: "https://images.unsplash.com/photo-1533090161767-e6ffed986c88?q=80&w=1200&auto=format&fit=crop",
+      excerpt: "The old door had six coats of paint on it. Underneath was oak nobody had seen since 1974.",
+      content: "<p>The old door had six coats of paint on it. Underneath was oak nobody had seen since 1974.</p><p>Stripping it took longer than building the frame. That felt backwards until I remembered most restoration is like that &mdash; the removing is the real work, the assembling is just the reward for finishing it.</p><h2>The joints</h2><p>I used simple lap joints instead of anything fancier. Nobody will ever see them, and that's sort of the point of a kitchen table.</p><p>It wobbled for exactly one afternoon before I found the short leg. Now it's the steadiest thing in the house.</p>",
+      likes: 27,
+      likedBy: []
+    },
+    {
+      id: "p3",
+      author: "mara",
+      title: "Notes from a week of only handwritten drafts",
+      date: "2026-05-30",
+      createdAt: "2026-05-30T10:00:00.000Z",
+      cover: "https://images.unsplash.com/photo-1455390582262-044cdead277a?q=80&w=1200&auto=format&fit=crop",
+      excerpt: "No backspace key for seven days. It changed which sentences I was willing to start.",
+      content: "<p>No backspace key for seven days. It changed which sentences I was willing to start.</p><p>On a screen, a bad sentence costs nothing &mdash; you delete it and move on. On paper, a bad sentence costs a scratched-out line staring back at you, so you think a little longer before committing to one.</p><p>I'm not going back to longhand permanently. But I'm keeping the pause.</p>",
+      likes: 8,
+      likedBy: []
+    }
+  ],
+  comments: [],
+  notifications: [
+    { id: "n1", type: "like", actor: "jonah_p", postId: "p2", postTitle: "A small kitchen table, rebuilt from a door", time: "2026-07-04T09:12:00.000Z", seen: false, recipient: "mara" },
+    { id: "n2", type: "reply", actor: "wren.codes", postId: "p1", postTitle: "Slowing down the shipping cadence, on purpose", body: "This is exactly the permission I needed to hear today.", time: "2026-07-03T21:40:00.000Z", seen: false, recipient: "mara" },
+    { id: "n3", type: "like", actor: "delia", postId: "p1", postTitle: "Slowing down the shipping cadence, on purpose", time: "2026-07-02T14:05:00.000Z", seen: false, recipient: "mara" },
+    { id: "n4", type: "follow", actor: "sam_writes", time: "2026-06-30T08:00:00.000Z", seen: true, recipient: "mara" }
+  ]
+};
 
-function normalizeDb(db) {
-  db.users = (db.users || []).map(u => ({
-    ...u,
-    followers: u.followers || [],
-    following: u.following || [],
-    avatar: typeof u.avatar === "undefined" ? null : u.avatar,
-    bio: typeof u.bio === "string" ? u.bio : ""
+function normalizeDb(raw) {
+  const db = {
+    users: [],
+    posts: [],
+    comments: [],
+    notifications: [],
+    ...raw
+  };
+
+  db.users = (db.users || []).map(user => ({
+    id: user.id || `u${Date.now()}`,
+    username: user.username || "guest",
+    name: user.name || user.username || "Guest",
+    password: user.password || "demo1234",
+    avatar: user.avatar || null,
+    joined: user.joined || new Date().toISOString().slice(0, 10),
+    timezone: user.timezone || "UTC",
+    following: Array.isArray(user.following) ? user.following : [],
+    followers: Array.isArray(user.followers) ? user.followers : [],
+    bio: user.bio || ""
   }));
-  db.posts = db.posts || [];
-  db.comments = db.comments || [];
-  db.notifications = db.notifications || [];
+
+  db.posts = (db.posts || []).map(post => ({
+    id: post.id || `p${Date.now()}`,
+    author: post.author || "mara",
+    title: post.title || "Untitled entry",
+    date: post.date || new Date().toISOString().slice(0, 10),
+    createdAt: post.createdAt || new Date().toISOString(),
+    cover: post.cover || null,
+    excerpt: post.excerpt || "",
+    content: post.content || "",
+    likes: typeof post.likes === "number" ? post.likes : 0,
+    likedBy: Array.isArray(post.likedBy) ? post.likedBy : []
+  }));
+
+  db.comments = Array.isArray(db.comments)
+    ? db.comments.map(comment => ({
+        id: comment.id || `c${Date.now()}`,
+        postId: comment.postId || "",
+        author: comment.author || "",
+        body: comment.body || "",
+        image: comment.image || null,
+        time: comment.time || new Date().toISOString()
+      }))
+    : [];
+
+  db.notifications = Array.isArray(db.notifications)
+    ? db.notifications.map(notification => ({
+        id: notification.id || `n${Date.now()}`,
+        type: notification.type || "info",
+        actor: notification.actor || "",
+        recipient: notification.recipient || "",
+        postId: notification.postId || null,
+        postTitle: notification.postTitle || "",
+        body: notification.body || "",
+        time: notification.time || new Date().toISOString(),
+        seen: Boolean(notification.seen)
+      }))
+    : [];
+
   return db;
 }
+
+app.use((req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PATCH,DELETE,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  if (req.method === "OPTIONS") return res.status(204).end();
+  next();
+});
+app.use(express.static(publicPath));
 
 function loadDb() {
   try {
     if (!fs.existsSync(dbPath)) {
-      fs.writeFileSync(dbPath, JSON.stringify(normalizeDb({ users: [], posts: [], comments: [], notifications: [] }), null, 2));
+      fs.writeFileSync(dbPath, JSON.stringify(DEFAULT_SEED, null, 2));
     }
     const raw = JSON.parse(fs.readFileSync(dbPath, "utf8"));
-    return normalizeDb(raw);
+    const normalized = normalizeDb(raw);
+    let updated = false;
+
+    if (!normalized.users.length) {
+      normalized.users = DEFAULT_SEED.users;
+      updated = true;
+    } else if (!normalized.users.some(u => u.username.toLowerCase() === "mara")) {
+      normalized.users.unshift(DEFAULT_SEED.users[0]);
+      updated = true;
+    }
+
+    if (!normalized.posts.length) {
+      normalized.posts = DEFAULT_SEED.posts;
+      updated = true;
+    } else {
+      const missing = DEFAULT_SEED.posts.filter(p => !normalized.posts.some(existing => existing.id === p.id));
+      if (missing.length) {
+        normalized.posts = [...missing, ...normalized.posts];
+        updated = true;
+      }
+    }
+
+    if (!normalized.comments.length) {
+      normalized.comments = DEFAULT_SEED.comments;
+      updated = true;
+    }
+
+    if (!normalized.notifications.length) {
+      normalized.notifications = DEFAULT_SEED.notifications;
+      updated = true;
+    }
+
+    if (updated) {
+      saveDb(normalized);
+    }
+
+    return normalized;
   } catch (err) {
     console.error("Failed to load db.json", err);
-    return normalizeDb({ users: [], posts: [], comments: [], notifications: [] });
+    saveDb(DEFAULT_SEED);
+    return JSON.parse(JSON.stringify(DEFAULT_SEED));
   }
 }
 

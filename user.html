@@ -73,20 +73,19 @@
       </div>
     `;
 
-    fetch(`/api/posts?author=${encodeURIComponent(user.username)}`)
-      .then(r => r.json())
-      .then(posts => {
-        const list = document.getElementById('publicPosts');
-        list.innerHTML = posts.length ? posts.map(post => `
-          <a class="entry" href="post.html?id=${post.id}">
-            <div class="entry-body">
-              <span class="entry-date">${Progress.formatDateShort(post.date)}</span>
-              <h2 class="entry-title"><span class="underline">${post.title}</span></h2>
-              <p class="entry-excerpt">${post.excerpt || ''}</p>
-            </div>
-          </a>
-        `).join('') : '<p style="color:var(--muted);">No posts yet.</p>';
-      });
+    (async () => {
+      const posts = await apiFetch(`/api/posts?author=${encodeURIComponent(user.username)}`) || [];
+      const list = document.getElementById('publicPosts');
+      list.innerHTML = posts.length ? posts.map(post => `
+        <a class="entry" href="post.html?id=${post.id}">
+          <div class="entry-body">
+            <span class="entry-date">${Progress.formatDateShort(post.date)}</span>
+            <h2 class="entry-title"><span class="underline">${post.title}</span></h2>
+            <p class="entry-excerpt">${post.excerpt || ''}</p>
+          </div>
+        </a>
+      `).join('') : '<p style="color:var(--muted);">No posts yet.</p>';
+    })();
   }
 
   async function start() {
@@ -96,14 +95,10 @@
     let fetchedUser = null;
     try {
       if (userId) {
-        const res = await fetch(`/api/users/${userId}`);
-        if (res.ok) fetchedUser = await res.json();
+        fetchedUser = await apiFetch(`/api/users/${userId}`);
       } else if (username) {
-        const res = await fetch(`/api/users?username=${encodeURIComponent(username)}`);
-        if (res.ok) {
-          const users = await res.json();
-          fetchedUser = Array.isArray(users) ? users[0] || null : users;
-        }
+        const users = await apiFetch(`/api/users?username=${encodeURIComponent(username)}`);
+        fetchedUser = Array.isArray(users) ? users[0] || null : users;
       }
     } catch (e) {
       fetchedUser = null;

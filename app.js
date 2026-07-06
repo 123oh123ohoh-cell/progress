@@ -200,8 +200,8 @@ function mountModals() {
   if (!root) return;
 
   root.innerHTML = `
-    <div class="modal-overlay" id="modalOverlay">
-      <div class="modal">
+    <div class="modal-overlay" id="modalOverlay" aria-hidden="true">
+      <div class="modal" role="dialog" aria-modal="true">
         <button class="modal-close" id="modalClose">&times;</button>
 
         <div id="loginPane">
@@ -210,11 +210,11 @@ function mountModals() {
           <div class="modal-error" id="loginError"></div>
           <div class="field">
             <label for="loginUsername">Username</label>
-            <input id="loginUsername" type="text" autocomplete="username" placeholder="mara">
+            <input id="loginUsername" type="text" autocomplete="username" placeholder="mara" autocapitalize="none" spellcheck="false">
           </div>
           <div class="field">
             <label for="loginPassword">Password</label>
-            <input id="loginPassword" type="password" autocomplete="current-password" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;">
+            <input id="loginPassword" type="password" autocomplete="current-password" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" autocapitalize="none" spellcheck="false">
           </div>
           <button class="modal-submit" id="loginSubmit">Log in</button>
           <p class="modal-switch">New here? <button id="toSignup">Create an account</button></p>
@@ -227,15 +227,15 @@ function mountModals() {
           <div class="modal-error" id="signupError"></div>
           <div class="field">
             <label for="signupName">Display name</label>
-            <input id="signupName" type="text" placeholder="Mara Studios">
+            <input id="signupName" type="text" placeholder="Mara Studios" autocapitalize="words" spellcheck="false">
           </div>
           <div class="field">
             <label for="signupUsername">Username</label>
-            <input id="signupUsername" type="text" placeholder="mara">
+            <input id="signupUsername" type="text" placeholder="mara" autocapitalize="none" spellcheck="false">
           </div>
           <div class="field">
             <label for="signupPassword">Password</label>
-            <input id="signupPassword" type="password" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;">
+            <input id="signupPassword" type="password" autocomplete="new-password" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" autocapitalize="none" spellcheck="false">
           </div>
           <button class="modal-submit" id="signupSubmit">Create account</button>
           <p class="modal-switch">Already have one? <button id="toLogin">Log in</button></p>
@@ -298,11 +298,17 @@ function showModal(which) {
   document.getElementById("signupError").classList.remove("show");
   document.getElementById("loginPane").style.display = which === "login" ? "block" : "none";
   document.getElementById("signupPane").style.display = which === "signup" ? "block" : "none";
-  document.getElementById("modalOverlay").classList.add("open");
+  const overlay = document.getElementById("modalOverlay");
+  overlay.classList.add("open");
+  overlay.setAttribute("aria-hidden", "false");
+  document.body.classList.add("modal-open");
 }
 
 function hideModal() {
-  document.getElementById("modalOverlay").classList.remove("open");
+  const overlay = document.getElementById("modalOverlay");
+  overlay.classList.remove("open");
+  overlay.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("modal-open");
 }
 
 function showToast(msg) {
@@ -311,6 +317,11 @@ function showToast(msg) {
   t.textContent = msg;
   t.classList.add("show");
   setTimeout(() => t.classList.remove("show"), 2600);
+}
+
+function setDeviceMode() {
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent || "");
+  document.body.classList.toggle("mobile", isMobile);
 }
 
 function attachNavScrollWatcher() {
@@ -345,6 +356,8 @@ function attachNavScrollWatcher() {
 
 /* Call this once per page after DOM is ready */
 function initShell(activePage) {
+  setDeviceMode();
+  window.addEventListener("resize", setDeviceMode);
   Progress.loadFromApi()
     .catch(() => {})
     .finally(() => {
