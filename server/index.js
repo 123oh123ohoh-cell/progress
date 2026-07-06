@@ -455,6 +455,16 @@ app.get("/api/current-user", (req, res) => {
   res.status(200).json({});
 });
 
+app.use((req, res) => {
+  res.status(404).json({ error: "Not found" });
+});
+
+app.use((err, req, res, next) => {
+  console.error("Unhandled error:", err);
+  if (res.headersSent) return next(err);
+  res.status(500).json({ error: "Internal server error" });
+});
+
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });

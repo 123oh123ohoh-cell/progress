@@ -151,7 +151,13 @@ const Progress = {
         this.db.users.push(savedCurrent);
       }
     }
-    if (posts && posts.length) this.db.posts = posts;
+    if (posts && posts.length) {
+      // Merge instead of overwrite so a post created locally (e.g. because the
+      // API call briefly failed) isn't lost if the server hasn't caught up yet.
+      const apiIds = new Set(posts.map(p => p.id));
+      const localOnly = (this.db.posts || []).filter(p => !apiIds.has(p.id));
+      this.db.posts = [...localOnly, ...posts].sort((a, b) => new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date));
+    }
     if (notifications && notifications.length) this.db.notifications = notifications;
     this.persist();
     return this.db;
@@ -410,11 +416,21 @@ const Progress = {
     const user = this.getCurrentUser();
     if (!user) return null;
     if (API_ENABLED) {
-      const payload = await apiFetch("/api/posts", {
+      const body = JSON.stringify({ author: user.username, title, content, cover, excerpt });
+      let payload = await apiFetch("/api/posts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ author: user.username, title, content, cover, excerpt })
+        body
       });
+      if (!payload) {
+        // Retry once in case of a transient server/network hiccup before
+        // falling back to a local-only post.
+        payload = await apiFetch("/api/posts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body
+        });
+      }
       if (payload) {
         await this.loadFromApi();
         return payload;
