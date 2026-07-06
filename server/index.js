@@ -1,16 +1,25 @@
+require("dotenv").config();
 const express = require("express");
 const path = require("path");
-const fs = require("fs");
+const { MongoClient } = require("mongodb");
 
 const app = express();
 const port = process.env.PORT || 3000;
 const publicPath = path.join(__dirname, "..");
-const dbPath = path.join(__dirname, "../db.json");
+const mongoUri = process.env.MONGODB_URI;
+const dbName = process.env.MONGODB_DB || "progress";
+
+if (!mongoUri) {
+  console.error("Missing MONGODB_URI environment variable. Set it in a .env file locally or in your host's environment settings.");
+  process.exit(1);
+}
+
+const DEFAULT_TIMEZONE = "UTC";
 
 const DEFAULT_SEED = {
   users: [
     {
-      id: "u1",
+      _id: "u1",
       username: "mara",
       name: "Mara Studios",
       password: "demo1234",
@@ -24,7 +33,7 @@ const DEFAULT_SEED = {
   ],
   posts: [
     {
-      id: "p1",
+      _id: "p1",
       author: "mara",
       title: "Slowing down the shipping cadence, on purpose",
       date: "2026-06-28",
@@ -36,7 +45,7 @@ const DEFAULT_SEED = {
       likedBy: []
     },
     {
-      id: "p2",
+      _id: "p2",
       author: "mara",
       title: "A small kitchen table, rebuilt from a door",
       date: "2026-06-14",
@@ -48,7 +57,7 @@ const DEFAULT_SEED = {
       likedBy: []
     },
     {
-      id: "p3",
+      _id: "p3",
       author: "mara",
       title: "Notes from a week of only handwritten drafts",
       date: "2026-05-30",
@@ -62,76 +71,101 @@ const DEFAULT_SEED = {
   ],
   comments: [],
   notifications: [
-    { id: "n1", type: "like", actor: "jonah_p", postId: "p2", postTitle: "A small kitchen table, rebuilt from a door", time: "2026-07-04T09:12:00.000Z", seen: false, recipient: "mara" },
-    { id: "n2", type: "reply", actor: "wren.codes", postId: "p1", postTitle: "Slowing down the shipping cadence, on purpose", body: "This is exactly the permission I needed to hear today.", time: "2026-07-03T21:40:00.000Z", seen: false, recipient: "mara" },
-    { id: "n3", type: "like", actor: "delia", postId: "p1", postTitle: "Slowing down the shipping cadence, on purpose", time: "2026-07-02T14:05:00.000Z", seen: false, recipient: "mara" },
-    { id: "n4", type: "follow", actor: "sam_writes", time: "2026-06-30T08:00:00.000Z", seen: true, recipient: "mara" }
+    { _id: "n1", type: "like", actor: "jonah_p", postId: "p2", postTitle: "A small kitchen table, rebuilt from a door", time: "2026-07-04T09:12:00.000Z", seen: false, recipient: "mara" },
+    { _id: "n2", type: "reply", actor: "wren.codes", postId: "p1", postTitle: "Slowing down the shipping cadence, on purpose", body: "This is exactly the permission I needed to hear today.", time: "2026-07-03T21:40:00.000Z", seen: false, recipient: "mara" },
+    { _id: "n3", type: "like", actor: "delia", postId: "p1", postTitle: "Slowing down the shipping cadence, on purpose", time: "2026-07-02T14:05:00.000Z", seen: false, recipient: "mara" },
+    { _id: "n4", type: "follow", actor: "sam_writes", time: "2026-06-30T08:00:00.000Z", seen: true, recipient: "mara" }
   ]
 };
 
-function normalizeDb(raw) {
-  const db = {
-    users: [],
-    posts: [],
-    comments: [],
-    notifications: [],
-    ...raw
-  };
+function generateId(prefix) {
+  return `${prefix}${Date.now()}${Math.random().toString(36).slice(2, 7)}`;
+}
 
-  db.users = (db.users || []).map(user => ({
-    id: user.id || `u${Date.now()}`,
-    username: user.username || "guest",
-    name: user.name || user.username || "Guest",
-    password: user.password || "demo1234",
-    avatar: user.avatar || null,
-    joined: user.joined || new Date().toISOString().slice(0, 10),
-    timezone: user.timezone || "UTC",
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function toClient(doc) {
+  if (!doc) return doc;
+  const { _id, ...rest } = doc;
+  return { id: _id, ...rest };
+}
+
+function normalizeUser(doc) {
+  const user = toClient(doc);
+  return {
+    ...user,
+    timezone: user.timezone || DEFAULT_TIMEZONE,
     following: Array.isArray(user.following) ? user.following : [],
     followers: Array.isArray(user.followers) ? user.followers : [],
     bio: user.bio || ""
-  }));
-
-  db.posts = (db.posts || []).map(post => ({
-    id: post.id || `p${Date.now()}`,
-    author: post.author || "mara",
-    title: post.title || "Untitled entry",
-    date: post.date || new Date().toISOString().slice(0, 10),
-    createdAt: post.createdAt || new Date().toISOString(),
-    cover: post.cover || null,
-    excerpt: post.excerpt || "",
-    content: post.content || "",
-    likes: typeof post.likes === "number" ? post.likes : 0,
-    likedBy: Array.isArray(post.likedBy) ? post.likedBy : []
-  }));
-
-  db.comments = Array.isArray(db.comments)
-    ? db.comments.map(comment => ({
-        id: comment.id || `c${Date.now()}`,
-        postId: comment.postId || "",
-        author: comment.author || "",
-        body: comment.body || "",
-        image: comment.image || null,
-        time: comment.time || new Date().toISOString()
-      }))
-    : [];
-
-  db.notifications = Array.isArray(db.notifications)
-    ? db.notifications.map(notification => ({
-        id: notification.id || `n${Date.now()}`,
-        type: notification.type || "info",
-        actor: notification.actor || "",
-        recipient: notification.recipient || "",
-        postId: notification.postId || null,
-        postTitle: notification.postTitle || "",
-        body: notification.body || "",
-        time: notification.time || new Date().toISOString(),
-        seen: Boolean(notification.seen)
-      }))
-    : [];
-
-  return db;
+  };
 }
 
+function publicUser(user) {
+  return {
+    id: user.id,
+    username: user.username,
+    name: user.name,
+    avatar: user.avatar,
+    joined: user.joined,
+    timezone: user.timezone,
+    bio: user.bio || "",
+    followers: user.followers || [],
+    following: user.following || []
+  };
+}
+
+function normalizePost(doc) {
+  const post = toClient(doc);
+  return {
+    ...post,
+    likes: typeof post.likes === "number" ? post.likes : 0,
+    likedBy: Array.isArray(post.likedBy) ? post.likedBy : []
+  };
+}
+
+let db;
+
+async function connect() {
+  const client = new MongoClient(mongoUri);
+  await client.connect();
+  db = client.db(dbName);
+  console.log(`Connected to MongoDB database "${dbName}"`);
+  await seedIfNeeded();
+}
+
+async function seedIfNeeded() {
+  const users = db.collection("users");
+  const posts = db.collection("posts");
+  const comments = db.collection("comments");
+  const notifications = db.collection("notifications");
+
+  if (!(await users.findOne({ username: "mara" }))) {
+    await users.insertOne(DEFAULT_SEED.users[0]);
+  }
+
+  for (const seedPost of DEFAULT_SEED.posts) {
+    const exists = await posts.findOne({ _id: seedPost._id });
+    if (!exists) await posts.insertOne(seedPost);
+  }
+
+  if ((await comments.estimatedDocumentCount()) === 0 && DEFAULT_SEED.comments.length) {
+    await comments.insertMany(DEFAULT_SEED.comments);
+  }
+
+  if ((await notifications.estimatedDocumentCount()) === 0) {
+    await notifications.insertMany(DEFAULT_SEED.notifications);
+  }
+}
+
+function asyncHandler(fn) {
+  return (req, res, next) => fn(req, res, next).catch(next);
+}
+
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,PATCH,DELETE,OPTIONS");
@@ -139,129 +173,79 @@ app.use((req, res, next) => {
   if (req.method === "OPTIONS") return res.status(204).end();
   next();
 });
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use(express.static(publicPath));
 
-function loadDb() {
-  try {
-    if (!fs.existsSync(dbPath)) {
-      fs.writeFileSync(dbPath, JSON.stringify(DEFAULT_SEED, null, 2));
-    }
-    const raw = JSON.parse(fs.readFileSync(dbPath, "utf8"));
-    const normalized = normalizeDb(raw);
-    let updated = false;
-
-    if (!normalized.users.length) {
-      normalized.users = DEFAULT_SEED.users;
-      updated = true;
-    } else if (!normalized.users.some(u => u.username.toLowerCase() === "mara")) {
-      normalized.users.unshift(DEFAULT_SEED.users[0]);
-      updated = true;
-    }
-
-    if (!normalized.posts.length) {
-      normalized.posts = DEFAULT_SEED.posts;
-      updated = true;
-    } else {
-      const missing = DEFAULT_SEED.posts.filter(p => !normalized.posts.some(existing => existing.id === p.id));
-      if (missing.length) {
-        normalized.posts = [...missing, ...normalized.posts];
-        updated = true;
-      }
-    }
-
-    if (!normalized.comments.length) {
-      normalized.comments = DEFAULT_SEED.comments;
-      updated = true;
-    }
-
-    if (!normalized.notifications.length) {
-      normalized.notifications = DEFAULT_SEED.notifications;
-      updated = true;
-    }
-
-    if (updated) {
-      saveDb(normalized);
-    }
-
-    return normalized;
-  } catch (err) {
-    console.error("Failed to load db.json", err);
-    saveDb(DEFAULT_SEED);
-    return JSON.parse(JSON.stringify(DEFAULT_SEED));
-  }
-}
-
-function saveDb(db) {
-  fs.writeFileSync(dbPath, JSON.stringify(normalizeDb(db), null, 2));
-}
-
-app.get("/api/users", (req, res) => {
-  const db = loadDb();
-  let users = db.users || [];
+app.get("/api/users", asyncHandler(async (req, res) => {
+  const filter = {};
   if (req.query.username) {
-    users = users.filter(u => u.username.toLowerCase() === req.query.username.toLowerCase());
+    filter.username = { $regex: `^${escapeRegex(req.query.username)}$`, $options: "i" };
   }
-  res.json(users.map(u => ({ id: u.id, username: u.username, name: u.name, avatar: u.avatar, joined: u.joined, timezone: u.timezone, bio: u.bio || "", followers: u.followers || [], following: u.following || [] })));
-});
+  const docs = await db.collection("users").find(filter).toArray();
+  res.json(docs.map(normalizeUser).map(publicUser));
+}));
 
-app.get("/api/users/:id", (req, res) => {
-  const db = loadDb();
-  const user = db.users.find(u => u.id === req.params.id);
-  if (!user) return res.status(404).json({ error: "User not found" });
-  res.json({ id: user.id, username: user.username, name: user.name, avatar: user.avatar, bio: user.bio || "", followers: user.followers || [], following: user.following || [], joined: user.joined, timezone: user.timezone });
-});
+app.get("/api/users/:id", asyncHandler(async (req, res) => {
+  const doc = await db.collection("users").findOne({ _id: req.params.id });
+  if (!doc) return res.status(404).json({ error: "User not found" });
+  res.json(publicUser(normalizeUser(doc)));
+}));
 
-app.post("/api/users", (req, res) => {
-  const db = loadDb();
+app.post("/api/users", asyncHandler(async (req, res) => {
   const { username, name, password, timezone } = req.body;
   if (!username || !name || !password) return res.status(400).json({ error: "username, name, and password are required" });
-  if (db.users.some(u => u.username.toLowerCase() === username.toLowerCase())) {
-    return res.status(409).json({ error: "Username already taken" });
-  }
-  const id = "u" + Date.now();
-  const user = { id, username, name, password, avatar: null, joined: new Date().toISOString().slice(0, 10), timezone: timezone || "UTC", following: [], followers: [] };
-  db.users.push(user);
-  saveDb(db);
-  res.status(201).json(user);
-});
+  const existing = await db.collection("users").findOne({ username: { $regex: `^${escapeRegex(username)}$`, $options: "i" } });
+  if (existing) return res.status(409).json({ error: "Username already taken" });
+  const user = {
+    _id: generateId("u"),
+    username,
+    name,
+    password,
+    avatar: null,
+    joined: new Date().toISOString().slice(0, 10),
+    timezone: timezone || DEFAULT_TIMEZONE,
+    following: [],
+    followers: [],
+    bio: ""
+  };
+  await db.collection("users").insertOne(user);
+  res.status(201).json(toClient(user));
+}));
 
-app.patch("/api/users/:id", (req, res) => {
-  const db = loadDb();
-  const user = db.users.find(u => u.id === req.params.id);
-  if (!user) return res.status(404).json({ error: "User not found" });
+app.patch("/api/users/:id", asyncHandler(async (req, res) => {
+  const users = db.collection("users");
+  const doc = await users.findOne({ _id: req.params.id });
+  if (!doc) return res.status(404).json({ error: "User not found" });
   const { name, timezone, avatar, bio } = req.body;
-  if (typeof name === "string") user.name = name;
-  if (typeof timezone === "string") user.timezone = timezone;
-  if (typeof avatar !== "undefined") user.avatar = avatar;
-  if (typeof bio === "string") user.bio = bio;
-  saveDb(db);
-  res.json({ id: user.id, username: user.username, name: user.name, avatar: user.avatar, bio: user.bio || "", timezone: user.timezone, followers: user.followers || [], following: user.following || [], joined: user.joined });
-});
+  const update = {};
+  if (typeof name === "string") update.name = name;
+  if (typeof timezone === "string") update.timezone = timezone;
+  if (typeof avatar !== "undefined") update.avatar = avatar;
+  if (typeof bio === "string") update.bio = bio;
+  if (Object.keys(update).length) {
+    await users.updateOne({ _id: req.params.id }, { $set: update });
+  }
+  const updated = await users.findOne({ _id: req.params.id });
+  res.json(publicUser(normalizeUser(updated)));
+}));
 
-app.post("/api/users/:id/follow", (req, res) => {
-  const db = loadDb();
-  const target = db.users.find(u => u.id === req.params.id);
+app.post("/api/users/:id/follow", asyncHandler(async (req, res) => {
+  const users = db.collection("users");
+  const target = await users.findOne({ _id: req.params.id });
   const { followerId, action } = req.body;
   if (!target) return res.status(404).json({ error: "User not found" });
-  const follower = db.users.find(u => u.id === followerId);
+  const follower = await users.findOne({ _id: followerId });
   if (!follower) return res.status(404).json({ error: "Follower user not found" });
-  if (target.id === follower.id) return res.status(400).json({ error: "Cannot follow yourself" });
+  if (target._id === follower._id) return res.status(400).json({ error: "Cannot follow yourself" });
 
   const isUnfollow = action === "unfollow";
-  follower.following = follower.following || [];
-  target.followers = target.followers || [];
+  const followerFollowing = Array.isArray(follower.following) ? follower.following : [];
+  const targetFollowers = Array.isArray(target.followers) ? target.followers : [];
 
   if (!isUnfollow) {
-    if (!follower.following.includes(target.username)) {
-      follower.following.push(target.username);
-    }
-    if (!target.followers.includes(follower.username)) {
-      target.followers.push(follower.username);
-    }
-    db.notifications.unshift({
-      id: "n" + Date.now(),
+    if (!followerFollowing.includes(target.username)) followerFollowing.push(target.username);
+    if (!targetFollowers.includes(follower.username)) targetFollowers.push(follower.username);
+    await db.collection("notifications").insertOne({
+      _id: generateId("n"),
       type: "follow",
       actor: follower.username,
       recipient: target.username,
@@ -269,63 +253,62 @@ app.post("/api/users/:id/follow", (req, res) => {
       seen: false
     });
   } else {
-    follower.following = follower.following.filter(name => name !== target.username);
-    target.followers = target.followers.filter(name => name !== follower.username);
+    const fi = followerFollowing.indexOf(target.username);
+    if (fi !== -1) followerFollowing.splice(fi, 1);
+    const ti = targetFollowers.indexOf(follower.username);
+    if (ti !== -1) targetFollowers.splice(ti, 1);
   }
 
-  saveDb(db);
-  res.json({ follower: follower.username, target: target.username, following: follower.following, followers: target.followers });
-});
+  await users.updateOne({ _id: follower._id }, { $set: { following: followerFollowing } });
+  await users.updateOne({ _id: target._id }, { $set: { followers: targetFollowers } });
 
-app.post("/api/users/:id/unfollow", (req, res) => {
-  const db = loadDb();
-  const target = db.users.find(u => u.id === req.params.id);
+  res.json({ follower: follower.username, target: target.username, following: followerFollowing, followers: targetFollowers });
+}));
+
+app.post("/api/users/:id/unfollow", asyncHandler(async (req, res) => {
+  const users = db.collection("users");
+  const target = await users.findOne({ _id: req.params.id });
   const { followerId } = req.body;
   if (!target) return res.status(404).json({ error: "User not found" });
-  const follower = db.users.find(u => u.id === followerId);
+  const follower = await users.findOne({ _id: followerId });
   if (!follower) return res.status(404).json({ error: "Follower user not found" });
-  if (target.id === follower.id) return res.status(400).json({ error: "Cannot unfollow yourself" });
-  const followIndex = follower.following.indexOf(target.username);
-  if (followIndex !== -1) {
-    follower.following.splice(followIndex, 1);
-  }
-  const followerIndex = target.followers.indexOf(follower.username);
-  if (followerIndex !== -1) {
-    target.followers.splice(followerIndex, 1);
-  }
-  saveDb(db);
+  if (target._id === follower._id) return res.status(400).json({ error: "Cannot unfollow yourself" });
+
+  const followerFollowing = Array.isArray(follower.following) ? follower.following : [];
+  const targetFollowers = Array.isArray(target.followers) ? target.followers : [];
+  const fi = followerFollowing.indexOf(target.username);
+  if (fi !== -1) followerFollowing.splice(fi, 1);
+  const ti = targetFollowers.indexOf(follower.username);
+  if (ti !== -1) targetFollowers.splice(ti, 1);
+
+  await users.updateOne({ _id: follower._id }, { $set: { following: followerFollowing } });
+  await users.updateOne({ _id: target._id }, { $set: { followers: targetFollowers } });
+
   res.json({ follower: follower.username, target: target.username });
-});
+}));
 
-app.get("/api/posts", (req, res) => {
-  const db = loadDb();
-  let posts = (db.posts || []).map(p => ({
-    ...p,
-    likes: typeof p.likes === "number" ? p.likes : 0,
-    likedBy: Array.isArray(p.likedBy) ? p.likedBy : []
-  }));
+app.get("/api/posts", asyncHandler(async (req, res) => {
+  const filter = {};
   if (req.query.author) {
-    posts = posts.filter(p => p.author.toLowerCase() === req.query.author.toLowerCase());
+    filter.author = { $regex: `^${escapeRegex(req.query.author)}$`, $options: "i" };
   }
-  posts.sort((a, b) => new Date(b.createdAt || b.date).getTime() - new Date(a.createdAt || a.date).getTime());
+  const docs = await db.collection("posts").find(filter).toArray();
+  const posts = docs.map(normalizePost).sort((a, b) => new Date(b.createdAt || b.date).getTime() - new Date(a.createdAt || a.date).getTime());
   res.json(posts);
-});
+}));
 
-app.get("/api/posts/:id", (req, res) => {
-  const db = loadDb();
-  const post = (db.posts || []).find(p => p.id === req.params.id);
-  if (!post) return res.status(404).json({ error: "Post not found" });
-  res.json(post);
-});
+app.get("/api/posts/:id", asyncHandler(async (req, res) => {
+  const doc = await db.collection("posts").findOne({ _id: req.params.id });
+  if (!doc) return res.status(404).json({ error: "Post not found" });
+  res.json(normalizePost(doc));
+}));
 
-app.post("/api/posts", (req, res) => {
-  const db = loadDb();
+app.post("/api/posts", asyncHandler(async (req, res) => {
   const { author, title, content, cover, excerpt } = req.body;
   if (!author || !title || !content) return res.status(400).json({ error: "author, title and content are required" });
-  const id = "p" + Date.now();
   const createdAt = new Date().toISOString();
   const post = {
-    id,
+    _id: generateId("p"),
     author,
     title,
     date: createdAt.slice(0, 10),
@@ -336,129 +319,120 @@ app.post("/api/posts", (req, res) => {
     likes: 0,
     likedBy: []
   };
-  db.posts.unshift(post);
-  saveDb(db);
-  res.status(201).json(post);
-});
+  await db.collection("posts").insertOne(post);
+  res.status(201).json(toClient(post));
+}));
 
-app.delete("/api/posts/:id", (req, res) => {
-  const db = loadDb();
-  const index = (db.posts || []).findIndex(p => p.id === req.params.id);
-  if (index === -1) return res.status(404).json({ error: "Post not found" });
-  db.posts.splice(index, 1);
-  db.comments = (db.comments || []).filter(c => c.postId !== req.params.id);
-  db.notifications = (db.notifications || []).filter(n => n.postId !== req.params.id);
-  saveDb(db);
+app.delete("/api/posts/:id", asyncHandler(async (req, res) => {
+  const result = await db.collection("posts").deleteOne({ _id: req.params.id });
+  if (!result.deletedCount) return res.status(404).json({ error: "Post not found" });
+  await db.collection("comments").deleteMany({ postId: req.params.id });
+  await db.collection("notifications").deleteMany({ postId: req.params.id });
   res.status(204).end();
-});
+}));
 
-app.get("/api/posts/:id/comments", (req, res) => {
-  const db = loadDb();
-  const comments = (db.comments || []).filter(c => c.postId === req.params.id).sort((a, b) => new Date(a.time) - new Date(b.time));
+app.get("/api/posts/:id/comments", asyncHandler(async (req, res) => {
+  const docs = await db.collection("comments").find({ postId: req.params.id }).toArray();
+  const comments = docs.map(toClient).sort((a, b) => new Date(a.time) - new Date(b.time));
   res.json(comments);
-});
+}));
 
-app.post("/api/posts/:id/comments", (req, res) => {
-  const db = loadDb();
-  const post = (db.posts || []).find(p => p.id === req.params.id);
+app.post("/api/posts/:id/comments", asyncHandler(async (req, res) => {
+  const post = await db.collection("posts").findOne({ _id: req.params.id });
   const { author, body, image } = req.body;
   if (!post) return res.status(404).json({ error: "Post not found" });
   if (!author || (!body && !image)) return res.status(400).json({ error: "author and body or image are required" });
   const comment = {
-    id: "c" + Date.now(),
-    postId: post.id,
+    _id: generateId("c"),
+    postId: post._id,
     author,
     body: body || "",
     image: image || null,
     time: new Date().toISOString()
   };
-  db.comments = db.comments || [];
-  db.comments.push(comment);
+  await db.collection("comments").insertOne(comment);
   if (post.author !== author) {
-    db.notifications = db.notifications || [];
-    db.notifications.unshift({
-      id: "n" + Date.now(),
+    await db.collection("notifications").insertOne({
+      _id: generateId("n"),
       type: "reply",
       actor: author,
       recipient: post.author,
-      postId: post.id,
+      postId: post._id,
       postTitle: post.title,
       body: body || "",
       time: new Date().toISOString(),
       seen: false
     });
   }
-  saveDb(db);
-  res.status(201).json(comment);
-});
+  res.status(201).json(toClient(comment));
+}));
 
-app.delete("/api/posts/:id/comments/:commentId", (req, res) => {
-  const db = loadDb();
-  const index = (db.comments || []).findIndex(c => c.id === req.params.commentId && c.postId === req.params.id);
-  if (index === -1) return res.status(404).json({ error: "Comment not found" });
-  db.comments.splice(index, 1);
-  saveDb(db);
+app.delete("/api/posts/:id/comments/:commentId", asyncHandler(async (req, res) => {
+  const result = await db.collection("comments").deleteOne({ _id: req.params.commentId, postId: req.params.id });
+  if (!result.deletedCount) return res.status(404).json({ error: "Comment not found" });
   res.status(204).end();
-});
+}));
 
-app.post("/api/posts/:id/like", (req, res) => {
-  const db = loadDb();
-  const post = (db.posts || []).find(p => p.id === req.params.id);
+app.post("/api/posts/:id/like", asyncHandler(async (req, res) => {
+  const posts = db.collection("posts");
+  const post = await posts.findOne({ _id: req.params.id });
   const { username } = req.body;
   if (!post) return res.status(404).json({ error: "Post not found" });
   if (!username) return res.status(400).json({ error: "username is required" });
-  const idx = post.likedBy.indexOf(username);
+  const likedBy = Array.isArray(post.likedBy) ? post.likedBy : [];
+  let likes = typeof post.likes === "number" ? post.likes : 0;
+  const idx = likedBy.indexOf(username);
   if (idx === -1) {
-    post.likedBy.push(username);
-    post.likes += 1;
+    likedBy.push(username);
+    likes += 1;
     if (post.author !== username) {
-      db.notifications = db.notifications || [];
-      db.notifications.unshift({
-        id: "n" + Date.now(),
+      await db.collection("notifications").insertOne({
+        _id: generateId("n"),
         type: "like",
         actor: username,
         recipient: post.author,
-        postId: post.id,
+        postId: post._id,
         postTitle: post.title,
         time: new Date().toISOString(),
         seen: false
       });
     }
   } else {
-    post.likedBy.splice(idx, 1);
-    post.likes = Math.max(0, post.likes - 1);
+    likedBy.splice(idx, 1);
+    likes = Math.max(0, likes - 1);
   }
-  saveDb(db);
-  res.json(post);
-});
+  await posts.updateOne({ _id: post._id }, { $set: { likedBy, likes } });
+  const updated = await posts.findOne({ _id: post._id });
+  res.json(normalizePost(updated));
+}));
 
-app.get("/api/notifications", (req, res) => {
-  const db = loadDb();
+app.get("/api/notifications", asyncHandler(async (req, res) => {
   const recipient = req.query.recipient;
   if (!recipient) return res.status(400).json({ error: "recipient is required" });
-  const notifications = (db.notifications || []).filter(n => !n.recipient || n.recipient === recipient).sort((a, b) => new Date(b.time) - new Date(a.time));
+  const docs = await db.collection("notifications").find({
+    $or: [{ recipient }, { recipient: { $exists: false } }, { recipient: null }, { recipient: "" }]
+  }).toArray();
+  const notifications = docs.map(toClient).sort((a, b) => new Date(b.time) - new Date(a.time));
   res.json(notifications);
-});
+}));
 
-app.post("/api/notifications/mark-seen", (req, res) => {
-  const db = loadDb();
+app.post("/api/notifications/mark-seen", asyncHandler(async (req, res) => {
   const recipient = req.body.recipient;
   if (!recipient) return res.status(400).json({ error: "recipient is required" });
-  db.notifications = (db.notifications || []).map(n => {
-    if (!n.recipient || n.recipient === recipient) n.seen = true;
-    return n;
-  });
-  saveDb(db);
+  await db.collection("notifications").updateMany(
+    { $or: [{ recipient }, { recipient: { $exists: false } }, { recipient: null }, { recipient: "" }] },
+    { $set: { seen: true } }
+  );
   res.json({ ok: true });
-});
+}));
 
-app.post("/api/login", (req, res) => {
-  const db = loadDb();
+app.post("/api/login", asyncHandler(async (req, res) => {
   const { username, password } = req.body;
-  const user = db.users.find(u => u.username.toLowerCase() === username.toLowerCase());
+  if (!username || !password) return res.status(400).json({ error: "username and password are required" });
+  const user = await db.collection("users").findOne({ username: { $regex: `^${escapeRegex(username)}$`, $options: "i" } });
   if (!user || user.password !== password) return res.status(401).json({ error: "Invalid credentials" });
-  res.json({ id: user.id, username: user.username, name: user.name, avatar: user.avatar, timezone: user.timezone, joined: user.joined });
-});
+  res.json({ id: user._id, username: user.username, name: user.name, avatar: user.avatar, timezone: user.timezone, joined: user.joined });
+}));
 
 app.get("/api/current-user", (req, res) => {
   res.status(200).json({});
@@ -474,6 +448,14 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: "Internal server error" });
 });
 
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
-});
+connect()
+  .then(() => {
+    app.listen(port, () => {
+      console.log(`Server running on port ${port}`);
+    });
+  })
+  .catch(err => {
+    console.error("Failed to connect to MongoDB:", err);
+    process.exit(1);
+  });
+

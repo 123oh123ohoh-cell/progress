@@ -4,6 +4,9 @@ node_modules/
 # Local database file
 /db.json
 
+# Environment variables (contains secrets, never commit)
+.env
+
 # Package manager lockfiles
 package-lock.json
 
