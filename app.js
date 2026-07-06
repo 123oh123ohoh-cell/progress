@@ -331,6 +331,7 @@ function renderNav(activePage) {
         <img class="nav-logo-image" src="images/nearheader.png" alt="" loading="lazy">
       </a>
       <div class="nav-right">
+        <a href="chat.html" class="nav-new nav-chat-link">chat</a>
         ${user ? `<a href="write.html" class="nav-new">+ new entry</a>` : ""}
         <div class="bell-wrap">
           <button class="bell-btn" id="bellBtn" aria-label="Notifications">
