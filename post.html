@@ -38,7 +38,7 @@
 
   async function renderPost() {
     const post = Progress.getPost(postId);
-    const comments = Progress.getComments(postId);
+    const comments = await Progress.loadComments(postId);
     if (!post) {
       await Progress.loadFromApi().catch(() => {});
       const refreshed = Progress.getPost(postId);
