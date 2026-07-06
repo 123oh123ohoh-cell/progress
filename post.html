@@ -36,6 +36,13 @@
       </div>`;
   }
 
+  window.addEventListener("scroll", () => {
+    const h = document.documentElement;
+    const scrolled = (h.scrollTop) / (h.scrollHeight - h.clientHeight) * 100;
+    const fill = document.getElementById("progressFill");
+    if (fill) fill.style.width = Math.min(100, scrolled) + "%";
+  });
+
   async function renderPost() {
     const post = Progress.getPost(postId);
     const comments = await Progress.loadComments(postId);
@@ -48,7 +55,6 @@
       }
       return renderPost();
     }
-    Progress.loadFromApi().then(() => renderPost()).catch(() => {});
     const user = Progress.getCurrentUser();
     const likedByMe = post.likedBy.includes(user ? user.username : "guest");
     const author = Progress.getUser(post.author);
@@ -281,23 +287,27 @@
           showToast("Log in to reply.");
           return;
         }
-        document.getElementById("replyInput").value = "";
         replyImageData = null;
         if (imageInput) imageInput.value = "";
         if (imagePreview) imagePreview.innerHTML = "";
         showToast("Reply posted.");
-        setTimeout(() => location.reload(), 300);
+        renderPost();
       });
     }
-
-    window.addEventListener("scroll", () => {
-      const h = document.documentElement;
-      const scrolled = (h.scrollTop) / (h.scrollHeight - h.clientHeight) * 100;
-      document.getElementById("progressFill").style.width = Math.min(100, scrolled) + "%";
-    });
   }
 
   renderPost();
+
+  Progress.loadFromApi().then(() => {
+    // A single background refresh once fresh data arrives. Never re-schedule
+    // itself (that caused an infinite render loop that kept wiping out the
+    // reply form and duplicating emoji tooltips). Also skip it entirely if
+    // the visitor is actively composing a reply so it can't yank the form
+    // out from under them.
+    const activeInput = document.getElementById("replyInput");
+    if (activeInput && (document.activeElement === activeInput || activeInput.value.trim())) return;
+    renderPost();
+  }).catch(() => {});
 
   initShell("post");
 </script>
