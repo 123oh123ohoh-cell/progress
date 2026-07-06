@@ -20,6 +20,13 @@ const BADGES = {
   creator: { label: "Creator", description: "Awarded for creator contributions.", image: "images/creator.png" }
 };
 
+const BROWSE_ALLOWED_USERNAMES = new Set(["mara", "own", "progresstesting1"]);
+
+function canBrowseUsers(user) {
+  return Boolean(user && BROWSE_ALLOWED_USERNAMES.has(user.username));
+}
+
+
 function renderBadgeChip(id) {
   const badge = BADGES[id];
   if (!badge) return "";
@@ -302,7 +309,7 @@ function renderAccountDropdown(user, activePage) {
 
   el.innerHTML = `
     <div class="dropdown-header">${user.name} &middot; @${user.username}</div>
-    <a class="dropdown-item" href="users.html">Browse users</a>
+    ${canBrowseUsers(user) ? `<a class="dropdown-item" href="users.html">Browse users</a>` : ""}
     <a class="dropdown-item" href="profile.html?tab=profile">Profile</a>
     <a class="dropdown-item" href="profile.html?tab=settings">Settings</a>
     <button class="dropdown-item danger" id="logoutBtn">Log out</button>

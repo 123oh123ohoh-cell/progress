@@ -8,6 +8,7 @@ const DB_KEY = "progress:db:v1";
 const DEFAULT_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 const BACKEND_RENDER_URL = "https://progress-351h.onrender.com";
 const BACKEND_LOCAL_URL = "http://127.0.0.1:3000";
+const ALLOWED_CREATOR_USERNAMES = new Set(["mara", "own", "progresstesting1"]);
 const API_ENABLED = true;
 const API_BASE = (() => {
   if (typeof window === "undefined") return BACKEND_RENDER_URL;
@@ -156,10 +157,19 @@ function loadDB() {
 
     if (parsed.currentUser) {
       const currentUser = parsed.users.find(u => u.username === parsed.currentUser);
-      if (currentUser && !currentUser.badges.includes("creator")) {
+      if (currentUser && ALLOWED_CREATOR_USERNAMES.has(currentUser.username) && !currentUser.badges.includes("creator")) {
         currentUser.badges.push("creator");
       }
     }
+
+    parsed.users.forEach(u => {
+      if (!ALLOWED_CREATOR_USERNAMES.has(u.username)) {
+        u.badges = (u.badges || []).filter(b => b !== "creator");
+        if (u.displayBadge === "creator") u.displayBadge = null;
+      } else if (!u.badges.includes("creator")) {
+        u.badges.push("creator");
+      }
+    });
 
     const badgeAssignments = {
       mara: ["dexterity"]

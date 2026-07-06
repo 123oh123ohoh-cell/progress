@@ -808,11 +808,15 @@ body.mobile .mobile-fab { display: flex; }
   object-fit: cover;
 }
 .inline-emoticon {
-  width: 22px;
-  height: 22px;
+  display: inline-block;
+  width: 1.1em;
+  height: 1.1em;
   vertical-align: text-bottom;
-  margin: 0 3px;
+  margin: 0 0.18em;
   object-fit: contain;
+  border: none;
+  outline: none;
+  background: transparent;
 }
 .notif-emoticon {
   width: 17px;

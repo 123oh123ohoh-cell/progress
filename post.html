@@ -69,9 +69,9 @@
         <button class="react-btn ${likedByMe ? "liked" : ""}" id="likeBtn">
           ${ICONS.heart} <span id="likeCount">${post.likes}</span>
         </button>
-        <button class="react-btn" id="replyBtn">${ICONS.reply} Reply</button>
-        ${user && user.username !== post.author ? `<button class="react-btn" id="followBtn">${Progress.isFollowing(post.author) ? "Following" : "Follow author"}</button>` : ""}
-        ${user && user.username === post.author ? `<button class="react-btn danger" id="deleteBtn">Delete entry</button>` : ""}
+        <button type="button" class="react-btn" id="replyBtn">${ICONS.reply} Reply</button>
+        ${user && user.username !== post.author ? `<button type="button" class="react-btn" id="followBtn">${Progress.isFollowing(post.author) ? "Following" : "Follow author"}</button>` : ""}
+        ${user && user.username === post.author ? `<button type="button" class="react-btn danger" id="deleteBtn">Delete entry</button>` : ""}
       </div>
       <section class="replies-section">
         <div class="replies-header">
@@ -121,7 +121,10 @@
     document.getElementById("replyBtn").addEventListener("click", () => {
       if (!Progress.getCurrentUser()) { showModal("login"); return; }
       const form = document.getElementById("replyForm");
-      if (form) document.getElementById("replyInput").focus();
+      if (form) {
+        form.scrollIntoView({ behavior: "smooth", block: "center" });
+        document.getElementById("replyInput").focus();
+      }
     });
 
     const followBtn = document.getElementById("followBtn");
@@ -209,9 +212,13 @@
         </button>
       `).join("");
 
-      const emojiTooltip = document.createElement("div");
-      emojiTooltip.className = "emoji-tooltip hidden";
-      document.body.appendChild(emojiTooltip);
+      let emojiTooltip = document.getElementById("emojiTooltip");
+      if (!emojiTooltip) {
+        emojiTooltip = document.createElement("div");
+        emojiTooltip.id = "emojiTooltip";
+        emojiTooltip.className = "emoji-tooltip hidden";
+        document.body.appendChild(emojiTooltip);
+      }
 
       const attachEmoticonTooltip = (element, name) => {
         const small = element.classList.contains("reply-emoticon");

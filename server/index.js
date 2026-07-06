@@ -16,6 +16,7 @@ if (!mongoUri) {
 }
 
 const DEFAULT_TIMEZONE = "UTC";
+const ALLOWED_CREATOR_USERNAMES = new Set(["mara", "own", "progresstesting1"]);
 
 const DEFAULT_SEED = {
   users: [
@@ -135,6 +136,13 @@ function normalizeUser(doc) {
 }
 
 function publicUser(user) {
+  const badges = Array.isArray(user.badges) ? user.badges.filter(b => b !== "creator") : [];
+  let displayBadge = user.displayBadge || null;
+  if (ALLOWED_CREATOR_USERNAMES.has(user.username)) {
+    if (!badges.includes("creator")) badges.push("creator");
+  } else if (displayBadge === "creator") {
+    displayBadge = null;
+  }
   return {
     id: user.id,
     username: user.username,
@@ -143,7 +151,8 @@ function publicUser(user) {
     joined: user.joined,
     timezone: user.timezone,
     bio: user.bio || "",
-    badges: user.badges || [],
+    badges,
+    displayBadge,
     followers: user.followers || [],
     following: user.following || []
   };
