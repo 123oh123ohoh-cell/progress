@@ -42,7 +42,6 @@ const SEED = {
   currentUser: null, // null = logged out
   users: [
     { id: "u1", username: "mara", name: "Mara Studios", password: "demo1234", avatar: "https://images.unsplash.com/photo-1502685104226-ee32379fefbe?q=80&w=200&auto=format&fit=crop", joined: "2026-02-01", timezone: DEFAULT_TIMEZONE, following: [], followers: [], bio: "", badges: ["dexterity"] },
-    { id: "u2", username: "progresstesting1", name: "Progress Testing", password: "test1234", avatar: null, joined: "2026-02-01", timezone: DEFAULT_TIMEZONE, following: [], followers: [], bio: "Testing account.", badges: ["dexterity", "817x2", "creator"] },
     { id: "u3", username: "817x2", name: "817x2", password: "test1234", avatar: null, joined: "2026-02-01", timezone: DEFAULT_TIMEZONE, following: [], followers: [], bio: "Testing account.", badges: ["dexterity", "817x2"] }
   ],
   posts: [
@@ -125,7 +124,6 @@ function loadDB() {
 
     const badgeAssignments = {
       mara: ["dexterity"],
-      progresstesting1: ["dexterity", "817x2", "creator"],
       "817x2": ["dexterity", "817x2"]
     };
     parsed.users.forEach(u => {

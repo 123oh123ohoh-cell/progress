@@ -31,19 +31,7 @@ const DEFAULT_SEED = {
       bio: "",
       badges: ["dexterity"]
     },
-    {
-      _id: "u2",
-      username: "progresstesting1",
-      name: "Progress Testing",
-      password: "test1234",
-      avatar: null,
-      joined: "2026-02-01",
-      timezone: "UTC",
-      following: [],
-      followers: [],
-      bio: "Testing account.",
-      badges: ["dexterity", "817x2", "creator"]
-    },
+
     {
       _id: "u3",
       username: "817x2",
@@ -186,9 +174,7 @@ async function seedIfNeeded() {
   if (!(await users.findOne({ username: "mara" }))) {
     await users.insertOne(DEFAULT_SEED.users[0]);
   }
-  if (!(await users.findOne({ username: "progresstesting1" }))) {
-    await users.insertOne(DEFAULT_SEED.users[1]);
-  }
+
   if (!(await users.findOne({ username: "817x2" }))) {
     await users.insertOne({
       _id: "u3",
