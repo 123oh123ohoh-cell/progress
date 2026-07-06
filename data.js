@@ -150,6 +150,16 @@ const Progress = {
       if (savedCurrent && !this.db.users.some(u => u.username === savedCurrent.username)) {
         this.db.users.push(savedCurrent);
       }
+    } else if (savedCurrent && savedCurrent.password) {
+      // The server has no users at all (or the request failed) but we have a
+      // locally logged-in account. Try to sync it to the server so it stops
+      // being local-only.
+      this.syncLocalUserToApi(savedCurrent);
+    }
+    if (users && users.length && savedCurrent && !users.some(u => u.username === savedCurrent.username) && savedCurrent.password) {
+      // Our current user exists locally but the server doesn't know about it
+      // (e.g. signup previously failed silently). Try to sync it now.
+      this.syncLocalUserToApi(savedCurrent);
     }
     if (posts && posts.length) {
       // Merge instead of overwrite so a post created locally (e.g. because the
@@ -161,6 +171,26 @@ const Progress = {
     if (notifications && notifications.length) this.db.notifications = notifications;
     this.persist();
     return this.db;
+  },
+
+  async syncLocalUserToApi(user) {
+    if (this._syncingUser === user.username) return;
+    this._syncingUser = user.username;
+    try {
+      const payload = await apiFetch("/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: user.username, name: user.name, password: user.password, timezone: user.timezone })
+      });
+      if (payload && !payload.error) {
+        const existing = this.db.users.find(u => u.username === user.username);
+        if (existing) Object.assign(existing, payload, { password: user.password });
+        else this.db.users.push({ ...payload, password: user.password });
+        this.persist();
+      }
+    } finally {
+      this._syncingUser = null;
+    }
   },
 
   async loadComments(postId) {
@@ -303,11 +333,21 @@ const Progress = {
 
   async login(username, password) {
     if (API_ENABLED) {
-      const payload = await apiFetch("/api/login", {
+      const loginBody = JSON.stringify({ username, password });
+      let payload = await apiFetch("/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password })
+        body: loginBody
       });
+      if (!payload) {
+        // Retry once in case of a transient server/network hiccup before
+        // falling back to a local-only login.
+        payload = await apiFetch("/api/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: loginBody
+        });
+      }
       if (payload && !payload.error) {
         const user = { ...payload, password };
         const existing = this.db.users.find(u => u.username === user.username);
@@ -342,11 +382,21 @@ const Progress = {
       return { ok: false, error: "That username is already taken." };
     }
     if (API_ENABLED) {
-      const payload = await apiFetch("/api/users", {
+      const signupBody = JSON.stringify({ username, name: name.trim(), password, timezone: DEFAULT_TIMEZONE });
+      let payload = await apiFetch("/api/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, name: name.trim(), password, timezone: DEFAULT_TIMEZONE })
+        body: signupBody
       });
+      if (!payload) {
+        // Retry once in case of a transient server/network hiccup before
+        // falling back to a local-only account.
+        payload = await apiFetch("/api/users", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: signupBody
+        });
+      }
       if (payload && !payload.error) {
         const user = { ...payload, password };
         this.db.users.push(user);
