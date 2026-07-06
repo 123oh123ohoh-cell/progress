@@ -96,6 +96,17 @@ function loadDB() {
   }
   try {
     const parsed = JSON.parse(raw);
+    // Ensure seed users are always present
+    const seedUsernames = new Set(SEED.users.map(u => u.username));
+    const existingUsernames = new Set(parsed.users.map(u => u.username));
+    
+    // Add any missing seed users
+    for (const seedUser of SEED.users) {
+      if (!existingUsernames.has(seedUser.username)) {
+        parsed.users.unshift({ ...seedUser });
+      }
+    }
+    
     // Normalize old saved DB shapes so missing arrays don't break the app.
     parsed.users = (parsed.users || []).map(u => ({
       ...u,
