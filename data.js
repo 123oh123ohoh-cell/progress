@@ -9,6 +9,16 @@ const DEFAULT_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || "UT
 const BACKEND_RENDER_URL = "https://progress-351h.onrender.com";
 const BACKEND_LOCAL_URL = "http://127.0.0.1:3000";
 const ALLOWED_CREATOR_USERNAMES = new Set(["mara", "own", "progresstesting1"]);
+// Badges awarded automatically based on username. The server independently
+// computes this same table itself (never trusting a client-supplied badges
+// field), this copy is only used for the offline-only local-account
+// fallback and to repair the local mock DB when the server is unreachable.
+const SIGNUP_BADGE_AWARDS = {
+  mara: ["dexterity"],
+  own: ["dexterity"],
+  progresstesting1: ["dexterity"],
+  "817x2": ["817x2"]
+};
 const API_ENABLED = true;
 const API_BASE = (() => {
   if (typeof window === "undefined") return BACKEND_RENDER_URL;
@@ -171,9 +181,7 @@ function loadDB() {
       }
     });
 
-    const badgeAssignments = {
-      mara: ["dexterity"]
-    };
+    const badgeAssignments = SIGNUP_BADGE_AWARDS;
     parsed.users.forEach(u => {
       const awarded = badgeAssignments[u.username] || [];
       const existingBadges = new Set(u.badges || []);
@@ -498,10 +506,7 @@ const Progress = {
     if (this.db.users.some(u => u.username.toLowerCase() === username)) {
       return { ok: false, error: "That username is already taken." };
     }
-    const badges = [];
-    if (username === "817x2") {
-      badges.push("817x2");
-    }
+    const badges = SIGNUP_BADGE_AWARDS[username] || [];
 
     if (API_ENABLED) {
       const signupBody = JSON.stringify({ username, name: trimmedName, password, timezone: DEFAULT_TIMEZONE, badges });

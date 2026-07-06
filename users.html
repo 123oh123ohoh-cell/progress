@@ -17,7 +17,8 @@
   <div id="authContainer" style="display:none; margin-top:80px; max-width:320px; margin-left:auto; margin-right:auto; text-align:center;">
     <h1 style="font-family:var(--font-display); font-size:28px; margin-bottom:24px;">Access Directory</h1>
     <p style="color:var(--muted); margin-bottom:12px;">This directory is only available to approved creator accounts.</p>
-    <p style="color:var(--muted); margin-bottom:24px;">Log in as <strong>@mara</strong>, <strong>@own</strong>, or <strong>@progresstesting1</strong> to access it.</p>
+    <p style="color:var(--muted); margin-bottom:24px;">Log in as <strong>@mara</strong>, <strong>@own</strong>, or <strong>@progresstesting1</strong>, or enter the access password below.</p>
+    <input type="password" id="directoryPassword" placeholder="Password" style="width:100%; padding:10px 12px; border:1px solid var(--border-color); border-radius:6px; font-size:14px; margin-bottom:12px; box-sizing:border-box;">
     <button id="submitPassword" style="width:100%; padding:10px 12px; background:var(--accent); color:white; border:none; border-radius:6px; font-size:14px; cursor:pointer; font-weight:500;">Check access</button>
     <p id="passwordError" style="color:var(--error); font-size:13px; margin-top:12px; display:none;">You do not have permission to access this page.</p>
   </div>
@@ -36,14 +37,20 @@
 <script src="app.js"></script>
 <script>
   const ALLOWED_BROWSE_USERNAMES = new Set(["mara", "own", "progresstesting1"]);
+  const DIRECTORY_PASSWORD = "blowblow426J";
   const authContainer = document.getElementById("authContainer");
   const contentContainer = document.getElementById("contentContainer");
+  const passwordInput = document.getElementById("directoryPassword");
   const submitBtn = document.getElementById("submitPassword");
   const passwordError = document.getElementById("passwordError");
 
-  function checkAuth() {
+  function hasAccountAccess() {
     const user = Progress.getCurrentUser();
-    if (user && ALLOWED_BROWSE_USERNAMES.has(user.username)) {
+    return !!(user && ALLOWED_BROWSE_USERNAMES.has(user.username));
+  }
+
+  function checkAuth() {
+    if (hasAccountAccess() || sessionStorage.getItem("directoryAuth") === "true") {
       authContainer.style.display = "none";
       contentContainer.style.display = "block";
       renderUsers();
@@ -54,14 +61,16 @@
   }
 
   submitBtn.addEventListener("click", () => {
-    const user = Progress.getCurrentUser();
-    if (user && ALLOWED_BROWSE_USERNAMES.has(user.username)) {
+    if (hasAccountAccess() || passwordInput.value === DIRECTORY_PASSWORD) {
+      sessionStorage.setItem("directoryAuth", "true");
       passwordError.style.display = "none";
       checkAuth();
       return;
     }
 
     passwordError.style.display = "block";
+    passwordInput.value = "";
+    passwordInput.focus();
   });
 
   passwordInput.addEventListener("keydown", (e) => {

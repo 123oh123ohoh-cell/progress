@@ -18,6 +18,17 @@ if (!mongoUri) {
 const DEFAULT_TIMEZONE = "UTC";
 const ALLOWED_CREATOR_USERNAMES = new Set(["mara", "own", "progresstesting1"]);
 
+// Badges awarded automatically based on username at signup time. This is
+// computed server-side (never trusted from the request body) so a client
+// can't grant itself arbitrary badges by adding a `badges` field to the
+// signup request.
+const SIGNUP_BADGE_AWARDS = {
+  mara: ["dexterity"],
+  own: ["dexterity"],
+  progresstesting1: ["dexterity"],
+  "817x2": ["817x2"]
+};
+
 const DEFAULT_SEED = {
   users: [
     {
@@ -117,6 +128,30 @@ function isLegacyPassword(stored) {
   return typeof stored === "string" && !stored.startsWith("scrypt:");
 }
 
+// Checks whether `user` is missing any badge it's entitled to via
+// SIGNUP_BADGE_AWARDS (e.g. an account created before a badge existed, or
+// before its username was added to the table). If so, grants the missing
+// badge(s) and drops a "badge" notification for the user, the same way a
+// newly-earned badge is announced elsewhere. Mutates and returns `user.badges`
+// so callers can respond with up-to-date data without a second DB read.
+async function ensureUsernameBadges(user) {
+  const awarded = SIGNUP_BADGE_AWARDS[user.username] || [];
+  const currentBadges = Array.isArray(user.badges) ? user.badges : [];
+  const missing = awarded.filter(b => !currentBadges.includes(b));
+  if (!missing.length) return user;
+  await db.collection("users").updateOne({ _id: user._id }, { $addToSet: { badges: { $each: missing } } });
+  await db.collection("notifications").insertMany(missing.map(badgeId => ({
+    _id: generateId("n"),
+    type: "badge",
+    badgeId,
+    recipient: user.username,
+    time: new Date().toISOString(),
+    seen: false
+  })));
+  user.badges = [...currentBadges, ...missing];
+  return user;
+}
+
 function toClient(doc) {
   if (!doc) return doc;
   const { _id, ...rest } = doc;
@@ -210,6 +245,16 @@ async function seedIfNeeded() {
     }
   }
 
+  // Retroactively grant username-based badges to any of these accounts that
+  // already existed before the badge was introduced (accounts that don't
+  // exist are left alone - they'll get the badge automatically on signup).
+  // This also runs on every login (see /api/login), this boot-time pass
+  // just catches accounts that never log in again.
+  for (const awardedUsername of Object.keys(SIGNUP_BADGE_AWARDS)) {
+    const existingUser = await users.findOne({ username: awardedUsername });
+    if (existingUser) await ensureUsernameBadges(existingUser);
+  }
+
   for (const seedPost of DEFAULT_SEED.posts) {
     const exists = await posts.findOne({ _id: seedPost._id });
     if (!exists) await posts.insertOne(seedPost);
@@ -255,7 +300,7 @@ app.get("/api/users/:id", asyncHandler(async (req, res) => {
 }));
 
 app.post("/api/users", asyncHandler(async (req, res) => {
-  const { username, name, password, timezone, badges } = req.body;
+  const { username, name, password, timezone } = req.body;
   if (!username || !name || !password) return res.status(400).json({ error: "username, name, and password are required" });
   const normalizedUsername = username.trim().toLowerCase();
   if (!normalizedUsername) return res.status(400).json({ error: "username, name, and password are required" });
@@ -272,7 +317,9 @@ app.post("/api/users", asyncHandler(async (req, res) => {
     following: [],
     followers: [],
     bio: "",
-    badges: Array.isArray(badges) ? badges : []
+    // Badges are decided by the server from the username, never trusted
+    // from the request body - see SIGNUP_BADGE_AWARDS.
+    badges: SIGNUP_BADGE_AWARDS[normalizedUsername] || []
   };
   await db.collection("users").insertOne(user);
   res.status(201).json(publicUser(normalizeUser(user)));
@@ -562,6 +609,7 @@ app.post("/api/login", asyncHandler(async (req, res) => {
     user.password = hashPassword(password);
     await db.collection("users").updateOne({ _id: user._id }, { $set: { password: user.password } });
   }
+  await ensureUsernameBadges(user);
   res.json(publicUser(normalizeUser(user)));
 }));
 
