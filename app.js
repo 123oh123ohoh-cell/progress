@@ -302,6 +302,7 @@ function renderAccountDropdown(user, activePage) {
 
   el.innerHTML = `
     <div class="dropdown-header">${user.name} &middot; @${user.username}</div>
+    <a class="dropdown-item" href="users.html">Browse users</a>
     <a class="dropdown-item" href="profile.html?tab=profile">Profile</a>
     <a class="dropdown-item" href="profile.html?tab=settings">Settings</a>
     <button class="dropdown-item danger" id="logoutBtn">Log out</button>
