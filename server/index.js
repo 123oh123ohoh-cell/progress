@@ -278,6 +278,30 @@ function roomPresence(room) {
     .filter(Boolean);
 }
 
+// DM rooms are `dm:<usernameA>:<usernameB>` with the two usernames sorted,
+// so both participants always land on the same room id regardless of who
+// started the conversation. `dmParticipants` is the inverse: given a room
+// id, returns the two usernames it belongs to, or null if it's not a DM
+// room at all (e.g. the "global" room).
+function dmRoomId(userA, userB) {
+  return "dm:" + [userA, userB].sort().join(":");
+}
+
+function dmParticipants(room) {
+  if (typeof room !== "string" || !room.startsWith("dm:")) return null;
+  const parts = room.slice(3).split(":");
+  return parts.length === 2 && parts[0] && parts[1] ? parts : null;
+}
+
+// Same trust model as the rest of this API (no session tokens - a client
+// just claims a username), but this at least stops someone from reading or
+// joining a DM room without claiming to be one of its two participants.
+function canAccessRoom(room, username) {
+  const participants = dmParticipants(room);
+  if (!participants) return true; // non-DM rooms (e.g. "global") stay open
+  return participants.includes(username);
+}
+
 let db;
 
 async function connect() {
@@ -837,11 +861,9 @@ app.post("/api/notifications/mark-seen", asyncHandler(async (req, res) => {
 }));
 
 // ---- Realtime chat ----
-// `room` is a free-form string. "global" is the one shared room the current
-// UI uses; a 1-on-1 room can reuse this same storage/broadcast machinery
-// later with an id like `dm:<usernameA>:<usernameB>` (usernames sorted so
-// both participants land in the same room). Nothing below assumes "global"
-// specifically.
+// `room` is a free-form string. "global" is the one shared room the main
+// chat UI uses; DM rooms are `dm:<usernameA>:<usernameB>` (see dmRoomId /
+// dmParticipants / canAccessRoom above).
 
 // Shared by both the REST fallback and the WebSocket "send" handler so a
 // message is stored and broadcast identically no matter which path sent it.
@@ -849,6 +871,7 @@ async function createChatMessage({ room, author, body }) {
   const targetRoom = (room || DEFAULT_CHAT_ROOM).toString().slice(0, 200);
   const trimmed = (body || "").toString().trim();
   if (!author || !trimmed) return null;
+  if (!canAccessRoom(targetRoom, author)) return null;
   const message = {
     _id: generateId("m"),
     room: targetRoom,
@@ -864,6 +887,10 @@ async function createChatMessage({ room, author, body }) {
 
 app.get("/api/chat/messages", asyncHandler(async (req, res) => {
   const room = (req.query.room || DEFAULT_CHAT_ROOM).toString().slice(0, 200);
+  const viewer = (req.query.username || "").toString();
+  if (dmParticipants(room) && !canAccessRoom(room, viewer)) {
+    return res.status(403).json({ error: "Not a participant in this conversation" });
+  }
   const limit = Math.min(parseInt(req.query.limit, 10) || 50, 200);
   const docs = await db.collection("messages")
     .find({ room })
@@ -871,6 +898,31 @@ app.get("/api/chat/messages", asyncHandler(async (req, res) => {
     .limit(limit)
     .toArray();
   res.json(docs.map(normalizeChatMessage).reverse());
+}));
+
+// Lists every DM room `username` is a participant in, each with its most
+// recent message, newest first - powers the DM sidebar on the chat page.
+app.get("/api/chat/conversations", asyncHandler(async (req, res) => {
+  const username = (req.query.username || "").toString();
+  if (!username) return res.status(400).json({ error: "username is required" });
+  const rooms = await db.collection("messages").distinct("room", { room: { $regex: "^dm:" } });
+  const mine = rooms.filter(room => canAccessRoom(room, username));
+  const conversations = await Promise.all(mine.map(async room => {
+    const participants = dmParticipants(room);
+    const withUsername = participants.find(p => p !== username) || participants[0];
+    const lastDocs = await db.collection("messages").find({ room }).sort({ time: -1 }).limit(1).toArray();
+    return {
+      room,
+      with: withUsername,
+      lastMessage: lastDocs[0] ? normalizeChatMessage(lastDocs[0]) : null
+    };
+  }));
+  conversations.sort((a, b) => {
+    const at = a.lastMessage ? new Date(a.lastMessage.time).getTime() : 0;
+    const bt = b.lastMessage ? new Date(b.lastMessage.time).getTime() : 0;
+    return bt - at;
+  });
+  res.json(conversations);
 }));
 
 // REST fallback for sending a message when a client's WebSocket connection
@@ -964,7 +1016,7 @@ connect()
       }
       const username = (url.searchParams.get("username") || "").trim();
       const room = (url.searchParams.get("room") || DEFAULT_CHAT_ROOM).trim().slice(0, 200) || DEFAULT_CHAT_ROOM;
-      if (!username) {
+      if (!username || !canAccessRoom(room, username)) {
         socket.destroy();
         return;
       }

@@ -56,7 +56,11 @@
             <span>${user.following.length} following</span>
             <span>Joined ${Progress.formatDate(user.joined)}</span>
           </div>
-          ${viewer && !isOwnProfile ? `<button type="button" class="upload-btn ${Progress.isFollowing(user.username) ? "following" : ""}" id="followBtn">${Progress.isFollowing(user.username) ? "Following" : "Follow"}</button>` : ""}
+          ${viewer && !isOwnProfile ? `
+          <div class="profile-action-row">
+            <button type="button" class="upload-btn ${Progress.isFollowing(user.username) ? "following" : ""}" id="followBtn">${Progress.isFollowing(user.username) ? "Following" : "Follow"}</button>
+            <a href="chat.html?with=${encodeURIComponent(user.username)}" class="btn">Message</a>
+          </div>` : ""}
           <div class="bio-text" style="margin-top:12px;">${user.bio ? renderEmoticonsText(user.bio, "bio-emoticon") : `<span style="color:var(--muted);">No bio yet.</span>`}</div>
         </div>
       </div>
