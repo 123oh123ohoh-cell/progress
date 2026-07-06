@@ -170,6 +170,19 @@ async function seedIfNeeded() {
   const comments = db.collection("comments");
   const notifications = db.collection("notifications");
 
+  // Create indexes for data integrity and query performance
+  try {
+    await users.createIndex({ username: 1 }, { unique: true });
+    await posts.createIndex({ author: 1, createdAt: -1 });
+    await comments.createIndex({ postId: 1, time: 1 });
+    await notifications.createIndex({ recipient: 1, time: -1 });
+  } catch (e) {
+    // Indexes may already exist, which is fine
+    if (!e.message.includes("already exists")) {
+      console.warn("Index creation warning:", e.message);
+    }
+  }
+
   if (!(await users.findOne({ username: "mara" }))) {
     await users.insertOne(DEFAULT_SEED.users[0]);
   }
