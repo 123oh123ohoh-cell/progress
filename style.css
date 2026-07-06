@@ -882,6 +882,27 @@ body.mobile .mobile-fab { display: flex; }
   transform: translateY(-1px);
   outline: none;
 }
+.profile-badge.is-displayed {
+  border-color: var(--mocha-dark);
+  box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--mocha-dark);
+}
+.profile-badge.is-displayed::after {
+  content: "✓";
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: var(--mocha-dark);
+  color: var(--paper);
+  font-size: 10px;
+  line-height: 16px;
+  text-align: center;
+}
+.profile-badges-inventory .profile-badge {
+  position: relative;
+}
 .profile-badge-image {
   width: 1.2em;
   height: 1.2em;

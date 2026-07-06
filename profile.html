@@ -264,11 +264,17 @@
           showToast("This badge can't be displayed on display name.");
           return;
         }
-        const updated = await Progress.updateProfile({ displayBadge: badgeId });
+        const isActive = user.displayBadge === badgeId;
+        const nextBadge = isActive ? null : badgeId;
+        const updated = await Progress.updateProfile({ displayBadge: nextBadge });
         if (updated) {
           user = updated;
           render();
-          showToast(`Displayed ${BADGES[badgeId].label} on your name.`);
+          showToast(isActive
+            ? `Removed ${BADGES[badgeId].label} from your name.`
+            : `Displayed ${BADGES[badgeId].label} on your name.`);
+        } else {
+          showToast("Could not update your badge. Please try again.");
         }
       });
     });

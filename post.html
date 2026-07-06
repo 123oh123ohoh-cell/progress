@@ -238,7 +238,7 @@
           const rect = element.getBoundingClientRect();
           const tooltipWidth = small ? 90 : 120;
           const left = Math.min(window.innerWidth - tooltipWidth - 12, Math.max(12, rect.left + rect.width / 2 - tooltipWidth / 2));
-          const top = small ? rect.top - 76 : rect.top - 98;
+          const top = rect.top - emojiTooltip.offsetHeight - 12;
           emojiTooltip.style.left = `${left}px`;
           emojiTooltip.style.top = `${top < 12 ? rect.bottom + 12 : top}px`;
         });

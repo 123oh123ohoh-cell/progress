@@ -282,12 +282,26 @@ app.patch("/api/users/:id", asyncHandler(async (req, res) => {
   const users = db.collection("users");
   const doc = await users.findOne({ _id: req.params.id });
   if (!doc) return res.status(404).json({ error: "User not found" });
-  const { name, timezone, avatar, bio } = req.body;
+  const { name, timezone, avatar, bio, displayBadge } = req.body;
   const update = {};
   if (typeof name === "string") update.name = name;
   if (typeof timezone === "string") update.timezone = timezone;
   if (typeof avatar !== "undefined") update.avatar = avatar;
   if (typeof bio === "string") update.bio = bio;
+  if (typeof displayBadge !== "undefined") {
+    if (displayBadge === null) {
+      update.displayBadge = null;
+    } else {
+      const ownedBadges = Array.isArray(doc.badges) ? [...doc.badges] : [];
+      if (ALLOWED_CREATOR_USERNAMES.has(doc.username) && !ownedBadges.includes("creator")) {
+        ownedBadges.push("creator");
+      }
+      if (displayBadge === "dexterity" || !ownedBadges.includes(displayBadge)) {
+        return res.status(400).json({ error: "You don't own that badge" });
+      }
+      update.displayBadge = displayBadge;
+    }
+  }
   if (Object.keys(update).length) {
     await users.updateOne({ _id: req.params.id }, { $set: update });
   }

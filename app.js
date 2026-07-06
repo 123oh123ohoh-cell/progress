@@ -27,14 +27,17 @@ function canBrowseUsers(user) {
 }
 
 
-function renderBadgeChip(id) {
+function renderBadgeChip(id, activeId) {
   const badge = BADGES[id];
   if (!badge) return "";
+  const isActive = !!activeId && id === activeId;
+  const activeClass = isActive ? " is-displayed" : "";
+  const activeAttr = isActive ? ` data-active="true"` : "";
   if (badge.image) {
     const extraClass = id === "creator" ? " creator-badge" : "";
-    return `<img class="profile-badge profile-badge-image${extraClass}" src="${badge.image}" alt="${badge.label}" title="${badge.label}" data-badge-id="${id}" tabindex="0" />`;
+    return `<img class="profile-badge profile-badge-image${extraClass}${activeClass}" src="${badge.image}" alt="${badge.label}" title="${badge.label}" data-badge-id="${id}"${activeAttr} tabindex="0" />`;
   }
-  return `<span class="profile-badge" data-badge-id="${id}" tabindex="0" aria-label="${badge.label}">${badge.icon}</span>`;
+  return `<span class="profile-badge${activeClass}" data-badge-id="${id}"${activeAttr} tabindex="0" aria-label="${badge.label}">${badge.icon}</span>`;
 }
 
 function renderDisplayBadge(user) {
@@ -55,7 +58,7 @@ function renderBadges(user) {
 
 function renderBadgeDetails(user) {
   if (!user || !user.badges || !user.badges.length) return "";
-  return `<div class="profile-badges-inventory">${user.badges.map(id => renderBadgeChip(id)).join(" ")}</div>`;
+  return `<div class="profile-badges-inventory">${user.badges.map(id => renderBadgeChip(id, user.displayBadge)).join(" ")}</div>`;
 }
 
 function attachBadgeTooltip(root) {
