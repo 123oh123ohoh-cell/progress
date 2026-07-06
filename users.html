@@ -14,8 +14,15 @@
 <div id="modal-root"></div>
 
 <main class="container">
-  <div id="accessControl"></div>
-  <div id="usersDirectoryWrapper" style="display:none;">
+  <div id="authContainer" style="display:none; margin-top:80px; max-width:320px; margin-left:auto; margin-right:auto; text-align:center;">
+    <h1 style="font-family:var(--font-display); font-size:28px; margin-bottom:24px;">Access Directory</h1>
+    <p style="color:var(--muted); margin-bottom:24px;">Enter the password to browse users</p>
+    <input type="password" id="directoryPassword" placeholder="Password" style="width:100%; padding:10px 12px; border:1px solid var(--border-color); border-radius:6px; font-size:14px; margin-bottom:12px; box-sizing:border-box;">
+    <button id="submitPassword" style="width:100%; padding:10px 12px; background:var(--accent); color:white; border:none; border-radius:6px; font-size:14px; cursor:pointer; font-weight:500;">Access</button>
+    <p id="passwordError" style="color:var(--error); font-size:13px; margin-top:12px; display:none;">Incorrect password</p>
+  </div>
+
+  <div id="contentContainer" style="display:none;">
     <div style="margin-top:40px; margin-bottom:40px;">
       <h1 style="font-family:var(--font-display); font-size:32px; margin-bottom:12px;">Community</h1>
       <p style="color:var(--muted); font-size:16px;">Browse writers and follow their journeys</p>
@@ -28,99 +35,43 @@
 <script src="data.js"></script>
 <script src="app.js"></script>
 <script>
-  const ACCESS_PASSWORD = "blowblow426J"; // Password required to access this page
+  const DIRECTORY_PASSWORD = "blowblow426J";
+  const authContainer = document.getElementById("authContainer");
+  const contentContainer = document.getElementById("contentContainer");
+  const passwordInput = document.getElementById("directoryPassword");
+  const submitBtn = document.getElementById("submitPassword");
+  const passwordError = document.getElementById("passwordError");
 
-  const accessControl = document.getElementById("accessControl");
-  const usersDirectoryWrapper = document.getElementById("usersDirectoryWrapper");
-  const root = document.getElementById("usersDirectory");
-
-  function checkAccess() {
-    initShell("users");
-    const user = Progress.getCurrentUser();
-
-    // Check if user is logged in as "own"
-    if (!user || user.username !== "own") {
-      accessControl.innerHTML = `
-        <div class="feed-empty" style="padding-top:80px; text-align:center;">
-          <div class="error-illustration" style="margin-bottom:28px; max-width:360px; margin-left:auto; margin-right:auto;">
-            <img src="images/404page.png" alt="Access restricted">
-          </div>
-          <h3>Access Restricted</h3>
-          <p>This feature is only available to the curator account.</p>
-          <p><a href="index.html" style="text-decoration:underline;">Back to home</a></p>
-        </div>`;
-      return;
-    }
-
-    // Check session storage for password verification
-    const sessionKey = "users_page_verified";
-    if (sessionStorage.getItem(sessionKey) === "true") {
-      // Already verified in this session
+  function checkAuth() {
+    const auth = sessionStorage.getItem("directoryAuth");
+    if (auth === "true") {
+      authContainer.style.display = "none";
+      contentContainer.style.display = "block";
       renderUsers();
-      usersDirectoryWrapper.style.display = "block";
-      return;
+    } else {
+      authContainer.style.display = "block";
+      contentContainer.style.display = "none";
     }
-
-    // Show password prompt
-    accessControl.innerHTML = `
-      <div style="
-        max-width:400px;
-        margin:80px auto 0;
-        padding:40px;
-        background:var(--bg-card);
-        border-radius:8px;
-        border:1px solid var(--border-color);
-      ">
-        <h2 style="font-family:var(--font-display); font-size:24px; margin-bottom:24px; text-align:center;">Curator Access</h2>
-        <p style="color:var(--muted); text-align:center; margin-bottom:24px;">Enter the curator password to access this directory.</p>
-        <div style="margin-bottom:16px;">
-          <input 
-            type="password" 
-            id="accessPassword" 
-            placeholder="Password" 
-            autocomplete="off"
-            style="
-              width:100%;
-              padding:12px;
-              border:1px solid var(--border-color);
-              border-radius:4px;
-              font-size:14px;
-              background:var(--bg);
-              color:var(--text);
-              box-sizing:border-box;
-            "
-          >
-        </div>
-        <div id="accessError" style="color:var(--error); font-size:13px; margin-bottom:16px; display:none;"></div>
-        <button id="accessSubmit" class="btn primary" style="width:100%; cursor:pointer;">Enter</button>
-      </div>
-    `;
-
-    const passwordInput = document.getElementById("accessPassword");
-    const submitBtn = document.getElementById("accessSubmit");
-    const errorEl = document.getElementById("accessError");
-
-    function handleSubmit() {
-      const enteredPassword = passwordInput.value.trim();
-      if (enteredPassword === ACCESS_PASSWORD) {
-        sessionStorage.setItem(sessionKey, "true");
-        accessControl.innerHTML = "";
-        renderUsers();
-        usersDirectoryWrapper.style.display = "block";
-      } else {
-        errorEl.textContent = "Incorrect password.";
-        errorEl.style.display = "block";
-        passwordInput.value = "";
-        passwordInput.focus();
-      }
-    }
-
-    submitBtn.addEventListener("click", handleSubmit);
-    passwordInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") handleSubmit();
-    });
-    passwordInput.focus();
   }
+
+  submitBtn.addEventListener("click", () => {
+    const password = passwordInput.value;
+    if (password === DIRECTORY_PASSWORD) {
+      sessionStorage.setItem("directoryAuth", "true");
+      passwordError.style.display = "none";
+      checkAuth();
+    } else {
+      passwordError.style.display = "block";
+      passwordInput.value = "";
+      passwordInput.focus();
+    }
+  });
+
+  passwordInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") submitBtn.click();
+  });
+
+  const root = document.getElementById("usersDirectory");
 
   async function renderUsers() {
     root.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:40px 20px; color:var(--muted);">Loading users...</div>`;
@@ -183,7 +134,8 @@
     }
   }
 
-  checkAccess();
+  initShell("users");
+  checkAuth();
 </script>
 
 </body>
