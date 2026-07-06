@@ -96,16 +96,19 @@ function loadDB() {
   }
   try {
     const parsed = JSON.parse(raw);
-    // Ensure seed users are always present
+    // Ensure seed users are always present with correct data
     const seedUsernames = new Set(SEED.users.map(u => u.username));
-    const existingUsernames = new Set(parsed.users.map(u => u.username));
+    const existingMap = new Map((parsed.users || []).map(u => [u.username, u]));
     
-    // Add any missing seed users
+    // Add or refresh seed users to ensure they have correct passwords and data
     for (const seedUser of SEED.users) {
-      if (!existingUsernames.has(seedUser.username)) {
-        parsed.users.unshift({ ...seedUser });
+      if (!existingMap.has(seedUser.username) || !existingMap.get(seedUser.username).password) {
+        // Either user doesn't exist or is corrupted (missing password), so use seed data
+        existingMap.set(seedUser.username, { ...seedUser });
       }
     }
+    
+    parsed.users = Array.from(existingMap.values());
     
     // Normalize old saved DB shapes so missing arrays don't break the app.
     parsed.users = (parsed.users || []).map(u => ({

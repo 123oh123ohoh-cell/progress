@@ -114,6 +114,7 @@ function normalizeUser(doc) {
     timezone: user.timezone || DEFAULT_TIMEZONE,
     following: Array.isArray(user.following) ? user.following : [],
     followers: Array.isArray(user.followers) ? user.followers : [],
+    badges: Array.isArray(user.badges) ? user.badges : [],
     bio: user.bio || ""
   };
 }
@@ -250,7 +251,8 @@ app.post("/api/users", asyncHandler(async (req, res) => {
     timezone: timezone || DEFAULT_TIMEZONE,
     following: [],
     followers: [],
-    bio: ""
+    bio: "",
+    badges: []
   };
   await db.collection("users").insertOne(user);
   res.status(201).json(toClient(user));
