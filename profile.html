@@ -59,6 +59,14 @@
     }
   }
 
+  async function refreshNowPlaying() {
+    const slot = document.getElementById("nowPlayingSlot");
+    if (!slot || !user) return;
+    if (!user.spotifyAccount || !user.spotifyAccount.connected) { slot.innerHTML = ""; return; }
+    const data = await fetchSpotifyNowPlaying(user.id);
+    slot.innerHTML = renderNowPlayingWidget(data);
+  }
+
   async function start() {
     initShell("profile");
     user = Progress.getCurrentUser();
@@ -70,11 +78,20 @@
         </div>`;
       return;
     }
+    const spotifyStatus = params.get("spotify");
+    if (spotifyStatus === "connected") {
+      showToast("Spotify connected!");
+      history.replaceState(null, "", "profile.html?tab=settings");
+    } else if (spotifyStatus === "error") {
+      showToast("Couldn't connect Spotify. Please try again.");
+      history.replaceState(null, "", "profile.html?tab=settings");
+    }
     render();
     Progress.loadFromApi().then(() => {
       user = Progress.getCurrentUser();
       render();
     }).catch(() => {});
+    setInterval(refreshNowPlaying, 30000);
   }
 
   start();
@@ -121,6 +138,7 @@
     const content = document.getElementById("tabContent");
     if (activeTab === "profile") {
       content.innerHTML = `
+        <div id="nowPlayingSlot"></div>
         <div class="settings-section">
           <h3>Joined</h3>
           <p style="margin:0;">${Progress.formatDate(user.joined || "Unknown")}</p>
@@ -129,6 +147,11 @@
           <h3>Bio</h3>
           <div class="bio-text">${user.bio ? renderEmoticonsText(user.bio, "bio-emoticon") : `<span style="color:var(--muted);">No bio yet.</span>`}</div>
         </div>
+        ${user.spotify ? `
+        <div class="settings-section">
+          <h3>Featured track</h3>
+          ${renderSpotifyEmbed(user)}
+        </div>` : ""}
         <div class="settings-section">
           <h3>Timezone</h3>
           <p style="margin:0;">${user.timezone || Progress.getTimeZone()}</p>
@@ -165,6 +188,28 @@
           <div class="field-note">Use <code>:computer:</code>, <code>:dead:</code>, <code>:two:</code> for custom emoticons.</div>
         </div>
         <div class="settings-section">
+          <h3>Spotify account</h3>
+          <div id="spotifyAccountBox">
+            ${user.spotifyAccount && user.spotifyAccount.connected ? `
+              <div class="spotify-connect-row">
+                <span class="spotify-connect-status">✓ Connected${user.spotifyAccount.displayName ? ` as <a href="${user.spotifyAccount.profileUrl || "#"}" target="_blank" rel="noopener noreferrer">${escapeHTML(user.spotifyAccount.displayName)}</a>` : ""}</span>
+                <button class="btn danger" id="disconnectSpotifyBtn">Disconnect</button>
+              </div>
+            ` : `
+              <div class="spotify-connect-row">
+                <button class="btn" id="connectSpotifyBtn">Connect Spotify</button>
+              </div>
+            `}
+          </div>
+          <p class="field-note">Connect your real Spotify account to show what you're currently listening to on your profile. Anyone who visits your profile can see it.</p>
+        </div>
+        <div class="settings-section">
+          <h3>Featured Spotify link</h3>
+          <div class="field"><input id="spotifyField" placeholder="Paste a Spotify track, album, playlist, or artist link" value="${escapeHTML(user.spotify || "")}"></div>
+          <p class="field-note">Right-click a song, album, playlist, or artist in Spotify → Share → Copy Link, then paste it here. It'll show up as a mini player on your profile.</p>
+          <div id="spotifyPreview">${renderSpotifyEmbed(user)}</div>
+        </div>
+        <div class="settings-section">
           <h3>Timezone</h3>
           <div class="field">
             <select id="timezoneField">
@@ -187,8 +232,10 @@
         const name = document.getElementById("nameField").value.trim();
         const bio = document.getElementById("bioField").value.trim();
         const timezone = document.getElementById("timezoneField").value;
+        const spotify = document.getElementById("spotifyField").value.trim();
         if (!name) { showToast("Display name can't be empty."); return; }
-        const updated = await Progress.updateProfile({ name, bio, timezone });
+        if (spotify && !spotifyEmbedUrl(spotify)) { showToast("That doesn't look like a valid Spotify link."); return; }
+        const updated = await Progress.updateProfile({ name, bio, timezone, spotify });
         if (!updated) {
           showToast("Could not save settings.");
           return;
@@ -197,6 +244,7 @@
         user.name = name;
         user.bio = bio;
         user.timezone = timezone;
+        user.spotify = spotify;
         render();
         showToast("Settings saved.");
       });
@@ -248,6 +296,49 @@
       timezoneField.addEventListener("change", () => {
         timezonePreview.textContent = formatZonePreview(timezoneField.value);
       });
+
+      const spotifyField = document.getElementById("spotifyField");
+      const spotifyPreview = document.getElementById("spotifyPreview");
+      let spotifyPreviewTimer;
+      spotifyField.addEventListener("input", () => {
+        clearTimeout(spotifyPreviewTimer);
+        spotifyPreviewTimer = setTimeout(() => {
+          const val = spotifyField.value.trim();
+          if (!val) { spotifyPreview.innerHTML = ""; return; }
+          const embed = renderSpotifyEmbed({ spotify: val });
+          spotifyPreview.innerHTML = embed || `<p class="field-note" style="color:var(--danger);">That doesn't look like a Spotify link yet.</p>`;
+        }, 400);
+      });
+
+      const connectSpotifyBtn = document.getElementById("connectSpotifyBtn");
+      if (connectSpotifyBtn) {
+        apiFetch("/api/spotify/status").then(status => {
+          if (status && status.configured === false) {
+            connectSpotifyBtn.disabled = true;
+            connectSpotifyBtn.textContent = "Not configured yet";
+            connectSpotifyBtn.title = "Spotify integration isn't set up on this server yet.";
+          }
+        });
+        connectSpotifyBtn.addEventListener("click", () => {
+          window.location.href = `${API_BASE}/api/spotify/login?userId=${encodeURIComponent(user.id)}`;
+        });
+      }
+
+      const disconnectSpotifyBtn = document.getElementById("disconnectSpotifyBtn");
+      if (disconnectSpotifyBtn) {
+        disconnectSpotifyBtn.addEventListener("click", async () => {
+          disconnectSpotifyBtn.disabled = true;
+          const result = await apiFetch(`/api/users/${user.id}/spotify/disconnect`, { method: "POST" });
+          if (result) {
+            user = result;
+            render();
+            showToast("Disconnected Spotify.");
+          } else {
+            disconnectSpotifyBtn.disabled = false;
+            showToast("Could not disconnect. Try again.");
+          }
+        });
+      }
     }
 
     attachBadgeTooltip(wrap);

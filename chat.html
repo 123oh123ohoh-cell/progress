@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chat — Progress</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;1,500;1,600&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="nav-root"></div>
+<div id="modal-root"></div>
+
+<main class="container">
+  <header class="feed-header">
+    <h1>Chat</h1>
+    <p id="chatSub">A live, shared room for anyone hanging around Progress right now.</p>
+  </header>
+
+  <div class="chat-wrap" id="chatWrap">
+    <!-- filled by JS -->
+  </div>
+</main>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+<script>
+  const CHAT_ROOM = "global";
+  const HISTORY_LIMIT = 50;
+
+  let socket = null;
+  let reconnectDelay = 1000;
+  let reconnectTimer = null;
+  let manuallyClosed = false;
+  let typingTimeout = null;
+  let lastTypingSent = 0;
+  const seenMessageIds = new Set();
+
+  function wsUrl(room, username) {
+    const httpBase = API_BASE.replace(/\/$/, "");
+    const wsBase = httpBase.replace(/^https:/, "wss:").replace(/^http:/, "ws:");
+    return `${wsBase}/ws/chat?room=${encodeURIComponent(room)}&username=${encodeURIComponent(username)}`;
+  }
+
+  function setStatus(text, cls) {
+    const el = document.getElementById("chatStatus");
+    if (!el) return;
+    el.textContent = text;
+    el.className = "chat-status" + (cls ? ` ${cls}` : "");
+  }
+
+  function scrollToBottom(force) {
+    const log = document.getElementById("chatLog");
+    if (!log) return;
+    const nearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 120;
+    if (force || nearBottom) log.scrollTop = log.scrollHeight;
+  }
+
+  function messageRow(msg, user) {
+    const author = Progress.getUser(msg.author);
+    const mine = user && msg.author === user.username;
+    return `
+      <div class="chat-msg ${mine ? "mine" : ""}" data-id="${msg.id}">
+        ${!mine ? `<a href="user.html?username=${encodeURIComponent(msg.author)}" class="chat-avatar">${avatarHTML(author, 30)}</a>` : ""}
+        <div class="chat-bubble-col">
+          ${!mine ? `<span class="chat-author">@${escapeHTML(msg.author)}</span>` : ""}
+          <div class="chat-bubble">${renderEmoticonsText(msg.body, "inline-emoticon")}</div>
+          <span class="chat-time">${Progress.timeAgo(msg.time)}</span>
+        </div>
+      </div>`;
+  }
+
+  function appendMessage(msg, user) {
+    if (seenMessageIds.has(msg.id)) return;
+    seenMessageIds.add(msg.id);
+    const log = document.getElementById("chatLog");
+    if (!log) return;
+    log.insertAdjacentHTML("beforeend", messageRow(msg, user));
+    scrollToBottom();
+  }
+
+  function renderPresence(users) {
+    const el = document.getElementById("chatPresence");
+    if (!el) return;
+    const unique = Array.from(new Set(users || []));
+    if (!unique.length) {
+      el.textContent = "";
+      return;
+    }
+    el.textContent = unique.length === 1
+      ? `@${unique[0]} is here`
+      : `${unique.length} people here now`;
+  }
+
+  function connectSocket(user) {
+    if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+    manuallyClosed = false;
+    setStatus("Connecting…", "connecting");
+
+    try {
+      socket = new WebSocket(wsUrl(CHAT_ROOM, user.username));
+    } catch (e) {
+      setStatus("Can't connect", "offline");
+      scheduleReconnect(user);
+      return;
+    }
+
+    socket.addEventListener("open", () => {
+      reconnectDelay = 1000;
+      setStatus("Live", "online");
+    });
+
+    socket.addEventListener("message", (event) => {
+      let data;
+      try { data = JSON.parse(event.data); } catch (e) { return; }
+      if (data.type === "message") {
+        appendMessage(data.message, user);
+      } else if (data.type === "presence") {
+        renderPresence(data.users);
+      } else if (data.type === "typing") {
+        showTypingHint(data.username, user);
+      }
+    });
+
+    socket.addEventListener("close", () => {
+      if (manuallyClosed) return;
+      setStatus("Reconnecting…", "offline");
+      scheduleReconnect(user);
+    });
+
+    socket.addEventListener("error", () => {
+      socket.close();
+    });
+  }
+
+  function scheduleReconnect(user) {
+    if (reconnectTimer) return;
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null;
+      connectSocket(user);
+    }, reconnectDelay);
+    reconnectDelay = Math.min(reconnectDelay * 2, 15000);
+  }
+
+  let typingHintTimer = null;
+  function showTypingHint(username, user) {
+    if (!username || username === user.username) return;
+    const el = document.getElementById("chatTyping");
+    if (!el) return;
+    el.textContent = `@${username} is typing…`;
+    clearTimeout(typingHintTimer);
+    typingHintTimer = setTimeout(() => { el.textContent = ""; }, 2500);
+  }
+
+  async function loadHistory(user) {
+    const log = document.getElementById("chatLog");
+    const history = await apiFetch(`/api/chat/messages?room=${encodeURIComponent(CHAT_ROOM)}&limit=${HISTORY_LIMIT}`);
+    if (!history) {
+      log.innerHTML = `<div class="chat-empty">Couldn't load history — messages sent from here will still go out live.</div>`;
+      return;
+    }
+    if (!history.length) {
+      log.innerHTML = `<div class="chat-empty">No messages yet. Say hello.</div>`;
+      return;
+    }
+    log.innerHTML = "";
+    history.forEach(msg => appendMessage(msg, user));
+    scrollToBottom(true);
+  }
+
+  function sendMessage(user, text) {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ type: "send", body: trimmed }));
+    } else {
+      // Socket down — fall back to REST so the message still lands.
+      apiFetch("/api/chat/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ room: CHAT_ROOM, author: user.username, body: trimmed })
+      }).then(msg => { if (msg) appendMessage(msg, user); });
+    }
+  }
+
+  function renderLoggedOut() {
+    const wrap = document.getElementById("chatWrap");
+    wrap.innerHTML = `
+      <div class="feed-empty" style="padding-top:60px;">
+        <h3>Log in to join the chat</h3>
+        <p>Use the account menu in the top right to log in or create an account.</p>
+      </div>`;
+  }
+
+  function renderChat(user) {
+    const wrap = document.getElementById("chatWrap");
+    wrap.innerHTML = `
+      <div class="chat-panel">
+        <div class="chat-panel-head">
+          <span class="chat-status" id="chatStatus">Connecting…</span>
+          <span class="chat-presence" id="chatPresence"></span>
+        </div>
+        <div class="chat-log" id="chatLog">
+          <div class="chat-empty">Loading…</div>
+        </div>
+        <div class="chat-typing" id="chatTyping"></div>
+        <form class="chat-input-row" id="chatForm">
+          <input type="text" id="chatInput" class="chat-input" placeholder="Say something…" maxlength="2000" autocomplete="off">
+          <button type="submit" class="btn primary">Send</button>
+        </form>
+      </div>
+    `;
+
+    const form = document.getElementById("chatForm");
+    const input = document.getElementById("chatInput");
+
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      sendMessage(user, input.value);
+      input.value = "";
+    });
+
+    input.addEventListener("input", () => {
+      const now = Date.now();
+      if (socket && socket.readyState === WebSocket.OPEN && now - lastTypingSent > 1500) {
+        lastTypingSent = now;
+        socket.send(JSON.stringify({ type: "typing" }));
+      }
+    });
+
+    loadHistory(user);
+    connectSocket(user);
+  }
+
+  async function start() {
+    initShell("chat");
+    await Progress.loadFromApi().catch(() => {});
+    const user = Progress.getCurrentUser();
+    if (!user) {
+      renderLoggedOut();
+      return;
+    }
+    renderChat(user);
+  }
+
+  window.addEventListener("beforeunload", () => {
+    manuallyClosed = true;
+    if (socket) socket.close();
+  });
+
+  start();
+</script>
+
+</body>
+</html>

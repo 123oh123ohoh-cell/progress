@@ -60,6 +60,11 @@
           <div class="bio-text" style="margin-top:12px;">${user.bio ? renderEmoticonsText(user.bio, "bio-emoticon") : `<span style="color:var(--muted);">No bio yet.</span>`}</div>
         </div>
       </div>
+      ${user.spotify ? `
+      <div class="settings-section" style="margin-top:24px;">
+        <h3>Now playing</h3>
+        ${renderSpotifyEmbed(user)}
+      </div>` : ""}
       <div class="settings-section" style="margin-top:24px;">
         <h3>Latest posts</h3>
         <div id="publicPosts"></div>

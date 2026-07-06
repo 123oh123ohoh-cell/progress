@@ -113,6 +113,123 @@ function escapeHTML(str) {
   return div.innerHTML;
 }
 
+const SPOTIFY_EMBED_TYPES = new Set(["track", "album", "playlist", "artist", "episode", "show"]);
+const SPOTIFY_EMBED_HEIGHTS = { track: 152, episode: 232, show: 232, album: 352, playlist: 352, artist: 352 };
+
+// Parses a pasted Spotify share link (or a spotify:type:id URI) into a
+// { type, id } pair, or returns null if it doesn't look like Spotify at
+// all. `type` is always one of SPOTIFY_EMBED_TYPES and `id` is always
+// alphanumeric - callers always rebuild the embed URL from these two
+// values rather than reusing the raw input, which keeps arbitrary URLs
+// out of the embed <iframe>.
+function parseSpotifyLink(raw) {
+  if (!raw || typeof raw !== "string") return null;
+  const trimmed = raw.trim();
+  let match = trimmed.match(/^https:\/\/open\.spotify\.com\/(?:intl-[a-zA-Z-]+\/)?(track|album|playlist|artist|episode|show)\/([a-zA-Z0-9]+)(?:\?\S*)?$/i);
+  if (!match) match = trimmed.match(/^spotify:(track|album|playlist|artist|episode|show):([a-zA-Z0-9]+)$/i);
+  if (!match) return null;
+  const type = match[1].toLowerCase();
+  if (!SPOTIFY_EMBED_TYPES.has(type)) return null;
+  return { type, id: match[2] };
+}
+
+function spotifyEmbedUrl(raw) {
+  const parsed = parseSpotifyLink(raw);
+  if (!parsed) return null;
+  return `https://open.spotify.com/embed/${parsed.type}/${parsed.id}?utm_source=generator`;
+}
+
+function renderSpotifyEmbed(user) {
+  const parsed = parseSpotifyLink(user && user.spotify);
+  if (!parsed) return "";
+  const height = SPOTIFY_EMBED_HEIGHTS[parsed.type] || 352;
+  const src = `https://open.spotify.com/embed/${parsed.type}/${parsed.id}?utm_source=generator`;
+  return `<div class="spotify-embed"><iframe src="${src}" width="100%" height="${height}" frameborder="0" loading="lazy" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" title="Spotify embed"></iframe></div>`;
+}
+
+// Fetches the live "currently playing" status for a user's connected real Spotify account
+// (from the server, which proxies Spotify's Web API using the user's stored tokens).
+async function fetchSpotifyNowPlaying(userId) {
+  if (!userId) return null;
+  return apiFetch(`/api/users/${userId}/spotify/now-playing`);
+}
+
+// Renders the small "Listening on Spotify" card, or "" if nothing is currently playing.
+// Only trusts open.spotify.com/https:// URLs for the href/art src even though they already
+// came from our own server (which itself only relays Spotify's API) - cheap defense in depth.
+function renderNowPlayingWidget(data) {
+  if (!data || !data.playing) return "";
+  const p = data.playing;
+  const safeHref = p.trackUrl && p.trackUrl.startsWith("https://open.spotify.com/") ? p.trackUrl : "#";
+  const safeArt = p.albumArt && /^https:\/\//i.test(p.albumArt) ? p.albumArt : null;
+  return `
+    <a class="now-playing-widget" href="${safeHref}" target="_blank" rel="noopener noreferrer">
+      ${safeArt ? `<img src="${safeArt}" alt="">` : `<div class="now-playing-art-fallback">♪</div>`}
+      <div class="now-playing-info">
+        <span class="now-playing-label">${p.isPlaying ? "Listening on Spotify" : "Paused on Spotify"}</span>
+        <span class="now-playing-track">${escapeHTML(p.trackName || "")}</span>
+        <span class="now-playing-artist">${escapeHTML(p.artistNames || "")}</span>
+      </div>
+    </a>`;
+}
+
+const YOUTUBE_URL_PATTERNS = [
+  /^https?:\/\/(?:www\.|m\.)?youtube\.com\/watch\?(?:[^\s#]*&)?v=([a-zA-Z0-9_-]{11})(?:[&#][^\s]*)?$/i,
+  /^https?:\/\/(?:www\.)?youtu\.be\/([a-zA-Z0-9_-]{11})(?:[?#][^\s]*)?$/i,
+  /^https?:\/\/(?:www\.|m\.)?youtube(?:-nocookie)?\.com\/(?:embed|shorts|live)\/([a-zA-Z0-9_-]{11})(?:[?#][^\s]*)?$/i
+];
+
+// Parses a pasted YouTube video link into a { id, start } pair, or returns
+// null if it doesn't look like YouTube at all. `id` is always an
+// 11-character [a-zA-Z0-9_-] token and `start` is always a non-negative
+// integer (seconds) - callers always rebuild the embed URL from these two
+// values rather than reusing the raw input, which keeps arbitrary URLs
+// out of the embed <iframe>.
+function parseYouTubeLink(raw) {
+  if (!raw || typeof raw !== "string") return null;
+  const trimmed = raw.trim();
+  let id = null;
+  for (const re of YOUTUBE_URL_PATTERNS) {
+    const match = trimmed.match(re);
+    if (match) { id = match[1]; break; }
+  }
+  if (!id) return null;
+  return { id, start: parseYouTubeStart(trimmed) };
+}
+
+// Extracts a start time in seconds from a YouTube URL's `t=`/`start=` query
+// param. Supports plain seconds ("t=90") and the "1h2m3s" style YouTube
+// uses when you copy a link at a specific timestamp.
+function parseYouTubeStart(raw) {
+  const match = raw.match(/[?&#](?:t|start)=([0-9hms]+)/i);
+  if (!match) return 0;
+  const value = match[1];
+  if (/^\d+$/.test(value)) return parseInt(value, 10);
+  let seconds = 0;
+  (value.match(/\d+[hms]/gi) || []).forEach(part => {
+    const n = parseInt(part, 10);
+    const unit = part.slice(-1).toLowerCase();
+    if (unit === "h") seconds += n * 3600;
+    else if (unit === "m") seconds += n * 60;
+    else seconds += n;
+  });
+  return seconds;
+}
+
+// Returns a self-contained "card" of HTML (wrapping <div> + <iframe>) for a
+// YouTube link, or "" if the link doesn't parse. Used by the post editor to
+// embed an actual playable video inline in the entry content - the returned
+// HTML is inserted directly into the contenteditable canvas and saved as
+// part of the post's HTML content, same as inline images. The iframe `src`
+// is always rebuilt from the regex-captured id/start, never the raw pasted
+// string, for the same injection-safety reason as the Spotify embed.
+function renderYouTubeEmbed(raw) {
+  const parsed = parseYouTubeLink(raw);
+  if (!parsed) return "";
+  const src = `https://www.youtube-nocookie.com/embed/${parsed.id}${parsed.start ? `?start=${parsed.start}` : ""}`;
+  return `<div class="yt-embed" contenteditable="false"><iframe src="${src}" width="100%" height="315" title="YouTube video player" frameborder="0" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>`;
+}
+
 function getEmoticonNames() {
   return [...EMOTICON_NAMES];
 }

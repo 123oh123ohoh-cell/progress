@@ -2,7 +2,9 @@ require("dotenv").config();
 const express = require("express");
 const path = require("path");
 const crypto = require("crypto");
+const http = require("http");
 const { MongoClient } = require("mongodb");
+const { WebSocketServer } = require("ws");
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -17,6 +19,33 @@ if (!mongoUri) {
 
 const DEFAULT_TIMEZONE = "UTC";
 const ALLOWED_CREATOR_USERNAMES = new Set(["mara", "own", "progresstesting1"]);
+const DEFAULT_CHAT_ROOM = "global";
+
+// Matches a Spotify share link (open.spotify.com/<type>/<id>, optionally
+// with an "intl-xx" locale prefix and/or a "?si=..." query string) or a
+// "spotify:<type>:<id>" URI. Used to validate the `spotify` profile field
+// before storing it - the embed <iframe src> the client renders is always
+// rebuilt from the matched type/id, never the raw stored string, so this
+// whitelist is what keeps arbitrary URLs from ever reaching that iframe.
+const SPOTIFY_LINK_RE = /^(?:https:\/\/open\.spotify\.com\/(?:intl-[a-zA-Z-]+\/)?(?:track|album|playlist|artist|episode|show)\/[a-zA-Z0-9]+(?:\?[^\s]*)?|spotify:(?:track|album|playlist|artist|episode|show):[a-zA-Z0-9]+)$/i;
+
+// Real Spotify account OAuth ("Connect with Spotify" -> live currently-playing widget).
+// Client secret is server-side only, never sent to the browser.
+const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID || "";
+const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET || "";
+const SPOTIFY_REDIRECT_URI = process.env.SPOTIFY_REDIRECT_URI || "http://127.0.0.1:3000/api/spotify/callback";
+// Minimal scopes: just enough to read currently-playing + a display name/avatar for the "connected as" label.
+const SPOTIFY_SCOPES = "user-read-currently-playing user-read-private";
+// Short-lived, single-use CSRF state tokens for the OAuth flow: state -> { userId, expires }.
+// In-memory is fine for a single free-tier instance - if the process restarts mid-flow the user
+// just clicks "Connect Spotify" again (the whole login->callback round trip normally takes seconds).
+const spotifyOAuthStates = new Map();
+function cleanupSpotifyOAuthStates() {
+  const now = Date.now();
+  for (const [state, entry] of spotifyOAuthStates) {
+    if (entry.expires < now) spotifyOAuthStates.delete(state);
+  }
+}
 
 // Badges awarded automatically based on username at signup time. This is
 // computed server-side (never trusted from the request body) so a client
@@ -43,6 +72,7 @@ const DEFAULT_SEED = {
       following: [],
       followers: [],
       bio: "",
+      spotify: "",
       badges: ["dexterity"]
     }
   ],
@@ -174,7 +204,8 @@ function normalizeUser(doc) {
     following: Array.isArray(user.following) ? user.following : [],
     followers: Array.isArray(user.followers) ? user.followers : [],
     badges: Array.isArray(user.badges) ? user.badges : [],
-    bio: user.bio || ""
+    bio: user.bio || "",
+    spotify: user.spotify || ""
   };
 }
 
@@ -186,6 +217,11 @@ function publicUser(user) {
   } else if (displayBadge === "creator") {
     displayBadge = null;
   }
+  // Only ever expose the public-safe bits of a connected Spotify account -
+  // never accessToken/refreshToken/spotifyId, which stay server-side only.
+  const spotifyAccount = user.spotifyAccount && user.spotifyAccount.connected
+    ? { connected: true, displayName: user.spotifyAccount.spotifyName || null, profileUrl: user.spotifyAccount.spotifyProfileUrl || null }
+    : { connected: false, displayName: null, profileUrl: null };
   return {
     id: user.id,
     username: user.username,
@@ -194,6 +230,8 @@ function publicUser(user) {
     joined: user.joined,
     timezone: user.timezone,
     bio: user.bio || "",
+    spotify: user.spotify || "",
+    spotifyAccount,
     badges,
     displayBadge,
     followers: user.followers || [],
@@ -208,6 +246,36 @@ function normalizePost(doc) {
     likes: typeof post.likes === "number" ? post.likes : 0,
     likedBy: Array.isArray(post.likedBy) ? post.likedBy : []
   };
+}
+
+function normalizeChatMessage(doc) {
+  return toClient(doc);
+}
+
+// room -> Set<ws>. In-memory only (fine for a single instance) - message
+// history itself lives in Mongo via createChatMessage/GET /api/chat/messages.
+const chatRooms = new Map();
+
+function chatRoomClients(room) {
+  let set = chatRooms.get(room);
+  if (!set) {
+    set = new Set();
+    chatRooms.set(room, set);
+  }
+  return set;
+}
+
+function broadcastToRoom(room, payload) {
+  const json = JSON.stringify(payload);
+  for (const client of chatRoomClients(room)) {
+    if (client.readyState === client.OPEN) client.send(json);
+  }
+}
+
+function roomPresence(room) {
+  return Array.from(chatRoomClients(room))
+    .map(c => c.username)
+    .filter(Boolean);
 }
 
 let db;
@@ -225,6 +293,7 @@ async function seedIfNeeded() {
   const posts = db.collection("posts");
   const comments = db.collection("comments");
   const notifications = db.collection("notifications");
+  const messages = db.collection("messages");
 
   // Create indexes for data integrity and query performance
   try {
@@ -232,6 +301,7 @@ async function seedIfNeeded() {
     await posts.createIndex({ author: 1, createdAt: -1 });
     await comments.createIndex({ postId: 1, time: 1 });
     await notifications.createIndex({ recipient: 1, time: -1 });
+    await messages.createIndex({ room: 1, time: 1 });
   } catch (e) {
     // Indexes may already exist, which is fine
     if (!e.message.includes("already exists")) {
@@ -325,6 +395,7 @@ app.post("/api/users", asyncHandler(async (req, res) => {
     following: [],
     followers: [],
     bio: "",
+    spotify: "",
     // Badges are decided by the server from the username, never trusted
     // from the request body - see SIGNUP_BADGE_AWARDS.
     badges: SIGNUP_BADGE_AWARDS[normalizedUsername] || []
@@ -338,12 +409,19 @@ app.patch("/api/users/:id", asyncHandler(async (req, res) => {
   const users = db.collection("users");
   const doc = await users.findOne({ _id: req.params.id });
   if (!doc) return res.status(404).json({ error: "User not found" });
-  const { name, timezone, avatar, bio, displayBadge } = req.body;
+  const { name, timezone, avatar, bio, displayBadge, spotify } = req.body;
   const update = {};
   if (typeof name === "string") update.name = name;
   if (typeof timezone === "string") update.timezone = timezone;
   if (typeof avatar !== "undefined") update.avatar = avatar;
   if (typeof bio === "string") update.bio = bio;
+  if (typeof spotify === "string") {
+    const trimmedSpotify = spotify.trim();
+    if (trimmedSpotify && (trimmedSpotify.length > 300 || !SPOTIFY_LINK_RE.test(trimmedSpotify))) {
+      return res.status(400).json({ error: "That doesn't look like a valid Spotify link." });
+    }
+    update.spotify = trimmedSpotify;
+  }
   if (typeof displayBadge !== "undefined") {
     if (displayBadge === null) {
       update.displayBadge = null;
@@ -467,6 +545,156 @@ app.post("/api/users/:id/unfollow", asyncHandler(async (req, res) => {
   await users.updateOne({ _id: target._id }, { $set: { followers: targetFollowers } });
 
   res.json({ follower: follower.username, target: target.username });
+}));
+
+// ---- Spotify account OAuth ("Connect with Spotify") ----
+
+app.get("/api/spotify/status", (req, res) => {
+  res.json({ configured: !!(SPOTIFY_CLIENT_ID && SPOTIFY_CLIENT_SECRET) });
+});
+
+app.get("/api/spotify/login", asyncHandler(async (req, res) => {
+  if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET) {
+    return res.status(503).send("Spotify integration isn't configured on this server yet.");
+  }
+  const userId = req.query.userId;
+  if (!userId) return res.status(400).send("Missing userId");
+  const user = await db.collection("users").findOne({ _id: userId });
+  if (!user) return res.status(404).send("User not found");
+
+  cleanupSpotifyOAuthStates();
+  const state = crypto.randomBytes(24).toString("hex");
+  spotifyOAuthStates.set(state, { userId, expires: Date.now() + 10 * 60 * 1000 });
+
+  const authorizeUrl = new URL("https://accounts.spotify.com/authorize");
+  authorizeUrl.searchParams.set("response_type", "code");
+  authorizeUrl.searchParams.set("client_id", SPOTIFY_CLIENT_ID);
+  authorizeUrl.searchParams.set("scope", SPOTIFY_SCOPES);
+  authorizeUrl.searchParams.set("redirect_uri", SPOTIFY_REDIRECT_URI);
+  authorizeUrl.searchParams.set("state", state);
+  res.redirect(authorizeUrl.toString());
+}));
+
+app.get("/api/spotify/callback", asyncHandler(async (req, res) => {
+  const redirectError = () => res.redirect("/profile.html?tab=settings&spotify=error");
+  const { code, state, error } = req.query;
+  if (error || !code || !state || !spotifyOAuthStates.has(state)) return redirectError();
+
+  const pending = spotifyOAuthStates.get(state);
+  spotifyOAuthStates.delete(state); // single-use
+  if (pending.expires < Date.now()) return redirectError();
+
+  try {
+    const tokenRes = await fetch("https://accounts.spotify.com/api/token", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Authorization": "Basic " + Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString("base64")
+      },
+      body: new URLSearchParams({ grant_type: "authorization_code", code, redirect_uri: SPOTIFY_REDIRECT_URI })
+    });
+    if (!tokenRes.ok) return redirectError();
+    const tokens = await tokenRes.json();
+
+    let profile = null;
+    try {
+      const profileRes = await fetch("https://api.spotify.com/v1/me", {
+        headers: { "Authorization": `Bearer ${tokens.access_token}` }
+      });
+      if (profileRes.ok) profile = await profileRes.json();
+    } catch (e) {
+      profile = null;
+    }
+
+    await db.collection("users").updateOne({ _id: pending.userId }, { $set: {
+      spotifyAccount: {
+        connected: true,
+        spotifyId: profile ? profile.id : null,
+        spotifyName: profile ? profile.display_name : null,
+        spotifyProfileUrl: profile && profile.external_urls ? profile.external_urls.spotify : null,
+        accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token,
+        accessTokenExpires: Date.now() + (tokens.expires_in * 1000)
+      }
+    }});
+
+    res.redirect("/profile.html?tab=settings&spotify=connected");
+  } catch (e) {
+    console.error("Spotify OAuth callback failed:", e);
+    redirectError();
+  }
+}));
+
+// Returns a valid access token for a user's connected Spotify account, refreshing it first if
+// it's expired (or about to expire). Returns null if not connected or the refresh fails.
+async function getValidSpotifyAccessToken(userDoc) {
+  const acct = userDoc.spotifyAccount;
+  if (!acct || !acct.refreshToken) return null;
+  if (acct.accessToken && acct.accessTokenExpires && acct.accessTokenExpires > Date.now() + 5000) {
+    return acct.accessToken;
+  }
+  try {
+    const tokenRes = await fetch("https://accounts.spotify.com/api/token", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Authorization": "Basic " + Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString("base64")
+      },
+      body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: acct.refreshToken })
+    });
+    if (!tokenRes.ok) return null;
+    const tokens = await tokenRes.json();
+    const update = {
+      "spotifyAccount.accessToken": tokens.access_token,
+      "spotifyAccount.accessTokenExpires": Date.now() + (tokens.expires_in * 1000)
+    };
+    if (tokens.refresh_token) update["spotifyAccount.refreshToken"] = tokens.refresh_token;
+    await db.collection("users").updateOne({ _id: userDoc._id }, { $set: update });
+    return tokens.access_token;
+  } catch (e) {
+    return null;
+  }
+}
+
+app.get("/api/users/:id/spotify/now-playing", asyncHandler(async (req, res) => {
+  const userDoc = await db.collection("users").findOne({ _id: req.params.id });
+  if (!userDoc) return res.status(404).json({ error: "User not found" });
+  if (!userDoc.spotifyAccount || !userDoc.spotifyAccount.connected) {
+    return res.json({ connected: false, playing: null });
+  }
+  const accessToken = await getValidSpotifyAccessToken(userDoc);
+  if (!accessToken) return res.json({ connected: true, playing: null });
+
+  try {
+    const npRes = await fetch("https://api.spotify.com/v1/me/player/currently-playing", {
+      headers: { "Authorization": `Bearer ${accessToken}` }
+    });
+    if (npRes.status !== 200) return res.json({ connected: true, playing: null });
+    const data = await npRes.json().catch(() => null);
+    if (!data || !data.item) return res.json({ connected: true, playing: null });
+    const images = (data.item.album && data.item.album.images) || [];
+    return res.json({
+      connected: true,
+      playing: {
+        isPlaying: !!data.is_playing,
+        trackName: data.item.name,
+        artistNames: (data.item.artists || []).map(a => a.name).join(", "),
+        albumArt: (images[1] && images[1].url) || (images[0] && images[0].url) || null,
+        trackUrl: (data.item.external_urls && data.item.external_urls.spotify) || null
+      }
+    });
+  } catch (e) {
+    return res.json({ connected: true, playing: null });
+  }
+}));
+
+app.post("/api/users/:id/spotify/disconnect", asyncHandler(async (req, res) => {
+  const users = db.collection("users");
+  const doc = await users.findOne({ _id: req.params.id });
+  if (!doc) return res.status(404).json({ error: "User not found" });
+  await users.updateOne({ _id: req.params.id }, { $unset: { spotifyAccount: "" } });
+  const updated = await users.findOne({ _id: req.params.id });
+  res.json(publicUser(normalizeUser(updated)));
 }));
 
 app.get("/api/posts", asyncHandler(async (req, res) => {
@@ -608,6 +836,52 @@ app.post("/api/notifications/mark-seen", asyncHandler(async (req, res) => {
   res.json({ ok: true });
 }));
 
+// ---- Realtime chat ----
+// `room` is a free-form string. "global" is the one shared room the current
+// UI uses; a 1-on-1 room can reuse this same storage/broadcast machinery
+// later with an id like `dm:<usernameA>:<usernameB>` (usernames sorted so
+// both participants land in the same room). Nothing below assumes "global"
+// specifically.
+
+// Shared by both the REST fallback and the WebSocket "send" handler so a
+// message is stored and broadcast identically no matter which path sent it.
+async function createChatMessage({ room, author, body }) {
+  const targetRoom = (room || DEFAULT_CHAT_ROOM).toString().slice(0, 200);
+  const trimmed = (body || "").toString().trim();
+  if (!author || !trimmed) return null;
+  const message = {
+    _id: generateId("m"),
+    room: targetRoom,
+    author,
+    body: trimmed.slice(0, 2000),
+    time: new Date().toISOString()
+  };
+  await db.collection("messages").insertOne(message);
+  const clientMessage = normalizeChatMessage(message);
+  broadcastToRoom(targetRoom, { type: "message", message: clientMessage });
+  return clientMessage;
+}
+
+app.get("/api/chat/messages", asyncHandler(async (req, res) => {
+  const room = (req.query.room || DEFAULT_CHAT_ROOM).toString().slice(0, 200);
+  const limit = Math.min(parseInt(req.query.limit, 10) || 50, 200);
+  const docs = await db.collection("messages")
+    .find({ room })
+    .sort({ time: -1 })
+    .limit(limit)
+    .toArray();
+  res.json(docs.map(normalizeChatMessage).reverse());
+}));
+
+// REST fallback for sending a message when a client's WebSocket connection
+// isn't available - still broadcasts to any WS clients in the room via
+// createChatMessage(), so it never creates a message only the sender sees.
+app.post("/api/chat/messages", asyncHandler(async (req, res) => {
+  const message = await createChatMessage(req.body);
+  if (!message) return res.status(400).json({ error: "author and body are required" });
+  res.status(201).json(message);
+}));
+
 app.post("/api/login", asyncHandler(async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) return res.status(400).json({ error: "username and password are required" });
@@ -638,7 +912,68 @@ app.use((err, req, res, next) => {
 
 connect()
   .then(() => {
-    app.listen(port, () => {
+    const server = http.createServer(app);
+
+    // ---- Chat WebSocket upgrade ----
+    // Path: /ws/chat?room=<room>&username=<username>
+    // Trusts the `username` query param the same way the REST routes trust
+    // `author`/`username` fields in the body - there's no session/token auth
+    // anywhere else in this API yet, so this matches the existing model
+    // rather than introducing a new one just for chat.
+    const wss = new WebSocketServer({ noServer: true });
+
+    wss.on("connection", (ws, req, { room, username }) => {
+      ws.room = room;
+      ws.username = username;
+      chatRoomClients(room).add(ws);
+      broadcastToRoom(room, { type: "presence", room, users: roomPresence(room) });
+
+      ws.on("message", raw => {
+        let data;
+        try {
+          data = JSON.parse(raw.toString());
+        } catch (e) {
+          return;
+        }
+        if (data.type === "send") {
+          createChatMessage({ room: ws.room, author: ws.username, body: data.body }).catch(err => {
+            console.error("Chat message failed:", err);
+          });
+        } else if (data.type === "typing") {
+          broadcastToRoom(ws.room, { type: "typing", room: ws.room, username: ws.username });
+        }
+      });
+
+      ws.on("close", () => {
+        chatRoomClients(room).delete(ws);
+        broadcastToRoom(room, { type: "presence", room, users: roomPresence(room) });
+      });
+    });
+
+    server.on("upgrade", (req, socket, head) => {
+      let url;
+      try {
+        url = new URL(req.url, "http://localhost");
+      } catch (e) {
+        socket.destroy();
+        return;
+      }
+      if (url.pathname !== "/ws/chat") {
+        socket.destroy();
+        return;
+      }
+      const username = (url.searchParams.get("username") || "").trim();
+      const room = (url.searchParams.get("room") || DEFAULT_CHAT_ROOM).trim().slice(0, 200) || DEFAULT_CHAT_ROOM;
+      if (!username) {
+        socket.destroy();
+        return;
+      }
+      wss.handleUpgrade(req, socket, head, ws => {
+        wss.emit("connection", ws, req, { room, username });
+      });
+    });
+
+    server.listen(port, () => {
       console.log(`Server running on port ${port}`);
     });
   })
@@ -646,4 +981,3 @@ connect()
     console.error("Failed to connect to MongoDB:", err);
     process.exit(1);
   });
-
