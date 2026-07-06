@@ -431,6 +431,13 @@ function mountModals() {
     if (label) button.textContent = label;
   }
 
+  function withWakingLabel(button, label) {
+    const timer = setTimeout(() => {
+      if (button.disabled) button.textContent = label;
+    }, 4000);
+    return () => clearTimeout(timer);
+  }
+
   document.getElementById("loginSubmit").addEventListener("click", async () => {
     const username = document.getElementById("loginUsername").value;
     const password = document.getElementById("loginPassword").value;
@@ -438,7 +445,9 @@ function mountModals() {
     errEl.classList.remove("show");
     errEl.textContent = "";
     setModalButtonState(loginSubmit, false, "Logging in...");
+    const stopWaking = withWakingLabel(loginSubmit, "Waking up server\u2026");
     const res = await Progress.login(username, password);
+    stopWaking();
     setModalButtonState(loginSubmit, true, "Log in");
     if (!res.ok) {
       errEl.textContent = res.error;
@@ -458,7 +467,9 @@ function mountModals() {
     errEl.classList.remove("show");
     errEl.textContent = "";
     setModalButtonState(signupSubmit, false, "Creating...");
+    const stopWaking = withWakingLabel(signupSubmit, "Waking up server\u2026");
     const res = await Progress.signup(username, name, password);
+    stopWaking();
     setModalButtonState(signupSubmit, true, "Create account");
     if (!res.ok) {
       errEl.textContent = res.error;
@@ -466,7 +477,9 @@ function mountModals() {
       return;
     }
     hideModal();
-    showToast(`Account created. Welcome, ${res.user.name.split(" ")[0]}.`);
+    showToast(res.offline
+      ? "Account created locally. It'll finish syncing once the server's reachable."
+      : `Account created. Welcome, ${res.user.name.split(" ")[0]}.`);
     setTimeout(() => location.reload(), 500);
   });
 

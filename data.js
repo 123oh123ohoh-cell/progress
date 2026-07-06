@@ -38,6 +38,32 @@ async function apiFetch(path, options = {}) {
   }
 }
 
+/* Like apiFetch, but preserves the server's response even on non-2xx status
+   codes (e.g. 401 invalid credentials, 409 username taken) instead of
+   collapsing every kind of failure into `null`. Login/signup need to be able
+   to tell "the server said no" apart from "the server was never reached"
+   (asleep/offline/slow) so they can show an accurate error instead of a
+   misleading one. `status: 0` means the request never got a response. */
+async function apiFetchAuth(path, options = {}, timeoutMs = 8000) {
+  const url = path.startsWith("http://") || path.startsWith("https://") ? path : API_BASE + path;
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    let res;
+    try {
+      res = await fetch(url, { ...options, signal: controller.signal });
+    } finally {
+      clearTimeout(timeout);
+    }
+    let body = null;
+    try { body = await res.json(); } catch (e) { body = null; }
+    if (!res.ok) return { ok: false, status: res.status, error: (body && body.error) || null };
+    return { ok: true, status: res.status, data: body };
+  } catch (e) {
+    return { ok: false, status: 0, error: null };
+  }
+}
+
 const SEED = {
   currentUser: null, // null = logged out
   users: [
@@ -411,62 +437,54 @@ const Progress = {
 
   async login(username, password) {
     username = username.trim();
-    const localUser = this.db.users.find(u => u.username.toLowerCase() === username.toLowerCase());
-    if (localUser) {
-      if (localUser.password !== password) return { ok: false, error: "That username and password don't match." };
-      this.db.currentUser = localUser.username;
-      this.persist();
-      if (API_ENABLED) {
-        const loginBody = JSON.stringify({ username, password });
-        apiFetch("/api/login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: loginBody
-        }).then(payload => {
-          if (payload && !payload.error) {
-            const user = { ...payload, password };
-            const existing = this.db.users.find(u => u.username === user.username);
-            if (existing) Object.assign(existing, user);
-            else this.db.users.push(user);
-            this.persist();
-          }
-        }).catch(() => {});
+    if (!username || !password) return { ok: false, error: "Enter your username and password." };
+
+    if (API_ENABLED) {
+      const loginBody = JSON.stringify({ username, password });
+      const headers = { "Content-Type": "application/json" };
+      let result = await apiFetchAuth("/api/login", { method: "POST", headers, body: loginBody });
+      if (result.status === 0) {
+        // First attempt got no response at all (likely a free-tier cold
+        // boot) - give it one longer-timeout retry before giving up.
+        result = await apiFetchAuth("/api/login", { method: "POST", headers, body: loginBody }, 20000);
       }
-      return { ok: true, user: localUser };
+      if (result.ok) {
+        const user = { ...result.data, password };
+        const existing = this.db.users.find(u => u.username === user.username);
+        if (existing) Object.assign(existing, user);
+        else this.db.users.push(user);
+        this.db.currentUser = user.username;
+        this.persist();
+        return { ok: true, user };
+      }
+      if (result.status === 0) {
+        // The server was genuinely unreachable (offline, or no local dev
+        // backend running) - fall back to a locally cached account instead
+        // of incorrectly telling the user their password is wrong.
+        const localUser = this.db.users.find(u => u.username.toLowerCase() === username.toLowerCase());
+        if (localUser && localUser.password === password) {
+          this.db.currentUser = localUser.username;
+          this.persist();
+          return { ok: true, user: localUser };
+        }
+        return { ok: false, error: "Couldn't reach the server. Check your connection and try again in a moment." };
+      }
+      // The server responded definitively (e.g. 401 invalid credentials) -
+      // trust that answer rather than a possibly-stale local cache.
+      return { ok: false, error: result.error || "That username and password don't match." };
     }
 
-    if (!API_ENABLED) {
-      return { ok: false, error: "That username and password don't match." };
-    }
-
-    const loginBody = JSON.stringify({ username, password });
-    let payload = await apiFetch("/api/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: loginBody
-    });
-    if (!payload) {
-      payload = await apiFetch("/api/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: loginBody
-      });
-    }
-    if (payload && !payload.error) {
-      const user = { ...payload, password };
-      const existing = this.db.users.find(u => u.username === user.username);
-      if (existing) Object.assign(existing, user);
-      else this.db.users.push(user);
-      this.db.currentUser = user.username;
-      this.persist();
-      return { ok: true, user };
-    }
-    return { ok: false, error: payload?.error || "That username and password don't match." };
+    const localUser = this.db.users.find(u => u.username.toLowerCase() === username.toLowerCase());
+    if (!localUser || localUser.password !== password) return { ok: false, error: "That username and password don't match." };
+    this.db.currentUser = localUser.username;
+    this.persist();
+    return { ok: true, user: localUser };
   },
 
   async signup(username, name, password) {
     username = username.trim().toLowerCase();
-    if (!username || !name.trim() || !password) return { ok: false, error: "Fill in every field to continue." };
+    const trimmedName = name.trim();
+    if (!username || !trimmedName || !password) return { ok: false, error: "Fill in every field to continue." };
     if (this.db.users.some(u => u.username.toLowerCase() === username)) {
       return { ok: false, error: "That username is already taken." };
     }
@@ -474,25 +492,41 @@ const Progress = {
     if (username === "817x2") {
       badges.push("817x2");
     }
-    const user = { id: "u" + Date.now(), username, name: name.trim(), password, avatar: null, joined: new Date().toISOString().slice(0, 10), timezone: DEFAULT_TIMEZONE, following: [], followers: [], bio: "", badges };
+
+    if (API_ENABLED) {
+      const signupBody = JSON.stringify({ username, name: trimmedName, password, timezone: DEFAULT_TIMEZONE, badges });
+      const headers = { "Content-Type": "application/json" };
+      let result = await apiFetchAuth("/api/users", { method: "POST", headers, body: signupBody });
+      if (result.status === 0) {
+        result = await apiFetchAuth("/api/users", { method: "POST", headers, body: signupBody }, 20000);
+      }
+      if (result.ok) {
+        const user = { ...result.data, password };
+        const existing = this.db.users.find(u => u.username === user.username);
+        if (existing) Object.assign(existing, user);
+        else this.db.users.push(user);
+        this.db.currentUser = user.username;
+        this.persist();
+        return { ok: true, user };
+      }
+      if (result.status === 0) {
+        // The server was genuinely unreachable (offline, or no local dev
+        // backend running) - keep the demo usable with a local-only account
+        // instead of silently pretending it exists server-side.
+        const user = { id: "u" + Date.now(), username, name: trimmedName, password, avatar: null, joined: new Date().toISOString().slice(0, 10), timezone: DEFAULT_TIMEZONE, following: [], followers: [], bio: "", badges };
+        this.db.users.push(user);
+        this.db.currentUser = user.username;
+        this.persist();
+        return { ok: true, user, offline: true };
+      }
+      // The server responded definitively (e.g. 409 username already taken).
+      return { ok: false, error: result.error || "That username is already taken." };
+    }
+
+    const user = { id: "u" + Date.now(), username, name: trimmedName, password, avatar: null, joined: new Date().toISOString().slice(0, 10), timezone: DEFAULT_TIMEZONE, following: [], followers: [], bio: "", badges };
     this.db.users.push(user);
     this.db.currentUser = user.username;
     this.persist();
-    if (API_ENABLED) {
-      const signupBody = JSON.stringify({ username, name: name.trim(), password, timezone: DEFAULT_TIMEZONE, badges });
-      apiFetch("/api/users", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: signupBody
-      }).then(payload => {
-        if (payload && !payload.error) {
-          const existing = this.db.users.find(u => u.username === username);
-          if (existing) Object.assign(existing, payload, { password });
-          else this.db.users.push({ ...payload, password });
-          this.persist();
-        }
-      }).catch(() => {});
-    }
     return { ok: true, user };
   },
 

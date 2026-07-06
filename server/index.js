@@ -1,6 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const path = require("path");
+const crypto = require("crypto");
 const { MongoClient } = require("mongodb");
 
 const app = express();
@@ -22,7 +23,7 @@ const DEFAULT_SEED = {
       _id: "u1",
       username: "mara",
       name: "Mara Studios",
-      password: "demo1234",
+      password: hashPassword("demo1234"),
       avatar: "https://images.unsplash.com/photo-1502685104226-ee32379fefbe?q=80&w=200&auto=format&fit=crop",
       joined: "2026-02-01",
       timezone: "UTC",
@@ -85,6 +86,34 @@ function generateId(prefix) {
 
 function escapeRegex(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// Passwords are stored as `scrypt:<salt>:<hash>`. `verifyPassword` also
+// accepts legacy plaintext values (from before hashing was added) so
+// existing accounts keep working; a successful login with a legacy
+// password transparently upgrades it to a hashed one.
+function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString("hex");
+  const hash = crypto.scryptSync(String(password), salt, 64).toString("hex");
+  return `scrypt:${salt}:${hash}`;
+}
+
+function verifyPassword(password, stored) {
+  if (typeof stored !== "string" || !stored) return false;
+  if (stored.startsWith("scrypt:")) {
+    const [, salt, hash] = stored.split(":");
+    if (!salt || !hash) return false;
+    const hashBuffer = Buffer.from(hash, "hex");
+    const candidateBuffer = crypto.scryptSync(String(password), salt, 64);
+    if (hashBuffer.length !== candidateBuffer.length) return false;
+    return crypto.timingSafeEqual(hashBuffer, candidateBuffer);
+  }
+  // Legacy plaintext password from before hashing was introduced.
+  return stored === password;
+}
+
+function isLegacyPassword(stored) {
+  return typeof stored === "string" && !stored.startsWith("scrypt:");
 }
 
 function toClient(doc) {
@@ -158,14 +187,18 @@ async function seedIfNeeded() {
     }
   }
 
-  if (!(await users.findOne({ username: "mara" }))) {
+  const mara = await users.findOne({ username: "mara" });
+  if (!mara) {
     await users.insertOne(DEFAULT_SEED.users[0]);
   } else {
-    // Ensure mara has correct password (fix corrupted data)
-    await users.updateOne(
-      { username: "mara" },
-      { $set: { password: "demo1234", badges: ["dexterity"] } }
-    );
+    // Only repair the demo account if its password/badges are actually
+    // missing or corrupted - don't clobber it unconditionally on every boot.
+    const repair = {};
+    if (!mara.password) repair.password = hashPassword("demo1234");
+    if (!Array.isArray(mara.badges) || !mara.badges.length) repair.badges = ["dexterity"];
+    if (Object.keys(repair).length) {
+      await users.updateOne({ username: "mara" }, { $set: repair });
+    }
   }
 
   for (const seedPost of DEFAULT_SEED.posts) {
@@ -213,25 +246,27 @@ app.get("/api/users/:id", asyncHandler(async (req, res) => {
 }));
 
 app.post("/api/users", asyncHandler(async (req, res) => {
-  const { username, name, password, timezone } = req.body;
+  const { username, name, password, timezone, badges } = req.body;
   if (!username || !name || !password) return res.status(400).json({ error: "username, name, and password are required" });
-  const existing = await db.collection("users").findOne({ username: { $regex: `^${escapeRegex(username)}$`, $options: "i" } });
+  const normalizedUsername = username.trim().toLowerCase();
+  if (!normalizedUsername) return res.status(400).json({ error: "username, name, and password are required" });
+  const existing = await db.collection("users").findOne({ username: { $regex: `^${escapeRegex(normalizedUsername)}$`, $options: "i" } });
   if (existing) return res.status(409).json({ error: "Username already taken" });
   const user = {
     _id: generateId("u"),
-    username,
+    username: normalizedUsername,
     name,
-    password,
+    password: hashPassword(password),
     avatar: null,
     joined: new Date().toISOString().slice(0, 10),
     timezone: timezone || DEFAULT_TIMEZONE,
     following: [],
     followers: [],
     bio: "",
-    badges: []
+    badges: Array.isArray(badges) ? badges : []
   };
   await db.collection("users").insertOne(user);
-  res.status(201).json(toClient(user));
+  res.status(201).json(publicUser(normalizeUser(user)));
 }));
 
 app.patch("/api/users/:id", asyncHandler(async (req, res) => {
@@ -498,7 +533,12 @@ app.post("/api/login", asyncHandler(async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) return res.status(400).json({ error: "username and password are required" });
   const user = await db.collection("users").findOne({ username: { $regex: `^${escapeRegex(username)}$`, $options: "i" } });
-  if (!user || user.password !== password) return res.status(401).json({ error: "Invalid credentials" });
+  if (!user || !verifyPassword(password, user.password)) return res.status(401).json({ error: "Invalid credentials" });
+  if (isLegacyPassword(user.password)) {
+    // Transparently upgrade legacy plaintext passwords to a hashed one.
+    user.password = hashPassword(password);
+    await db.collection("users").updateOne({ _id: user._id }, { $set: { password: user.password } });
+  }
   res.json(publicUser(normalizeUser(user)));
 }));
 
