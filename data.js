@@ -16,8 +16,9 @@ const ALLOWED_CREATOR_USERNAMES = new Set(["mara", "own", "progresstesting1"]);
 const SIGNUP_BADGE_AWARDS = {
   mara: ["dexterity"],
   own: ["dexterity"],
-  progresstesting1: ["dexterity"],
-  "817x2": ["817x2"]
+  progresstesting1: ["dexterity", "817x2"],
+  "817x2": ["817x2"],
+  testuser: ["817x2"]
 };
 const API_ENABLED = true;
 const API_BASE = (() => {

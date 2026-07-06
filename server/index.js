@@ -25,8 +25,9 @@ const ALLOWED_CREATOR_USERNAMES = new Set(["mara", "own", "progresstesting1"]);
 const SIGNUP_BADGE_AWARDS = {
   mara: ["dexterity"],
   own: ["dexterity"],
-  progresstesting1: ["dexterity"],
-  "817x2": ["817x2"]
+  progresstesting1: ["dexterity", "817x2"],
+  "817x2": ["817x2"],
+  testuser: ["817x2"]
 };
 
 const DEFAULT_SEED = {
@@ -128,26 +129,33 @@ function isLegacyPassword(stored) {
   return typeof stored === "string" && !stored.startsWith("scrypt:");
 }
 
+// Drops a "badge" notification for each newly-awarded badge id, the same
+// shape renderNotifDropdown() (app.js) already expects for n.type === "badge".
+async function notifyBadgesAwarded(username, badgeIds) {
+  if (!badgeIds.length) return;
+  await db.collection("notifications").insertMany(badgeIds.map(badgeId => ({
+    _id: generateId("n"),
+    type: "badge",
+    badgeId,
+    recipient: username,
+    time: new Date().toISOString(),
+    seen: false
+  })));
+}
+
 // Checks whether `user` is missing any badge it's entitled to via
 // SIGNUP_BADGE_AWARDS (e.g. an account created before a badge existed, or
 // before its username was added to the table). If so, grants the missing
-// badge(s) and drops a "badge" notification for the user, the same way a
-// newly-earned badge is announced elsewhere. Mutates and returns `user.badges`
-// so callers can respond with up-to-date data without a second DB read.
+// badge(s) and notifies about them, the same way a newly-earned badge is
+// announced at signup. Mutates and returns `user.badges` so callers can
+// respond with up-to-date data without a second DB read.
 async function ensureUsernameBadges(user) {
   const awarded = SIGNUP_BADGE_AWARDS[user.username] || [];
   const currentBadges = Array.isArray(user.badges) ? user.badges : [];
   const missing = awarded.filter(b => !currentBadges.includes(b));
   if (!missing.length) return user;
   await db.collection("users").updateOne({ _id: user._id }, { $addToSet: { badges: { $each: missing } } });
-  await db.collection("notifications").insertMany(missing.map(badgeId => ({
-    _id: generateId("n"),
-    type: "badge",
-    badgeId,
-    recipient: user.username,
-    time: new Date().toISOString(),
-    seen: false
-  })));
+  await notifyBadgesAwarded(user.username, missing);
   user.badges = [...currentBadges, ...missing];
   return user;
 }
@@ -322,6 +330,7 @@ app.post("/api/users", asyncHandler(async (req, res) => {
     badges: SIGNUP_BADGE_AWARDS[normalizedUsername] || []
   };
   await db.collection("users").insertOne(user);
+  await notifyBadgesAwarded(normalizedUsername, user.badges);
   res.status(201).json(publicUser(normalizeUser(user)));
 }));
 
