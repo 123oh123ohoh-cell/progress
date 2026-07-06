@@ -392,6 +392,15 @@ app.post("/api/posts/:id/comments", (req, res) => {
   res.status(201).json(comment);
 });
 
+app.delete("/api/posts/:id/comments/:commentId", (req, res) => {
+  const db = loadDb();
+  const index = (db.comments || []).findIndex(c => c.id === req.params.commentId && c.postId === req.params.id);
+  if (index === -1) return res.status(404).json({ error: "Comment not found" });
+  db.comments.splice(index, 1);
+  saveDb(db);
+  res.status(204).end();
+});
+
 app.post("/api/posts/:id/like", (req, res) => {
   const db = loadDb();
   const post = (db.posts || []).find(p => p.id === req.params.id);
