@@ -27,7 +27,7 @@ const SIGNUP_BADGE_AWARDS = {
   own: ["dexterity"],
   progresstesting1: ["dexterity", "817x2"],
   "817x2": ["817x2"],
-  testuser: ["817x2"]
+  testuser: ["817x2", "dexterity"]
 };
 
 const DEFAULT_SEED = {
