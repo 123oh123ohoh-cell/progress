@@ -292,12 +292,41 @@
   // can join and sync your own Spotify to them), plus a start/end control
   // for the current user's own session. Re-used on a light poll and on the
   // "listen-session-updated" event app.js fires after join/leave/end/sync.
+  // Applies fresh session data onto an already-rendered card without tearing
+  // down its DOM node, so the progress bar's CSS transition keeps flowing
+  // smoothly instead of snapping/glitching back on every ~8s poll.
+  function updateListenCardInPlace(cardEl, session) {
+    const hasProgress = typeof session.progressMs === "number" && typeof session.durationMs === "number" && session.durationMs > 0;
+    cardEl.classList.toggle("is-playing", !!session.isPlaying);
+    cardEl.classList.toggle("is-paused", !session.isPlaying);
+    if (hasProgress) {
+      cardEl.dataset.durationMs = session.durationMs;
+      cardEl.dataset.progressMs = session.progressMs;
+      cardEl.dataset.fetchedAt = session.updatedAt || Date.now();
+      cardEl.dataset.isPlaying = session.isPlaying ? "1" : "0";
+    } else {
+      delete cardEl.dataset.durationMs;
+      delete cardEl.dataset.progressMs;
+      delete cardEl.dataset.fetchedAt;
+      delete cardEl.dataset.isPlaying;
+    }
+    const trackEl = cardEl.querySelector(".now-playing-track");
+    const artistEl = cardEl.querySelector(".now-playing-artist");
+    if (trackEl) trackEl.textContent = session.trackName || "Nothing playing yet";
+    if (artistEl) artistEl.textContent = session.artistNames || "";
+    const countEl = cardEl.querySelector(".listen-session-count");
+    if (countEl) countEl.textContent = `${session.participants.length} listening`;
+    const artImg = cardEl.querySelector(".now-playing-widget img");
+    if (artImg && session.albumArt && artImg.src !== session.albumArt) artImg.src = session.albumArt;
+  }
+
   async function loadListenRail() {
     const rail = document.getElementById("chatListenRail");
     if (!rail) return;
     const sessions = await fetchListenSessions();
     const mySession = sessions.find(s => s.hostUsername === currentUser.username);
     const otherSessions = sessions.filter(s => s.hostUsername !== currentUser.username);
+    const ordered = [mySession, ...otherSessions].filter(Boolean);
 
     const hasSpotify = currentUser.spotifyAccount && currentUser.spotifyAccount.connected;
     const startControl = mySession
@@ -306,13 +335,32 @@
         ? `<button type="button" class="btn primary" id="startListenBtn" style="width:100%;">Start listening together</button>`
         : `<a href="profile.html?tab=settings" class="field-note" style="display:block;">Connect Spotify to start a listening session</a>`;
 
-    const cards = [mySession, ...otherSessions].filter(Boolean).map(s => renderListenSessionCard(s)).join("");
+    let cardsContainer = rail.querySelector("#chatListenCards");
+    const existingIds = cardsContainer
+      ? Array.from(cardsContainer.querySelectorAll("[data-session-id]")).map(el => el.dataset.sessionId)
+      : [];
+    const newIds = ordered.map(s => s.id);
+    const sameSet = cardsContainer && existingIds.length === newIds.length && existingIds.every((id, i) => id === newIds[i]);
 
-    rail.innerHTML = `
-      <div class="chat-listen-rail-title">Listen Together</div>
-      ${cards}
-      ${startControl}
-    `;
+    if (sameSet) {
+      // Nothing structurally changed (same sessions, same order) - update each
+      // card's numbers in place instead of rebuilding the DOM.
+      ordered.forEach(session => {
+        const cardEl = cardsContainer.querySelector(`[data-session-id="${session.id}"]`);
+        if (cardEl) updateListenCardInPlace(cardEl, session);
+      });
+      // The start/end control can still change (e.g. participant count on my
+      // own session's button area) - only the title/cards were preserved above.
+      let controlSlot = rail.querySelector("#chatListenControl");
+      if (controlSlot) controlSlot.innerHTML = startControl;
+    } else {
+      const cards = ordered.map(s => renderListenSessionCard(s)).join("");
+      rail.innerHTML = `
+        <div class="chat-listen-rail-title">Listen Together</div>
+        <div id="chatListenCards">${cards}</div>
+        <div id="chatListenControl">${startControl}</div>
+      `;
+    }
 
     const startBtn = document.getElementById("startListenBtn");
     if (startBtn) {
