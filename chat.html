@@ -417,9 +417,9 @@
             <div class="chat-empty">Loading…</div>
           </div>
           <div class="chat-typing" id="chatTyping"></div>
-          <div class="emoji-picker chat-emoji-picker" id="chatEmojiPicker"></div>
           <form class="chat-input-row" id="chatForm">
-            <button type="button" class="chat-emoji-btn" id="chatEmojiBtn" aria-label="Insert emoticon">☺</button>
+            <div class="emoji-picker chat-emoji-picker" id="chatEmojiPicker"></div>
+            <button type="button" class="chat-emoji-btn" id="chatEmojiBtn" aria-label="Insert sticker" title="Stickers">🐱</button>
             <input type="text" id="chatInput" class="chat-input" placeholder="Say something…" maxlength="2000" autocomplete="off">
             <button type="submit" class="btn primary">Send</button>
           </form>
@@ -462,22 +462,55 @@
   // everywhere else in the app) and wires up: toggling it open/closed,
   // inserting a :name: token at the current cursor position on click, and
   // closing it on an outside click or after sending a message.
+  let chatEmojiDocListenerAttached = false;
+
+  // Sets up chat's sticker picker: builds the button grid, wires each one to
+  // insert a :name: token at the cursor, and attaches the same hover-preview
+  // tooltip used by the reply-form picker on post.html. The document-level
+  // outside-click listener is only ever attached once (guarded by the flag
+  // above) even though this function itself re-runs on every renderChat(),
+  // so re-renders can't stack up duplicate close handlers.
   function setupChatEmojiPicker() {
     const picker = document.getElementById("chatEmojiPicker");
     const toggleBtn = document.getElementById("chatEmojiBtn");
     if (!picker || !toggleBtn) return;
 
     picker.innerHTML = getEmoticonNames().map(name => `
-      <button type="button" class="emoji-btn" data-name="${name}" title=":${name}:">
+      <button type="button" class="emoji-btn" data-name="${name}">
         <img src="images/emoticons/${name}.png" alt="${name}">
       </button>
     `).join("");
 
+    let tooltip = document.getElementById("chatEmojiTooltip");
+    if (!tooltip) {
+      tooltip = document.createElement("div");
+      tooltip.id = "chatEmojiTooltip";
+      tooltip.className = "emoji-tooltip hidden";
+      document.body.appendChild(tooltip);
+    }
+
     picker.querySelectorAll(".emoji-btn").forEach(btn => {
+      const name = btn.dataset.name || "";
+
+      btn.addEventListener("mouseenter", () => {
+        tooltip.innerHTML = `
+          <img src="images/emoticons/${name}.png" alt="${name}">
+          <div class="emoji-tooltip-label">:${name}:</div>
+        `;
+        tooltip.classList.remove("hidden");
+        const rect = btn.getBoundingClientRect();
+        const tooltipWidth = 120;
+        const gap = 12;
+        const left = Math.min(window.innerWidth - tooltipWidth - 12, Math.max(12, rect.left + rect.width / 2 - tooltipWidth / 2));
+        const top = rect.top - tooltip.offsetHeight - gap;
+        tooltip.style.left = `${left}px`;
+        tooltip.style.top = `${top < 12 ? rect.bottom + gap : top}px`;
+      });
+      btn.addEventListener("mouseleave", () => tooltip.classList.add("hidden"));
+
       btn.addEventListener("click", () => {
         const textarea = document.getElementById("chatInput");
         if (!textarea) return;
-        const name = btn.dataset.name || "";
         const placeholder = `:${name}:`;
         const start = textarea.selectionStart ?? textarea.value.length;
         const end = textarea.selectionEnd ?? textarea.value.length;
@@ -488,19 +521,24 @@
       });
     });
 
-    toggleBtn.addEventListener("click", (e) => {
+    toggleBtn.onclick = (e) => {
       e.stopPropagation();
       picker.classList.toggle("open");
-    });
+    };
 
-    picker.addEventListener("click", (e) => e.stopPropagation());
+    picker.onclick = (e) => e.stopPropagation();
 
-    document.addEventListener("click", closeChatEmojiPicker);
+    if (!chatEmojiDocListenerAttached) {
+      document.addEventListener("click", closeChatEmojiPicker);
+      chatEmojiDocListenerAttached = true;
+    }
   }
 
   function closeChatEmojiPicker() {
     const picker = document.getElementById("chatEmojiPicker");
     if (picker) picker.classList.remove("open");
+    const tooltip = document.getElementById("chatEmojiTooltip");
+    if (tooltip) tooltip.classList.add("hidden");
   }
 
   async function start() {

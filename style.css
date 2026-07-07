@@ -1610,8 +1610,6 @@ body.modal-open { overflow: hidden; }
   z-index: 50;
 }
 .chat-emoji-picker.open { display: flex; flex-wrap: wrap; }
-.chat-emoji-picker .emoji-btn { width: 44px; height: 44px; border-radius: 12px; }
-.chat-emoji-picker .emoji-btn img { width: 26px; height: 26px; }
 
 .chat-input {
   flex: 1;
