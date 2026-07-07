@@ -951,6 +951,39 @@ function applyLockedOverlayIfNeeded() {
 // banned them, their local session never picked up that change, and would
 // otherwise slip straight past this check with a stale banned: false. This
 // always re-confirms directly against the server first.
+let bannedMainObserver = null;
+
+// Individual pages (post.html especially) re-render their own content into
+// <main> on their own independent timers - e.g. once immediately, then
+// again after their own data refresh completes. That second re-render can
+// fire AFTER this overlay has already gone up and silently overwrite it
+// with the real page content again, since nothing was stopping it from
+// touching <main>. A MutationObserver makes this unconditional: once
+// applied, ANY future change to <main>'s children (from any page's script,
+// at any time) gets instantly replaced back with the banned screen, so
+// there's no timing race left to lose.
+function lockMainToBannedScreen() {
+  const main = document.querySelector("main");
+  if (!main) return;
+  const bannedHTML = `
+    <div class="locked-screen banned-screen">
+      <div class="error-illustration">
+        <img src="images/404page.png" alt="Account banned illustration">
+      </div>
+      <h1>This account has been banned</h1>
+      <p>Your account has been suspended for violating our community guidelines. If you believe this was a mistake, you're welcome to submit an appeal and we'll take a look.</p>
+      <a class="btn primary banned-appeal-btn" href="https://forms.gle/FBDevngpyBNgWVAQ7" target="_blank" rel="noopener noreferrer">Submit an appeal</a>
+    </div>
+  `;
+  const enforce = () => {
+    if (!main.querySelector(".banned-screen")) main.innerHTML = bannedHTML;
+  };
+  enforce();
+  if (bannedMainObserver) bannedMainObserver.disconnect();
+  bannedMainObserver = new MutationObserver(enforce);
+  bannedMainObserver.observe(main, { childList: true });
+}
+
 async function applyBannedOverlayIfNeeded() {
   const user = Progress.getCurrentUser();
   if (!user) return false;
@@ -959,18 +992,7 @@ async function applyBannedOverlayIfNeeded() {
   if (fresh) banned = !!fresh.banned;
   if (!banned) return false;
   document.body.classList.add("account-banned");
-  const main = document.querySelector("main");
-  if (main && !main.querySelector(".banned-screen")) {
-    main.innerHTML = `
-      <div class="locked-screen banned-screen">
-        <div class="error-illustration">
-          <img src="images/404page.png" alt="Account banned illustration">
-        </div>
-        <h1>Your account has been banned</h1>
-        <p>If you think this is a mistake, you can <a href="https://forms.gle/FBDevngpyBNgWVAQ7" target="_blank" rel="noopener noreferrer">appeal here</a>.</p>
-      </div>
-    `;
-  }
+  lockMainToBannedScreen();
   return true;
 }
 
