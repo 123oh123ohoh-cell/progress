@@ -2,9 +2,7 @@ require("dotenv").config();
 const express = require("express");
 const path = require("path");
 const crypto = require("crypto");
-const http = require("http");
 const { MongoClient } = require("mongodb");
-const { WebSocketServer } = require("ws");
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -19,7 +17,6 @@ if (!mongoUri) {
 
 const DEFAULT_TIMEZONE = "UTC";
 const ALLOWED_CREATOR_USERNAMES = new Set(["mara", "own", "progresstesting1"]);
-const DEFAULT_CHAT_ROOM = "global";
 
 // Matches a Spotify share link (open.spotify.com/<type>/<id>, optionally
 // with an "intl-xx" locale prefix and/or a "?si=..." query string) or a
@@ -223,21 +220,20 @@ function publicUser(user) {
     ? { connected: true, displayName: user.spotifyAccount.spotifyName || null, profileUrl: user.spotifyAccount.spotifyProfileUrl || null }
     : { connected: false, displayName: null, profileUrl: null };
   return {
-  id: user.id,
-  username: user.username,
-  name: user.name,
-  avatar: user.avatar,
-  joined: user.joined,
-  timezone: user.timezone,
-  bio: user.bio || "",
-  spotify: user.spotify || "",
-  spotifyAccount,
-  spotifyPresence: user.spotifyPresence || null,
-  badges,
-  displayBadge,
-  followers: user.followers || [],
-  following: user.following || []
-};
+    id: user.id,
+    username: user.username,
+    name: user.name,
+    avatar: user.avatar,
+    joined: user.joined,
+    timezone: user.timezone,
+    bio: user.bio || "",
+    spotify: user.spotify || "",
+    spotifyAccount,
+    badges,
+    displayBadge,
+    followers: user.followers || [],
+    following: user.following || []
+  };
 }
 
 function normalizePost(doc) {
@@ -247,60 +243,6 @@ function normalizePost(doc) {
     likes: typeof post.likes === "number" ? post.likes : 0,
     likedBy: Array.isArray(post.likedBy) ? post.likedBy : []
   };
-}
-
-function normalizeChatMessage(doc) {
-  return toClient(doc);
-}
-
-// room -> Set<ws>. In-memory only (fine for a single instance) - message
-// history itself lives in Mongo via createChatMessage/GET /api/chat/messages.
-const chatRooms = new Map();
-
-function chatRoomClients(room) {
-  let set = chatRooms.get(room);
-  if (!set) {
-    set = new Set();
-    chatRooms.set(room, set);
-  }
-  return set;
-}
-
-function broadcastToRoom(room, payload) {
-  const json = JSON.stringify(payload);
-  for (const client of chatRoomClients(room)) {
-    if (client.readyState === client.OPEN) client.send(json);
-  }
-}
-
-function roomPresence(room) {
-  return Array.from(chatRoomClients(room))
-    .map(c => c.username)
-    .filter(Boolean);
-}
-
-// DM rooms are `dm:<usernameA>:<usernameB>` with the two usernames sorted,
-// so both participants always land on the same room id regardless of who
-// started the conversation. `dmParticipants` is the inverse: given a room
-// id, returns the two usernames it belongs to, or null if it's not a DM
-// room at all (e.g. the "global" room).
-function dmRoomId(userA, userB) {
-  return "dm:" + [userA, userB].sort().join(":");
-}
-
-function dmParticipants(room) {
-  if (typeof room !== "string" || !room.startsWith("dm:")) return null;
-  const parts = room.slice(3).split(":");
-  return parts.length === 2 && parts[0] && parts[1] ? parts : null;
-}
-
-// Same trust model as the rest of this API (no session tokens - a client
-// just claims a username), but this at least stops someone from reading or
-// joining a DM room without claiming to be one of its two participants.
-function canAccessRoom(room, username) {
-  const participants = dmParticipants(room);
-  if (!participants) return true; // non-DM rooms (e.g. "global") stay open
-  return participants.includes(username);
 }
 
 let db;
@@ -318,7 +260,6 @@ async function seedIfNeeded() {
   const posts = db.collection("posts");
   const comments = db.collection("comments");
   const notifications = db.collection("notifications");
-  const messages = db.collection("messages");
 
   // Create indexes for data integrity and query performance
   try {
@@ -326,7 +267,6 @@ async function seedIfNeeded() {
     await posts.createIndex({ author: 1, createdAt: -1 });
     await comments.createIndex({ postId: 1, time: 1 });
     await notifications.createIndex({ recipient: 1, time: -1 });
-    await messages.createIndex({ room: 1, time: 1 });
   } catch (e) {
     // Indexes may already exist, which is fine
     if (!e.message.includes("already exists")) {
@@ -681,101 +621,46 @@ async function getValidSpotifyAccessToken(userDoc) {
   }
 }
 
-async function updateSpotifyPresence(userDoc) {
-  const token = await getValidSpotifyAccessToken(userDoc);
-
-  if (!token) {
-    await db.collection("users").updateOne(
-      { _id: userDoc._id },
-      { $set: { spotifyPresence: null } }
-    );
-    return;
+app.get("/api/users/:id/spotify/now-playing", asyncHandler(async (req, res) => {
+  const userDoc = await db.collection("users").findOne({ _id: req.params.id });
+  if (!userDoc) return res.status(404).json({ error: "User not found" });
+  if (!userDoc.spotifyAccount || !userDoc.spotifyAccount.connected) {
+    return res.json({ connected: false, playing: null });
   }
+  const accessToken = await getValidSpotifyAccessToken(userDoc);
+  if (!accessToken) return res.json({ connected: true, playing: null });
 
   try {
-    const res = await fetch(
-      "https://api.spotify.com/v1/me/player/currently-playing",
-      {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      }
-    );
-
-    if (res.status !== 200) {
-      await db.collection("users").updateOne(
-        { _id: userDoc._id },
-        { $set: { spotifyPresence: null } }
-      );
-      return;
-    }
-
-    const data = await res.json();
-
-    if (!data.item) {
-      await db.collection("users").updateOne(
-        { _id: userDoc._id },
-        { $set: { spotifyPresence: null } }
-      );
-      return;
-    }
-
-    await db.collection("users").updateOne(
-      { _id: userDoc._id },
-      {
-        $set: {
-          spotifyPresence: {
-            isPlaying: data.is_playing,
-            trackName: data.item.name,
-            artistNames: data.item.artists.map(a => a.name).join(", "),
-            albumName: data.item.album.name,
-            albumArt: data.item.album.images[0]?.url || null,
-            trackUrl: data.item.external_urls.spotify,
-            progress: data.progress_ms,
-            duration: data.item.duration_ms,
-            updatedAt: Date.now()
-          }
-        }
-      }
-    );
-  } catch {
-    await db.collection("users").updateOne(
-      { _id: userDoc._id },
-      { $set: { spotifyPresence: null } }
-    );
-  }
-}
-
-app.get("/api/users/:id/spotify/now-playing", asyncHandler(async (req, res) => {
-  const user = await db.collection("users").findOne({
-    _id: req.params.id
-  });
-
-  if (!user) {
-    return res.status(404).json({
-      error: "User not found"
+    const npRes = await fetch("https://api.spotify.com/v1/me/player/currently-playing", {
+      headers: { "Authorization": `Bearer ${accessToken}` }
     });
+    if (npRes.status !== 200) return res.json({ connected: true, playing: null });
+    const data = await npRes.json().catch(() => null);
+    if (!data || !data.item) return res.json({ connected: true, playing: null });
+    const images = (data.item.album && data.item.album.images) || [];
+    return res.json({
+      connected: true,
+      playing: {
+        isPlaying: !!data.is_playing,
+        trackName: data.item.name,
+        artistNames: (data.item.artists || []).map(a => a.name).join(", "),
+        albumArt: (images[1] && images[1].url) || (images[0] && images[0].url) || null,
+        trackUrl: (data.item.external_urls && data.item.external_urls.spotify) || null,
+        progressMs: typeof data.progress_ms === "number" ? data.progress_ms : null,
+        durationMs: (data.item && typeof data.item.duration_ms === "number") ? data.item.duration_ms : null,
+        fetchedAt: Date.now()
+      }
+    });
+  } catch (e) {
+    return res.json({ connected: true, playing: null });
   }
-
-  res.json({
-    connected: !!user.spotifyAccount?.connected,
-    playing: user.spotifyPresence || null
-  });
 }));
 
 app.post("/api/users/:id/spotify/disconnect", asyncHandler(async (req, res) => {
   const users = db.collection("users");
   const doc = await users.findOne({ _id: req.params.id });
   if (!doc) return res.status(404).json({ error: "User not found" });
-  await users.updateOne(
-  { _id: req.params.id },
-  {
-    $unset: {
-      spotifyAccount: "",
-      spotifyPresence: ""
-    }
-  }
-);
+  await users.updateOne({ _id: req.params.id }, { $unset: { spotifyAccount: "" } });
   const updated = await users.findOne({ _id: req.params.id });
   res.json(publicUser(normalizeUser(updated)));
 }));
@@ -919,80 +804,6 @@ app.post("/api/notifications/mark-seen", asyncHandler(async (req, res) => {
   res.json({ ok: true });
 }));
 
-// ---- Realtime chat ----
-// `room` is a free-form string. "global" is the one shared room the main
-// chat UI uses; DM rooms are `dm:<usernameA>:<usernameB>` (see dmRoomId /
-// dmParticipants / canAccessRoom above).
-
-// Shared by both the REST fallback and the WebSocket "send" handler so a
-// message is stored and broadcast identically no matter which path sent it.
-async function createChatMessage({ room, author, body }) {
-  const targetRoom = (room || DEFAULT_CHAT_ROOM).toString().slice(0, 200);
-  const trimmed = (body || "").toString().trim();
-  if (!author || !trimmed) return null;
-  if (!canAccessRoom(targetRoom, author)) return null;
-  const message = {
-    _id: generateId("m"),
-    room: targetRoom,
-    author,
-    body: trimmed.slice(0, 2000),
-    time: new Date().toISOString()
-  };
-  await db.collection("messages").insertOne(message);
-  const clientMessage = normalizeChatMessage(message);
-  broadcastToRoom(targetRoom, { type: "message", message: clientMessage });
-  return clientMessage;
-}
-
-app.get("/api/chat/messages", asyncHandler(async (req, res) => {
-  const room = (req.query.room || DEFAULT_CHAT_ROOM).toString().slice(0, 200);
-  const viewer = (req.query.username || "").toString();
-  if (dmParticipants(room) && !canAccessRoom(room, viewer)) {
-    return res.status(403).json({ error: "Not a participant in this conversation" });
-  }
-  const limit = Math.min(parseInt(req.query.limit, 10) || 50, 200);
-  const docs = await db.collection("messages")
-    .find({ room })
-    .sort({ time: -1 })
-    .limit(limit)
-    .toArray();
-  res.json(docs.map(normalizeChatMessage).reverse());
-}));
-
-// Lists every DM room `username` is a participant in, each with its most
-// recent message, newest first - powers the DM sidebar on the chat page.
-app.get("/api/chat/conversations", asyncHandler(async (req, res) => {
-  const username = (req.query.username || "").toString();
-  if (!username) return res.status(400).json({ error: "username is required" });
-  const rooms = await db.collection("messages").distinct("room", { room: { $regex: "^dm:" } });
-  const mine = rooms.filter(room => canAccessRoom(room, username));
-  const conversations = await Promise.all(mine.map(async room => {
-    const participants = dmParticipants(room);
-    const withUsername = participants.find(p => p !== username) || participants[0];
-    const lastDocs = await db.collection("messages").find({ room }).sort({ time: -1 }).limit(1).toArray();
-    return {
-      room,
-      with: withUsername,
-      lastMessage: lastDocs[0] ? normalizeChatMessage(lastDocs[0]) : null
-    };
-  }));
-  conversations.sort((a, b) => {
-    const at = a.lastMessage ? new Date(a.lastMessage.time).getTime() : 0;
-    const bt = b.lastMessage ? new Date(b.lastMessage.time).getTime() : 0;
-    return bt - at;
-  });
-  res.json(conversations);
-}));
-
-// REST fallback for sending a message when a client's WebSocket connection
-// isn't available - still broadcasts to any WS clients in the room via
-// createChatMessage(), so it never creates a message only the sender sees.
-app.post("/api/chat/messages", asyncHandler(async (req, res) => {
-  const message = await createChatMessage(req.body);
-  if (!message) return res.status(400).json({ error: "author and body are required" });
-  res.status(201).json(message);
-}));
-
 app.post("/api/login", asyncHandler(async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) return res.status(400).json({ error: "username and password are required" });
@@ -1023,81 +834,7 @@ app.use((err, req, res, next) => {
 
 connect()
   .then(() => {
-    const server = http.createServer(app);
-
-    // ---- Chat WebSocket upgrade ----
-    // Path: /ws/chat?room=<room>&username=<username>
-    // Trusts the `username` query param the same way the REST routes trust
-    // `author`/`username` fields in the body - there's no session/token auth
-    // anywhere else in this API yet, so this matches the existing model
-    // rather than introducing a new one just for chat.
-    const wss = new WebSocketServer({ noServer: true });
-
-    wss.on("connection", (ws, req, { room, username }) => {
-      ws.room = room;
-      ws.username = username;
-      chatRoomClients(room).add(ws);
-      broadcastToRoom(room, { type: "presence", room, users: roomPresence(room) });
-
-      ws.on("message", raw => {
-        let data;
-        try {
-          data = JSON.parse(raw.toString());
-        } catch (e) {
-          return;
-        }
-        if (data.type === "send") {
-          createChatMessage({ room: ws.room, author: ws.username, body: data.body }).catch(err => {
-            console.error("Chat message failed:", err);
-          });
-        } else if (data.type === "typing") {
-          broadcastToRoom(ws.room, { type: "typing", room: ws.room, username: ws.username });
-        }
-      });
-
-      ws.on("close", () => {
-        chatRoomClients(room).delete(ws);
-        broadcastToRoom(room, { type: "presence", room, users: roomPresence(room) });
-      });
-    });
-
-    server.on("upgrade", (req, socket, head) => {
-      let url;
-      try {
-        url = new URL(req.url, "http://localhost");
-      } catch (e) {
-        socket.destroy();
-        return;
-      }
-      if (url.pathname !== "/ws/chat") {
-        socket.destroy();
-        return;
-      }
-      const username = (url.searchParams.get("username") || "").trim();
-      const room = (url.searchParams.get("room") || DEFAULT_CHAT_ROOM).trim().slice(0, 200) || DEFAULT_CHAT_ROOM;
-      if (!username || !canAccessRoom(room, username)) {
-        socket.destroy();
-        return;
-      }
-      wss.handleUpgrade(req, socket, head, ws => {
-        wss.emit("connection", ws, req, { room, username });
-      });
-    });
-// Refresh Spotify "currently playing" for connected users every 15 seconds.
-setInterval(async () => {
-  try {
-    const users = await db.collection("users")
-      .find({ "spotifyAccount.connected": true })
-      .toArray();
-
-    for (const user of users) {
-      await updateSpotifyPresence(user);
-    }
-  } catch (err) {
-    console.error("Spotify presence update failed:", err);
-  }
-}, 15000);
-    server.listen(port, () => {
+    app.listen(port, () => {
       console.log(`Server running on port ${port}`);
     });
   })
