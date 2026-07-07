@@ -60,11 +60,12 @@
           <div class="bio-text" style="margin-top:12px;">${user.bio ? renderEmoticonsText(user.bio, "bio-emoticon") : `<span style="color:var(--muted);">No bio yet.</span>`}</div>
         </div>
       </div>
-      ${user.spotify ? `
-      <div class="settings-section" style="margin-top:24px;">
-        <h3>Now playing</h3>
-        ${renderSpotifyEmbed(user)}
-      </div>` : ""}
+      <div id="nowPlayingSlot"></div>
+${user.spotify ? `
+<div class="settings-section" style="margin-top:24px;">
+  <h3>Featured Track</h3>
+  ${renderSpotifyEmbed(user)}
+</div>` : ""}
       <div class="settings-section" style="margin-top:24px;">
         <h3>Latest posts</h3>
         <div id="publicPosts"></div>
@@ -87,6 +88,40 @@
         showToast(nowFollowing ? "You are now following this person." : "Unfollowed.");
       });
     }
+
+    const nowPlayingSlot = document.getElementById("nowPlayingSlot");
+
+async function refreshNowPlaying() {
+  if (!nowPlayingSlot) return;
+
+  // Don't trust `user.spotifyAccount` here - it can come from a merge with a
+  // cached local copy (see the effectiveUser merge in start()) that may
+  // predate the account connecting Spotify. Always re-check directly against
+  // the server first, so a stale cache can never hide a live "now playing".
+  let connected = user.spotifyAccount && user.spotifyAccount.connected;
+  if (!connected) {
+    try {
+      const fresh = await apiFetch(`/api/users/${user.id}`);
+      if (fresh && fresh.spotifyAccount && fresh.spotifyAccount.connected) {
+        connected = true;
+        user.spotifyAccount = fresh.spotifyAccount;
+      }
+    } catch (e) {
+      // leave connected as false; fall through to clearing the slot below
+    }
+  }
+
+  if (!connected) {
+    nowPlayingSlot.innerHTML = "";
+    return;
+  }
+
+  const data = await fetchSpotifyNowPlaying(user.id);
+  nowPlayingSlot.innerHTML = renderNowPlayingWidget(data);
+}
+
+refreshNowPlaying();
+setInterval(refreshNowPlaying, 30000); // Refresh every 30 seconds
 
     (async () => {
       const result = await apiFetch(`/api/posts?author=${encodeURIComponent(user.username)}`);
@@ -135,6 +170,7 @@
       effectiveUser.joined = fetchedUser?.joined || localUser.joined;
       effectiveUser.timezone = fetchedUser?.timezone || localUser.timezone;
       effectiveUser.badges = fetchedUser?.badges || localUser.badges || [];
+      effectiveUser.spotifyAccount = fetchedUser?.spotifyAccount || localUser.spotifyAccount;
     }
 
     renderPublicProfile(effectiveUser);
