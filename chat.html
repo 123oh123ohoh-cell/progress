@@ -74,7 +74,7 @@
         ${!mine ? `<a href="user.html?username=${encodeURIComponent(msg.author)}" class="chat-avatar">${avatarHTML(author, 30)}</a>` : ""}
         <div class="chat-bubble-col">
           ${!mine && currentRoom === GLOBAL_ROOM ? `<span class="chat-author">@${escapeHTML(msg.author)}</span>` : ""}
-          <div class="chat-bubble">${renderEmoticonsText(msg.body, "inline-emoticon")}</div>
+          <div class="chat-bubble">${renderMentionsInHTML(renderEmoticonsText(msg.body, "inline-emoticon"))}</div>
           <span class="chat-time">${Progress.timeAgo(msg.time)}</span>
         </div>
       </div>`;
@@ -417,7 +417,9 @@
             <div class="chat-empty">Loading…</div>
           </div>
           <div class="chat-typing" id="chatTyping"></div>
+          <div class="emoji-picker chat-emoji-picker" id="chatEmojiPicker"></div>
           <form class="chat-input-row" id="chatForm">
+            <button type="button" class="chat-emoji-btn" id="chatEmojiBtn" aria-label="Insert emoticon">☺</button>
             <input type="text" id="chatInput" class="chat-input" placeholder="Say something…" maxlength="2000" autocomplete="off">
             <button type="submit" class="btn primary">Send</button>
           </form>
@@ -430,6 +432,7 @@
       const input = document.getElementById("chatInput");
       sendMessage(input.value);
       input.value = "";
+      closeChatEmojiPicker();
     });
 
     document.getElementById("chatInput").addEventListener("input", () => {
@@ -445,12 +448,59 @@
       startDmFromInput();
     });
 
+    setupChatEmojiPicker();
+
     loadSidebar();
     loadHistory();
     connectSocket();
     loadListenRail();
     if (listenRailTimer) clearInterval(listenRailTimer);
     listenRailTimer = setInterval(loadListenRail, 1000);
+  }
+
+  // Populates the chat emoji popup (reusing the same emoticon set as
+  // everywhere else in the app) and wires up: toggling it open/closed,
+  // inserting a :name: token at the current cursor position on click, and
+  // closing it on an outside click or after sending a message.
+  function setupChatEmojiPicker() {
+    const picker = document.getElementById("chatEmojiPicker");
+    const toggleBtn = document.getElementById("chatEmojiBtn");
+    if (!picker || !toggleBtn) return;
+
+    picker.innerHTML = getEmoticonNames().map(name => `
+      <button type="button" class="emoji-btn" data-name="${name}" title=":${name}:">
+        <img src="images/emoticons/${name}.png" alt="${name}">
+      </button>
+    `).join("");
+
+    picker.querySelectorAll(".emoji-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const textarea = document.getElementById("chatInput");
+        if (!textarea) return;
+        const name = btn.dataset.name || "";
+        const placeholder = `:${name}:`;
+        const start = textarea.selectionStart ?? textarea.value.length;
+        const end = textarea.selectionEnd ?? textarea.value.length;
+        const value = textarea.value;
+        textarea.value = value.slice(0, start) + placeholder + value.slice(end);
+        textarea.focus();
+        textarea.selectionStart = textarea.selectionEnd = start + placeholder.length;
+      });
+    });
+
+    toggleBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      picker.classList.toggle("open");
+    });
+
+    picker.addEventListener("click", (e) => e.stopPropagation());
+
+    document.addEventListener("click", closeChatEmojiPicker);
+  }
+
+  function closeChatEmojiPicker() {
+    const picker = document.getElementById("chatEmojiPicker");
+    if (picker) picker.classList.remove("open");
   }
 
   async function start() {

@@ -92,7 +92,12 @@ function attachBadgeTooltip(root) {
   });
 }
 
-const EMOTICON_NAMES = ["computer", "dead", "two"];
+const EMOTICON_NAMES = [
+  "backpack", "banana", "bee", "bored", "computer", "computer2", "computersupport",
+  "cow", "dead", "dexterity", "dolphinhead", "fishhead", "hamster", "hi", "kiss",
+  "lion", "mwa", "pancake", "penguin", "raindeer", "romantic", "shark", "shark2",
+  "sharkcat", "squish", "squuish", "starbucks", "turtle_lazy", "two", "windy", "wonder"
+];
 const EMOTICON_NAME_SET = new Set(EMOTICON_NAMES);
 
 function initials(name) {
@@ -456,6 +461,67 @@ function renderEmoticonsInHTML(html, cssClass = "inline-emoticon") {
 
 function renderEmoticonsText(text, cssClass = "inline-emoticon") {
   return renderEmoticonsInHTML(escapeHTML(text || ""), cssClass);
+}
+
+// Wraps @username mentions in a link to that user's profile, but ONLY when
+// the username actually matches a real registered user - a stray "@foo"
+// that isn't anyone's account is left as plain text, so the underline
+// specifically signals "this mention actually went through" rather than
+// styling every @-prefixed word regardless of whether it's a real user.
+function renderMentionsInHTML(html, cssClass = "mention-link") {
+  if (!html) return "";
+
+  const template = document.createElement("template");
+  template.innerHTML = html;
+  const walker = document.createTreeWalker(template.content, NodeFilter.SHOW_TEXT);
+  const textNodes = [];
+  let current;
+
+  while ((current = walker.nextNode())) {
+    if (!shouldSkipEmoticonNode(current)) textNodes.push(current);
+  }
+
+  const tokenRE = /@([a-zA-Z0-9_.]+)/g;
+
+  textNodes.forEach(node => {
+    const raw = node.nodeValue || "";
+    tokenRE.lastIndex = 0;
+    if (!tokenRE.test(raw)) return;
+
+    tokenRE.lastIndex = 0;
+    const frag = document.createDocumentFragment();
+    let lastIndex = 0;
+    let match;
+    let touched = false;
+
+    while ((match = tokenRE.exec(raw))) {
+      const full = match[0];
+      const username = (match[1] || "").toLowerCase();
+      const mentionedUser = Progress.getUser(username);
+      if (!mentionedUser) continue; // not a real user - leave the text as-is
+
+      if (match.index > lastIndex) {
+        frag.appendChild(document.createTextNode(raw.slice(lastIndex, match.index)));
+      }
+
+      const link = document.createElement("a");
+      link.className = cssClass;
+      link.href = `user.html?id=${mentionedUser.id}`;
+      link.textContent = full;
+      frag.appendChild(link);
+
+      lastIndex = match.index + full.length;
+      touched = true;
+    }
+
+    if (!touched) return;
+    if (lastIndex < raw.length) {
+      frag.appendChild(document.createTextNode(raw.slice(lastIndex)));
+    }
+    node.replaceWith(frag);
+  });
+
+  return template.innerHTML;
 }
 
 function bootingUpHTML(opts) {
