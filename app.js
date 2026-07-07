@@ -915,15 +915,85 @@ function attachNavScrollWatcher() {
 }
 
 /* Call this once per page after DOM is ready */
+// Blanks out the page's <main> content with a locked-account notice and
+// makes the top nav visually present but fully non-interactive. Safe to
+// call repeatedly (checks if the screen is already there) and deliberately
+// does NOT touch anything else - the person can only reach the appeal link.
+function applyLockedOverlayIfNeeded() {
+  const user = Progress.getCurrentUser();
+  if (!user || !user.locked) return;
+  document.body.classList.add("account-locked");
+  const main = document.querySelector("main");
+  if (main && !main.querySelector(".locked-screen")) {
+    main.innerHTML = `
+      <div class="locked-screen">
+        <div class="error-illustration">
+          <img src="images/404page.png" alt="Account locked illustration">
+        </div>
+        <h1>Your account has been locked</h1>
+        <p>If you think this is a mistake, you can <a href="https://forms.gle/4p5gh4ocT3K6WQuU6" target="_blank" rel="noopener noreferrer">appeal here</a>.</p>
+      </div>
+    `;
+  }
+}
+
+// Separate, independent ban overlay - its own body class (account-banned)
+// and its own screen marker class (banned-screen) so it never gets
+// confused with or clobbered by the unrelated lock overlay above. Returns
+// true/false so callers can decide whether to also check the lock overlay
+// (a banned account takes priority and skips the lock check entirely).
+// Separate, independent ban overlay - its own body class (account-banned)
+// and its own screen marker class (banned-screen) so it never gets
+// confused with or clobbered by the unrelated lock overlay above.
+//
+// Deliberately does NOT trust the cached Progress.getCurrentUser().banned
+// value alone - if someone was already logged in on a device when an admin
+// banned them, their local session never picked up that change, and would
+// otherwise slip straight past this check with a stale banned: false. This
+// always re-confirms directly against the server first.
+async function applyBannedOverlayIfNeeded() {
+  const user = Progress.getCurrentUser();
+  if (!user) return false;
+  let banned = !!user.banned;
+  const fresh = await apiFetch(`/api/users/${user.id}`);
+  if (fresh) banned = !!fresh.banned;
+  if (!banned) return false;
+  document.body.classList.add("account-banned");
+  const main = document.querySelector("main");
+  if (main && !main.querySelector(".banned-screen")) {
+    main.innerHTML = `
+      <div class="locked-screen banned-screen">
+        <div class="error-illustration">
+          <img src="images/404page.png" alt="Account banned illustration">
+        </div>
+        <h1>Your account has been banned</h1>
+        <p>If you think this is a mistake, you can <a href="https://forms.gle/FBDevngpyBNgWVAQ7" target="_blank" rel="noopener noreferrer">appeal here</a>.</p>
+      </div>
+    `;
+  }
+  return true;
+}
+
 function initShell(activePage) {
   setDeviceMode();
   window.addEventListener("resize", setDeviceMode);
   renderNav(activePage);
   mountModals();
   attachNavScrollWatcher();
+  // Fires immediately - the network round-trip to confirm ban status
+  // against the server already takes longer than the current page's own
+  // synchronous render call (e.g. index.html calling renderFeed() right
+  // after initShell()), so by the time this resolves and overwrites <main>,
+  // it reliably wins over whatever that page just put there.
+  (async () => {
+    const banned = await applyBannedOverlayIfNeeded();
+    if (!banned) applyLockedOverlayIfNeeded();
+  })();
   return Progress.loadFromApi()
     .catch(() => {})
-    .then(() => {
+    .then(async () => {
+      const banned = await applyBannedOverlayIfNeeded();
+      if (!banned) applyLockedOverlayIfNeeded();
       const badge = document.getElementById("bellBadge");
       if (badge) {
         const unseen = Progress.unseenCount();
