@@ -849,6 +849,12 @@ body.mobile .mobile-fab { display: flex; }
   height: 2em;
   margin: 0 0.15em;
 }
+.chat-bubble .inline-emoticon {
+  width: 2.6em;
+  height: 2.6em;
+  vertical-align: middle;
+  margin: 2px 0.1em;
+}
 .notif-emoticon {
   width: 17px;
   height: 17px;
