@@ -2,7 +2,9 @@ require("dotenv").config();
 const express = require("express");
 const path = require("path");
 const crypto = require("crypto");
+const http = require("http");
 const { MongoClient } = require("mongodb");
+const { WebSocketServer } = require("ws");
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -17,28 +19,14 @@ if (!mongoUri) {
 
 const DEFAULT_TIMEZONE = "UTC";
 const ALLOWED_CREATOR_USERNAMES = new Set(["mara", "own", "progresstesting1"]);
+const DEFAULT_CHAT_ROOM = "global";
 
-// Matches a Spotify share link (open.spotify.com/<type>/<id>, optionally
-// with an "intl-xx" locale prefix and/or a "?si=..." query string) or a
-// "spotify:<type>:<id>" URI. Used to validate the `spotify` profile field
-// before storing it - the embed <iframe src> the client renders is always
-// rebuilt from the matched type/id, never the raw stored string, so this
-// whitelist is what keeps arbitrary URLs from ever reaching that iframe.
 const SPOTIFY_LINK_RE = /^(?:https:\/\/open\.spotify\.com\/(?:intl-[a-zA-Z-]+\/)?(?:track|album|playlist|artist|episode|show)\/[a-zA-Z0-9]+(?:\?[^\s]*)?|spotify:(?:track|album|playlist|artist|episode|show):[a-zA-Z0-9]+)$/i;
 
-// Real Spotify account OAuth ("Connect with Spotify" -> live currently-playing widget).
-// Client secret is server-side only, never sent to the browser.
 const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID || "";
 const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET || "";
 const SPOTIFY_REDIRECT_URI = process.env.SPOTIFY_REDIRECT_URI || "http://127.0.0.1:3000/api/spotify/callback";
-// Minimal scopes: read currently-playing + a display name/avatar for the "connected as" label,
-// plus playback read/modify so followers in a Listen Together session can have their own
-// Spotify seeked/played to match the host. Users who connected before this scope existed will
-// need to reconnect once (Spotify enforces scopes per-token, not retroactively).
 const SPOTIFY_SCOPES = "user-read-currently-playing user-read-private user-read-playback-state user-modify-playback-state";
-// Short-lived, single-use CSRF state tokens for the OAuth flow: state -> { userId, expires }.
-// In-memory is fine for a single free-tier instance - if the process restarts mid-flow the user
-// just clicks "Connect Spotify" again (the whole login->callback round trip normally takes seconds).
 const spotifyOAuthStates = new Map();
 function cleanupSpotifyOAuthStates() {
   const now = Date.now();
@@ -47,10 +35,6 @@ function cleanupSpotifyOAuthStates() {
   }
 }
 
-// Badges awarded automatically based on username at signup time. This is
-// computed server-side (never trusted from the request body) so a client
-// can't grant itself arbitrary badges by adding a `badges` field to the
-// signup request.
 const SIGNUP_BADGE_AWARDS = {
   mara: ["dexterity"],
   own: ["dexterity"],
@@ -117,7 +101,7 @@ const DEFAULT_SEED = {
   comments: [],
   notifications: [
     { _id: "n1", type: "like", actor: "jonah_p", postId: "p2", postTitle: "A small kitchen table, rebuilt from a door", time: "2026-07-04T09:12:00.000Z", seen: false, recipient: "mara" },
-    { _id: "n2", type: "reply", actor: "wren.codes", postId: "p1", postTitle: "Slowing down the shipping cadence, on purpose", body: "This is exactly the permission I needed to hear today.", time: "2026-07-03T21:40:00.000Z", seen: false, recipient: "mara" },
+    { _id: "n2", type: "reply", actor: "wren.codes", postId: "p1", postTitle: "Slowing down the shipping cadence, on purpose", time: "2026-07-03T21:40:00.000Z", body: "This is exactly the permission I needed to hear today.", seen: false, recipient: "mara" },
     { _id: "n3", type: "like", actor: "delia", postId: "p1", postTitle: "Slowing down the shipping cadence, on purpose", time: "2026-07-02T14:05:00.000Z", seen: false, recipient: "mara" },
     { _id: "n4", type: "follow", actor: "sam_writes", time: "2026-06-30T08:00:00.000Z", seen: true, recipient: "mara" }
   ]
@@ -131,10 +115,6 @@ function escapeRegex(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-// Passwords are stored as `scrypt:<salt>:<hash>`. `verifyPassword` also
-// accepts legacy plaintext values (from before hashing was added) so
-// existing accounts keep working; a successful login with a legacy
-// password transparently upgrades it to a hashed one.
 function hashPassword(password) {
   const salt = crypto.randomBytes(16).toString("hex");
   const hash = crypto.scryptSync(String(password), salt, 64).toString("hex");
@@ -151,7 +131,6 @@ function verifyPassword(password, stored) {
     if (hashBuffer.length !== candidateBuffer.length) return false;
     return crypto.timingSafeEqual(hashBuffer, candidateBuffer);
   }
-  // Legacy plaintext password from before hashing was introduced.
   return stored === password;
 }
 
@@ -159,8 +138,6 @@ function isLegacyPassword(stored) {
   return typeof stored === "string" && !stored.startsWith("scrypt:");
 }
 
-// Drops a "badge" notification for each newly-awarded badge id, the same
-// shape renderNotifDropdown() (app.js) already expects for n.type === "badge".
 async function notifyBadgesAwarded(username, badgeIds) {
   if (!badgeIds.length) return;
   await db.collection("notifications").insertMany(badgeIds.map(badgeId => ({
@@ -173,12 +150,6 @@ async function notifyBadgesAwarded(username, badgeIds) {
   })));
 }
 
-// Checks whether `user` is missing any badge it's entitled to via
-// SIGNUP_BADGE_AWARDS (e.g. an account created before a badge existed, or
-// before its username was added to the table). If so, grants the missing
-// badge(s) and notifies about them, the same way a newly-earned badge is
-// announced at signup. Mutates and returns `user.badges` so callers can
-// respond with up-to-date data without a second DB read.
 async function ensureUsernameBadges(user) {
   const awarded = SIGNUP_BADGE_AWARDS[user.username] || [];
   const currentBadges = Array.isArray(user.badges) ? user.badges : [];
@@ -217,8 +188,6 @@ function publicUser(user) {
   } else if (displayBadge === "creator") {
     displayBadge = null;
   }
-  // Only ever expose the public-safe bits of a connected Spotify account -
-  // never accessToken/refreshToken/spotifyId, which stay server-side only.
   const spotifyAccount = user.spotifyAccount && user.spotifyAccount.connected
     ? { connected: true, displayName: user.spotifyAccount.spotifyName || null, profileUrl: user.spotifyAccount.spotifyProfileUrl || null }
     : { connected: false, displayName: null, profileUrl: null };
@@ -248,6 +217,50 @@ function normalizePost(doc) {
   };
 }
 
+function normalizeChatMessage(doc) {
+  return toClient(doc);
+}
+
+const chatRooms = new Map();
+
+function chatRoomClients(room) {
+  let set = chatRooms.get(room);
+  if (!set) {
+    set = new Set();
+    chatRooms.set(room, set);
+  }
+  return set;
+}
+
+function broadcastToRoom(room, payload) {
+  const json = JSON.stringify(payload);
+  for (const client of chatRoomClients(room)) {
+    if (client.readyState === client.OPEN) client.send(json);
+  }
+}
+
+function roomPresence(room) {
+  return Array.from(chatRoomClients(room))
+    .map(c => c.username)
+    .filter(Boolean);
+}
+
+function dmRoomId(userA, userB) {
+  return "dm:" + [userA, userB].sort().join(":");
+}
+
+function dmParticipants(room) {
+  if (typeof room !== "string" || !room.startsWith("dm:")) return null;
+  const parts = room.slice(3).split(":");
+  return parts.length === 2 && parts[0] && parts[1] ? parts : null;
+}
+
+function canAccessRoom(room, username) {
+  const participants = dmParticipants(room);
+  if (!participants) return true;
+  return participants.includes(username);
+}
+
 let db;
 
 async function connect() {
@@ -263,15 +276,15 @@ async function seedIfNeeded() {
   const posts = db.collection("posts");
   const comments = db.collection("comments");
   const notifications = db.collection("notifications");
+  const messages = db.collection("messages");
 
-  // Create indexes for data integrity and query performance
   try {
     await users.createIndex({ username: 1 }, { unique: true });
     await posts.createIndex({ author: 1, createdAt: -1 });
     await comments.createIndex({ postId: 1, time: 1 });
     await notifications.createIndex({ recipient: 1, time: -1 });
+    await messages.createIndex({ room: 1, time: 1 });
   } catch (e) {
-    // Indexes may already exist, which is fine
     if (!e.message.includes("already exists")) {
       console.warn("Index creation warning:", e.message);
     }
@@ -281,8 +294,6 @@ async function seedIfNeeded() {
   if (!mara) {
     await users.insertOne(DEFAULT_SEED.users[0]);
   } else {
-    // Only repair the demo account if its password/badges are actually
-    // missing or corrupted - don't clobber it unconditionally on every boot.
     const repair = {};
     if (!mara.password) repair.password = hashPassword("demo1234");
     if (!Array.isArray(mara.badges) || !mara.badges.length) repair.badges = ["dexterity"];
@@ -291,11 +302,6 @@ async function seedIfNeeded() {
     }
   }
 
-  // Retroactively grant username-based badges to any of these accounts that
-  // already existed before the badge was introduced (accounts that don't
-  // exist are left alone - they'll get the badge automatically on signup).
-  // This also runs on every login (see /api/login), this boot-time pass
-  // just catches accounts that never log in again.
   for (const awardedUsername of Object.keys(SIGNUP_BADGE_AWARDS)) {
     const existingUser = await users.findOne({ username: awardedUsername });
     if (existingUser) await ensureUsernameBadges(existingUser);
@@ -364,8 +370,6 @@ app.post("/api/users", asyncHandler(async (req, res) => {
     followers: [],
     bio: "",
     spotify: "",
-    // Badges are decided by the server from the username, never trusted
-    // from the request body - see SIGNUP_BADGE_AWARDS.
     badges: SIGNUP_BADGE_AWARDS[normalizedUsername] || []
   };
   await db.collection("users").insertOne(user);
@@ -422,11 +426,9 @@ app.delete("/api/users/:id", asyncHandler(async (req, res) => {
 
   const username = user.username;
 
-  // Delete all user's posts and comments on other posts
   await posts.deleteMany({ author: username });
   await comments.deleteMany({ author: username });
 
-  // Remove user from all likedBy arrays on remaining posts
   await posts.updateMany(
     { likedBy: username },
     { 
@@ -435,22 +437,18 @@ app.delete("/api/users/:id", asyncHandler(async (req, res) => {
     }
   );
 
-  // Delete all notifications about or by this user
   await notifications.deleteMany({ $or: [{ actor: username }, { recipient: username }] });
 
-  // Remove user from all other users' following lists
   await users.updateMany(
     { following: username },
     { $pull: { following: username } }
   );
 
-  // Remove user from all other users' followers lists
   await users.updateMany(
     { followers: username },
     { $pull: { followers: username } }
   );
 
-  // Delete the user account
   await users.deleteOne({ _id: req.params.id });
 
   res.status(204).end();
@@ -515,8 +513,6 @@ app.post("/api/users/:id/unfollow", asyncHandler(async (req, res) => {
   res.json({ follower: follower.username, target: target.username });
 }));
 
-// ---- Spotify account OAuth ("Connect with Spotify") ----
-
 app.get("/api/spotify/status", (req, res) => {
   res.json({ configured: !!(SPOTIFY_CLIENT_ID && SPOTIFY_CLIENT_SECRET) });
 });
@@ -549,7 +545,7 @@ app.get("/api/spotify/callback", asyncHandler(async (req, res) => {
   if (error || !code || !state || !spotifyOAuthStates.has(state)) return redirectError();
 
   const pending = spotifyOAuthStates.get(state);
-  spotifyOAuthStates.delete(state); // single-use
+  spotifyOAuthStates.delete(state);
   if (pending.expires < Date.now()) return redirectError();
 
   try {
@@ -593,8 +589,6 @@ app.get("/api/spotify/callback", asyncHandler(async (req, res) => {
   }
 }));
 
-// Returns a valid access token for a user's connected Spotify account, refreshing it first if
-// it's expired (or about to expire). Returns null if not connected or the refresh fails.
 async function getValidSpotifyAccessToken(userDoc) {
   const acct = userDoc.spotifyAccount;
   if (!acct || !acct.refreshToken) return null;
@@ -668,17 +662,6 @@ app.post("/api/users/:id/spotify/disconnect", asyncHandler(async (req, res) => {
   res.json(publicUser(normalizeUser(updated)));
 }));
 
-// ---------------------------------------------------------------------------
-// Listen Together: Discord-style Spotify listen-along. One host's live
-// playback (track + exact position) is the source of truth in `listenSessions`.
-// Followers don't hear the host's audio directly - instead, each follower's
-// own already-open Spotify app gets told (via the Spotify Web API, using
-// their own access token) to play the same track at the host's live position.
-// That's the same mechanism most third-party "listen along" tools use; it
-// requires the follower to have Spotify Premium and an active device open,
-// but does not require the heavier Web Playback SDK.
-// ---------------------------------------------------------------------------
-
 function publicListenSession(doc) {
   if (!doc) return null;
   return {
@@ -700,10 +683,6 @@ function publicListenSession(doc) {
   };
 }
 
-// Re-fetches the host's live currently-playing state from Spotify and writes
-// it onto the session document, so every read of a session is fresh rather
-// than relying on a background poller (simplest thing that works on a
-// single free-tier instance with no extra timers to manage or leak).
 async function refreshListenSessionFromHost(sessionDoc) {
   const hostDoc = await db.collection("users").findOne({ username: sessionDoc.hostUsername });
   if (!hostDoc || !hostDoc.spotifyAccount || !hostDoc.spotifyAccount.connected) return sessionDoc;
@@ -813,10 +792,6 @@ app.post("/api/listen/sessions/:id/end", asyncHandler(async (req, res) => {
   res.json({ ended: true });
 }));
 
-// A follower calls this to have their OWN Spotify (an already-open device on
-// their account) seek/play to match the host's live position. Requires
-// Premium + an active device; we surface both failure modes as friendly
-// messages instead of raw Spotify errors.
 app.post("/api/listen/sessions/:id/sync-me", asyncHandler(async (req, res) => {
   const { userId } = req.body || {};
   const userDoc = await db.collection("users").findOne({ _id: userId });
@@ -989,13 +964,74 @@ app.post("/api/notifications/mark-seen", asyncHandler(async (req, res) => {
   res.json({ ok: true });
 }));
 
+async function createChatMessage({ room, author, body }) {
+  const targetRoom = (room || DEFAULT_CHAT_ROOM).toString().slice(0, 200);
+  const trimmed = (body || "").toString().trim();
+  if (!author || !trimmed) return null;
+  if (!canAccessRoom(targetRoom, author)) return null;
+  const message = {
+    _id: generateId("m"),
+    room: targetRoom,
+    author,
+    body: trimmed.slice(0, 2000),
+    time: new Date().toISOString()
+  };
+  await db.collection("messages").insertOne(message);
+  const clientMessage = normalizeChatMessage(message);
+  broadcastToRoom(targetRoom, { type: "message", message: clientMessage });
+  return clientMessage;
+}
+
+app.get("/api/chat/messages", asyncHandler(async (req, res) => {
+  const room = (req.query.room || DEFAULT_CHAT_ROOM).toString().slice(0, 200);
+  const viewer = (req.query.username || "").toString();
+  if (dmParticipants(room) && !canAccessRoom(room, viewer)) {
+    return res.status(403).json({ error: "Not a participant in this conversation" });
+  }
+  const limit = Math.min(parseInt(req.query.limit, 10) || 50, 200);
+  const docs = await db.collection("messages")
+    .find({ room })
+    .sort({ time: -1 })
+    .limit(limit)
+    .toArray();
+  res.json(docs.map(normalizeChatMessage).reverse());
+}));
+
+app.get("/api/chat/conversations", asyncHandler(async (req, res) => {
+  const username = (req.query.username || "").toString();
+  if (!username) return res.status(400).json({ error: "username is required" });
+  const rooms = await db.collection("messages").distinct("room", { room: { $regex: "^dm:" } });
+  const mine = rooms.filter(room => canAccessRoom(room, username));
+  const conversations = await Promise.all(mine.map(async room => {
+    const participants = dmParticipants(room);
+    const withUsername = participants.find(p => p !== username) || participants[0];
+    const lastDocs = await db.collection("messages").find({ room }).sort({ time: -1 }).limit(1).toArray();
+    return {
+      room,
+      with: withUsername,
+      lastMessage: lastDocs[0] ? normalizeChatMessage(lastDocs[0]) : null
+    };
+  }));
+  conversations.sort((a, b) => {
+    const at = a.lastMessage ? new Date(a.lastMessage.time).getTime() : 0;
+    const bt = b.lastMessage ? new Date(b.lastMessage.time).getTime() : 0;
+    return bt - at;
+  });
+  res.json(conversations);
+}));
+
+app.post("/api/chat/messages", asyncHandler(async (req, res) => {
+  const message = await createChatMessage(req.body);
+  if (!message) return res.status(400).json({ error: "author and body are required" });
+  res.status(201).json(message);
+}));
+
 app.post("/api/login", asyncHandler(async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) return res.status(400).json({ error: "username and password are required" });
   const user = await db.collection("users").findOne({ username: { $regex: `^${escapeRegex(username)}$`, $options: "i" } });
   if (!user || !verifyPassword(password, user.password)) return res.status(401).json({ error: "Invalid credentials" });
   if (isLegacyPassword(user.password)) {
-    // Transparently upgrade legacy plaintext passwords to a hashed one.
     user.password = hashPassword(password);
     await db.collection("users").updateOne({ _id: user._id }, { $set: { password: user.password } });
   }
@@ -1019,7 +1055,62 @@ app.use((err, req, res, next) => {
 
 connect()
   .then(() => {
-    app.listen(port, () => {
+    const server = http.createServer(app);
+
+    const wss = new WebSocketServer({ noServer: true });
+
+    wss.on("connection", (ws, req, { room, username }) => {
+      ws.room = room;
+      ws.username = username;
+      chatRoomClients(room).add(ws);
+      broadcastToRoom(room, { type: "presence", room, users: roomPresence(room) });
+
+      ws.on("message", raw => {
+        let data;
+        try {
+          data = JSON.parse(raw.toString());
+        } catch (e) {
+          return;
+        }
+        if (data.type === "send") {
+          createChatMessage({ room: ws.room, author: ws.username, body: data.body }).catch(err => {
+            console.error("Chat message failed:", err);
+          });
+        } else if (data.type === "typing") {
+          broadcastToRoom(ws.room, { type: "typing", room: ws.room, username: ws.username });
+        }
+      });
+
+      ws.on("close", () => {
+        chatRoomClients(room).delete(ws);
+        broadcastToRoom(room, { type: "presence", room, users: roomPresence(room) });
+      });
+    });
+
+    server.on("upgrade", (req, socket, head) => {
+      let url;
+      try {
+        url = new URL(req.url, "http://localhost");
+      } catch (e) {
+        socket.destroy();
+        return;
+      }
+      if (url.pathname !== "/ws/chat") {
+        socket.destroy();
+        return;
+      }
+      const username = (url.searchParams.get("username") || "").trim();
+      const room = (url.searchParams.get("room") || DEFAULT_CHAT_ROOM).trim().slice(0, 200) || DEFAULT_CHAT_ROOM;
+      if (!username || !canAccessRoom(room, username)) {
+        socket.destroy();
+        return;
+      }
+      wss.handleUpgrade(req, socket, head, ws => {
+        wss.emit("connection", ws, req, { room, username });
+      });
+    });
+
+    server.listen(port, () => {
       console.log(`Server running on port ${port}`);
     });
   })
