@@ -325,6 +325,39 @@ function asyncHandler(fn) {
   return (req, res, next) => fn(req, res, next).catch(next);
 }
 
+// Scans `text` for @username mentions, looks up which of those are real
+// registered users, and drops a "mention" notification for each one -
+// skipping the author themselves and anyone in `skipUsernames` (e.g. the
+// post author, who already gets a separate "reply" notification for a
+// comment, so they don't need a duplicate "mention" one too).
+// `context` describes where the mention happened, used for the
+// notification payload so the client can route the click appropriately:
+// { postId, postTitle } for posts/comments, { room } for chat.
+async function notifyMentionedUsers({ text, author, skipUsernames = [], context = {} }) {
+  if (!text) return;
+  const mentioned = Array.from(new Set((text.match(/@([a-zA-Z0-9_.]+)/g) || [])
+    .map(m => m.slice(1).toLowerCase())))
+    .filter(u => u !== author.toLowerCase() && !skipUsernames.includes(u));
+  if (!mentioned.length) return;
+  try {
+    const mentionedUsers = await db.collection("users").find({ username: { $in: mentioned } }).toArray();
+    for (const u of mentionedUsers) {
+      await db.collection("notifications").insertOne({
+        _id: generateId("n"),
+        type: "mention",
+        actor: author,
+        recipient: u.username,
+        body: text,
+        time: new Date().toISOString(),
+        seen: false,
+        ...context
+      });
+    }
+  } catch (e) {
+    console.error("Mention notification failed:", e);
+  }
+}
+
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use((req, res, next) => {
@@ -858,6 +891,11 @@ app.post("/api/posts", asyncHandler(async (req, res) => {
     likedBy: []
   };
   await db.collection("posts").insertOne(post);
+  await notifyMentionedUsers({
+    text: content.replace(/<[^>]+>/g, " "),
+    author,
+    context: { postId: post._id, postTitle: post.title, via: "post" }
+  });
   res.status(201).json(toClient(post));
 }));
 
@@ -902,6 +940,12 @@ app.post("/api/posts/:id/comments", asyncHandler(async (req, res) => {
       seen: false
     });
   }
+  await notifyMentionedUsers({
+    text: body || "",
+    author,
+    skipUsernames: [post.author.toLowerCase()],
+    context: { postId: post._id, postTitle: post.title, via: "comment" }
+  });
   res.status(201).json(toClient(comment));
 }));
 
@@ -1001,24 +1045,7 @@ async function createChatMessage({ room, author, body }) {
         });
       }
     } else {
-      const mentioned = Array.from(new Set((message.body.match(/@([a-zA-Z0-9_.]+)/g) || [])
-        .map(m => m.slice(1).toLowerCase())))
-        .filter(u => u !== author.toLowerCase());
-      if (mentioned.length) {
-        const mentionedUsers = await db.collection("users").find({ username: { $in: mentioned } }).toArray();
-        for (const u of mentionedUsers) {
-          await db.collection("notifications").insertOne({
-            _id: generateId("n"),
-            type: "mention",
-            actor: author,
-            recipient: u.username,
-            room: targetRoom,
-            body: message.body,
-            time: new Date().toISOString(),
-            seen: false
-          });
-        }
-      }
+      await notifyMentionedUsers({ text: message.body, author, context: { room: targetRoom } });
     }
   } catch (e) {
     console.error("Chat notification failed:", e);
