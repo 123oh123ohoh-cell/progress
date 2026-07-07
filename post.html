@@ -65,7 +65,7 @@
         <span class="post-date">${Progress.formatDateTime(post.createdAt || post.date + "T00:00:00")}</span>
         <h1 class="post-title">${renderEmoticonsText(post.title, "inline-emoticon")}</h1>
         <div class="post-byline">
-          ${avatarHTML(author, 30)}
+          <a class="avatar-link" href="user.html?id=${author ? author.id : ""}">${avatarHTML(author, 30)}</a>
           <span>Written by <a class="username-link" href="user.html?id=${author ? author.id : ""}">@${post.author}</a></span>
         </div>
       </div>
@@ -89,7 +89,7 @@
             const author = Progress.getUser(comment.author);
             return `
               <div class="reply-item">
-                <div class="reply-avatar">${avatarHTML(author, 32)}</div>
+                <a class="reply-avatar" href="user.html?id=${author ? author.id : ""}">${avatarHTML(author, 32)}</a>
                 <div class="reply-content">
                   <div class="reply-meta"><strong><a class="username-link" href="user.html?id=${author ? author.id : ""}">@${comment.author}</a></strong><span>${Progress.formatDateTime(comment.time)}</span></div>
                   <p class="reply-body">${renderEmoticonsText(comment.body, "reply-emoticon")}</p>

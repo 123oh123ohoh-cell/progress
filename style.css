@@ -532,6 +532,14 @@ body.mobile .mobile-fab { display: flex; }
   font-size: 15px;
 }
 
+.avatar-link {
+  display: inline-flex;
+  line-height: 0;
+  border-radius: 50%;
+  transition: opacity .15s ease;
+}
+.avatar-link:hover { opacity: 0.85; }
+
 .error-illustration {
   max-width: 420px;
   margin: 0 auto 34px;

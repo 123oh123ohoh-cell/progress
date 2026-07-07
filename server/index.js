@@ -979,6 +979,51 @@ async function createChatMessage({ room, author, body }) {
   await db.collection("messages").insertOne(message);
   const clientMessage = normalizeChatMessage(message);
   broadcastToRoom(targetRoom, { type: "message", message: clientMessage });
+
+  // Chat notifications: a DM always notifies the other participant ("has
+  // messaged you"). Public rooms (Global) only notify users who were
+  // actually @mentioned in the message, so a busy room doesn't spam
+  // everyone in it on every single message.
+  try {
+    const participants = dmParticipants(targetRoom);
+    if (participants) {
+      const recipient = participants.find(p => p !== author);
+      if (recipient) {
+        await db.collection("notifications").insertOne({
+          _id: generateId("n"),
+          type: "message",
+          actor: author,
+          recipient,
+          room: targetRoom,
+          body: message.body,
+          time: new Date().toISOString(),
+          seen: false
+        });
+      }
+    } else {
+      const mentioned = Array.from(new Set((message.body.match(/@([a-zA-Z0-9_.]+)/g) || [])
+        .map(m => m.slice(1).toLowerCase())))
+        .filter(u => u !== author.toLowerCase());
+      if (mentioned.length) {
+        const mentionedUsers = await db.collection("users").find({ username: { $in: mentioned } }).toArray();
+        for (const u of mentionedUsers) {
+          await db.collection("notifications").insertOne({
+            _id: generateId("n"),
+            type: "mention",
+            actor: author,
+            recipient: u.username,
+            room: targetRoom,
+            body: message.body,
+            time: new Date().toISOString(),
+            seen: false
+          });
+        }
+      }
+    }
+  } catch (e) {
+    console.error("Chat notification failed:", e);
+  }
+
   return clientMessage;
 }
 

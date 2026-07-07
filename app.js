@@ -522,6 +522,12 @@ function renderNotifDropdown() {
         const actorHref = actorUser ? `user.html?id=${actorUser.id}` : `user.html?username=${encodeURIComponent(n.actor)}`;
         const actorText = `<strong><span class="username-link" data-href="${actorHref}">@${escapeHTML(n.actor)}</span></strong>`;
         const postHref = n.postId ? `post.html?id=${n.postId}` : "";
+        const chatHref = n.type === "message"
+          ? `chat.html?with=${encodeURIComponent(n.actor)}`
+          : n.type === "mention"
+            ? "chat.html"
+            : "";
+        const targetHref = postHref || chatHref;
         let text;
 
         if (n.type === "like") {
@@ -534,12 +540,20 @@ function renderNotifDropdown() {
           const badge = BADGES[n.badgeId];
           const badgeName = badge ? badge.label : n.badgeId;
           text = `You've been awarded with '${escapeHTML(badgeName)}'!`;
+        } else if (n.type === "message") {
+          text = `${actorText} has messaged you: "${renderEmoticonsText(n.body, "notif-emoticon")}"`;
+        } else if (n.type === "mention") {
+          text = n.via === "comment"
+            ? `${actorText} mentioned you in a comment on "${renderEmoticonsText(n.postTitle || "", "notif-emoticon")}": "${renderEmoticonsText(n.body, "notif-emoticon")}"`
+            : n.via === "post"
+              ? `${actorText} mentioned you in a post: "${renderEmoticonsText(n.postTitle || "", "notif-emoticon")}"`
+              : `${actorText} mentioned you in chat: "${renderEmoticonsText(n.body, "notif-emoticon")}"`;
         } else {
           text = `${actorText} did something`;
         }
 
         return `
-          <div class="notif-item" data-post-href="${postHref}">
+          <div class="notif-item" data-post-href="${targetHref}">
             <span class="dot-unread ${n.seen ? "seen" : ""}"></span>
             <div>
               <p>${text}</p>

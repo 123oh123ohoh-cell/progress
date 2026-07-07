@@ -299,16 +299,30 @@
     const hasProgress = typeof session.progressMs === "number" && typeof session.durationMs === "number" && session.durationMs > 0;
     cardEl.classList.toggle("is-playing", !!session.isPlaying);
     cardEl.classList.toggle("is-paused", !session.isPlaying);
-    if (hasProgress) {
+
+    // The rail polls every second, but the server only actually refreshes a
+    // session's real Spotify position occasionally (on join/sync/detail
+    // fetch) - most polls return byte-for-byte the same progress snapshot.
+    // Only reset the ticking baseline when something genuinely changed
+    // server-side; otherwise leave it alone so the smooth per-second ticker
+    // (tickNowPlayingWidgets) keeps advancing the bar uninterrupted instead
+    // of being yanked back to the same value every second.
+    const serverStamp = String(session.updatedAt || "");
+    const changed = cardEl.dataset.serverUpdatedAt !== serverStamp
+      || cardEl.dataset.isPlaying !== (session.isPlaying ? "1" : "0");
+
+    if (hasProgress && changed) {
       cardEl.dataset.durationMs = session.durationMs;
       cardEl.dataset.progressMs = session.progressMs;
-      cardEl.dataset.fetchedAt = session.updatedAt || Date.now();
+      cardEl.dataset.fetchedAt = Date.now();
       cardEl.dataset.isPlaying = session.isPlaying ? "1" : "0";
-    } else {
+      cardEl.dataset.serverUpdatedAt = serverStamp;
+    } else if (!hasProgress) {
       delete cardEl.dataset.durationMs;
       delete cardEl.dataset.progressMs;
       delete cardEl.dataset.fetchedAt;
       delete cardEl.dataset.isPlaying;
+      delete cardEl.dataset.serverUpdatedAt;
     }
     const trackEl = cardEl.querySelector(".now-playing-track");
     const artistEl = cardEl.querySelector(".now-playing-artist");

@@ -91,7 +91,7 @@
       user = Progress.getCurrentUser();
       render();
     }).catch(() => {});
-    setInterval(refreshNowPlaying, 5000);
+    setInterval(refreshNowPlaying, 10000); // Refresh every 10 seconds
   }
 
   start();
