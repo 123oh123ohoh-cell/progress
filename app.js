@@ -331,6 +331,7 @@ function renderNav(activePage) {
         <img class="nav-logo-image" src="images/nearheader.png" alt="" loading="lazy">
       </a>
       <div class="nav-right">
+        <a href="chat.html" class="nav-new nav-chat-link">chat</a>
         ${user ? `<a href="write.html" class="nav-new">+ new entry</a>` : ""}
         <div class="bell-wrap">
           <button class="bell-btn" id="bellBtn" aria-label="Notifications">
@@ -347,7 +348,7 @@ function renderNav(activePage) {
         </div>
       </div>
     </nav>
-    ${user && activePage !== "write" ? `
+    ${user && activePage !== "write" && activePage !== "chat" ? `
     <a href="write.html" class="mobile-fab" aria-label="New entry">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
     </a>` : ""}
