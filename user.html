@@ -121,7 +121,7 @@ async function refreshNowPlaying() {
 }
 
 refreshNowPlaying();
-setInterval(refreshNowPlaying, 30000); // Refresh every 30 seconds
+setInterval(refreshNowPlaying, 5000); // Refresh every 5 seconds
 
     (async () => {
       const result = await apiFetch(`/api/posts?author=${encodeURIComponent(user.username)}`);

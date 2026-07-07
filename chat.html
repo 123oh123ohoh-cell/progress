@@ -436,7 +436,7 @@
     connectSocket();
     loadListenRail();
     if (listenRailTimer) clearInterval(listenRailTimer);
-    listenRailTimer = setInterval(loadListenRail, 8000);
+    listenRailTimer = setInterval(loadListenRail, 1000);
   }
 
   async function start() {
