@@ -286,11 +286,60 @@
       </div>`;
   }
 
+  let listenRailTimer = null;
+
+  // Renders the sidebar "Listen Together" rail: any active sessions (so you
+  // can join and sync your own Spotify to them), plus a start/end control
+  // for the current user's own session. Re-used on a light poll and on the
+  // "listen-session-updated" event app.js fires after join/leave/end/sync.
+  async function loadListenRail() {
+    const rail = document.getElementById("chatListenRail");
+    if (!rail) return;
+    const sessions = await fetchListenSessions();
+    const mySession = sessions.find(s => s.hostUsername === currentUser.username);
+    const otherSessions = sessions.filter(s => s.hostUsername !== currentUser.username);
+
+    const hasSpotify = currentUser.spotifyAccount && currentUser.spotifyAccount.connected;
+    const startControl = mySession
+      ? ""
+      : hasSpotify
+        ? `<button type="button" class="btn primary" id="startListenBtn" style="width:100%;">Start listening together</button>`
+        : `<a href="profile.html?tab=settings" class="field-note" style="display:block;">Connect Spotify to start a listening session</a>`;
+
+    const cards = [mySession, ...otherSessions].filter(Boolean).map(s => renderListenSessionCard(s)).join("");
+
+    rail.innerHTML = `
+      <div class="chat-listen-rail-title">Listen Together</div>
+      ${cards}
+      ${startControl}
+    `;
+
+    const startBtn = document.getElementById("startListenBtn");
+    if (startBtn) {
+      startBtn.addEventListener("click", async () => {
+        startBtn.disabled = true;
+        startBtn.textContent = "Starting…";
+        const session = await createListenSession();
+        if (session) {
+          showToast("Listening session started. Friends can join from here.");
+          loadListenRail();
+        } else {
+          showToast("Couldn't start a session. Make sure Spotify is connected and playing.");
+          startBtn.disabled = false;
+          startBtn.textContent = "Start listening together";
+        }
+      });
+    }
+  }
+
+  document.addEventListener("listen-session-updated", () => loadListenRail());
+
   function renderChat() {
     const wrap = document.getElementById("chatWrap");
     wrap.innerHTML = `
       <div class="chat-shell">
         <aside class="chat-sidebar">
+          <div class="chat-listen-rail" id="chatListenRail"></div>
           <form class="chat-new-dm" id="newDmForm">
             <input type="text" id="newDmInput" placeholder="Message @username…" autocomplete="off">
           </form>
@@ -337,6 +386,9 @@
     loadSidebar();
     loadHistory();
     connectSocket();
+    loadListenRail();
+    if (listenRailTimer) clearInterval(listenRailTimer);
+    listenRailTimer = setInterval(loadListenRail, 8000);
   }
 
   async function start() {
@@ -361,7 +413,11 @@
     }
   }
 
-  window.addEventListener("beforeunload", closeSocket);
+  function closeListenRailPolling() {
+    if (listenRailTimer) { clearInterval(listenRailTimer); listenRailTimer = null; }
+  }
+
+  window.addEventListener("beforeunload", () => { closeSocket(); closeListenRailPolling(); });
 
   start();
 </script>
