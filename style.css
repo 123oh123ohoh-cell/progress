@@ -1332,6 +1332,17 @@ body.modal-open { overflow: hidden; }
 .chat-listen-rail .listen-session-actions { margin-top: 6px; padding-top: 6px; }
 .chat-listen-rail .btn { padding: 5px 9px; font-size: 12px; }
 
+.now-playing-slot-mini { margin: 10px 0 0; }
+.now-playing-widget-mini {
+  max-width: none; margin: 0; padding: 8px 10px;
+}
+.now-playing-widget-mini .now-playing-header { font-size: 9px; margin-bottom: 6px; }
+.now-playing-widget-mini .now-playing-widget img,
+.now-playing-widget-mini .now-playing-art-fallback { width: 34px; height: 34px; }
+.now-playing-widget-mini .now-playing-track { font-size: 12.5px; }
+.now-playing-widget-mini .now-playing-artist { font-size: 11px; margin-bottom: 2px; }
+.now-playing-widget-mini .now-playing-times { font-size: 9px; }
+
 .yt-embed { position: relative; width: 100%; height: 0; padding-top: 56.25%; margin: 30px 0; border-radius: var(--radius); overflow: hidden; background: var(--mocha-wash); }
 .yt-embed iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; display: block; }
 .spotify-post-embed { margin: 24px 0; }
