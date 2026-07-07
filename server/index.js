@@ -31,8 +31,11 @@ const SPOTIFY_LINK_RE = /^(?:https:\/\/open\.spotify\.com\/(?:intl-[a-zA-Z-]+\/)
 const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID || "";
 const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET || "";
 const SPOTIFY_REDIRECT_URI = process.env.SPOTIFY_REDIRECT_URI || "http://127.0.0.1:3000/api/spotify/callback";
-// Minimal scopes: just enough to read currently-playing + a display name/avatar for the "connected as" label.
-const SPOTIFY_SCOPES = "user-read-currently-playing user-read-private";
+// Minimal scopes: read currently-playing + a display name/avatar for the "connected as" label,
+// plus playback read/modify so followers in a Listen Together session can have their own
+// Spotify seeked/played to match the host. Users who connected before this scope existed will
+// need to reconnect once (Spotify enforces scopes per-token, not retroactively).
+const SPOTIFY_SCOPES = "user-read-currently-playing user-read-private user-read-playback-state user-modify-playback-state";
 // Short-lived, single-use CSRF state tokens for the OAuth flow: state -> { userId, expires }.
 // In-memory is fine for a single free-tier instance - if the process restarts mid-flow the user
 // just clicks "Connect Spotify" again (the whole login->callback round trip normally takes seconds).
@@ -663,6 +666,188 @@ app.post("/api/users/:id/spotify/disconnect", asyncHandler(async (req, res) => {
   await users.updateOne({ _id: req.params.id }, { $unset: { spotifyAccount: "" } });
   const updated = await users.findOne({ _id: req.params.id });
   res.json(publicUser(normalizeUser(updated)));
+}));
+
+// ---------------------------------------------------------------------------
+// Listen Together: Discord-style Spotify listen-along. One host's live
+// playback (track + exact position) is the source of truth in `listenSessions`.
+// Followers don't hear the host's audio directly - instead, each follower's
+// own already-open Spotify app gets told (via the Spotify Web API, using
+// their own access token) to play the same track at the host's live position.
+// That's the same mechanism most third-party "listen along" tools use; it
+// requires the follower to have Spotify Premium and an active device open,
+// but does not require the heavier Web Playback SDK.
+// ---------------------------------------------------------------------------
+
+function publicListenSession(doc) {
+  if (!doc) return null;
+  return {
+    id: doc._id,
+    hostUsername: doc.hostUsername,
+    hostUserId: doc.hostUserId,
+    active: doc.active !== false,
+    trackUri: doc.trackUri || null,
+    trackName: doc.trackName || null,
+    artistNames: doc.artistNames || null,
+    albumArt: doc.albumArt || null,
+    trackUrl: doc.trackUrl || null,
+    durationMs: typeof doc.durationMs === "number" ? doc.durationMs : null,
+    progressMs: typeof doc.progressMs === "number" ? doc.progressMs : null,
+    isPlaying: !!doc.isPlaying,
+    updatedAt: doc.updatedAt || null,
+    participants: (doc.participants || []).map(p => p.username),
+    createdAt: doc.createdAt
+  };
+}
+
+// Re-fetches the host's live currently-playing state from Spotify and writes
+// it onto the session document, so every read of a session is fresh rather
+// than relying on a background poller (simplest thing that works on a
+// single free-tier instance with no extra timers to manage or leak).
+async function refreshListenSessionFromHost(sessionDoc) {
+  const hostDoc = await db.collection("users").findOne({ username: sessionDoc.hostUsername });
+  if (!hostDoc || !hostDoc.spotifyAccount || !hostDoc.spotifyAccount.connected) return sessionDoc;
+  const accessToken = await getValidSpotifyAccessToken(hostDoc);
+  if (!accessToken) return sessionDoc;
+  try {
+    const npRes = await fetch("https://api.spotify.com/v1/me/player/currently-playing", {
+      headers: { "Authorization": `Bearer ${accessToken}` }
+    });
+    let update;
+    if (npRes.status === 200) {
+      const data = await npRes.json().catch(() => null);
+      if (data && data.item) {
+        const images = (data.item.album && data.item.album.images) || [];
+        update = {
+          trackUri: data.item.uri,
+          trackName: data.item.name,
+          artistNames: (data.item.artists || []).map(a => a.name).join(", "),
+          albumArt: (images[1] && images[1].url) || (images[0] && images[0].url) || null,
+          trackUrl: (data.item.external_urls && data.item.external_urls.spotify) || null,
+          durationMs: data.item.duration_ms,
+          progressMs: data.progress_ms,
+          isPlaying: !!data.is_playing,
+          updatedAt: Date.now()
+        };
+      }
+    }
+    if (!update) update = { isPlaying: false, updatedAt: Date.now() };
+    await db.collection("listenSessions").updateOne({ _id: sessionDoc._id }, { $set: update });
+    return { ...sessionDoc, ...update };
+  } catch (e) {
+    return sessionDoc;
+  }
+}
+
+app.post("/api/listen/sessions", asyncHandler(async (req, res) => {
+  const { hostId } = req.body || {};
+  const hostDoc = await db.collection("users").findOne({ _id: hostId });
+  if (!hostDoc) return res.status(404).json({ error: "User not found" });
+  if (!hostDoc.spotifyAccount || !hostDoc.spotifyAccount.connected) {
+    return res.status(400).json({ error: "Connect Spotify before starting a listening session." });
+  }
+  await db.collection("listenSessions").updateMany(
+    { hostUsername: hostDoc.username, active: true },
+    { $set: { active: false } }
+  );
+  const session = {
+    _id: crypto.randomUUID(),
+    hostUsername: hostDoc.username,
+    hostUserId: hostDoc._id,
+    active: true,
+    participants: [{ username: hostDoc.username, userId: hostDoc._id, joinedAt: Date.now() }],
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    isPlaying: false
+  };
+  await db.collection("listenSessions").insertOne(session);
+  const refreshed = await refreshListenSessionFromHost(session);
+  res.json(publicListenSession(refreshed));
+}));
+
+app.get("/api/listen/sessions", asyncHandler(async (req, res) => {
+  const docs = await db.collection("listenSessions").find({ active: true }).toArray();
+  res.json(docs.map(publicListenSession));
+}));
+
+app.get("/api/listen/sessions/:id", asyncHandler(async (req, res) => {
+  const doc = await db.collection("listenSessions").findOne({ _id: req.params.id, active: true });
+  if (!doc) return res.status(404).json({ error: "Session not found or ended" });
+  const refreshed = await refreshListenSessionFromHost(doc);
+  res.json(publicListenSession(refreshed));
+}));
+
+app.post("/api/listen/sessions/:id/join", asyncHandler(async (req, res) => {
+  const { userId } = req.body || {};
+  const userDoc = await db.collection("users").findOne({ _id: userId });
+  if (!userDoc) return res.status(404).json({ error: "User not found" });
+  const doc = await db.collection("listenSessions").findOne({ _id: req.params.id, active: true });
+  if (!doc) return res.status(404).json({ error: "Session not found or ended" });
+  const already = (doc.participants || []).some(p => p.username === userDoc.username);
+  if (!already) {
+    await db.collection("listenSessions").updateOne(
+      { _id: doc._id },
+      { $push: { participants: { username: userDoc.username, userId: userDoc._id, joinedAt: Date.now() } } }
+    );
+  }
+  const updated = await db.collection("listenSessions").findOne({ _id: doc._id });
+  const refreshed = await refreshListenSessionFromHost(updated);
+  res.json(publicListenSession(refreshed));
+}));
+
+app.post("/api/listen/sessions/:id/leave", asyncHandler(async (req, res) => {
+  const { userId } = req.body || {};
+  await db.collection("listenSessions").updateOne(
+    { _id: req.params.id },
+    { $pull: { participants: { userId } } }
+  );
+  res.json({ left: true });
+}));
+
+app.post("/api/listen/sessions/:id/end", asyncHandler(async (req, res) => {
+  const { userId } = req.body || {};
+  const doc = await db.collection("listenSessions").findOne({ _id: req.params.id });
+  if (!doc) return res.status(404).json({ error: "Session not found" });
+  if (doc.hostUserId !== userId) return res.status(403).json({ error: "Only the host can end this session." });
+  await db.collection("listenSessions").updateOne({ _id: req.params.id }, { $set: { active: false } });
+  res.json({ ended: true });
+}));
+
+// A follower calls this to have their OWN Spotify (an already-open device on
+// their account) seek/play to match the host's live position. Requires
+// Premium + an active device; we surface both failure modes as friendly
+// messages instead of raw Spotify errors.
+app.post("/api/listen/sessions/:id/sync-me", asyncHandler(async (req, res) => {
+  const { userId } = req.body || {};
+  const userDoc = await db.collection("users").findOne({ _id: userId });
+  if (!userDoc || !userDoc.spotifyAccount || !userDoc.spotifyAccount.connected) {
+    return res.status(400).json({ synced: false, reason: "Connect Spotify first." });
+  }
+  const doc = await db.collection("listenSessions").findOne({ _id: req.params.id, active: true });
+  if (!doc) return res.status(404).json({ synced: false, reason: "Session not found or ended" });
+  const refreshed = await refreshListenSessionFromHost(doc);
+  if (!refreshed.trackUri || !refreshed.isPlaying) {
+    return res.json({ synced: false, reason: "The host isn't playing anything right now." });
+  }
+  const accessToken = await getValidSpotifyAccessToken(userDoc);
+  if (!accessToken) {
+    return res.json({ synced: false, reason: "Couldn't refresh your Spotify session. Try reconnecting Spotify." });
+  }
+  const roundTripBufferMs = 1200;
+  const targetPosition = Math.max(0, refreshed.progressMs + (Date.now() - refreshed.updatedAt) + roundTripBufferMs);
+  try {
+    const playRes = await fetch("https://api.spotify.com/v1/me/player/play", {
+      method: "PUT",
+      headers: { "Authorization": `Bearer ${accessToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ uris: [refreshed.trackUri], position_ms: targetPosition })
+    });
+    if (playRes.status === 204) return res.json({ synced: true });
+    if (playRes.status === 404) return res.json({ synced: false, reason: "Open Spotify on a device first, then try again." });
+    if (playRes.status === 403) return res.json({ synced: false, reason: "Syncing playback needs Spotify Premium." });
+    return res.json({ synced: false, reason: "Spotify couldn't sync playback right now." });
+  } catch (e) {
+    return res.json({ synced: false, reason: "Spotify couldn't sync playback right now." });
+  }
 }));
 
 app.get("/api/posts", asyncHandler(async (req, res) => {

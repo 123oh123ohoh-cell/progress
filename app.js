@@ -116,12 +116,6 @@ function escapeHTML(str) {
 const SPOTIFY_EMBED_TYPES = new Set(["track", "album", "playlist", "artist", "episode", "show"]);
 const SPOTIFY_EMBED_HEIGHTS = { track: 152, episode: 232, show: 232, album: 352, playlist: 352, artist: 352 };
 
-// Parses a pasted Spotify share link (or a spotify:type:id URI) into a
-// { type, id } pair, or returns null if it doesn't look like Spotify at
-// all. `type` is always one of SPOTIFY_EMBED_TYPES and `id` is always
-// alphanumeric - callers always rebuild the embed URL from these two
-// values rather than reusing the raw input, which keeps arbitrary URLs
-// out of the embed <iframe>.
 function parseSpotifyLink(raw) {
   if (!raw || typeof raw !== "string") return null;
   const trimmed = raw.trim();
@@ -147,31 +141,208 @@ function renderSpotifyEmbed(user) {
   return `<div class="spotify-embed"><iframe src="${src}" width="100%" height="${height}" frameborder="0" loading="lazy" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" title="Spotify embed"></iframe></div>`;
 }
 
-// Fetches the live "currently playing" status for a user's connected real Spotify account
-// (from the server, which proxies Spotify's Web API using the user's stored tokens).
 async function fetchSpotifyNowPlaying(userId) {
   if (!userId) return null;
   return apiFetch(`/api/users/${userId}/spotify/now-playing`);
 }
 
-// Renders the small "Listening on Spotify" card, or "" if nothing is currently playing.
-// Only trusts open.spotify.com/https:// URLs for the href/art src even though they already
-// came from our own server (which itself only relays Spotify's API) - cheap defense in depth.
+function formatNowPlayingClock(ms) {
+  if (typeof ms !== "number" || !isFinite(ms) || ms < 0) return "0:00";
+  const totalSeconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+const SPOTIFY_GLYPH = `<svg class="now-playing-spotify-icon" viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141 4.32-1.32 9.719-.66 13.439 1.621.361.181.54.78.302 1.2zm.12-3.36c-3.899-2.34-10.32-2.58-14.037-1.38-.6.181-1.2-.18-1.381-.72-.18-.6.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.72 1.621.539.3.719 1.02.42 1.56-.301.42-1.021.6-1.442.3z"/></svg>`;
+
 function renderNowPlayingWidget(data) {
   if (!data || !data.playing) return "";
   const p = data.playing;
   const safeHref = p.trackUrl && p.trackUrl.startsWith("https://open.spotify.com/") ? p.trackUrl : "#";
   const safeArt = p.albumArt && /^https:\/\//i.test(p.albumArt) ? p.albumArt : null;
+  const stateClass = p.isPlaying ? "is-playing" : "is-paused";
+  const hasProgress = typeof p.progressMs === "number" && typeof p.durationMs === "number" && p.durationMs > 0;
+  const duration = hasProgress ? p.durationMs : 0;
+  const progress = hasProgress ? Math.min(p.progressMs, duration) : 0;
+  const pct = hasProgress ? Math.min(100, (progress / duration) * 100) : 0;
+  const dataAttrs = hasProgress
+    ? `data-duration-ms="${duration}" data-progress-ms="${progress}" data-fetched-at="${p.fetchedAt || Date.now()}" data-is-playing="${p.isPlaying ? "1" : "0"}"`
+    : "";
   return `
-    <a class="now-playing-widget" href="${safeHref}" target="_blank" rel="noopener noreferrer">
-      ${safeArt ? `<img src="${safeArt}" alt="">` : `<div class="now-playing-art-fallback">♪</div>`}
-      <div class="now-playing-info">
-        <span class="now-playing-label">${p.isPlaying ? "Listening on Spotify" : "Paused on Spotify"}</span>
-        <span class="now-playing-track">${escapeHTML(p.trackName || "")}</span>
-        <span class="now-playing-artist">${escapeHTML(p.artistNames || "")}</span>
+    <a class="now-playing-widget ${stateClass}" href="${safeHref}" target="_blank" rel="noopener noreferrer" ${dataAttrs}>
+      <div class="now-playing-header">${SPOTIFY_GLYPH}<span>${p.isPlaying ? "Listening to Spotify" : "Paused on Spotify"}</span></div>
+      <div class="now-playing-body">
+        ${safeArt ? `<img src="${safeArt}" alt="">` : `<div class="now-playing-art-fallback">♪</div>`}
+        <div class="now-playing-info">
+          <span class="now-playing-track">${escapeHTML(p.trackName || "")}</span>
+          <span class="now-playing-artist">${escapeHTML(p.artistNames || "")}</span>
+          ${hasProgress ? `
+          <div class="now-playing-progress">
+            <div class="now-playing-progress-fill" style="width:${pct.toFixed(2)}%"></div>
+          </div>
+          <div class="now-playing-times">
+            <span class="now-playing-elapsed">${formatNowPlayingClock(progress)}</span>
+            <span class="now-playing-duration">${formatNowPlayingClock(duration)}</span>
+          </div>` : ""}
+        </div>
       </div>
     </a>`;
 }
+
+function tickNowPlayingWidgets() {
+  document.querySelectorAll(".now-playing-widget[data-duration-ms]").forEach(el => {
+    const duration = Number(el.dataset.durationMs);
+    const baseProgress = Number(el.dataset.progressMs);
+    const fetchedAt = Number(el.dataset.fetchedAt);
+    const isPlaying = el.dataset.isPlaying === "1";
+    if (!duration) return;
+    const elapsed = isPlaying ? baseProgress + (Date.now() - fetchedAt) : baseProgress;
+    const clamped = Math.max(0, Math.min(duration, elapsed));
+    const pct = Math.min(100, (clamped / duration) * 100);
+    const fill = el.querySelector(".now-playing-progress-fill");
+    const elapsedLabel = el.querySelector(".now-playing-elapsed");
+    if (fill) fill.style.width = pct.toFixed(2) + "%";
+    if (elapsedLabel) elapsedLabel.textContent = formatNowPlayingClock(clamped);
+  });
+}
+setInterval(tickNowPlayingWidgets, 1000);
+
+async function fetchListenSessions() {
+  return (await apiFetch("/api/listen/sessions")) || [];
+}
+
+async function fetchListenSession(id) {
+  return apiFetch(`/api/listen/sessions/${encodeURIComponent(id)}`);
+}
+
+async function createListenSession() {
+  const user = Progress.getCurrentUser();
+  if (!user) return null;
+  return apiFetch("/api/listen/sessions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ hostId: user.id })
+  });
+}
+
+async function joinListenSession(id) {
+  const user = Progress.getCurrentUser();
+  if (!user) return null;
+  return apiFetch(`/api/listen/sessions/${encodeURIComponent(id)}/join`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId: user.id })
+  });
+}
+
+async function leaveListenSession(id) {
+  const user = Progress.getCurrentUser();
+  if (!user) return null;
+  return apiFetch(`/api/listen/sessions/${encodeURIComponent(id)}/leave`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId: user.id })
+  });
+}
+
+async function endListenSession(id) {
+  const user = Progress.getCurrentUser();
+  if (!user) return null;
+  return apiFetch(`/api/listen/sessions/${encodeURIComponent(id)}/end`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId: user.id })
+  });
+}
+
+async function syncMeToListenSession(id) {
+  const user = Progress.getCurrentUser();
+  if (!user) return { synced: false, reason: "Log in first." };
+  const result = await apiFetch(`/api/listen/sessions/${encodeURIComponent(id)}/sync-me`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId: user.id })
+  });
+  return result || { synced: false, reason: "Couldn't reach the server." };
+}
+
+function renderListenSessionCard(session, opts) {
+  opts = opts || {};
+  const hasProgress = typeof session.progressMs === "number" && typeof session.durationMs === "number" && session.durationMs > 0;
+  const pct = hasProgress ? Math.min(100, (session.progressMs / session.durationMs) * 100) : 0;
+  const dataAttrs = hasProgress
+    ? `data-duration-ms="${session.durationMs}" data-progress-ms="${session.progressMs}" data-fetched-at="${session.updatedAt || Date.now()}" data-is-playing="${session.isPlaying ? "1" : "0"}"`
+    : "";
+  const viewer = Progress.getCurrentUser();
+  const isHost = viewer && viewer.username === session.hostUsername;
+  const isJoined = viewer && session.participants.includes(viewer.username);
+  return `
+    <div class="listen-session-card now-playing-widget ${session.isPlaying ? "is-playing" : "is-paused"}" data-session-id="${session.id}" ${dataAttrs}>
+      <div class="now-playing-header">${SPOTIFY_GLYPH}<span>@${escapeHTML(session.hostUsername)}'s listening session</span></div>
+      <div class="now-playing-body">
+        ${session.albumArt ? `<img src="${session.albumArt}" alt="">` : `<div class="now-playing-art-fallback">♪</div>`}
+        <div class="now-playing-info">
+          <span class="now-playing-track">${escapeHTML(session.trackName || "Nothing playing yet")}</span>
+          <span class="now-playing-artist">${escapeHTML(session.artistNames || "")}</span>
+          ${hasProgress ? `
+          <div class="now-playing-progress"><div class="now-playing-progress-fill" style="width:${pct.toFixed(2)}%"></div></div>
+          <div class="now-playing-times">
+            <span class="now-playing-elapsed">${formatNowPlayingClock(session.progressMs)}</span>
+            <span class="now-playing-duration">${formatNowPlayingClock(session.durationMs)}</span>
+          </div>` : ""}
+        </div>
+      </div>
+      <div class="listen-session-actions">
+        <span class="listen-session-count">${session.participants.length} listening</span>
+        ${isHost
+          ? `<button type="button" class="btn danger listen-end-btn" data-session-id="${session.id}">End session</button>`
+          : isJoined
+            ? `<button type="button" class="btn listen-sync-btn" data-session-id="${session.id}">Sync my Spotify</button>
+               <button type="button" class="btn secondary listen-leave-btn" data-session-id="${session.id}">Leave</button>`
+            : `<button type="button" class="btn primary listen-join-btn" data-session-id="${session.id}">Join &amp; sync</button>`}
+      </div>
+    </div>`;
+}
+
+document.addEventListener("click", async (e) => {
+  const joinBtn = e.target.closest(".listen-join-btn");
+  const leaveBtn = e.target.closest(".listen-leave-btn");
+  const endBtn = e.target.closest(".listen-end-btn");
+  const syncBtn = e.target.closest(".listen-sync-btn");
+  if (!joinBtn && !leaveBtn && !endBtn && !syncBtn) return;
+
+  if (!Progress.getCurrentUser()) { showModal("login"); return; }
+
+  if (joinBtn) {
+    joinBtn.disabled = true;
+    const result = await joinListenSession(joinBtn.dataset.sessionId);
+    if (result) {
+      showToast("Joined. Syncing your Spotify…");
+      const sync = await syncMeToListenSession(joinBtn.dataset.sessionId);
+      showToast(sync.synced ? "Synced!" : (sync.reason || "Couldn't sync."));
+      document.dispatchEvent(new CustomEvent("listen-session-updated"));
+    } else {
+      joinBtn.disabled = false;
+      showToast("Couldn't join that session.");
+    }
+  } else if (leaveBtn) {
+    leaveBtn.disabled = true;
+    await leaveListenSession(leaveBtn.dataset.sessionId);
+    document.dispatchEvent(new CustomEvent("listen-session-updated"));
+  } else if (endBtn) {
+    endBtn.disabled = true;
+    await endListenSession(endBtn.dataset.sessionId);
+    document.dispatchEvent(new CustomEvent("listen-session-updated"));
+  } else if (syncBtn) {
+    syncBtn.disabled = true;
+    syncBtn.textContent = "Syncing…";
+    const sync = await syncMeToListenSession(syncBtn.dataset.sessionId);
+    showToast(sync.synced ? "Synced!" : (sync.reason || "Couldn't sync."));
+    syncBtn.disabled = false;
+    syncBtn.textContent = "Sync my Spotify";
+  }
+});
 
 const YOUTUBE_URL_PATTERNS = [
   /^https?:\/\/(?:www\.|m\.)?youtube\.com\/watch\?(?:[^\s#]*&)?v=([a-zA-Z0-9_-]{11})(?:[&#][^\s]*)?$/i,
@@ -179,12 +350,6 @@ const YOUTUBE_URL_PATTERNS = [
   /^https?:\/\/(?:www\.|m\.)?youtube(?:-nocookie)?\.com\/(?:embed|shorts|live)\/([a-zA-Z0-9_-]{11})(?:[?#][^\s]*)?$/i
 ];
 
-// Parses a pasted YouTube video link into a { id, start } pair, or returns
-// null if it doesn't look like YouTube at all. `id` is always an
-// 11-character [a-zA-Z0-9_-] token and `start` is always a non-negative
-// integer (seconds) - callers always rebuild the embed URL from these two
-// values rather than reusing the raw input, which keeps arbitrary URLs
-// out of the embed <iframe>.
 function parseYouTubeLink(raw) {
   if (!raw || typeof raw !== "string") return null;
   const trimmed = raw.trim();
@@ -197,9 +362,6 @@ function parseYouTubeLink(raw) {
   return { id, start: parseYouTubeStart(trimmed) };
 }
 
-// Extracts a start time in seconds from a YouTube URL's `t=`/`start=` query
-// param. Supports plain seconds ("t=90") and the "1h2m3s" style YouTube
-// uses when you copy a link at a specific timestamp.
 function parseYouTubeStart(raw) {
   const match = raw.match(/[?&#](?:t|start)=([0-9hms]+)/i);
   if (!match) return 0;
@@ -216,13 +378,6 @@ function parseYouTubeStart(raw) {
   return seconds;
 }
 
-// Returns a self-contained "card" of HTML (wrapping <div> + <iframe>) for a
-// YouTube link, or "" if the link doesn't parse. Used by the post editor to
-// embed an actual playable video inline in the entry content - the returned
-// HTML is inserted directly into the contenteditable canvas and saved as
-// part of the post's HTML content, same as inline images. The iframe `src`
-// is always rebuilt from the regex-captured id/start, never the raw pasted
-// string, for the same injection-safety reason as the Spotify embed.
 function renderYouTubeEmbed(raw) {
   const parsed = parseYouTubeLink(raw);
   if (!parsed) return "";
@@ -303,9 +458,6 @@ function renderEmoticonsText(text, cssClass = "inline-emoticon") {
   return renderEmoticonsInHTML(escapeHTML(text || ""), cssClass);
 }
 
-/* Shown instead of an empty/"nothing here" state whenever we can't tell if
-   there's really no content, or if it's just that our free-tier backend is
-   still waking up from a nap. */
 function bootingUpHTML(opts) {
   const { title = "Waking up the server\u2026 \u{1F634}", padding = "80px 20px" } = opts || {};
   return `

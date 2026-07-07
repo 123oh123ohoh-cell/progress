@@ -60,12 +60,11 @@
           <div class="bio-text" style="margin-top:12px;">${user.bio ? renderEmoticonsText(user.bio, "bio-emoticon") : `<span style="color:var(--muted);">No bio yet.</span>`}</div>
         </div>
       </div>
-      <div id="nowPlayingSlot"></div>
-${user.spotify ? `
-<div class="settings-section" style="margin-top:24px;">
-  <h3>Featured Track</h3>
-  ${renderSpotifyEmbed(user)}
-</div>` : ""}
+      ${user.spotify ? `
+      <div class="settings-section" style="margin-top:24px;">
+        <h3>Now playing</h3>
+        ${renderSpotifyEmbed(user)}
+      </div>` : ""}
       <div class="settings-section" style="margin-top:24px;">
         <h3>Latest posts</h3>
         <div id="publicPosts"></div>
@@ -88,23 +87,6 @@ ${user.spotify ? `
         showToast(nowFollowing ? "You are now following this person." : "Unfollowed.");
       });
     }
-
-    const nowPlayingSlot = document.getElementById("nowPlayingSlot");
-
-async function refreshNowPlaying() {
-  if (!nowPlayingSlot) return;
-
-  if (!user.spotifyAccount || !user.spotifyAccount.connected) {
-    nowPlayingSlot.innerHTML = "";
-    return;
-  }
-
-  const data = await fetchSpotifyNowPlaying(user.id);
-  nowPlayingSlot.innerHTML = renderNowPlayingWidget(data);
-}
-
-refreshNowPlaying();
-setInterval(refreshNowPlaying, 30000); // Refresh every 30 seconds
 
     (async () => {
       const result = await apiFetch(`/api/posts?author=${encodeURIComponent(user.username)}`);
@@ -153,7 +135,6 @@ setInterval(refreshNowPlaying, 30000); // Refresh every 30 seconds
       effectiveUser.joined = fetchedUser?.joined || localUser.joined;
       effectiveUser.timezone = fetchedUser?.timezone || localUser.timezone;
       effectiveUser.badges = fetchedUser?.badges || localUser.badges || [];
-      effectiveUser.spotifyAccount = fetchedUser?.spotifyAccount || localUser.spotifyAccount;
     }
 
     renderPublicProfile(effectiveUser);
