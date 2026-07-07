@@ -116,7 +116,11 @@
                     <div style="font-weight:600; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
                       ${user.name}${renderDisplayBadge(user)}
                     </div>
-                    <div style="color:var(--muted); font-size:13px;">@${user.username}</div>
+                    <div style="color:var(--muted); font-size:13px;">
+                      @${user.username}
+                      ${user.locked ? `<span style="color:var(--danger); font-family:var(--font-mono); font-size:10.5px; text-transform:uppercase; margin-left:6px;">&#128274; Locked</span>` : ''}
+                      ${user.banned ? `<span style="color:var(--danger); font-family:var(--font-mono); font-size:10.5px; text-transform:uppercase; margin-left:6px;">&#128683; Banned</span>` : ''}
+                    </div>
                   </div>
                 </div>
                 
@@ -132,11 +136,84 @@
                 ${renderBadges(user) ? `<div style="margin-top:12px; display:flex; gap:6px; flex-wrap:wrap;">
                   ${renderBadges(user)}
                 </div>` : ''}
+
+                ${hasAccountAccess() && !isCurrentUser ? `
+                <div style="margin-top:12px; padding-top:12px; border-top:1px solid var(--border-color);">
+                  <button type="button" class="lock-toggle-btn" data-user-id="${user.id}" data-locked="${user.locked ? '1' : '0'}" style="
+                    width:100%; padding:8px 12px; font-size:12px; border-radius:6px; cursor:pointer;
+                    border:1px solid ${user.locked ? 'var(--accent)' : 'var(--danger)'};
+                    background:var(--bg-card); color:${user.locked ? 'var(--accent)' : 'var(--danger)'};
+                  ">${user.locked ? 'Unlock account' : 'Lock account'}</button>
+                  <button type="button" class="ban-toggle-btn" data-user-id="${user.id}" data-banned="${user.banned ? '1' : '0'}" style="
+                    width:100%; padding:8px 12px; font-size:12px; border-radius:6px; cursor:pointer; margin-top:8px;
+                    border:1px solid ${user.banned ? 'var(--accent)' : 'var(--danger)'};
+                    background:${user.banned ? 'var(--bg-card)' : 'var(--danger)'}; color:${user.banned ? 'var(--accent)' : '#fff'};
+                  ">${user.banned ? 'Unban account' : 'Ban account'}</button>
+                </div>` : ''}
               </div>
             </a>
           `;
         })
         .join("");
+
+      // Lock/unlock buttons sit inside the card's outer <a> (whole card links
+      // to that user's profile), so each click needs to stop the navigation
+      // and the click event from bubbling up to the link.
+      root.querySelectorAll(".lock-toggle-btn").forEach(btn => {
+        btn.addEventListener("click", async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const userId = btn.dataset.userId;
+          const nextLocked = btn.dataset.locked !== "1";
+          const requester = Progress.getCurrentUser();
+          if (!requester) return;
+          btn.disabled = true;
+          btn.textContent = nextLocked ? "Locking…" : "Unlocking…";
+          const result = await apiFetch(`/api/users/${userId}/lock`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ requesterUsername: requester.username, locked: nextLocked })
+          });
+          if (result) {
+            showToast(nextLocked ? "Account locked." : "Account unlocked.");
+            renderUsers();
+          } else {
+            showToast("Couldn't update that account's lock status.");
+            btn.disabled = false;
+            btn.textContent = nextLocked ? "Lock account" : "Unlock account";
+          }
+        });
+      });
+
+      // Ban system - entirely separate from lock above, hits its own
+      // dedicated /ban and /unban routes (not a shared route with a
+      // boolean flag), so each direction can be checked independently.
+      root.querySelectorAll(".ban-toggle-btn").forEach(btn => {
+        btn.addEventListener("click", async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const userId = btn.dataset.userId;
+          const currentlyBanned = btn.dataset.banned === "1";
+          const requester = Progress.getCurrentUser();
+          if (!requester) return;
+          btn.disabled = true;
+          btn.textContent = currentlyBanned ? "Unbanning…" : "Banning…";
+          const endpoint = currentlyBanned ? "unban" : "ban";
+          const result = await apiFetch(`/api/users/${userId}/${endpoint}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ requesterUsername: requester.username })
+          });
+          if (result) {
+            showToast(currentlyBanned ? "Account unbanned." : "Account banned.");
+            renderUsers();
+          } else {
+            showToast("Couldn't update that account's ban status.");
+            btn.disabled = false;
+            btn.textContent = currentlyBanned ? "Unban account" : "Ban account";
+          }
+        });
+      });
 
       // Fill in the compact now-playing card for each user with Spotify connected.
       // Fetched in parallel (one request per connected user, not per card render)
@@ -161,6 +238,7 @@
     }
   }
 
+  initShell("users");
   checkAuth();
 </script>
 

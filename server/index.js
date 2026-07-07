@@ -176,7 +176,9 @@ function normalizeUser(doc) {
     followers: Array.isArray(user.followers) ? user.followers : [],
     badges: Array.isArray(user.badges) ? user.badges : [],
     bio: user.bio || "",
-    spotify: user.spotify || ""
+    spotify: user.spotify || "",
+    locked: !!user.locked,
+    banned: !!user.banned
   };
 }
 
@@ -204,7 +206,9 @@ function publicUser(user) {
     badges,
     displayBadge,
     followers: user.followers || [],
-    following: user.following || []
+    following: user.following || [],
+    locked: !!user.locked,
+    banned: !!user.banned
   };
 }
 
@@ -544,6 +548,66 @@ app.post("/api/users/:id/unfollow", asyncHandler(async (req, res) => {
   await users.updateOne({ _id: target._id }, { $set: { followers: targetFollowers } });
 
   res.json({ follower: follower.username, target: target.username });
+}));
+
+// Locking an account prevents it from logging in (checked in /api/login)
+// until an admin unlocks it again. Restricted to the same small admin set
+// that already gates access to the users.html directory itself
+// (ALLOWED_CREATOR_USERNAMES) - there's no session/token auth anywhere else
+// in this API, so this matches the existing trust model rather than
+// introducing a new one just for this feature.
+app.post("/api/users/:id/lock", asyncHandler(async (req, res) => {
+  const { requesterUsername, locked } = req.body || {};
+  if (!requesterUsername || !ALLOWED_CREATOR_USERNAMES.has(requesterUsername.toLowerCase())) {
+    return res.status(403).json({ error: "Only admins can lock or unlock accounts." });
+  }
+  const users = db.collection("users");
+  const target = await users.findOne({ _id: req.params.id });
+  if (!target) return res.status(404).json({ error: "User not found" });
+  if (target.username === requesterUsername.toLowerCase()) {
+    return res.status(400).json({ error: "You can't lock your own account." });
+  }
+  await users.updateOne({ _id: req.params.id }, { $set: { locked: !!locked } });
+  const updated = await users.findOne({ _id: req.params.id });
+  res.json(publicUser(normalizeUser(updated)));
+}));
+
+// ---------------------------------------------------------------------------
+// Ban system - a separate, independent mechanism from the lock feature
+// above. Same admin gating (ALLOWED_CREATOR_USERNAMES) and self-action
+// prevention, but its own field (`banned`) and its own two explicit routes
+// (rather than one route with a boolean flag) so each action is simple to
+// verify on its own: hit /ban, confirm `banned: true` comes back; hit
+// /unban, confirm `banned: false` comes back.
+// ---------------------------------------------------------------------------
+
+app.post("/api/users/:id/ban", asyncHandler(async (req, res) => {
+  const { requesterUsername } = req.body || {};
+  if (!requesterUsername || !ALLOWED_CREATOR_USERNAMES.has(requesterUsername.toLowerCase())) {
+    return res.status(403).json({ error: "Only admins can ban accounts." });
+  }
+  const users = db.collection("users");
+  const target = await users.findOne({ _id: req.params.id });
+  if (!target) return res.status(404).json({ error: "User not found" });
+  if (target.username === requesterUsername.toLowerCase()) {
+    return res.status(400).json({ error: "You can't ban your own account." });
+  }
+  await users.updateOne({ _id: req.params.id }, { $set: { banned: true } });
+  const updated = await users.findOne({ _id: req.params.id });
+  res.json(publicUser(normalizeUser(updated)));
+}));
+
+app.post("/api/users/:id/unban", asyncHandler(async (req, res) => {
+  const { requesterUsername } = req.body || {};
+  if (!requesterUsername || !ALLOWED_CREATOR_USERNAMES.has(requesterUsername.toLowerCase())) {
+    return res.status(403).json({ error: "Only admins can unban accounts." });
+  }
+  const users = db.collection("users");
+  const target = await users.findOne({ _id: req.params.id });
+  if (!target) return res.status(404).json({ error: "User not found" });
+  await users.updateOne({ _id: req.params.id }, { $set: { banned: false } });
+  const updated = await users.findOne({ _id: req.params.id });
+  res.json(publicUser(normalizeUser(updated)));
 }));
 
 app.get("/api/spotify/status", (req, res) => {
@@ -1103,6 +1167,11 @@ app.post("/api/login", asyncHandler(async (req, res) => {
   if (!username || !password) return res.status(400).json({ error: "username and password are required" });
   const user = await db.collection("users").findOne({ username: { $regex: `^${escapeRegex(username)}$`, $options: "i" } });
   if (!user || !verifyPassword(password, user.password)) return res.status(401).json({ error: "Invalid credentials" });
+  // Locked accounts can still log in - the client shows a persistent
+  // site-wide blocked screen (with nav visible but non-interactive) based on
+  // the `locked` flag on every page, rather than stopping them at the login
+  // modal. This also covers a user who was already logged in on a device
+  // when an admin locked their account.
   if (isLegacyPassword(user.password)) {
     user.password = hashPassword(password);
     await db.collection("users").updateOne({ _id: user._id }, { $set: { password: user.password } });
