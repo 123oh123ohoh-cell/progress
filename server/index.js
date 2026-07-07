@@ -223,20 +223,21 @@ function publicUser(user) {
     ? { connected: true, displayName: user.spotifyAccount.spotifyName || null, profileUrl: user.spotifyAccount.spotifyProfileUrl || null }
     : { connected: false, displayName: null, profileUrl: null };
   return {
-    id: user.id,
-    username: user.username,
-    name: user.name,
-    avatar: user.avatar,
-    joined: user.joined,
-    timezone: user.timezone,
-    bio: user.bio || "",
-    spotify: user.spotify || "",
-    spotifyAccount,
-    badges,
-    displayBadge,
-    followers: user.followers || [],
-    following: user.following || []
-  };
+  id: user.id,
+  username: user.username,
+  name: user.name,
+  avatar: user.avatar,
+  joined: user.joined,
+  timezone: user.timezone,
+  bio: user.bio || "",
+  spotify: user.spotify || "",
+  spotifyAccount,
+  spotifyPresence: user.spotifyPresence || null,
+  badges,
+  displayBadge,
+  followers: user.followers || [],
+  following: user.following || []
+};
 }
 
 function normalizePost(doc) {
@@ -680,43 +681,101 @@ async function getValidSpotifyAccessToken(userDoc) {
   }
 }
 
-app.get("/api/users/:id/spotify/now-playing", asyncHandler(async (req, res) => {
-  const userDoc = await db.collection("users").findOne({ _id: req.params.id });
-  if (!userDoc) return res.status(404).json({ error: "User not found" });
-  if (!userDoc.spotifyAccount || !userDoc.spotifyAccount.connected) {
-    return res.json({ connected: false, playing: null });
+async function updateSpotifyPresence(userDoc) {
+  const token = await getValidSpotifyAccessToken(userDoc);
+
+  if (!token) {
+    await db.collection("users").updateOne(
+      { _id: userDoc._id },
+      { $set: { spotifyPresence: null } }
+    );
+    return;
   }
-  const accessToken = await getValidSpotifyAccessToken(userDoc);
-  if (!accessToken) return res.json({ connected: true, playing: null });
 
   try {
-    const npRes = await fetch("https://api.spotify.com/v1/me/player/currently-playing", {
-      headers: { "Authorization": `Bearer ${accessToken}` }
-    });
-    if (npRes.status !== 200) return res.json({ connected: true, playing: null });
-    const data = await npRes.json().catch(() => null);
-    if (!data || !data.item) return res.json({ connected: true, playing: null });
-    const images = (data.item.album && data.item.album.images) || [];
-    return res.json({
-      connected: true,
-      playing: {
-        isPlaying: !!data.is_playing,
-        trackName: data.item.name,
-        artistNames: (data.item.artists || []).map(a => a.name).join(", "),
-        albumArt: (images[1] && images[1].url) || (images[0] && images[0].url) || null,
-        trackUrl: (data.item.external_urls && data.item.external_urls.spotify) || null
+    const res = await fetch(
+      "https://api.spotify.com/v1/me/player/currently-playing",
+      {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
       }
-    });
-  } catch (e) {
-    return res.json({ connected: true, playing: null });
+    );
+
+    if (res.status !== 200) {
+      await db.collection("users").updateOne(
+        { _id: userDoc._id },
+        { $set: { spotifyPresence: null } }
+      );
+      return;
+    }
+
+    const data = await res.json();
+
+    if (!data.item) {
+      await db.collection("users").updateOne(
+        { _id: userDoc._id },
+        { $set: { spotifyPresence: null } }
+      );
+      return;
+    }
+
+    await db.collection("users").updateOne(
+      { _id: userDoc._id },
+      {
+        $set: {
+          spotifyPresence: {
+            isPlaying: data.is_playing,
+            trackName: data.item.name,
+            artistNames: data.item.artists.map(a => a.name).join(", "),
+            albumName: data.item.album.name,
+            albumArt: data.item.album.images[0]?.url || null,
+            trackUrl: data.item.external_urls.spotify,
+            progress: data.progress_ms,
+            duration: data.item.duration_ms,
+            updatedAt: Date.now()
+          }
+        }
+      }
+    );
+  } catch {
+    await db.collection("users").updateOne(
+      { _id: userDoc._id },
+      { $set: { spotifyPresence: null } }
+    );
   }
+}
+
+app.get("/api/users/:id/spotify/now-playing", asyncHandler(async (req, res) => {
+  const user = await db.collection("users").findOne({
+    _id: req.params.id
+  });
+
+  if (!user) {
+    return res.status(404).json({
+      error: "User not found"
+    });
+  }
+
+  res.json({
+    connected: !!user.spotifyAccount?.connected,
+    playing: user.spotifyPresence || null
+  });
 }));
 
 app.post("/api/users/:id/spotify/disconnect", asyncHandler(async (req, res) => {
   const users = db.collection("users");
   const doc = await users.findOne({ _id: req.params.id });
   if (!doc) return res.status(404).json({ error: "User not found" });
-  await users.updateOne({ _id: req.params.id }, { $unset: { spotifyAccount: "" } });
+  await users.updateOne(
+  { _id: req.params.id },
+  {
+    $unset: {
+      spotifyAccount: "",
+      spotifyPresence: ""
+    }
+  }
+);
   const updated = await users.findOne({ _id: req.params.id });
   res.json(publicUser(normalizeUser(updated)));
 }));
@@ -1024,7 +1083,20 @@ connect()
         wss.emit("connection", ws, req, { room, username });
       });
     });
+// Refresh Spotify "currently playing" for connected users every 15 seconds.
+setInterval(async () => {
+  try {
+    const users = await db.collection("users")
+      .find({ "spotifyAccount.connected": true })
+      .toArray();
 
+    for (const user of users) {
+      await updateSpotifyPresence(user);
+    }
+  } catch (err) {
+    console.error("Spotify presence update failed:", err);
+  }
+}, 15000);
     server.listen(port, () => {
       console.log(`Server running on port ${port}`);
     });
