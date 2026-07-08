@@ -39,7 +39,12 @@ async function apiFetch(path, options = {}) {
       url = API_BASE + "/api/" + path.replace(/^\/+/, "");
     }
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 3500);
+    // Render's free tier can take 50+ seconds to spin back up from a cold
+    // start (see the "Waking up the server" message this app shows during
+    // that wait) - a short timeout here was aborting perfectly healthy
+    // requests before the server even finished booting, which is exactly
+    // what was causing posts to fail to load with NS_BINDING_ABORTED.
+    const timeout = setTimeout(() => controller.abort(), 60000);
     const res = await fetch(url, { ...options, signal: controller.signal });
     clearTimeout(timeout);
     if (!res.ok) return null;
