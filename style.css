@@ -1697,6 +1697,10 @@ body.modal-open { overflow: hidden; }
   flex-shrink: 0;
 }
 .online-dot.online { background: #3a8a5a; }
+.profile-status-sep {
+  color: var(--mocha-light);
+  margin-right: 4px;
+}
 .online-dot.away { background: #d9a441; }
 .online-label {
   font-family: var(--font-mono);

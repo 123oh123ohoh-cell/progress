@@ -46,25 +46,29 @@
     const isOwnProfile = viewer && viewer.username === user.username;
 
     root.innerHTML = `
-      <div class="settings-avatar-row" style="margin-top:40px; align-items:flex-start;">
-        <div class="profile-avatar-wrap">
-          ${user.avatar ? `<img class="profile-avatar-img" src="${user.avatar}" alt="${user.name}">` : `<div class="initials-lg">${initials(user.name)}</div>`}
-          <span class="profile-online-badge" id="onlineIndicator"></span>
-        </div>
-        <div>
-          <div style="font-family:var(--font-display); font-size:24px; margin-bottom:1px;">
-            <span>${user.name}${renderDisplayBadge(user)}</span>
+      <div style="margin-top:40px;">
+        <div style="display:flex; align-items:center; gap:16px; margin-bottom:16px;">
+          <div class="profile-avatar-wrap">
+            ${user.avatar ? `<img class="profile-avatar-img" src="${user.avatar}" alt="${user.name}">` : `<div class="initials-lg">${initials(user.name)}</div>`}
+            <span class="profile-online-badge" id="onlineIndicator"></span>
           </div>
-          <div style="color:var(--muted); font-size:14px; margin-bottom:2px;">@${user.username}</div>
-          <div style="display:flex; gap:18px; color:var(--muted); font-size:14px; margin-bottom:4px;">
-            <span id="followerCount">${user.followers.length} followers</span>
-            <span>${user.following.length} following</span>
-            <span>Joined ${Progress.formatDate(user.joined)}</span>
+          <div>
+            <div style="font-family:var(--font-display); font-size:24px; margin-bottom:2px;">
+              <span>${user.name}${renderDisplayBadge(user)}</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px; color:var(--muted); font-size:14px;">
+              <span>@${user.username}</span>
+              <span id="onlineStatusText"></span>
+            </div>
           </div>
-          <div id="onlineStatusText" style="margin-bottom:4px;"></div>
-          ${viewer && !isOwnProfile ? `<button type="button" class="upload-btn ${Progress.isFollowing(user.username) ? "following" : ""}" id="followBtn">${Progress.isFollowing(user.username) ? "Following" : "Follow"}</button>` : ""}
-          <div class="bio-text" style="margin-top:12px;">${user.bio ? renderEmoticonsText(user.bio, "bio-emoticon") : `<span style="color:var(--muted);">No bio yet.</span>`}</div>
         </div>
+        <div style="display:flex; gap:18px; color:var(--muted); font-size:14px; margin-bottom:10px;">
+          <span id="followerCount">${user.followers.length} followers</span>
+          <span>${user.following.length} following</span>
+          <span>Joined ${Progress.formatDate(user.joined)}</span>
+        </div>
+        ${viewer && !isOwnProfile ? `<button type="button" class="upload-btn ${Progress.isFollowing(user.username) ? "following" : ""}" id="followBtn">${Progress.isFollowing(user.username) ? "Following" : "Follow"}</button>` : ""}
+        <div class="bio-text" style="margin-top:12px;">${user.bio ? renderEmoticonsText(user.bio, "bio-emoticon") : `<span style="color:var(--muted);">No bio yet.</span>`}</div>
       </div>
       <div id="nowPlayingSlot"></div>
 ${user.spotify ? `
@@ -142,7 +146,7 @@ async function refreshOnlineStatus() {
     }
     if (textEl) {
       const label = status === "online" ? "Online" : status === "away" ? "Away" : "Offline";
-      textEl.innerHTML = `<span class="online-dot ${status}"></span><span class="online-label ${status}">${label}</span>`;
+      textEl.innerHTML = `<span class="profile-status-sep">&middot;</span><span class="online-dot ${status}"></span><span class="online-label ${status}">${label}</span>`;
     }
   } catch (e) {
     if (el) { el.classList.remove("online"); el.classList.remove("away"); }
