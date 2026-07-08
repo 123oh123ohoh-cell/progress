@@ -47,7 +47,10 @@
 
     root.innerHTML = `
       <div class="settings-avatar-row" style="margin-top:40px;">
-        ${user.avatar ? `<img src="${user.avatar}" alt="${user.name}">` : `<div class="initials-lg">${initials(user.name)}</div>`}
+        <div class="profile-avatar-wrap">
+          ${user.avatar ? `<img class="profile-avatar-img" src="${user.avatar}" alt="${user.name}">` : `<div class="initials-lg">${initials(user.name)}</div>`}
+          <span class="profile-online-badge" id="onlineIndicator"></span>
+        </div>
         <div>
           <div style="font-family:var(--font-display); font-size:24px; margin-bottom:2px;">
             <span>${user.name}${renderDisplayBadge(user)}</span>
