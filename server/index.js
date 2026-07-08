@@ -1297,8 +1297,22 @@ connect()
     });
 
     server.listen(port, () => {
-      console.log(`Server running on port ${port}`);
-    });
+  console.log(`Server running on port ${port}`);
+
+  // ← ADD THIS BLOCK ↓
+  // Render sets RENDER_EXTERNAL_URL automatically — ping ourselves every
+  // 14 min so the free-tier server never goes to sleep.
+  const selfUrl = process.env.RENDER_EXTERNAL_URL;
+  if (selfUrl) {
+    setInterval(async () => {
+      try {
+        await fetch(`${selfUrl}/api/posts`);
+        console.log("[keep-alive] ping ok");
+      } catch (e) { /* silent */ }
+    }, 14 * 60 * 1000);
+  }
+  // ← END ADD
+});
   })
   .catch(err => {
     console.error("Failed to connect to MongoDB:", err);

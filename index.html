@@ -69,11 +69,11 @@
     });
   }
 
-  async function start() {
-    initShell("feed");
-    renderFeed();
-    Progress.loadFromApi().then(renderFeed).catch(() => {});
-  }
+ async function start() {
+    const ready = initShell("feed"); // initShell already calls loadFromApi
+    renderFeed();                    // render from cache immediately
+    ready.then(renderFeed).catch(() => {}); // re-render when fresh data arrives
+}
 
   start();
 </script>

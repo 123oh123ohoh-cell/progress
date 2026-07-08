@@ -543,25 +543,35 @@
 
   async function start() {
     initShell("chat");
-    await Progress.loadFromApi().catch(() => {});
+
+    // Use whatever's already in localStorage — no waiting
     currentUser = Progress.getCurrentUser();
+
     if (!currentUser) {
-      renderLoggedOut();
-      return;
+        // Not logged in locally either — show logged-out state,
+        // then try once more after the API responds
+        renderLoggedOut();
+        Progress.loadFromApi().then(() => {
+            currentUser = Progress.getCurrentUser();
+            if (currentUser) start();
+        }).catch(() => {});
+        return;
     }
 
     const params = new URLSearchParams(location.search);
     const withUsername = params.get("with");
     if (withUsername && withUsername.toLowerCase() !== currentUser.username.toLowerCase()) {
-      currentRoom = dmRoomId(currentUser.username, withUsername);
-      currentPeer = withUsername;
+        currentRoom = dmRoomId(currentUser.username, withUsername);
+        currentPeer = withUsername;
     }
 
     renderChat();
     if (currentPeer) {
-      document.getElementById("chatRoomTitle").textContent = `@${currentPeer}`;
+        document.getElementById("chatRoomTitle").textContent = `@${currentPeer}`;
     }
-  }
+    // Refresh in the background — don't block anything on it
+    Progress.loadFromApi().catch(() => {});
+}
 
   function closeListenRailPolling() {
     if (listenRailTimer) { clearInterval(listenRailTimer); listenRailTimer = null; }

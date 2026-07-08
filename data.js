@@ -236,6 +236,16 @@ const Progress = {
 
   async loadFromApi() {
     if (!API_ENABLED) return this.db;
+    // If a fetch is already in flight, return the same promise
+    // instead of firing a second identical batch of requests
+    if (this._loadPromise) return this._loadPromise;
+    this._loadPromise = this._doLoad().finally(() => {
+        this._loadPromise = null;
+    });
+    return this._loadPromise;
+},
+
+  async _doLoad() {
     const savedCurrent = this.getCurrentUser();
     const [users, posts, notifications] = await Promise.all([
       apiFetch("/api/users"),
