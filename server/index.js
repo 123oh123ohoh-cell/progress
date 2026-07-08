@@ -265,6 +265,28 @@ function canAccessRoom(room, username) {
   return participants.includes(username);
 }
 
+// Tracks how many active WebSocket connections each username currently has
+// across ALL rooms and tabs (not the same as roomPresence, which is scoped
+// to a single room for the "@username is here" chat indicator). A username
+// counts as online as long as this is above zero; opening a second tab or
+// switching rooms just increments/decrements the same counter rather than
+// flipping online/offline on every room change.
+const onlineUsernameCounts = new Map();
+
+function markUserOnline(username) {
+  if (!username) return;
+  onlineUsernameCounts.set(username, (onlineUsernameCounts.get(username) || 0) + 1);
+}
+function markUserOffline(username) {
+  if (!username) return;
+  const next = (onlineUsernameCounts.get(username) || 0) - 1;
+  if (next <= 0) onlineUsernameCounts.delete(username);
+  else onlineUsernameCounts.set(username, next);
+}
+function isUserOnline(username) {
+  return onlineUsernameCounts.has(username);
+}
+
 let db;
 
 async function connect() {
@@ -327,6 +349,17 @@ async function seedIfNeeded() {
 
 function asyncHandler(fn) {
   return (req, res, next) => fn(req, res, next).catch(next);
+}
+
+// The banned-account overlay in app.js is a client-side visual block only -
+// it does nothing to stop a banned account from calling these write routes
+// directly (a raw API request, a stale page that loaded before the block
+// kicked in, etc.). This is the actual enforcement: every route that
+// creates or modifies something on someone's behalf checks this first.
+async function isUsernameBanned(username) {
+  if (!username) return false;
+  const doc = await db.collection("users").findOne({ username: username.toLowerCase() });
+  return !!(doc && doc.banned);
 }
 
 // Scans `text` for @username mentions, looks up which of those are real
@@ -499,6 +532,7 @@ app.post("/api/users/:id/follow", asyncHandler(async (req, res) => {
   const follower = await users.findOne({ _id: followerId });
   if (!follower) return res.status(404).json({ error: "Follower user not found" });
   if (target._id === follower._id) return res.status(400).json({ error: "Cannot follow yourself" });
+  if (follower.banned) return res.status(403).json({ error: "This account has been banned." });
 
   const isUnfollow = action === "unfollow";
   const followerFollowing = Array.isArray(follower.following) ? follower.following : [];
@@ -819,6 +853,7 @@ app.post("/api/listen/sessions", asyncHandler(async (req, res) => {
   const { hostId } = req.body || {};
   const hostDoc = await db.collection("users").findOne({ _id: hostId });
   if (!hostDoc) return res.status(404).json({ error: "User not found" });
+  if (hostDoc.banned) return res.status(403).json({ error: "This account has been banned." });
   if (!hostDoc.spotifyAccount || !hostDoc.spotifyAccount.connected) {
     return res.status(400).json({ error: "Connect Spotify before starting a listening session." });
   }
@@ -941,6 +976,7 @@ app.get("/api/posts/:id", asyncHandler(async (req, res) => {
 app.post("/api/posts", asyncHandler(async (req, res) => {
   const { author, title, content, cover, excerpt } = req.body;
   if (!author || !title || !content) return res.status(400).json({ error: "author, title and content are required" });
+  if (await isUsernameBanned(author)) return res.status(403).json({ error: "This account has been banned." });
   const createdAt = new Date().toISOString();
   const post = {
     _id: generateId("p"),
@@ -982,6 +1018,7 @@ app.post("/api/posts/:id/comments", asyncHandler(async (req, res) => {
   const { author, body, image } = req.body;
   if (!post) return res.status(404).json({ error: "Post not found" });
   if (!author || (!body && !image)) return res.status(400).json({ error: "author and body or image are required" });
+  if (await isUsernameBanned(author)) return res.status(403).json({ error: "This account has been banned." });
   const comment = {
     _id: generateId("c"),
     postId: post._id,
@@ -1025,6 +1062,7 @@ app.post("/api/posts/:id/like", asyncHandler(async (req, res) => {
   const { username } = req.body;
   if (!post) return res.status(404).json({ error: "Post not found" });
   if (!username) return res.status(400).json({ error: "username is required" });
+  if (await isUsernameBanned(username)) return res.status(403).json({ error: "This account has been banned." });
   const likedBy = Array.isArray(post.likedBy) ? post.likedBy : [];
   let likes = typeof post.likes === "number" ? post.likes : 0;
   const idx = likedBy.indexOf(username);
@@ -1077,6 +1115,7 @@ async function createChatMessage({ room, author, body }) {
   const trimmed = (body || "").toString().trim();
   if (!author || !trimmed) return null;
   if (!canAccessRoom(targetRoom, author)) return null;
+  if (await isUsernameBanned(author)) return null;
   const message = {
     _id: generateId("m"),
     room: targetRoom,
@@ -1180,6 +1219,10 @@ app.post("/api/login", asyncHandler(async (req, res) => {
   res.json(publicUser(normalizeUser(user)));
 }));
 
+app.get("/api/online-users", (req, res) => {
+  res.json({ online: Array.from(onlineUsernameCounts.keys()) });
+});
+
 app.get("/api/current-user", (req, res) => {
   res.status(200).json({});
 });
@@ -1204,6 +1247,7 @@ connect()
       ws.room = room;
       ws.username = username;
       chatRoomClients(room).add(ws);
+      markUserOnline(username);
       broadcastToRoom(room, { type: "presence", room, users: roomPresence(room) });
 
       ws.on("message", raw => {
@@ -1224,6 +1268,7 @@ connect()
 
       ws.on("close", () => {
         chatRoomClients(room).delete(ws);
+        markUserOffline(username);
         broadcastToRoom(room, { type: "presence", room, users: roomPresence(room) });
       });
     });
