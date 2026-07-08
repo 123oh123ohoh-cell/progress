@@ -1863,7 +1863,7 @@ body.modal-open { overflow: hidden; }
   .toolbar { flex-wrap: wrap; gap: 10px; }
   .tb-btn { flex: 1 1 32%; }
   .reply-form textarea { min-height: 140px; }
-  .settings-avatar-row { flex-direction: column; align-items: flex-start; }
+  .settings-avatar-row { flex-direction: column; align-items: flex-start; gap: 10px; }
   .settings-avatar-row > img, .settings-avatar-row .initials-lg, .profile-avatar-wrap .profile-avatar-img { width: 66px; height: 66px; }
   .settings-avatar-row .upload-btn { width: 100%; }
   /* Chat gets a genuine full-screen mobile treatment instead of being
