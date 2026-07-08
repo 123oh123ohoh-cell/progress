@@ -135,15 +135,17 @@ async function refreshOnlineStatus() {
   if (!el && !textEl) return;
   try {
     const result = await apiFetch("/api/online-users");
-    const isOnline = !!(result && Array.isArray(result.online) && result.online.includes(user.username));
-    if (el) el.classList.toggle("online", isOnline);
+    const status = (result && result.statuses && result.statuses[user.username]) || "offline";
+    if (el) {
+      el.classList.toggle("online", status === "online");
+      el.classList.toggle("away", status === "away");
+    }
     if (textEl) {
-      textEl.innerHTML = isOnline
-        ? `<span class="online-dot online"></span><span class="online-label online">Online</span>`
-        : `<span class="online-dot"></span><span class="online-label">Offline</span>`;
+      const label = status === "online" ? "Online" : status === "away" ? "Away" : "Offline";
+      textEl.innerHTML = `<span class="online-dot ${status}"></span><span class="online-label ${status}">${label}</span>`;
     }
   } catch (e) {
-    if (el) el.classList.remove("online");
+    if (el) { el.classList.remove("online"); el.classList.remove("away"); }
     if (textEl) textEl.innerHTML = "";
   }
 }

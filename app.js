@@ -1077,6 +1077,31 @@ function initShell(activePage) {
   mountModals();
   attachNavScrollWatcher();
   if (checkSiteGate()) return Promise.resolve();
+
+  // Presence heartbeat: pings every ~20s from whatever page someone has
+  // open, well inside the server's 45s online window, so "online" reflects
+  // general site activity rather than just whether chat.html's WebSocket
+  // happens to still be connected. Also reports whether the tab is actually
+  // focused right now (Page Visibility API) so the server can tell "online"
+  // apart from "away" (tab open but backgrounded/minimized) - an immediate
+  // extra ping fires on every visibility change too, so switching tabs
+  // updates status right away instead of waiting for the next interval.
+  const heartbeatUser = Progress.getCurrentUser();
+  if (heartbeatUser) {
+    const sendHeartbeat = () => {
+      const current = Progress.getCurrentUser();
+      if (!current) return;
+      apiFetch("/api/presence/heartbeat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: current.username, active: !document.hidden })
+      }).catch(() => {});
+    };
+    sendHeartbeat();
+    setInterval(sendHeartbeat, 20000);
+    document.addEventListener("visibilitychange", sendHeartbeat);
+  }
+
   // Silent, fire-and-forget: just tallies which hostname this page load
   // came from (progressing.online vs progressing.vercel.app, etc). No
   // visible behavior depends on this - failures are ignored entirely.

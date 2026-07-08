@@ -1416,6 +1416,34 @@ body.modal-open { overflow: hidden; }
   display: flex; align-items: center; justify-content: center;
   font-family: var(--font-display); font-style: italic; font-size: 30px; color: var(--mocha-dark);
 }
+
+/* user.html wraps its avatar in this to position the online-status badge
+   at the bottom-right corner (Discord/Slack-style), which needs the
+   avatar's own explicit sizing since it's no longer a direct child of
+   .settings-avatar-row - profile.html's plain <img> above is untouched. */
+.profile-avatar-wrap {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+.profile-avatar-wrap .profile-avatar-img {
+  width: 78px; height: 78px; min-width: 78px; min-height: 78px;
+  display: block;
+  border-radius: 50%; object-fit: cover; border: 1px solid var(--mocha-light);
+}
+.profile-online-badge {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: var(--mocha-light);
+  border: 3px solid var(--cream);
+  box-sizing: border-box;
+}
+.profile-online-badge.online { background: #3a8a5a; }
+.profile-online-badge.away { background: #d9a441; }
 .settings-avatar-row .upload-btn {
   font-family: var(--font-mono); font-size: 12px; text-transform: uppercase;
   border: 1px solid var(--mocha-light); background: var(--paper); padding: 9px 16px;
@@ -1666,6 +1694,7 @@ body.modal-open { overflow: hidden; }
   flex-shrink: 0;
 }
 .online-dot.online { background: #3a8a5a; }
+.online-dot.away { background: #d9a441; }
 .online-label {
   font-family: var(--font-mono);
   font-size: 12px;
@@ -1676,6 +1705,7 @@ body.modal-open { overflow: hidden; }
   vertical-align: middle;
 }
 .online-label.online { color: #3a8a5a; }
+.online-label.away { color: #d9a441; }
 .chat-status.offline::before { content: "\25CF"; color: var(--danger); margin-right: 6px; }
 .chat-status.connecting::before { content: "\25CF"; color: var(--mocha-soft); margin-right: 6px; }
 
@@ -1831,7 +1861,7 @@ body.modal-open { overflow: hidden; }
   .tb-btn { flex: 1 1 32%; }
   .reply-form textarea { min-height: 140px; }
   .settings-avatar-row { flex-direction: column; align-items: flex-start; }
-  .settings-avatar-row > img, .settings-avatar-row .initials-lg { width: 66px; height: 66px; }
+  .settings-avatar-row > img, .settings-avatar-row .initials-lg, .profile-avatar-wrap .profile-avatar-img { width: 66px; height: 66px; }
   .settings-avatar-row .upload-btn { width: 100%; }
   /* Chat gets a genuine full-screen mobile treatment instead of being
      squeezed into the site's normal padded container: the header shrinks

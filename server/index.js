@@ -265,26 +265,37 @@ function canAccessRoom(room, username) {
   return participants.includes(username);
 }
 
-// Tracks how many active WebSocket connections each username currently has
-// across ALL rooms and tabs (not the same as roomPresence, which is scoped
-// to a single room for the "@username is here" chat indicator). A username
-// counts as online as long as this is above zero; opening a second tab or
-// switching rooms just increments/decrements the same counter rather than
-// flipping online/offline on every room change.
-const onlineUsernameCounts = new Map();
+// Presence used to be tied to having an active WebSocket connection - but
+// chat.html is the ONLY page that opens one, so anyone browsing their
+// profile, a post, or anywhere else would instantly show as "offline" the
+// moment they left chat, even though they were still actively using the
+// site. This is a heartbeat model instead: any page can ping in periodically,
+// and someone counts as online as long as we've heard from them recently -
+// the same approach Discord/Slack-style presence uses, and far more stable
+// than requiring a specific page's live socket.
+//
+// Each heartbeat also carries whether the browser tab was focused at the
+// time (via the client's Page Visibility API check), so presence has three
+// tiers rather than just on/off: "online" (recent ping, tab focused),
+// "away" (recent ping, but tabbed out/backgrounded), "offline" (no ping
+// within the timeout window at all).
+const PRESENCE_TIMEOUT_MS = 45000; // 45 seconds
+const lastSeenByUsername = new Map(); // username -> { lastSeen, active }
 
-function markUserOnline(username) {
+function recordHeartbeat(username, active) {
   if (!username) return;
-  onlineUsernameCounts.set(username, (onlineUsernameCounts.get(username) || 0) + 1);
+  lastSeenByUsername.set(username, { lastSeen: Date.now(), active: active !== false });
 }
-function markUserOffline(username) {
-  if (!username) return;
-  const next = (onlineUsernameCounts.get(username) || 0) - 1;
-  if (next <= 0) onlineUsernameCounts.delete(username);
-  else onlineUsernameCounts.set(username, next);
+
+function getPresenceStatus(username) {
+  const entry = lastSeenByUsername.get(username);
+  if (!entry) return "offline";
+  if (Date.now() - entry.lastSeen >= PRESENCE_TIMEOUT_MS) return "offline";
+  return entry.active ? "online" : "away";
 }
+
 function isUserOnline(username) {
-  return onlineUsernameCounts.has(username);
+  return getPresenceStatus(username) !== "offline";
 }
 
 let db;
@@ -1219,8 +1230,49 @@ app.post("/api/login", asyncHandler(async (req, res) => {
   res.json(publicUser(normalizeUser(user)));
 }));
 
+// Lightweight, invisible tracking of which hostname people are actually
+// loading the site from (e.g. progressing.online vs progressing.vercel.app,
+// or anything else pointed at this deployment). No visible behavior change -
+// just a running per-hostname tally an admin can check later.
+app.post("/api/analytics/hit", asyncHandler(async (req, res) => {
+  const hostname = ((req.body && req.body.hostname) || "").toString().slice(0, 200).toLowerCase();
+  if (!hostname) return res.status(400).json({ error: "hostname is required" });
+  await db.collection("domainHits").updateOne(
+    { _id: hostname },
+    { $inc: { count: 1 }, $set: { lastSeen: new Date().toISOString() } },
+    { upsert: true }
+  );
+  res.status(204).end();
+}));
+
+app.get("/api/analytics/hosts", asyncHandler(async (req, res) => {
+  const requesterUsername = (req.query.requesterUsername || "").toString();
+  if (!requesterUsername || !ALLOWED_CREATOR_USERNAMES.has(requesterUsername.toLowerCase())) {
+    return res.status(403).json({ error: "Only admins can view analytics." });
+  }
+  const docs = await db.collection("domainHits").find({}).toArray();
+  res.json(docs.map(d => ({ hostname: d._id, count: d.count || 0, lastSeen: d.lastSeen || null })));
+}));
+
+// Any logged-in page pings this every ~20s (see app.js) to say "I'm still
+// here" - this is what actually feeds isUserOnline()/the /api/online-users
+// list below, not any particular page's WebSocket.
+app.post("/api/presence/heartbeat", (req, res) => {
+  const username = ((req.body && req.body.username) || "").toString();
+  const active = !req.body || typeof req.body.active !== "boolean" ? true : req.body.active;
+  recordHeartbeat(username, active);
+  res.status(204).end();
+});
+
 app.get("/api/online-users", (req, res) => {
-  res.json({ online: Array.from(onlineUsernameCounts.keys()) });
+  const statuses = {};
+  for (const username of lastSeenByUsername.keys()) {
+    const status = getPresenceStatus(username);
+    if (status !== "offline") statuses[username] = status;
+  }
+  // `online` kept for now in case anything else still checks the old flat
+  // list shape - includes both online and away usernames.
+  res.json({ statuses, online: Object.keys(statuses) });
 });
 
 app.get("/api/current-user", (req, res) => {
@@ -1247,7 +1299,7 @@ connect()
       ws.room = room;
       ws.username = username;
       chatRoomClients(room).add(ws);
-      markUserOnline(username);
+      recordHeartbeat(username);
       broadcastToRoom(room, { type: "presence", room, users: roomPresence(room) });
 
       ws.on("message", raw => {
@@ -1268,7 +1320,6 @@ connect()
 
       ws.on("close", () => {
         chatRoomClients(room).delete(ws);
-        markUserOffline(username);
         broadcastToRoom(room, { type: "presence", room, users: roomPresence(room) });
       });
     });
