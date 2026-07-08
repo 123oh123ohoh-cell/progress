@@ -996,120 +996,12 @@ async function applyBannedOverlayIfNeeded() {
   return true;
 }
 
-const SITE_GATE_HOSTNAME = "progressing.online";
-const SITE_GATE_PASSWORD = "123";
-
-// A fun, casual "not public yet" gate that only applies when someone's
-// visiting via the progressing.online domain specifically (not the
-// vercel.app one) and hasn't already unlocked it this browser session.
-// Pure client-side, no server round-trip needed since this isn't tied to
-// any user account - anonymous visitors need to see it too. Once unlocked
-// the flag persists in sessionStorage so it doesn't reappear on every page
-// nav, only a fresh tab/session.
-function checkSiteGate() {
-  if (window.location.hostname !== SITE_GATE_HOSTNAME) return false;
-  if (sessionStorage.getItem("siteGateUnlocked") === "true") return false;
-
-  document.body.classList.add("site-gated");
-  const main = document.querySelector("main");
-  if (!main || main.querySelector(".site-gate-screen")) return true;
-
-  main.innerHTML = `
-    <div class="locked-screen site-gate-screen">
-      <div class="error-illustration">
-        <img src="images/404page.png" alt="Not public yet illustration">
-      </div>
-      <h1>The website is not public yet!</h1>
-      <p class="site-gate-subtext">${renderEmoticonsText("my co-workers found the website.. i'm kinda shy.. so im gonna put a password.. :dead:")}</p>
-      <div class="site-gate-form">
-        <div class="site-gate-question">Who are you?</div>
-        <div class="site-gate-options" id="siteGateOptions">
-          <div class="site-gate-option-col">
-            <button type="button" class="site-gate-option" data-value="coworkers">Co-workers</button>
-          </div>
-          <div class="site-gate-option-col">
-            <button type="button" class="site-gate-option" data-value="ourspawn">OurSpawn</button>
-            <span class="site-gate-hint">(psst.. it's 123)</span>
-          </div>
-          <div class="site-gate-option-col">
-            <button type="button" class="site-gate-option" data-value="random">idk random ig</button>
-            <span class="site-gate-hint">(psst.. it's 123)</span>
-          </div>
-        </div>
-        <input type="password" id="siteGatePassword" class="site-gate-password" placeholder="Password" autocomplete="off">
-        <button type="button" class="btn primary site-gate-submit" id="siteGateSubmit">Access website</button>
-        <div class="site-gate-error" id="siteGateError"></div>
-      </div>
-    </div>
-  `;
-
-  main.querySelectorAll(".site-gate-option").forEach(btn => {
-    btn.addEventListener("click", () => {
-      main.querySelectorAll(".site-gate-option").forEach(b => b.classList.remove("selected"));
-      btn.classList.add("selected");
-    });
-  });
-
-  const submit = () => {
-    const pwInput = document.getElementById("siteGatePassword");
-    const errorEl = document.getElementById("siteGateError");
-    if (pwInput.value === SITE_GATE_PASSWORD) {
-      sessionStorage.setItem("siteGateUnlocked", "true");
-      location.reload();
-    } else {
-      errorEl.textContent = "That's not it... try again.";
-      pwInput.value = "";
-      pwInput.focus();
-    }
-  };
-  document.getElementById("siteGateSubmit").addEventListener("click", submit);
-  document.getElementById("siteGatePassword").addEventListener("keydown", (e) => {
-    if (e.key === "Enter") submit();
-  });
-
-  return true;
-}
-
 function initShell(activePage) {
   setDeviceMode();
   window.addEventListener("resize", setDeviceMode);
   renderNav(activePage);
   mountModals();
   attachNavScrollWatcher();
-  if (checkSiteGate()) return Promise.resolve();
-
-  // Presence heartbeat: pings every ~20s from whatever page someone has
-  // open, well inside the server's 45s online window, so "online" reflects
-  // general site activity rather than just whether chat.html's WebSocket
-  // happens to still be connected. Also reports whether the tab is actually
-  // focused right now (Page Visibility API) so the server can tell "online"
-  // apart from "away" (tab open but backgrounded/minimized) - an immediate
-  // extra ping fires on every visibility change too, so switching tabs
-  // updates status right away instead of waiting for the next interval.
-  const heartbeatUser = Progress.getCurrentUser();
-  if (heartbeatUser) {
-    const sendHeartbeat = () => {
-      const current = Progress.getCurrentUser();
-      if (!current) return;
-      apiFetch("/api/presence/heartbeat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: current.username, active: !document.hidden })
-      }).catch(() => {});
-    };
-    sendHeartbeat();
-    setInterval(sendHeartbeat, 20000);
-    document.addEventListener("visibilitychange", sendHeartbeat);
-  }
-
-  // Silent, fire-and-forget: just tallies which hostname this page load
-  // came from (progressing.online vs progressing.vercel.app, etc). No
-  // visible behavior depends on this - failures are ignored entirely.
-  apiFetch("/api/analytics/hit", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ hostname: window.location.hostname })
-  }).catch(() => {});
   // Fires immediately - the network round-trip to confirm ban status
   // against the server already takes longer than the current page's own
   // synchronous render call (e.g. index.html calling renderFeed() right

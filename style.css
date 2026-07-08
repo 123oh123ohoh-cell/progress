@@ -190,19 +190,6 @@ body.account-banned .mobile-fab {
   display: none !important;
   pointer-events: none;
 }
-
-/* progressing.online gate: same nav-disabling treatment as the ban/lock
-   states, but its own rule since this one isn't about account status at
-   all - it's purely which domain someone's visiting from. */
-body.site-gated .nav {
-  pointer-events: none;
-  opacity: 0.55;
-}
-body.site-gated .mobile-fab {
-  display: none !important;
-  pointer-events: none;
-}
-
 .locked-screen {
   padding: 100px 20px;
   text-align: center;
@@ -235,89 +222,6 @@ body.site-gated .mobile-fab {
   margin-top: 22px;
   text-decoration: none;
   font-weight: 600;
-}
-
-/* This one specifically: a warm rose tone for the "kinda shy" personal
-   aside, deliberately distinct from the heading's plain --ink so the two
-   lines read as two different voices/moods. */
-.site-gate-subtext {
-  color: #a8527a !important;
-  font-size: 15px;
-  margin-top: 4px;
-}
-.site-gate-form {
-  margin-top: 30px;
-  padding-top: 26px;
-  border-top: 1px solid var(--mocha-light);
-}
-.site-gate-question {
-  font-family: var(--font-mono);
-  font-size: 11.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--muted);
-  margin-bottom: 12px;
-}
-.site-gate-options {
-  display: flex;
-  gap: 8px;
-  justify-content: center;
-  flex-wrap: wrap;
-  margin-bottom: 18px;
-}
-.site-gate-option-col {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-}
-.site-gate-hint {
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  color: var(--muted);
-  white-space: nowrap;
-  display: none;
-}
-.site-gate-hint.visible { display: block; }
-.site-gate-option {
-  border: 1px solid var(--mocha-light);
-  background: var(--paper);
-  color: var(--mocha-dark);
-  padding: 8px 16px;
-  border-radius: 20px;
-  font-size: 13.5px;
-  cursor: pointer;
-  transition: border-color .15s ease, background .15s ease, color .15s ease;
-}
-.site-gate-option:hover { border-color: var(--ink); }
-.site-gate-option.selected {
-  background: var(--ink);
-  border-color: var(--ink);
-  color: var(--cream);
-}
-.site-gate-password {
-  width: 100%;
-  max-width: 280px;
-  padding: 12px 14px;
-  border: 1px solid var(--mocha-light);
-  border-radius: var(--radius);
-  font-size: 15px;
-  background: var(--cream);
-  color: var(--ink);
-  text-align: center;
-  margin: 0 auto 14px;
-  display: block;
-}
-.site-gate-password:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
-.site-gate-submit {
-  width: 100%;
-  max-width: 280px;
-}
-.site-gate-error {
-  margin-top: 12px;
-  font-size: 13px;
-  color: var(--danger);
-  min-height: 18px;
 }
 
 .bell-wrap { position: relative; }
@@ -1418,35 +1322,6 @@ body.modal-open { overflow: hidden; }
   display: flex; align-items: center; justify-content: center;
   font-family: var(--font-display); font-style: italic; font-size: 30px; color: var(--mocha-dark);
 }
-
-/* user.html wraps its avatar in this to position the small online-status
-   dot at the bottom-right corner (Discord/Slack-style), which needs the
-   avatar's own explicit sizing since it's no longer a direct child of
-   .settings-avatar-row - profile.html's plain <img> above is untouched. */
-.profile-avatar-wrap {
-  position: relative;
-  display: inline-flex;
-  flex-shrink: 0;
-}
-.profile-avatar-wrap .profile-avatar-img {
-  width: 78px; height: 78px; min-width: 78px; min-height: 78px;
-  display: block;
-  border-radius: 50%; object-fit: cover; border: 1px solid var(--mocha-light);
-}
-.profile-online-badge {
-  position: absolute;
-  bottom: 2px;
-  right: 2px;
-  width: 17px;
-  height: 17px;
-  border-radius: 50%;
-  background: var(--mocha-light);
-  border: 3px solid var(--cream);
-  box-sizing: border-box;
-}
-.profile-online-badge.online { background: #3a8a5a; }
-.profile-online-badge.away { background: #d9a441; }
-
 .settings-avatar-row .upload-btn {
   font-family: var(--font-mono); font-size: 12px; text-transform: uppercase;
   border: 1px solid var(--mocha-light); background: var(--paper); padding: 9px 16px;
@@ -1697,7 +1572,6 @@ body.modal-open { overflow: hidden; }
   flex-shrink: 0;
 }
 .online-dot.online { background: #3a8a5a; }
-.online-dot.away { background: #d9a441; }
 .online-label {
   font-family: var(--font-mono);
   font-size: 12px;
@@ -1708,7 +1582,6 @@ body.modal-open { overflow: hidden; }
   vertical-align: middle;
 }
 .online-label.online { color: #3a8a5a; }
-.online-label.away { color: #d9a441; }
 .chat-status.offline::before { content: "\25CF"; color: var(--danger); margin-right: 6px; }
 .chat-status.connecting::before { content: "\25CF"; color: var(--mocha-soft); margin-right: 6px; }
 
@@ -1863,8 +1736,8 @@ body.modal-open { overflow: hidden; }
   .toolbar { flex-wrap: wrap; gap: 10px; }
   .tb-btn { flex: 1 1 32%; }
   .reply-form textarea { min-height: 140px; }
-  .settings-avatar-row { flex-direction: column; align-items: flex-start; gap: 10px; }
-  .settings-avatar-row > img, .settings-avatar-row .initials-lg, .profile-avatar-wrap .profile-avatar-img { width: 66px; height: 66px; }
+  .settings-avatar-row { flex-direction: column; align-items: flex-start; }
+  .settings-avatar-row > img, .settings-avatar-row .initials-lg { width: 66px; height: 66px; }
   .settings-avatar-row .upload-btn { width: 100%; }
   /* Chat gets a genuine full-screen mobile treatment instead of being
      squeezed into the site's normal padded container: the header shrinks

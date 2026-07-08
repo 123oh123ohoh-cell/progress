@@ -70,7 +70,7 @@
         </div>
       </div>
       ${post.cover ? `<img class="post-cover" src="${post.cover}" alt="">` : ""}
-      <article class="post-content">${renderMentionsInHTML(renderEmoticonsInHTML(post.content, "inline-emoticon"))}</article>
+      <article class="post-content">${renderEmoticonsInHTML(post.content, "inline-emoticon")}</article>
       <div class="post-footer">
         <button class="react-btn ${likedByMe ? "liked" : ""}" id="likeBtn">
           ${ICONS.heart} <span id="likeCount">${post.likes}</span>
@@ -92,7 +92,7 @@
                 <a class="reply-avatar" href="user.html?id=${author ? author.id : ""}">${avatarHTML(author, 32)}</a>
                 <div class="reply-content">
                   <div class="reply-meta"><strong><a class="username-link" href="user.html?id=${author ? author.id : ""}">@${comment.author}</a></strong><span>${Progress.formatDateTime(comment.time)}</span></div>
-                  <p class="reply-body">${renderMentionsInHTML(renderEmoticonsText(comment.body, "reply-emoticon"))}</p>
+                  <p class="reply-body">${renderEmoticonsText(comment.body, "reply-emoticon")}</p>
                   ${comment.image ? `<div class="reply-image"><img src="${comment.image}" alt="Reply image"></div>` : ""}
                 </div>
               </div>

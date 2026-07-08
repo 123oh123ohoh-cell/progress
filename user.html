@@ -47,19 +47,14 @@
 
     root.innerHTML = `
       <div class="settings-avatar-row" style="margin-top:40px;">
-        <div style="display:flex; flex-direction:column; align-items:center; gap:6px; margin-top:8px;">
-          <div class="profile-avatar-wrap">
-            ${user.avatar ? `<img class="profile-avatar-img" src="${user.avatar}" alt="${user.name}">` : `<div class="initials-lg">${initials(user.name)}</div>`}
-            <span class="profile-online-badge" id="onlineIndicator"></span>
-          </div>
-          <span id="onlineStatusText"></span>
-        </div>
+        ${user.avatar ? `<img src="${user.avatar}" alt="${user.name}">` : `<div class="initials-lg">${initials(user.name)}</div>`}
         <div>
-          <div style="font-family:var(--font-display); font-size:24px; margin-bottom:2px;">
+          <div style="font-family:var(--font-display); font-size:24px; margin-bottom:6px; display:flex; align-items:center; gap:10px;">
             <span>${user.name}${renderDisplayBadge(user)}</span>
+            <span id="onlineIndicator"></span>
           </div>
-          <div style="color:var(--muted); font-size:14px; margin-bottom:4px;">@${user.username}</div>
-          <div style="display:flex; gap:18px; color:var(--muted); font-size:14px; margin-bottom:6px;">
+          <div style="color:var(--muted); font-size:14px; margin-bottom:12px;">@${user.username}</div>
+          <div style="display:flex; gap:18px; color:var(--muted); font-size:14px; margin-bottom:10px;">
             <span id="followerCount">${user.followers.length} followers</span>
             <span>${user.following.length} following</span>
             <span>Joined ${Progress.formatDate(user.joined)}</span>
@@ -133,28 +128,15 @@ setInterval(refreshNowPlaying, 30000); // Refresh every 30 seconds
 
 async function refreshOnlineStatus() {
   const el = document.getElementById("onlineIndicator");
-  const textEl = document.getElementById("onlineStatusText");
-  if (!el && !textEl) return;
+  if (!el) return;
   try {
     const result = await apiFetch("/api/online-users");
-    const status = (result && result.statuses && result.statuses[user.username]) || "offline";
-    const isOffline = status === "offline";
-    if (el) {
-      el.classList.toggle("online", status === "online");
-      el.classList.toggle("away", status === "away");
-      el.style.display = isOffline ? "none" : "";
-    }
-    if (textEl) {
-      if (isOffline) {
-        textEl.innerHTML = "";
-      } else {
-        const label = status === "online" ? "Online" : "Away";
-        textEl.innerHTML = `<span class="online-dot ${status}"></span><span class="online-label ${status}">${label}</span>`;
-      }
-    }
+    const isOnline = !!(result && Array.isArray(result.online) && result.online.includes(user.username));
+    el.innerHTML = isOnline
+      ? `<span class="online-dot online"></span><span class="online-label online">Online</span>`
+      : `<span class="online-dot"></span><span class="online-label">Offline</span>`;
   } catch (e) {
-    if (el) { el.classList.remove("online"); el.classList.remove("away"); el.style.display = "none"; }
-    if (textEl) textEl.innerHTML = "";
+    el.innerHTML = "";
   }
 }
 

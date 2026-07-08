@@ -27,31 +27,18 @@
 <script src="data.js"></script>
 <script src="app.js"></script>
 <script>
-  // Distinguishes "we haven't heard back from the server yet" from "the
-  // server responded and there really are zero posts" - without this, the
-  // very first render (before Progress.loadFromApi() has resolved) would
-  // show "Nothing here yet, be the first to publish" purely because the
-  // local cache starts empty, even though the seed data always has posts
-  // waiting on the server. That's a misleading claim about a loading
-  // state, not an actual empty state.
-  let hasLoadedOnce = false;
-
   function renderFeed() {
     const posts = Progress.getPosts();
     const timeline = document.getElementById("timeline");
 
     if (!posts.length) {
-      if (!hasLoadedOnce) {
-        timeline.innerHTML = `<div class="feed-empty"><h3>Loading&hellip;</h3></div>`;
-      } else {
-        timeline.innerHTML = Progress.apiOnline === false
-          ? bootingUpHTML()
-          : `
-          <div class="feed-empty">
-            <h3>Nothing here yet</h3>
-            <p>The first entry is always the hardest one to publish.</p>
-          </div>`;
-      }
+      timeline.innerHTML = Progress.apiOnline === false
+        ? bootingUpHTML()
+        : `
+        <div class="feed-empty">
+          <h3>Nothing here yet</h3>
+          <p>The first entry is always the hardest one to publish.</p>
+        </div>`;
       return;
     }
 
@@ -85,9 +72,7 @@
   async function start() {
     initShell("feed");
     renderFeed();
-    Progress.loadFromApi()
-      .then(() => { hasLoadedOnce = true; renderFeed(); })
-      .catch(() => { hasLoadedOnce = true; renderFeed(); });
+    Progress.loadFromApi().then(renderFeed).catch(() => {});
   }
 
   start();
