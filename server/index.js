@@ -973,7 +973,14 @@ app.get("/api/posts", asyncHandler(async (req, res) => {
   if (req.query.author) {
     filter.author = { $regex: `^${escapeRegex(req.query.author)}$`, $options: "i" };
   }
-  const docs = await db.collection("posts").find(filter).toArray();
+  // Excludes `content` at the query level - it's the one field that can
+  // balloon a post's size (embedded base64 images from the editor), and
+  // the feed/profile list views never render it, only title/excerpt/cover.
+  // Fetching every post's full content here was making this endpoint's
+  // payload - and therefore how long it takes a free-tier Mongo + Render
+  // instance to build and send it - grow with every single post published,
+  // even though nothing on the list view needs that data.
+  const docs = await db.collection("posts").find(filter, { projection: { content: 0 } }).toArray();
   const posts = docs.map(normalizePost).sort((a, b) => new Date(b.createdAt || b.date).getTime() - new Date(a.createdAt || a.date).getTime());
   res.json(posts);
 }));
