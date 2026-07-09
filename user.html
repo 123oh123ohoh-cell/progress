@@ -47,11 +47,16 @@
 
     root.innerHTML = `
       <div class="settings-avatar-row" style="margin-top:40px;">
-        ${user.avatar ? `<img src="${user.avatar}" alt="${user.name}">` : `<div class="initials-lg">${initials(user.name)}</div>`}
+        <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
+          <div class="profile-avatar-wrap">
+            ${user.avatar ? `<img class="profile-avatar-img" src="${user.avatar}" alt="${user.name}">` : `<div class="initials-lg">${initials(user.name)}</div>`}
+            <span class="profile-online-badge" id="onlineIndicator"></span>
+          </div>
+          <span id="onlineStatusText"></span>
+        </div>
         <div>
-          <div style="font-family:var(--font-display); font-size:24px; margin-bottom:6px; display:flex; align-items:center; gap:10px;">
+          <div style="font-family:var(--font-display); font-size:24px; margin-bottom:6px;">
             <span>${user.name}${renderDisplayBadge(user)}</span>
-            <span id="onlineIndicator"></span>
           </div>
           <div style="color:var(--muted); font-size:14px; margin-bottom:12px;">@${user.username}</div>
           <div style="display:flex; gap:18px; color:var(--muted); font-size:14px; margin-bottom:10px;">
@@ -128,20 +133,25 @@ setInterval(refreshNowPlaying, 30000); // Refresh every 30 seconds
 
 async function refreshOnlineStatus() {
   const el = document.getElementById("onlineIndicator");
-  if (!el) return;
+  const textEl = document.getElementById("onlineStatusText");
+  if (!el && !textEl) return;
   try {
     const result = await apiFetch("/api/online-users");
     const isOnline = !!(result && Array.isArray(result.online) && result.online.includes(user.username));
-    el.innerHTML = isOnline
-      ? `<span class="online-dot online"></span><span class="online-label online">Online</span>`
-      : `<span class="online-dot"></span><span class="online-label">Offline</span>`;
+    if (el) el.classList.toggle("online", isOnline);
+    if (textEl) {
+      textEl.innerHTML = isOnline
+        ? `<span class="online-dot online"></span><span class="online-label online">Online</span>`
+        : `<span class="online-dot"></span><span class="online-label">Offline</span>`;
+    }
   } catch (e) {
-    el.innerHTML = "";
+    if (el) el.classList.remove("online");
+    if (textEl) textEl.innerHTML = "";
   }
 }
 
 refreshOnlineStatus();
-setInterval(refreshOnlineStatus, 15000); // Refresh every 15 seconds
+setInterval(refreshOnlineStatus, 15000); // Refresh every 15 seconds - makes it update
 
     (async () => {
       const result = await apiFetch(`/api/posts?author=${encodeURIComponent(user.username)}`);
