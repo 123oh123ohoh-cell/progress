@@ -983,15 +983,31 @@ function openPresenceSocket(activePage) {
     // with NS_ERROR_WEBSOCKET... every request.
     const wsBase = API_BASE.replace(/^http/, "ws");
     presenceSocket = new WebSocket(`${wsBase}/ws/chat?username=${encodeURIComponent(user.username)}&room=presence`);
+
+    // Tells the server whether THIS specific tab is currently focused, so
+    // someone can show as "Idle" rather than fully "Online" while every
+    // tab they have open is backgrounded (Discord calls this state Idle).
+    // Sent once right after connecting (correcting the server's default
+    // "active" assumption if the tab actually started out hidden) and
+    // again on every subsequent visibility change.
+    const sendActivity = () => {
+      if (presenceSocket.readyState === WebSocket.OPEN) {
+        presenceSocket.send(JSON.stringify({ type: "activity", active: !document.hidden }));
+      }
+    };
+    presenceSocket.addEventListener("open", sendActivity);
+    document.addEventListener("visibilitychange", sendActivity);
+
     // The server already broadcasts a "presence" message to everyone in
-    // this room the instant anyone connects/disconnects - re-dispatch that
-    // as a plain DOM event so any page (e.g. user.html) can react to it
-    // immediately, instead of relying purely on a polling interval.
+    // this room the instant anyone connects/disconnects/changes tab focus -
+    // re-dispatch that as a plain DOM event so any page (e.g. user.html)
+    // can react to it immediately, instead of relying purely on a polling
+    // interval.
     presenceSocket.addEventListener("message", (event) => {
       let data;
       try { data = JSON.parse(event.data); } catch (e) { return; }
       if (data.type === "global-presence") {
-        document.dispatchEvent(new CustomEvent("presence-update", { detail: data.online || [] }));
+        document.dispatchEvent(new CustomEvent("presence-update", { detail: data.statuses || {} }));
       }
     });
     window.addEventListener("beforeunload", () => {

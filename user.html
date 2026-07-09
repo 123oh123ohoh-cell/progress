@@ -131,25 +131,32 @@ async function refreshNowPlaying() {
 refreshNowPlaying();
 setInterval(refreshNowPlaying, 30000); // Refresh every 30 seconds
 
-function applyOnlineStatus(onlineList) {
+function applyOnlineStatus(statuses) {
   const el = document.getElementById("onlineIndicator");
   const textEl = document.getElementById("onlineStatusText");
   if (!el && !textEl) return;
-  const isOnline = Array.isArray(onlineList) && onlineList.includes(user.username);
-  if (el) el.classList.toggle("online", isOnline);
+  const status = (statuses && statuses[user.username]) || "offline";
+  if (el) {
+    el.classList.toggle("online", status === "online");
+    el.classList.toggle("idle", status === "idle");
+  }
   if (textEl) {
-    textEl.innerHTML = isOnline
-      ? `<span class="online-dot online"></span><span class="online-label online">Online</span>`
-      : `<span class="online-dot"></span><span class="online-label">Offline</span>`;
+    if (status === "online") {
+      textEl.innerHTML = `<span class="online-dot online"></span><span class="online-label online">Online</span>`;
+    } else if (status === "idle") {
+      textEl.innerHTML = `<span class="online-dot idle"></span><span class="online-label idle">Idle</span>`;
+    } else {
+      textEl.innerHTML = "";
+    }
   }
 }
 
 async function refreshOnlineStatus() {
   try {
     const result = await apiFetch("/api/online-users", { cache: "no-store" });
-    applyOnlineStatus(result && result.online);
+    applyOnlineStatus(result && result.statuses);
   } catch (e) {
-    applyOnlineStatus([]);
+    applyOnlineStatus({});
   }
 }
 

@@ -847,6 +847,10 @@ body.account-banned .mobile-fab {
   font-family: var(--font-mono);
   font-size: 12px;
   color: var(--muted);
+  word-break: break-word;
+}
+.emoji-tooltip-label.long-name {
+  font-size: 9.5px;
 }
 .reply-image-preview {
   display: flex;
@@ -1349,6 +1353,7 @@ body.modal-open { overflow: hidden; }
   box-sizing: border-box;
 }
 .profile-online-badge.online { background: #3a8a5a; }
+.profile-online-badge.idle { background: #d9a441; }
 
 .settings-avatar-row .upload-btn {
   font-family: var(--font-mono); font-size: 12px; text-transform: uppercase;
@@ -1600,6 +1605,7 @@ body.modal-open { overflow: hidden; }
   flex-shrink: 0;
 }
 .online-dot.online { background: #3a8a5a; }
+.online-dot.idle { background: #d9a441; }
 .online-label {
   font-family: var(--font-mono);
   font-size: 12px;
@@ -1610,6 +1616,7 @@ body.modal-open { overflow: hidden; }
   vertical-align: middle;
 }
 .online-label.online { color: #3a8a5a; }
+.online-label.idle { color: #d9a441; }
 .chat-status.offline::before { content: "\25CF"; color: var(--danger); margin-right: 6px; }
 .chat-status.connecting::before { content: "\25CF"; color: var(--mocha-soft); margin-right: 6px; }
 
