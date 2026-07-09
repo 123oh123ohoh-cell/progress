@@ -197,6 +197,7 @@ function publicUser(user) {
     id: user.id,
     username: user.username,
     name: user.name,
+    online: isUserOnline(user.username),
     avatar: user.avatar,
     joined: user.joined,
     timezone: user.timezone,
@@ -1248,6 +1249,18 @@ connect()
       ws.username = username;
       chatRoomClients(room).add(ws);
       markUserOnline(username);
+      const presence = JSON.stringify({
+    type: "user-online",
+    username
+});
+
+for (const clients of chatRooms.values()) {
+    for (const client of clients) {
+        if (client.readyState === client.OPEN) {
+            client.send(presence);
+        }
+    }
+}
       broadcastToRoom(room, { type: "presence", room, users: roomPresence(room) });
 
       ws.on("message", raw => {
@@ -1267,8 +1280,21 @@ connect()
       });
 
       ws.on("close", () => {
+        
         chatRoomClients(room).delete(ws);
         markUserOffline(username);
+        const presence = JSON.stringify({
+    type: "user-offline",
+    username
+});
+
+for (const clients of chatRooms.values()) {
+    for (const client of clients) {
+        if (client.readyState === client.OPEN) {
+            client.send(presence);
+        }
+    }
+}
         broadcastToRoom(room, { type: "presence", room, users: roomPresence(room) });
       });
     });

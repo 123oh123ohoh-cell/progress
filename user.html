@@ -131,27 +131,29 @@ async function refreshNowPlaying() {
 refreshNowPlaying();
 setInterval(refreshNowPlaying, 30000); // Refresh every 30 seconds
 
-async function refreshOnlineStatus() {
+function setOnlineStatus(isOnline) {
   const el = document.getElementById("onlineIndicator");
   const textEl = document.getElementById("onlineStatusText");
-  if (!el && !textEl) return;
-  try {
-    const result = await apiFetch("/api/online-users");
-    const isOnline = !!(result && Array.isArray(result.online) && result.online.includes(user.username));
-    if (el) el.classList.toggle("online", isOnline);
-    if (textEl) {
-      textEl.innerHTML = isOnline
-        ? `<span class="online-dot online"></span><span class="online-label online">Online</span>`
-        : `<span class="online-dot"></span><span class="online-label">Offline</span>`;
-    }
-  } catch (e) {
-    if (el) el.classList.remove("online");
-    if (textEl) textEl.innerHTML = "";
+
+  if (el) {
+    el.classList.toggle("online", isOnline);
+  }
+
+  if (textEl) {
+    textEl.innerHTML = isOnline
+      ? `<span class="online-dot online"></span><span class="online-label online">Online</span>`
+      : `<span class="online-dot"></span><span class="online-label">Offline</span>`;
   }
 }
 
-refreshOnlineStatus();
-setInterval(refreshOnlineStatus, 15000); // Refresh every 15 seconds - makes it update
+(async () => {
+  try {
+    const result = await apiFetch("/api/online-users");
+    setOnlineStatus(
+      result?.online?.includes(user.username)
+    );
+  } catch {}
+})();
 
     (async () => {
       const result = await apiFetch(`/api/posts?author=${encodeURIComponent(user.username)}`);
@@ -205,6 +207,33 @@ setInterval(refreshOnlineStatus, 15000); // Refresh every 15 seconds - makes it 
 
     renderPublicProfile(effectiveUser);
     attachBadgeTooltip(root);
+    const currentUser = Progress.getCurrentUser();
+
+if (currentUser) {
+  const protocol = location.protocol === "https:" ? "wss" : "ws";
+
+  const ws = new WebSocket(
+    `${protocol}://${location.host}/ws/chat?room=global&username=${encodeURIComponent(currentUser.username)}`
+  );
+
+  ws.onmessage = ({ data }) => {
+    let msg;
+
+    try {
+      msg = JSON.parse(data);
+    } catch {
+      return;
+    }
+
+    if (msg.type === "user-online" && msg.username === effectiveUser.username) {
+      setOnlineStatus(true);
+    }
+
+    if (msg.type === "user-offline" && msg.username === effectiveUser.username) {
+      setOnlineStatus(false);
+    }
+  };
+}
   }
 
   start();
