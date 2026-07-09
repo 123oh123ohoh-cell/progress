@@ -39,7 +39,7 @@ const SIGNUP_BADGE_AWARDS = {
   mara: ["dexterity"],
   own: ["dexterity"],
   progresstesting1: ["dexterity", "817x2"],
-  "817x2": ["817x2"],
+  "817x2": ["817x2", "dexterity"],
   testuser: ["817x2", "dexterity"]
 };
 
