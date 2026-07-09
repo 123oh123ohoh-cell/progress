@@ -37,6 +37,7 @@
   let typingHintTimer = null;
   let lastTypingSent = 0;
   let seenMessageIds = new Set();
+  let lastRenderedDateKey = null;
 
   let currentUser = null;
   let currentRoom = GLOBAL_ROOM;
@@ -69,15 +70,71 @@
   function messageRow(msg) {
     const author = Progress.getUser(msg.author);
     const mine = currentUser && msg.author === currentUser.username;
+    const imageHTML = msg.image ? `<div class="chat-image"><img src="${msg.image}" alt="Shared image" loading="lazy"></div>` : "";
+    const bodyHTML = msg.body ? `<div class="chat-bubble">${renderMentionsInHTML(renderEmoticonsText(msg.body, "inline-emoticon"))}</div>` : "";
     return `
       <div class="chat-msg ${mine ? "mine" : ""}" data-id="${msg.id}">
         ${!mine ? `<a href="user.html?username=${encodeURIComponent(msg.author)}" class="chat-avatar">${avatarHTML(author, 30)}</a>` : ""}
         <div class="chat-bubble-col">
           ${!mine && currentRoom === GLOBAL_ROOM ? `<span class="chat-author">@${escapeHTML(msg.author)}</span>` : ""}
-          <div class="chat-bubble">${renderMentionsInHTML(renderEmoticonsText(msg.body, "inline-emoticon"))}</div>
+          ${imageHTML}
+          ${bodyHTML}
           <span class="chat-time">${Progress.timeAgo(msg.time)}</span>
         </div>
       </div>`;
+  }
+
+  function dateSeparatorLabel(isoTime) {
+    const msgDate = new Date(isoTime);
+    const today = new Date();
+    if (msgDate.toDateString() === today.toDateString()) return "Today";
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (msgDate.toDateString() === yesterday.toDateString()) return "Yesterday";
+    const sameYear = msgDate.getFullYear() === today.getFullYear();
+    return msgDate.toLocaleDateString(undefined, sameYear ? { month: "long", day: "numeric" } : { month: "long", day: "numeric", year: "numeric" });
+  }
+
+  const linkPreviewCache = new Map();
+
+  function extractFirstUrl(text) {
+    const match = (text || "").match(/https?:\/\/[^\s<]+/i);
+    return match ? match[0] : null;
+  }
+
+  async function attachLinkPreview(msg) {
+    const url = extractFirstUrl(msg.body);
+    if (!url) return;
+    const bubbleCol = document.querySelector(`.chat-msg[data-id="${msg.id}"] .chat-bubble-col`);
+    if (!bubbleCol) return;
+
+    let preview;
+    if (linkPreviewCache.has(url)) {
+      preview = linkPreviewCache.get(url);
+    } else {
+      const result = await apiFetch(`/api/link-preview?url=${encodeURIComponent(url)}`);
+      preview = (result && result.preview) || null;
+      linkPreviewCache.set(url, preview);
+    }
+    if (!preview) return;
+
+    const card = document.createElement("a");
+    card.className = "chat-link-preview";
+    card.href = preview.url;
+    card.target = "_blank";
+    card.rel = "noopener noreferrer";
+    card.innerHTML = `
+      ${preview.image ? `<img src="${preview.image}" alt="">` : ""}
+      <div class="chat-link-preview-body">
+        ${preview.siteName ? `<div class="chat-link-preview-site">${escapeHTML(preview.siteName)}</div>` : ""}
+        ${preview.title ? `<div class="chat-link-preview-title">${escapeHTML(preview.title)}</div>` : ""}
+        ${preview.description ? `<div class="chat-link-preview-desc">${escapeHTML(preview.description)}</div>` : ""}
+      </div>
+    `;
+    const timeEl = bubbleCol.querySelector(".chat-time");
+    if (timeEl) bubbleCol.insertBefore(card, timeEl);
+    else bubbleCol.appendChild(card);
+    scrollToBottom();
   }
 
   function appendMessage(msg) {
@@ -87,8 +144,14 @@
     if (!log) return;
     const empty = log.querySelector(".chat-empty");
     if (empty) empty.remove();
+    const dayKey = new Date(msg.time).toDateString();
+    if (dayKey !== lastRenderedDateKey) {
+      lastRenderedDateKey = dayKey;
+      log.insertAdjacentHTML("beforeend", `<div class="chat-date-separator"><span>${dateSeparatorLabel(msg.time)}</span></div>`);
+    }
     log.insertAdjacentHTML("beforeend", messageRow(msg));
     scrollToBottom();
+    attachLinkPreview(msg);
   }
 
   function renderPresence(users) {
@@ -173,6 +236,7 @@
     const log = document.getElementById("chatLog");
     log.innerHTML = `<div class="chat-empty">Loading…</div>`;
     seenMessageIds = new Set();
+    lastRenderedDateKey = null;
     const url = `/api/chat/messages?room=${encodeURIComponent(currentRoom)}&limit=${HISTORY_LIMIT}&username=${encodeURIComponent(currentUser.username)}`;
     const history = await apiFetch(url);
     if (!history) {
@@ -188,24 +252,42 @@
     scrollToBottom(true);
   }
 
-  function sendMessage(text) {
-    const trimmed = text.trim();
-    if (!trimmed) return;
+  function sendMessage(text, imageUrl) {
+    const trimmed = (text || "").trim();
+    if (!trimmed && !imageUrl) return;
     if (socket && socket.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify({ type: "send", body: trimmed }));
+      socket.send(JSON.stringify({ type: "send", body: trimmed, image: imageUrl || null }));
     } else {
       apiFetch("/api/chat/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ room: currentRoom, author: currentUser.username, body: trimmed })
+        body: JSON.stringify({ room: currentRoom, author: currentUser.username, body: trimmed, image: imageUrl || null })
       }).then(msg => {
         if (msg) { appendMessage(msg); if (currentRoom.startsWith("dm:")) loadSidebar(); }
       });
     }
   }
 
+  async function sendImageMessage(file) {
+    const reader = new FileReader();
+    reader.onload = async () => {
+      showToast("Uploading image\u2026");
+      const uploaded = await apiFetch("/api/upload-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: reader.result })
+      });
+      if (uploaded && uploaded.url) {
+        sendMessage("", uploaded.url);
+      } else {
+        showToast("Could not upload that image. Try again.");
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
   function roomListItemHTML(opts) {
-    const { room, label, sub, active, avatarUser } = opts;
+    const { room, label, sub, active, avatarUser, unreadCount } = opts;
     return `
       <button type="button" class="chat-room-item ${active ? "active" : ""}" data-room="${escapeHTML(room)}" data-label="${escapeHTML(label)}" data-peer="${escapeHTML(opts.peer || "")}">
         ${avatarUser !== undefined ? `<span class="chat-room-avatar">${avatarHTML(avatarUser, 28)}</span>` : `<span class="chat-room-avatar chat-room-avatar-global">#</span>`}
@@ -213,6 +295,7 @@
           <span class="chat-room-label">${escapeHTML(label)}</span>
           ${sub ? `<span class="chat-room-sub">${sub}</span>` : ""}
         </span>
+        ${unreadCount ? `<span class="chat-unread-badge">${unreadCount > 9 ? "9+" : unreadCount}</span>` : ""}
       </button>`;
   }
 
@@ -232,7 +315,8 @@
         sub: preview,
         active: currentRoom === conv.room,
         avatarUser: peerUser,
-        peer: conv.with
+        peer: conv.with,
+        unreadCount: currentRoom === conv.room ? 0 : (conv.unreadCount || 0)
       }));
     });
     list.innerHTML = items.join("");
@@ -257,6 +341,13 @@
     const url = new URL(location.href);
     if (peer) url.searchParams.set("with", peer); else url.searchParams.delete("with");
     history.replaceState(null, "", url);
+    if (room.startsWith("dm:")) {
+      apiFetch("/api/chat/mark-read", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: currentUser.username, room })
+      }).then(() => loadSidebar());
+    }
   }
 
   function startDmFromInput() {
@@ -420,6 +511,8 @@
           <form class="chat-input-row" id="chatForm">
             <div class="emoji-picker chat-emoji-picker" id="chatEmojiPicker"></div>
             <button type="button" class="chat-emoji-btn" id="chatEmojiBtn" aria-label="Insert sticker" title="Stickers">🐱</button>
+            <button type="button" class="chat-emoji-btn" id="chatImageBtn" aria-label="Attach image" title="Attach image">🖼️</button>
+            <input type="file" id="chatImageInput" accept="image/*" style="display:none;">
             <input type="text" id="chatInput" class="chat-input" placeholder="Say something…" maxlength="2000" autocomplete="off">
             <button type="submit" class="btn primary">Send</button>
           </form>
@@ -433,6 +526,15 @@
       sendMessage(input.value);
       input.value = "";
       closeChatEmojiPicker();
+    });
+
+    document.getElementById("chatImageBtn").addEventListener("click", () => {
+      document.getElementById("chatImageInput").click();
+    });
+    document.getElementById("chatImageInput").addEventListener("change", (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (file) sendImageMessage(file);
+      e.target.value = "";
     });
 
     document.getElementById("chatInput").addEventListener("input", () => {

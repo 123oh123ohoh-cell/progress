@@ -990,6 +990,51 @@ app.post("/api/listen/sessions/:id/sync-me", asyncHandler(async (req, res) => {
   }
 }));
 
+// Fetches a URL server-side and pulls out OpenGraph metadata for a link
+// preview card - has to happen server-side since the browser can't fetch
+// arbitrary cross-origin pages itself (CORS). Deliberately dependency-free
+// (plain regex over the raw HTML) rather than pulling in an HTML parser
+// just for this. A short timeout keeps a slow/unresponsive external site
+// from hanging the request.
+app.get("/api/link-preview", asyncHandler(async (req, res) => {
+  const url = (req.query.url || "").toString();
+  if (!/^https?:\/\//i.test(url)) {
+    return res.status(400).json({ error: "A valid http(s) URL is required." });
+  }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+  try {
+    const pageRes = await fetch(url, {
+      signal: controller.signal,
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; ProgressLinkPreview/1.0)" }
+    });
+    const html = await pageRes.text();
+
+    const metaValue = (attr, key) => {
+      const re1 = new RegExp(`<meta[^>]+${attr}=["']${key}["'][^>]+content=["']([^"']*)["']`, "i");
+      const re2 = new RegExp(`<meta[^>]+content=["']([^"']*)["'][^>]+${attr}=["']${key}["']`, "i");
+      const match = html.match(re1) || html.match(re2);
+      return match ? match[1] : null;
+    };
+
+    const titleTagMatch = html.match(/<title[^>]*>([^<]*)<\/title>/i);
+    const title = metaValue("property", "og:title") || (titleTagMatch ? titleTagMatch[1].trim() : null);
+    const description = metaValue("property", "og:description") || metaValue("name", "description");
+    const image = metaValue("property", "og:image");
+    let siteName = metaValue("property", "og:site_name");
+    if (!siteName) {
+      try { siteName = new URL(url).hostname.replace(/^www\./, ""); } catch (e) { siteName = null; }
+    }
+
+    if (!title && !description && !image) return res.json({ preview: null });
+    res.json({ preview: { title, description, image, siteName, url } });
+  } catch (e) {
+    res.json({ preview: null });
+  } finally {
+    clearTimeout(timeout);
+  }
+}));
+
 app.post("/api/upload-image", asyncHandler(async (req, res) => {
   const { image } = req.body || {};
   if (!image || typeof image !== "string" || !image.startsWith("data:image/")) {
@@ -1161,10 +1206,11 @@ app.post("/api/notifications/mark-seen", asyncHandler(async (req, res) => {
   res.json({ ok: true });
 }));
 
-async function createChatMessage({ room, author, body }) {
+async function createChatMessage({ room, author, body, image }) {
   const targetRoom = (room || DEFAULT_CHAT_ROOM).toString().slice(0, 200);
   const trimmed = (body || "").toString().trim();
-  if (!author || !trimmed) return null;
+  const safeImage = (typeof image === "string" && image.startsWith("https://")) ? image : null;
+  if (!author || (!trimmed && !safeImage)) return null;
   if (!canAccessRoom(targetRoom, author)) return null;
   if (await isUsernameBanned(author)) return null;
   const message = {
@@ -1172,6 +1218,7 @@ async function createChatMessage({ room, author, body }) {
     room: targetRoom,
     author,
     body: trimmed.slice(0, 2000),
+    image: safeImage,
     time: new Date().toISOString()
   };
   await db.collection("messages").insertOne(message);
@@ -1228,10 +1275,18 @@ app.get("/api/chat/conversations", asyncHandler(async (req, res) => {
     const participants = dmParticipants(room);
     const withUsername = participants.find(p => p !== username) || participants[0];
     const lastDocs = await db.collection("messages").find({ room }).sort({ time: -1 }).limit(1).toArray();
+    const readDoc = await db.collection("chatReadState").findOne({ _id: `${username}:${room}` });
+    const lastReadAt = readDoc ? readDoc.lastReadAt : null;
+    const unreadCount = await db.collection("messages").countDocuments({
+      room,
+      author: { $ne: username },
+      ...(lastReadAt ? { time: { $gt: lastReadAt } } : {})
+    });
     return {
       room,
       with: withUsername,
-      lastMessage: lastDocs[0] ? normalizeChatMessage(lastDocs[0]) : null
+      lastMessage: lastDocs[0] ? normalizeChatMessage(lastDocs[0]) : null,
+      unreadCount
     };
   }));
   conversations.sort((a, b) => {
@@ -1242,9 +1297,23 @@ app.get("/api/chat/conversations", asyncHandler(async (req, res) => {
   res.json(conversations);
 }));
 
+// Called when someone actually opens/views a conversation - records "now"
+// as their last-read point for that room, so unread counts on future
+// /api/chat/conversations calls only count messages after this moment.
+app.post("/api/chat/mark-read", asyncHandler(async (req, res) => {
+  const { username, room } = req.body || {};
+  if (!username || !room) return res.status(400).json({ error: "username and room are required" });
+  await db.collection("chatReadState").updateOne(
+    { _id: `${username}:${room}` },
+    { $set: { username, room, lastReadAt: new Date().toISOString() } },
+    { upsert: true }
+  );
+  res.status(204).end();
+}));
+
 app.post("/api/chat/messages", asyncHandler(async (req, res) => {
   const message = await createChatMessage(req.body);
-  if (!message) return res.status(400).json({ error: "author and body are required" });
+  if (!message) return res.status(400).json({ error: "author and (body or image) are required" });
   res.status(201).json(message);
 }));
 
@@ -1310,7 +1379,7 @@ connect()
           return;
         }
         if (data.type === "send") {
-          createChatMessage({ room: ws.room, author: ws.username, body: data.body }).catch(err => {
+          createChatMessage({ room: ws.room, author: ws.username, body: data.body, image: data.image }).catch(err => {
             console.error("Chat message failed:", err);
           });
         } else if (data.type === "typing") {
