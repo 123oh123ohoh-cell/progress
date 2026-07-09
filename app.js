@@ -983,6 +983,17 @@ function openPresenceSocket(activePage) {
     // with NS_ERROR_WEBSOCKET... every request.
     const wsBase = API_BASE.replace(/^http/, "ws");
     presenceSocket = new WebSocket(`${wsBase}/ws/chat?username=${encodeURIComponent(user.username)}&room=presence`);
+    // The server already broadcasts a "presence" message to everyone in
+    // this room the instant anyone connects/disconnects - re-dispatch that
+    // as a plain DOM event so any page (e.g. user.html) can react to it
+    // immediately, instead of relying purely on a polling interval.
+    presenceSocket.addEventListener("message", (event) => {
+      let data;
+      try { data = JSON.parse(event.data); } catch (e) { return; }
+      if (data.type === "global-presence") {
+        document.dispatchEvent(new CustomEvent("presence-update", { detail: data.online || [] }));
+      }
+    });
     window.addEventListener("beforeunload", () => {
       try { presenceSocket.close(); } catch (e) {}
     });
