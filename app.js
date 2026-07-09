@@ -463,11 +463,6 @@ function renderEmoticonsText(text, cssClass = "inline-emoticon") {
   return renderEmoticonsInHTML(escapeHTML(text || ""), cssClass);
 }
 
-// Wraps @username mentions in a link to that user's profile, but ONLY when
-// the username actually matches a real registered user - a stray "@foo"
-// that isn't anyone's account is left as plain text, so the underline
-// specifically signals "this mention actually went through" rather than
-// styling every @-prefixed word regardless of whether it's a real user.
 function renderMentionsInHTML(html, cssClass = "mention-link") {
   if (!html) return "";
 
@@ -498,7 +493,7 @@ function renderMentionsInHTML(html, cssClass = "mention-link") {
       const full = match[0];
       const username = (match[1] || "").toLowerCase();
       const mentionedUser = Progress.getUser(username);
-      if (!mentionedUser) continue; // not a real user - leave the text as-is
+      if (!mentionedUser) continue;
 
       if (match.index > lastIndex) {
         frag.appendChild(document.createTextNode(raw.slice(lastIndex, match.index)));
@@ -914,11 +909,6 @@ function attachNavScrollWatcher() {
   updateNav();
 }
 
-/* Call this once per page after DOM is ready */
-// Blanks out the page's <main> content with a locked-account notice and
-// makes the top nav visually present but fully non-interactive. Safe to
-// call repeatedly (checks if the screen is already there) and deliberately
-// does NOT touch anything else - the person can only reach the appeal link.
 function applyLockedOverlayIfNeeded() {
   const user = Progress.getCurrentUser();
   if (!user || !user.locked) return;
@@ -937,31 +927,8 @@ function applyLockedOverlayIfNeeded() {
   }
 }
 
-// Separate, independent ban overlay - its own body class (account-banned)
-// and its own screen marker class (banned-screen) so it never gets
-// confused with or clobbered by the unrelated lock overlay above. Returns
-// true/false so callers can decide whether to also check the lock overlay
-// (a banned account takes priority and skips the lock check entirely).
-// Separate, independent ban overlay - its own body class (account-banned)
-// and its own screen marker class (banned-screen) so it never gets
-// confused with or clobbered by the unrelated lock overlay above.
-//
-// Deliberately does NOT trust the cached Progress.getCurrentUser().banned
-// value alone - if someone was already logged in on a device when an admin
-// banned them, their local session never picked up that change, and would
-// otherwise slip straight past this check with a stale banned: false. This
-// always re-confirms directly against the server first.
 let bannedMainObserver = null;
 
-// Individual pages (post.html especially) re-render their own content into
-// <main> on their own independent timers - e.g. once immediately, then
-// again after their own data refresh completes. That second re-render can
-// fire AFTER this overlay has already gone up and silently overwrite it
-// with the real page content again, since nothing was stopping it from
-// touching <main>. A MutationObserver makes this unconditional: once
-// applied, ANY future change to <main>'s children (from any page's script,
-// at any time) gets instantly replaced back with the banned screen, so
-// there's no timing race left to lose.
 function lockMainToBannedScreen() {
   const main = document.querySelector("main");
   if (!main) return;
@@ -996,17 +963,38 @@ async function applyBannedOverlayIfNeeded() {
   return true;
 }
 
+// Discord-style presence: a single persistent WebSocket connection, opened
+// once per page and held open the whole time someone's on the site. Being
+// "online" is defined purely by that connection existing - no periodic
+// pings, no polling on the write side, nothing repeated at all. The
+// connection joins a dedicated "presence" room that never carries actual
+// chat traffic, so it stays idle except for the connect/disconnect signal
+// itself. Skipped on chat.html, which already opens its own connection for
+// real chat - no need for a second, redundant one there.
+let presenceSocket = null;
+function openPresenceSocket(activePage) {
+  if (activePage === "chat") return;
+  const user = Progress.getCurrentUser();
+  if (!user) return;
+  try {
+    const wsProtocol = location.protocol === "https:" ? "wss:" : "ws:";
+    presenceSocket = new WebSocket(`${wsProtocol}//${location.host}/ws/chat?username=${encodeURIComponent(user.username)}&room=presence`);
+    window.addEventListener("beforeunload", () => {
+      try { presenceSocket.close(); } catch (e) {}
+    });
+  } catch (e) {
+    // If this fails for any reason, the page still works fine - presence
+    // just won't reflect while this connection is unavailable.
+  }
+}
+
 function initShell(activePage) {
   setDeviceMode();
   window.addEventListener("resize", setDeviceMode);
   renderNav(activePage);
   mountModals();
   attachNavScrollWatcher();
-  // Fires immediately - the network round-trip to confirm ban status
-  // against the server already takes longer than the current page's own
-  // synchronous render call (e.g. index.html calling renderFeed() right
-  // after initShell()), so by the time this resolves and overwrites <main>,
-  // it reliably wins over whatever that page just put there.
+  openPresenceSocket(activePage);
   (async () => {
     const banned = await applyBannedOverlayIfNeeded();
     if (!banned) applyLockedOverlayIfNeeded();
