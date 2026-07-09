@@ -211,6 +211,13 @@
         renderPresence(data.users);
       } else if (data.type === "typing") {
         showTypingHint(data.username);
+      } else if (data.type === "dm-notify") {
+        // Pushed directly to this connection regardless of which room
+        // it's subscribed to - if it's for a different conversation than
+        // the one currently open, refresh the sidebar right away so the
+        // unread badge appears instantly instead of waiting for the next
+        // room switch.
+        if (data.room !== currentRoom) loadSidebar();
       }
     });
 
@@ -268,19 +275,37 @@
     }
   }
 
-  async function sendImageMessage(file) {
+  let pendingChatImageUrl = null;
+
+  function clearStagedImage() {
+    pendingChatImageUrl = null;
+    const staged = document.getElementById("chatImageStaged");
+    if (staged) staged.innerHTML = "";
+  }
+
+  async function stageChatImage(file) {
+    const staged = document.getElementById("chatImageStaged");
+    if (!staged) return;
+    staged.innerHTML = `<div class="chat-image-staged-loading">Uploading&hellip;</div>`;
     const reader = new FileReader();
     reader.onload = async () => {
-      showToast("Uploading image\u2026");
       const uploaded = await apiFetch("/api/upload-image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ image: reader.result })
       });
       if (uploaded && uploaded.url) {
-        sendMessage("", uploaded.url);
+        pendingChatImageUrl = uploaded.url;
+        staged.innerHTML = `
+          <div class="chat-image-staged-card">
+            <img src="${uploaded.url}" alt="">
+            <button type="button" class="chat-image-staged-remove" id="chatImageStagedRemove" aria-label="Remove image">&times;</button>
+          </div>`;
+        const removeBtn = document.getElementById("chatImageStagedRemove");
+        if (removeBtn) removeBtn.addEventListener("click", clearStagedImage);
       } else {
         showToast("Could not upload that image. Try again.");
+        staged.innerHTML = "";
       }
     };
     reader.readAsDataURL(file);
@@ -295,7 +320,7 @@
           <span class="chat-room-label">${escapeHTML(label)}</span>
           ${sub ? `<span class="chat-room-sub">${sub}</span>` : ""}
         </span>
-        ${unreadCount ? `<span class="chat-unread-badge">${unreadCount > 9 ? "9+" : unreadCount}</span>` : ""}
+        ${unreadCount ? `<span class="chat-unread-badge"></span>` : ""}
       </button>`;
   }
 
@@ -508,6 +533,7 @@
             <div class="chat-empty">Loading…</div>
           </div>
           <div class="chat-typing" id="chatTyping"></div>
+          <div class="chat-image-staged" id="chatImageStaged"></div>
           <form class="chat-input-row" id="chatForm">
             <div class="emoji-picker chat-emoji-picker" id="chatEmojiPicker"></div>
             <button type="button" class="chat-emoji-btn" id="chatEmojiBtn" aria-label="Insert sticker" title="Stickers">🐱</button>
@@ -523,8 +549,9 @@
     document.getElementById("chatForm").addEventListener("submit", (e) => {
       e.preventDefault();
       const input = document.getElementById("chatInput");
-      sendMessage(input.value);
+      sendMessage(input.value, pendingChatImageUrl);
       input.value = "";
+      clearStagedImage();
       closeChatEmojiPicker();
     });
 
@@ -533,7 +560,7 @@
     });
     document.getElementById("chatImageInput").addEventListener("change", (e) => {
       const file = e.target.files && e.target.files[0];
-      if (file) sendImageMessage(file);
+      if (file) stageChatImage(file);
       e.target.value = "";
     });
 

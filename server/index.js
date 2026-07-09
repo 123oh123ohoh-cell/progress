@@ -1240,6 +1240,17 @@ async function createChatMessage({ room, author, body, image }) {
           time: new Date().toISOString(),
           seen: false
         });
+        // Sent straight to the recipient's own connections (not a
+        // room broadcast) - this is what lets their sidebar bump the
+        // unread badge the instant a DM lands, even while they're
+        // sitting in Global or a completely different conversation.
+        const recipientConnections = usernameConnections.get(recipient);
+        if (recipientConnections) {
+          const payload = JSON.stringify({ type: "dm-notify", room: targetRoom, from: author });
+          for (const conn of recipientConnections) {
+            if (conn.readyState === conn.OPEN) conn.send(payload);
+          }
+        }
       }
     } else {
       await notifyMentionedUsers({ text: message.body, author, context: { room: targetRoom } });
