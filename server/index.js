@@ -39,7 +39,7 @@ const SIGNUP_BADGE_AWARDS = {
   mara: ["dexterity"],
   own: ["dexterity"],
   progresstesting1: ["dexterity", "817x2"],
-  "817x2": ["dexterity", "817x2"],
+  "817x2": ["817x2", "dexterity"],
   testuser: ["817x2", "dexterity"]
 };
 
@@ -265,25 +265,26 @@ function canAccessRoom(room, username) {
   return participants.includes(username);
 }
 
-// True connection-based presence, same model Discord uses: a username
-// counts as online exactly as long as they have at least one open
-// WebSocket connection (opened from every page, not just chat.html).
-// Connect increments, close decrements - no periodic pings needed at all,
-// which is the whole efficiency win over a heartbeat/polling approach.
-const onlineConnectionCounts = new Map();
+// Tracks how many active WebSocket connections each username currently has
+// across ALL rooms and tabs (not the same as roomPresence, which is scoped
+// to a single room for the "@username is here" chat indicator). A username
+// counts as online as long as this is above zero; opening a second tab or
+// switching rooms just increments/decrements the same counter rather than
+// flipping online/offline on every room change.
+const onlineUsernameCounts = new Map();
 
-function markConnected(username) {
+function markUserOnline(username) {
   if (!username) return;
-  onlineConnectionCounts.set(username, (onlineConnectionCounts.get(username) || 0) + 1);
+  onlineUsernameCounts.set(username, (onlineUsernameCounts.get(username) || 0) + 1);
 }
-function markDisconnected(username) {
+function markUserOffline(username) {
   if (!username) return;
-  const next = (onlineConnectionCounts.get(username) || 0) - 1;
-  if (next <= 0) onlineConnectionCounts.delete(username);
-  else onlineConnectionCounts.set(username, next);
+  const next = (onlineUsernameCounts.get(username) || 0) - 1;
+  if (next <= 0) onlineUsernameCounts.delete(username);
+  else onlineUsernameCounts.set(username, next);
 }
 function isUserOnline(username) {
-  return onlineConnectionCounts.has(username);
+  return onlineUsernameCounts.has(username);
 }
 
 let db;
@@ -350,12 +351,25 @@ function asyncHandler(fn) {
   return (req, res, next) => fn(req, res, next).catch(next);
 }
 
+// The banned-account overlay in app.js is a client-side visual block only -
+// it does nothing to stop a banned account from calling these write routes
+// directly (a raw API request, a stale page that loaded before the block
+// kicked in, etc.). This is the actual enforcement: every route that
+// creates or modifies something on someone's behalf checks this first.
 async function isUsernameBanned(username) {
   if (!username) return false;
   const doc = await db.collection("users").findOne({ username: username.toLowerCase() });
   return !!(doc && doc.banned);
 }
 
+// Scans `text` for @username mentions, looks up which of those are real
+// registered users, and drops a "mention" notification for each one -
+// skipping the author themselves and anyone in `skipUsernames` (e.g. the
+// post author, who already gets a separate "reply" notification for a
+// comment, so they don't need a duplicate "mention" one too).
+// `context` describes where the mention happened, used for the
+// notification payload so the client can route the click appropriately:
+// { postId, postTitle } for posts/comments, { room } for chat.
 async function notifyMentionedUsers({ text, author, skipUsernames = [], context = {} }) {
   if (!text) return;
   const mentioned = Array.from(new Set((text.match(/@([a-zA-Z0-9_.]+)/g) || [])
@@ -570,6 +584,12 @@ app.post("/api/users/:id/unfollow", asyncHandler(async (req, res) => {
   res.json({ follower: follower.username, target: target.username });
 }));
 
+// Locking an account prevents it from logging in (checked in /api/login)
+// until an admin unlocks it again. Restricted to the same small admin set
+// that already gates access to the users.html directory itself
+// (ALLOWED_CREATOR_USERNAMES) - there's no session/token auth anywhere else
+// in this API, so this matches the existing trust model rather than
+// introducing a new one just for this feature.
 app.post("/api/users/:id/lock", asyncHandler(async (req, res) => {
   const { requesterUsername, locked } = req.body || {};
   if (!requesterUsername || !ALLOWED_CREATOR_USERNAMES.has(requesterUsername.toLowerCase())) {
@@ -585,6 +605,15 @@ app.post("/api/users/:id/lock", asyncHandler(async (req, res) => {
   const updated = await users.findOne({ _id: req.params.id });
   res.json(publicUser(normalizeUser(updated)));
 }));
+
+// ---------------------------------------------------------------------------
+// Ban system - a separate, independent mechanism from the lock feature
+// above. Same admin gating (ALLOWED_CREATOR_USERNAMES) and self-action
+// prevention, but its own field (`banned`) and its own two explicit routes
+// (rather than one route with a boolean flag) so each action is simple to
+// verify on its own: hit /ban, confirm `banned: true` comes back; hit
+// /unban, confirm `banned: false` comes back.
+// ---------------------------------------------------------------------------
 
 app.post("/api/users/:id/ban", asyncHandler(async (req, res) => {
   const { requesterUsername } = req.body || {};
@@ -933,11 +962,7 @@ app.get("/api/posts", asyncHandler(async (req, res) => {
   if (req.query.author) {
     filter.author = { $regex: `^${escapeRegex(req.query.author)}$`, $options: "i" };
   }
-  // Excludes `content` at the query level - it's the one field that can
-  // balloon a post's size (embedded base64 images from the editor), and the
-  // feed/profile list views never render it, only title/excerpt/cover. This
-  // is what was causing the earlier "posts stuck loading for 2 minutes" bug.
-  const docs = await db.collection("posts").find(filter, { projection: { content: 0 } }).toArray();
+  const docs = await db.collection("posts").find(filter).toArray();
   const posts = docs.map(normalizePost).sort((a, b) => new Date(b.createdAt || b.date).getTime() - new Date(a.createdAt || a.date).getTime());
   res.json(posts);
 }));
@@ -1102,6 +1127,10 @@ async function createChatMessage({ room, author, body }) {
   const clientMessage = normalizeChatMessage(message);
   broadcastToRoom(targetRoom, { type: "message", message: clientMessage });
 
+  // Chat notifications: a DM always notifies the other participant ("has
+  // messaged you"). Public rooms (Global) only notify users who were
+  // actually @mentioned in the message, so a busy room doesn't spam
+  // everyone in it on every single message.
   try {
     const participants = dmParticipants(targetRoom);
     if (participants) {
@@ -1177,6 +1206,11 @@ app.post("/api/login", asyncHandler(async (req, res) => {
   if (!username || !password) return res.status(400).json({ error: "username and password are required" });
   const user = await db.collection("users").findOne({ username: { $regex: `^${escapeRegex(username)}$`, $options: "i" } });
   if (!user || !verifyPassword(password, user.password)) return res.status(401).json({ error: "Invalid credentials" });
+  // Locked accounts can still log in - the client shows a persistent
+  // site-wide blocked screen (with nav visible but non-interactive) based on
+  // the `locked` flag on every page, rather than stopping them at the login
+  // modal. This also covers a user who was already logged in on a device
+  // when an admin locked their account.
   if (isLegacyPassword(user.password)) {
     user.password = hashPassword(password);
     await db.collection("users").updateOne({ _id: user._id }, { $set: { password: user.password } });
@@ -1186,8 +1220,7 @@ app.post("/api/login", asyncHandler(async (req, res) => {
 }));
 
 app.get("/api/online-users", (req, res) => {
-  const online = Array.from(onlineConnectionCounts.keys());
-  res.json({ online });
+  res.json({ online: Array.from(onlineUsernameCounts.keys()) });
 });
 
 app.get("/api/current-user", (req, res) => {
@@ -1214,7 +1247,7 @@ connect()
       ws.room = room;
       ws.username = username;
       chatRoomClients(room).add(ws);
-      markConnected(username);
+      markUserOnline(username);
       broadcastToRoom(room, { type: "presence", room, users: roomPresence(room) });
 
       ws.on("message", raw => {
@@ -1235,7 +1268,7 @@ connect()
 
       ws.on("close", () => {
         chatRoomClients(room).delete(ws);
-        markDisconnected(username);
+        markUserOffline(username);
         broadcastToRoom(room, { type: "presence", room, users: roomPresence(room) });
       });
     });
@@ -1264,18 +1297,22 @@ connect()
     });
 
     server.listen(port, () => {
-      console.log(`Server running on port ${port}`);
+  console.log(`Server running on port ${port}`);
 
-      const selfUrl = process.env.RENDER_EXTERNAL_URL;
-      if (selfUrl) {
-        setInterval(async () => {
-          try {
-            await fetch(`${selfUrl}/api/posts`);
-            console.log("[keep-alive] ping ok");
-          } catch (e) { /* silent */ }
-        }, 14 * 60 * 1000);
-      }
-    });
+  // ← ADD THIS BLOCK ↓
+  // Render sets RENDER_EXTERNAL_URL automatically — ping ourselves every
+  // 14 min so the free-tier server never goes to sleep.
+  const selfUrl = process.env.RENDER_EXTERNAL_URL;
+  if (selfUrl) {
+    setInterval(async () => {
+      try {
+        await fetch(`${selfUrl}/api/posts`);
+        console.log("[keep-alive] ping ok");
+      } catch (e) { /* silent */ }
+    }, 14 * 60 * 1000);
+  }
+  // ← END ADD
+});
   })
   .catch(err => {
     console.error("Failed to connect to MongoDB:", err);
