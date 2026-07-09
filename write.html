@@ -31,7 +31,6 @@
     Progress.loadFromApi().catch(() => {});
     const user = Progress.getCurrentUser();
     let coverData = null;
-    let pendingImageUploads = 0;
 
     if (!user) {
       wrap.innerHTML = `
@@ -87,24 +86,9 @@
       const file = coverInput.files[0];
       if (!file) return;
       const reader = new FileReader();
-      reader.onload = async () => {
-        const localPreview = reader.result;
-        coverDrop.innerHTML = `<img src="${localPreview}" alt=""><div style="font-size:12px; color:var(--muted); margin-top:8px;">Uploading&hellip;</div>`;
-        pendingImageUploads++;
-        const uploaded = await apiFetch("/api/upload-image", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ image: localPreview })
-        });
-        pendingImageUploads--;
-        if (uploaded && uploaded.url) {
-          coverData = uploaded.url;
-          coverDrop.innerHTML = `<img src="${uploaded.url}" alt="">`;
-        } else {
-          showToast("Could not upload cover image. Try again.");
-          coverData = null;
-          coverDrop.innerHTML = `<div class="cover-hint">Click to add a cover image (optional)</div>`;
-        }
+      reader.onload = () => {
+        coverData = reader.result;
+        coverDrop.innerHTML = `<img src="${coverData}" alt="">`;
       };
       reader.readAsDataURL(file);
     });
@@ -131,26 +115,9 @@
       const file = imageInput.files[0];
       if (!file) return;
       const reader = new FileReader();
-      reader.onload = async () => {
+      reader.onload = () => {
         document.getElementById("canvas").focus();
-        const placeholderId = "img-upload-" + Date.now() + Math.random().toString(36).slice(2, 7);
-        document.execCommand("insertHTML", false, `<img id="${placeholderId}" src="${reader.result}" style="opacity:0.5;">`);
-        pendingImageUploads++;
-        const uploaded = await apiFetch("/api/upload-image", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ image: reader.result })
-        });
-        pendingImageUploads--;
-        const placeholderImg = document.getElementById(placeholderId);
-        if (uploaded && uploaded.url && placeholderImg) {
-          placeholderImg.src = uploaded.url;
-          placeholderImg.style.opacity = "";
-          placeholderImg.removeAttribute("id");
-        } else if (placeholderImg) {
-          showToast("Could not upload that image. Try again.");
-          placeholderImg.remove();
-        }
+        document.execCommand("insertImage", false, reader.result);
       };
       reader.readAsDataURL(file);
       imageInput.value = "";
@@ -189,7 +156,6 @@
     });
 
     document.getElementById("publishBtn").addEventListener("click", async () => {
-      if (pendingImageUploads > 0) { showToast("Still uploading an image - one sec, then try again."); return; }
       const title = document.getElementById("titleInput").value.trim();
       const content = document.getElementById("canvas").innerHTML.trim();
       if (!title) { showToast("Give your entry a title first."); return; }

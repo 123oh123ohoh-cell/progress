@@ -24,46 +24,6 @@ const DEFAULT_CHAT_ROOM = "global";
 const SPOTIFY_LINK_RE = /^(?:https:\/\/open\.spotify\.com\/(?:intl-[a-zA-Z-]+\/)?(?:track|album|playlist|artist|episode|show)\/[a-zA-Z0-9]+(?:\?[^\s]*)?|spotify:(?:track|album|playlist|artist|episode|show):[a-zA-Z0-9]+)$/i;
 
 const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID || "";
-
-const CLOUDINARY_CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME || "";
-const CLOUDINARY_API_KEY = process.env.CLOUDINARY_API_KEY || "";
-const CLOUDINARY_API_SECRET = process.env.CLOUDINARY_API_SECRET || "";
-
-// Uploads a base64 data URI to Cloudinary and returns the hosted URL.
-// Signed server-side (not an unsigned upload preset) so the API secret
-// never has to be exposed to the browser - the client sends us the raw
-// image, we forward it to Cloudinary ourselves and hand back just a URL.
-// This is what actually fixes the payload-bloat problem: once a post
-// stores a short Cloudinary URL instead of a multi-MB embedded base64
-// string, /api/posts stays small no matter how many images get published.
-async function uploadImageToCloudinary(base64DataUri) {
-  if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_API_KEY || !CLOUDINARY_API_SECRET) {
-    throw new Error("Cloudinary is not configured on this server yet.");
-  }
-  const timestamp = Math.round(Date.now() / 1000);
-  // Cloudinary's signature is a SHA-1 hash over every param being sent
-  // (except file/api_key/cloud_name/signature itself), sorted alphabetically,
-  // with the API secret appended - here that's just `timestamp`.
-  const signature = crypto.createHash("sha1").update(`timestamp=${timestamp}${CLOUDINARY_API_SECRET}`).digest("hex");
-
-  const body = new URLSearchParams();
-  body.set("file", base64DataUri);
-  body.set("api_key", CLOUDINARY_API_KEY);
-  body.set("timestamp", String(timestamp));
-  body.set("signature", signature);
-
-  const uploadRes = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: body.toString()
-  });
-  if (!uploadRes.ok) {
-    const errText = await uploadRes.text().catch(() => "");
-    throw new Error(`Cloudinary upload failed: ${uploadRes.status} ${errText}`);
-  }
-  const data = await uploadRes.json();
-  return data.secure_url;
-}
 const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET || "";
 const SPOTIFY_REDIRECT_URI = process.env.SPOTIFY_REDIRECT_URI || "http://127.0.0.1:3000/api/spotify/callback";
 const SPOTIFY_SCOPES = "user-read-currently-playing user-read-private user-read-playback-state user-modify-playback-state";
@@ -305,50 +265,35 @@ function canAccessRoom(room, username) {
   return participants.includes(username);
 }
 
-// Connection-based presence, same model Discord uses - but now tracks
-// individual connections (not just a count) so each one can report
-// whether its tab is currently focused (Page Visibility API on the
-// client). Someone with multiple tabs open only needs ONE of them
-// focused to count as "online" - if all their open tabs are backgrounded,
-// they show as "idle" instead of "offline", since the site is still open
-// somewhere, just not being actively looked at right now.
-const usernameConnections = new Map(); // username -> Set of ws connections
+// True connection-based presence, same model Discord uses: a username
+// counts as online exactly as long as they have at least one open
+// WebSocket connection (opened from every page, not just chat.html).
+// Connect increments, close decrements - no periodic pings needed at all,
+// which is the whole efficiency win over a heartbeat/polling approach.
+const onlineConnectionCounts = new Map();
 
-function addUserConnection(username, ws) {
+function markConnected(username) {
   if (!username) return;
-  let set = usernameConnections.get(username);
-  if (!set) { set = new Set(); usernameConnections.set(username, set); }
-  set.add(ws);
+  onlineConnectionCounts.set(username, (onlineConnectionCounts.get(username) || 0) + 1);
 }
-function removeUserConnection(username, ws) {
+function markDisconnected(username) {
   if (!username) return;
-  const set = usernameConnections.get(username);
-  if (!set) return;
-  set.delete(ws);
-  if (set.size === 0) usernameConnections.delete(username);
-}
-function getUserPresenceStatus(username) {
-  const set = usernameConnections.get(username);
-  if (!set || set.size === 0) return "offline";
-  for (const ws of set) {
-    if (ws.isActiveTab !== false) return "online";
-  }
-  return "idle";
+  const next = (onlineConnectionCounts.get(username) || 0) - 1;
+  if (next <= 0) onlineConnectionCounts.delete(username);
+  else onlineConnectionCounts.set(username, next);
 }
 function isUserOnline(username) {
-  return getUserPresenceStatus(username) !== "offline";
+  return onlineConnectionCounts.has(username);
 }
 
-// Fires on every connect/disconnect/activity-change anywhere on the site.
-// Sent to the "presence" room specifically (the one non-chat pages join),
-// carrying every currently-tracked username's status - "online" or "idle"
-// (fully offline usernames are just omitted, keeping the payload small).
+// Fires on every single connect/disconnect anywhere on the site (not just
+// within one room) - sent only to clients in the "presence" room (the one
+// non-chat pages open), carrying the FULL global online list. This is what
+// lets user.html update instantly rather than waiting on a poll, and fixes
+// the gap where someone connected via chat.html's own room wouldn't show up
+// in a room-scoped broadcast at all.
 function broadcastGlobalPresenceUpdate() {
-  const statuses = {};
-  for (const username of usernameConnections.keys()) {
-    statuses[username] = getUserPresenceStatus(username);
-  }
-  broadcastToRoom("presence", { type: "global-presence", statuses });
+  broadcastToRoom("presence", { type: "global-presence", online: Array.from(onlineConnectionCounts.keys()) });
 }
 
 let db;
@@ -993,20 +938,6 @@ app.post("/api/listen/sessions/:id/sync-me", asyncHandler(async (req, res) => {
   }
 }));
 
-app.post("/api/upload-image", asyncHandler(async (req, res) => {
-  const { image } = req.body || {};
-  if (!image || typeof image !== "string" || !image.startsWith("data:image/")) {
-    return res.status(400).json({ error: "A base64 image data URI is required." });
-  }
-  try {
-    const url = await uploadImageToCloudinary(image);
-    res.json({ url });
-  } catch (e) {
-    console.error("Image upload failed:", e);
-    res.status(502).json({ error: "Could not upload image. Try again." });
-  }
-}));
-
 app.get("/api/posts", asyncHandler(async (req, res) => {
   const filter = {};
   if (req.query.author) {
@@ -1266,11 +1197,8 @@ app.post("/api/login", asyncHandler(async (req, res) => {
 
 app.get("/api/online-users", (req, res) => {
   res.setHeader("Cache-Control", "no-store");
-  const statuses = {};
-  for (const username of usernameConnections.keys()) {
-    statuses[username] = getUserPresenceStatus(username);
-  }
-  res.json({ statuses, online: Object.keys(statuses) });
+  const online = Array.from(onlineConnectionCounts.keys());
+  res.json({ online });
 });
 
 app.get("/api/current-user", (req, res) => {
@@ -1296,12 +1224,8 @@ connect()
     wss.on("connection", (ws, req, { room, username }) => {
       ws.room = room;
       ws.username = username;
-      // Assume active/foreground on connect - the client sends its real
-      // Page Visibility state moments after opening the socket, correcting
-      // this immediately if the tab actually started out backgrounded.
-      ws.isActiveTab = true;
       chatRoomClients(room).add(ws);
-      addUserConnection(username, ws);
+      markConnected(username);
       broadcastToRoom(room, { type: "presence", room, users: roomPresence(room) });
       broadcastGlobalPresenceUpdate();
 
@@ -1318,18 +1242,12 @@ connect()
           });
         } else if (data.type === "typing") {
           broadcastToRoom(ws.room, { type: "typing", room: ws.room, username: ws.username });
-        } else if (data.type === "activity") {
-          // Sent whenever the client's document.hidden changes (tab
-          // switched away from / back to). Doesn't touch chat at all -
-          // purely updates this connection's contribution to presence.
-          ws.isActiveTab = !!data.active;
-          broadcastGlobalPresenceUpdate();
         }
       });
 
       ws.on("close", () => {
         chatRoomClients(room).delete(ws);
-        removeUserConnection(username, ws);
+        markDisconnected(username);
         broadcastToRoom(room, { type: "presence", room, users: roomPresence(room) });
         broadcastGlobalPresenceUpdate();
       });

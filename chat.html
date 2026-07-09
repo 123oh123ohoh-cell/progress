@@ -495,7 +495,7 @@
       btn.addEventListener("mouseenter", () => {
         tooltip.innerHTML = `
           <img src="images/emoticons/${name}.png" alt="${name}">
-          <div class="emoji-tooltip-label${name.length > 10 ? " long-name" : ""}">:${name}:</div>
+          <div class="emoji-tooltip-label">:${name}:</div>
         `;
         tooltip.classList.remove("hidden");
         const rect = btn.getBoundingClientRect();

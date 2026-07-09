@@ -231,7 +231,7 @@
         element.addEventListener("mouseenter", () => {
           emojiTooltip.innerHTML = `
             <img src="images/emoticons/${name}.png" alt="${name}">
-            <div class="emoji-tooltip-label${name.length > 10 ? " long-name" : ""}">:${name}:</div>
+            <div class="emoji-tooltip-label">:${name}:</div>
           `;
           emojiTooltip.classList.toggle("small", small);
           emojiTooltip.classList.remove("hidden");
