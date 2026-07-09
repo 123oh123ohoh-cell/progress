@@ -131,14 +131,12 @@ async function refreshNowPlaying() {
 refreshNowPlaying();
 setInterval(refreshNowPlaying, 30000); // Refresh every 30 seconds
 
-function setOnlineStatus(isOnline) {
+function applyOnlineStatus(onlineList) {
   const el = document.getElementById("onlineIndicator");
   const textEl = document.getElementById("onlineStatusText");
-
-  if (el) {
-    el.classList.toggle("online", isOnline);
-  }
-
+  if (!el && !textEl) return;
+  const isOnline = Array.isArray(onlineList) && onlineList.includes(user.username);
+  if (el) el.classList.toggle("online", isOnline);
   if (textEl) {
     textEl.innerHTML = isOnline
       ? `<span class="online-dot online"></span><span class="online-label online">Online</span>`
@@ -146,14 +144,24 @@ function setOnlineStatus(isOnline) {
   }
 }
 
-(async () => {
+async function refreshOnlineStatus() {
   try {
-    const result = await apiFetch("/api/online-users");
-    setOnlineStatus(
-      result?.online?.includes(user.username)
-    );
-  } catch {}
-})();
+    const result = await apiFetch("/api/online-users", { cache: "no-store" });
+    applyOnlineStatus(result && result.online);
+  } catch (e) {
+    applyOnlineStatus([]);
+  }
+}
+
+// Real-time: the moment anyone's connection actually changes anywhere on
+// the site, the server pushes the fresh online list straight to this page
+// over the presence WebSocket (opened in app.js's initShell) - no need to
+// wait for the next poll. The poll below still runs as a slower fallback,
+// in case the WebSocket connection drops for some reason.
+document.addEventListener("presence-update", (e) => applyOnlineStatus(e.detail));
+
+refreshOnlineStatus();
+setInterval(refreshOnlineStatus, 20000); // Fallback poll, now that push handles the real-time case
 
     (async () => {
       const result = await apiFetch(`/api/posts?author=${encodeURIComponent(user.username)}`);
@@ -207,33 +215,6 @@ function setOnlineStatus(isOnline) {
 
     renderPublicProfile(effectiveUser);
     attachBadgeTooltip(root);
-    const currentUser = Progress.getCurrentUser();
-
-if (currentUser) {
-  const protocol = location.protocol === "https:" ? "wss" : "ws";
-
-  const ws = new WebSocket(
-    `${protocol}://${location.host}/ws/chat?room=global&username=${encodeURIComponent(currentUser.username)}`
-  );
-
-  ws.onmessage = ({ data }) => {
-    let msg;
-
-    try {
-      msg = JSON.parse(data);
-    } catch {
-      return;
-    }
-
-    if (msg.type === "user-online" && msg.username === effectiveUser.username) {
-      setOnlineStatus(true);
-    }
-
-    if (msg.type === "user-offline" && msg.username === effectiveUser.username) {
-      setOnlineStatus(false);
-    }
-  };
-}
   }
 
   start();
