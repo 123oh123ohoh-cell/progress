@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;1,500;1,600&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
-<script>(function(){try{if(localStorage.getItem("progressTheme")==="dark")document.documentElement.setAttribute("data-theme","dark");}catch(e){}})();</script>
+<script>(function(){try{var t=localStorage.getItem("progressTheme");var dark=(t==="dark")||(t!=="light"&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);if(dark)document.documentElement.setAttribute("data-theme","dark");}catch(e){}})();</script>
 </head>
 <body>
 
@@ -226,7 +226,11 @@ refreshNowPlaying();
         <div class="settings-section">
           <h3>Appearance</h3>
           <label style="display:flex; align-items:center; gap:12px; cursor:pointer;">
-            <span class="theme-toggle-switch" id="themeToggleSwitch" data-on="${getStoredTheme() === "dark" ? "1" : "0"}"><span class="theme-toggle-knob"></span></span>
+            <span class="theme-toggle-switch" id="themeToggleSwitch" data-on="${getStoredTheme() === "dark" ? "1" : "0"}">
+              <svg class="theme-toggle-icon sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8L6 18M18 6l1.8-1.8"/></svg>
+              <svg class="theme-toggle-icon moon" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M20.5 14.5A8.5 8.5 0 019.5 3.5 8.5 8.5 0 1020.5 14.5z"/></svg>
+              <span class="theme-toggle-knob"></span>
+            </span>
             <span style="font-size:14px;">Dark mode</span>
           </label>
           <p class="field-note">Saved to this browser - it'll stay set here even if you log in on another device.</p>
@@ -242,6 +246,8 @@ refreshNowPlaying();
         const el = e.currentTarget;
         const nowOn = el.dataset.on !== "1";
         el.dataset.on = nowOn ? "1" : "0";
+        const knob = el.querySelector(".theme-toggle-knob");
+        if (knob) knob.textContent = nowOn ? "🌙" : "☀️";
         setTheme(nowOn ? "dark" : "light");
       });
 

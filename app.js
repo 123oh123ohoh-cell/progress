@@ -882,7 +882,17 @@ const THEME_STORAGE_KEY = "progressTheme";
 // each page's <head> reads this same key before first paint, so there's
 // no flash of the wrong theme while the page loads.
 function getStoredTheme() {
-  try { return localStorage.getItem(THEME_STORAGE_KEY) === "dark" ? "dark" : "light"; } catch (e) { return "light"; }
+  try {
+    const stored = localStorage.getItem(THEME_STORAGE_KEY);
+    if (stored === "dark" || stored === "light") return stored;
+  } catch (e) {}
+  // No explicit choice saved yet - respect the system/browser preference
+  // rather than always defaulting to light for someone whose OS is set
+  // to dark mode.
+  try {
+    if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) return "dark";
+  } catch (e) {}
+  return "light";
 }
 function applyTheme(theme) {
   if (theme === "dark") document.documentElement.setAttribute("data-theme", "dark");
