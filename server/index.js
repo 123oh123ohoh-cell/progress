@@ -1,6 +1,5 @@
 require("dotenv").config();
 const express = require("express");
-const helmet = require("helmet");
 const path = require("path");
 const crypto = require("crypto");
 const http = require("http");
@@ -656,24 +655,30 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(helmet({
-  // This app serves cross-origin embeds (Spotify/YouTube iframes) and
-  // loads Google Fonts, so the strictest defaults would break real
-  // features - configured deliberately rather than just disabling CSP
-  // outright.
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      imgSrc: ["'self'", "data:", "https:"],
-      frameSrc: ["https://open.spotify.com", "https://www.youtube-nocookie.com", "https://www.youtube.com"],
-      connectSrc: ["'self'", "https://progress-351h.onrender.com", "wss://progress-351h.onrender.com"]
-    }
-  },
-  crossOriginEmbedderPolicy: false // would otherwise block the Spotify/YouTube embeds
-}));
+// Security headers as plain res.setHeader() calls rather than the helmet
+// package - this is deliberate: these are universal HTTP concepts, not
+// anything Express-specific, so this same logic ports cleanly to a
+// different backend framework (or even a different language) later,
+// whereas helmet() itself is tied to Express's middleware pattern.
+const CSP_HEADER = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' https://fonts.gstatic.com",
+  "img-src 'self' data: https:",
+  "frame-src https://open.spotify.com https://www.youtube-nocookie.com https://www.youtube.com",
+  "connect-src 'self' https://progress-351h.onrender.com wss://progress-351h.onrender.com"
+].join("; ");
+
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff"); // stop browsers guessing a file's type differently than the server says
+  res.setHeader("X-Frame-Options", "DENY"); // stop this site being embedded in an iframe on someone else's page (clickjacking)
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin"); // don't leak full URLs to third-party sites via the Referer header
+  res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains"); // force HTTPS for a year once a browser's seen it once
+  res.setHeader("Content-Security-Policy", CSP_HEADER); // configured for this app's actual needs (Spotify/YouTube embeds, Google Fonts, the API's own origin) rather than the strictest possible defaults, which would break real features
+  res.removeHeader("X-Powered-By"); // don't advertise "this is Express" to anyone probing the server
+  next();
+});
 
 app.use(express.static(publicPath));
 app.use("/api", generalApiRateLimit);
