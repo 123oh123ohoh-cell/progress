@@ -44,6 +44,17 @@
   --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.25), 0 6px 20px rgba(0, 0, 0, 0.3);
 }
 
+/* A handful of components use a hardcoded rgba() (usually for a
+   translucent blur effect) rather than referencing --cream/--ink
+   directly, so they don't automatically invert the way var()-based rules
+   do - each needs its own explicit dark-mode value here. */
+[data-theme="dark"] .nav { background: rgba(23, 19, 15, 0.92); }
+[data-theme="dark"] .reply-form { background: rgba(32, 26, 21, 0.96); }
+[data-theme="dark"] .bio-preview { background: rgba(23, 19, 15, 0.5); }
+[data-theme="dark"] .post-content blockquote::before,
+[data-theme="dark"] .post-content blockquote::after { color: rgba(241, 231, 219, 0.18); }
+
+
 * { box-sizing: border-box; }
 
 html { scroll-behavior: smooth; }
