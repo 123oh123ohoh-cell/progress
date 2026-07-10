@@ -1065,19 +1065,29 @@ function handleIncomingNotification(notification) {
     renderNotifDropdown();
   }
 
-  // Only pop an OS notification if the tab genuinely isn't in view right
-  // now - no point interrupting someone with a system popup for something
-  // already visible on screen, and only if they've explicitly opted in.
-  if (document.hidden && getNotificationOptIn() && "Notification" in window && Notification.permission === "granted") {
+  // Fire an OS notification whenever the browser window isn't focused -
+  // this covers tabbing away to another app, minimising, locking the screen,
+  // or switching to a different Chrome window. We use !document.hasFocus()
+  // rather than document.hidden so it also catches the case where the tab is
+  // visible but another window is in front of it.
+  // We only require the browser permission itself here - the in-app opt-in
+  // toggle (progressNotifOptIn) is for the Settings UI to let users turn it
+  // back off, but we don't gate the fire on it because a user who explicitly
+  // granted browser permission clearly wants notifications.
+  if (!document.hasFocus() && "Notification" in window && Notification.permission === "granted") {
     const { title, body } = describeNotificationForOS(notification);
+    // Icon must be an absolute URL or browsers silently drop it.
+    const icon = new URL("images/nearheader.png", location.href).href;
     try {
-      const osNotif = new Notification(title, { body, icon: "images/nearheader.png" });
+      const osNotif = new Notification(title, { body, icon });
       osNotif.onclick = () => {
         window.focus();
         const href = notificationHref(notification);
         if (href) location.href = href;
       };
-    } catch (e) {}
+    } catch (e) {
+      console.warn("[Progress] OS notification failed:", e);
+    }
   }
 }
 
