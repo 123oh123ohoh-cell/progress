@@ -1001,6 +1001,76 @@ async function applyBannedOverlayIfNeeded() {
 // itself. Skipped on chat.html, which already opens its own connection for
 // real chat - no need for a second, redundant one there.
 let presenceSocket = null;
+const NOTIF_OPTIN_KEY = "progressNotifOptIn";
+
+function getNotificationOptIn() {
+  try { return localStorage.getItem(NOTIF_OPTIN_KEY) === "true"; } catch (e) { return false; }
+}
+function setNotificationOptIn(value) {
+  try { localStorage.setItem(NOTIF_OPTIN_KEY, value ? "true" : "false"); } catch (e) {}
+}
+// Must be called from a real user gesture (a click) - browsers refuse to
+// show the permission prompt otherwise.
+async function requestNotificationPermission() {
+  if (!("Notification" in window)) return false;
+  if (Notification.permission === "granted") { setNotificationOptIn(true); return true; }
+  if (Notification.permission === "denied") { setNotificationOptIn(false); return false; }
+  const result = await Notification.requestPermission();
+  const granted = result === "granted";
+  setNotificationOptIn(granted);
+  return granted;
+}
+
+function describeNotificationForOS(n) {
+  if (n.type === "like") return { title: "New like", body: `@${n.actor} liked your post "${n.postTitle || ""}"` };
+  if (n.type === "reply") return { title: "New reply", body: `@${n.actor}: ${n.body || ""}` };
+  if (n.type === "follow") return { title: "New follower", body: `@${n.actor} started following you` };
+  if (n.type === "message") return { title: `@${n.actor}`, body: n.body || "sent you a message" };
+  if (n.type === "mention") return { title: "You were mentioned", body: `@${n.actor}: ${n.body || ""}` };
+  if (n.type === "badge") return { title: "New badge!", body: "You've been awarded a new badge." };
+  return { title: "New notification", body: "You have a new notification on Progress." };
+}
+
+function notificationHref(n) {
+  if (n.postId) return `post.html?id=${n.postId}`;
+  if (n.type === "message") return `chat.html?with=${encodeURIComponent(n.actor)}`;
+  if (n.type === "mention") return "chat.html";
+  return null;
+}
+
+// Called whenever a "notification" WS message arrives, regardless of
+// whether it came in on the shared presence socket or chat.html's own
+// dedicated socket - both funnel through here so the behavior is
+// identical no matter which page someone's on.
+function handleIncomingNotification(notification) {
+  Progress.addNotification(notification);
+  const badge = document.getElementById("bellBadge");
+  if (badge) {
+    const unseen = Progress.unseenCount();
+    badge.textContent = unseen;
+    badge.classList.toggle("hidden", !unseen);
+  }
+  const notifDD = document.getElementById("notifDropdown");
+  if (notifDD && notifDD.classList.contains("open")) {
+    renderNotifDropdown();
+  }
+
+  // Only pop an OS notification if the tab genuinely isn't in view right
+  // now - no point interrupting someone with a system popup for something
+  // already visible on screen, and only if they've explicitly opted in.
+  if (document.hidden && getNotificationOptIn() && "Notification" in window && Notification.permission === "granted") {
+    const { title, body } = describeNotificationForOS(notification);
+    try {
+      const osNotif = new Notification(title, { body, icon: "images/nearheader.png" });
+      osNotif.onclick = () => {
+        window.focus();
+        const href = notificationHref(notification);
+        if (href) location.href = href;
+      };
+    } catch (e) {}
+  }
+}
+
 function openPresenceSocket(activePage) {
   if (activePage === "chat") return;
   const user = Progress.getCurrentUser();
@@ -1038,6 +1108,8 @@ function openPresenceSocket(activePage) {
       try { data = JSON.parse(event.data); } catch (e) { return; }
       if (data.type === "global-presence") {
         document.dispatchEvent(new CustomEvent("presence-update", { detail: data.statuses || {} }));
+      } else if (data.type === "notification") {
+        handleIncomingNotification(data.notification);
       }
     });
     window.addEventListener("beforeunload", () => {

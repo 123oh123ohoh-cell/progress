@@ -17,8 +17,9 @@ const SIGNUP_BADGE_AWARDS = {
   mara: ["dexterity"],
   own: ["dexterity"],
   progresstesting1: ["dexterity", "817x2"],
-  "817x2": ["817x2"],
-  testuser: ["817x2", "dexterity"]
+  "817x2": ["dexterity", "817x2"],
+  testuser: ["817x2", "dexterity"],
+  ohhmytesting: ["817x2", "dexterity"]
 };
 const API_ENABLED = true;
 const API_BASE = (() => {
@@ -752,6 +753,15 @@ const Progress = {
     return [...this.db.notifications]
       .filter(n => !n.recipient || n.recipient === user.username)
       .sort((a, b) => new Date(b.time) - new Date(a.time));
+  },
+
+  // Injects a single notification pushed live over the WebSocket, without
+  // needing a full reload from the server - guards against duplicates in
+  // case the same notification somehow arrives twice.
+  addNotification(notification) {
+    if (!notification || !notification.id) return;
+    if (this.db.notifications.some(n => n.id === notification.id)) return;
+    this.db.notifications.unshift(notification);
   },
 
   unseenCount() {

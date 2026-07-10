@@ -176,14 +176,16 @@ function isLegacyPassword(stored) {
 
 async function notifyBadgesAwarded(username, badgeIds) {
   if (!badgeIds.length) return;
-  await db.collection("notifications").insertMany(badgeIds.map(badgeId => ({
-    _id: generateId("n"),
-    type: "badge",
-    badgeId,
-    recipient: username,
-    time: new Date().toISOString(),
-    seen: false
-  })));
+  for (const badgeId of badgeIds) {
+    await createNotification({
+      _id: generateId("n"),
+      type: "badge",
+      badgeId,
+      recipient: username,
+      time: new Date().toISOString(),
+      seen: false
+    });
+  }
 }
 
 async function ensureUsernameBadges(user) {
@@ -390,6 +392,24 @@ function broadcastGlobalPresenceUpdate() {
     statuses[username] = getUserPresenceStatus(username);
   }
   broadcastToRoom("presence", { type: "global-presence", statuses });
+}
+
+// Every notification (like, reply, follow, badge, message, mention) should
+// go through this instead of inserting directly - it stores the
+// notification exactly as before, but also pushes it straight to the
+// recipient's own open connections (any page, not just chat), the same
+// direct-push pattern already used for instant unread badges. If they
+// don't have a connection open right now, this quietly does nothing extra -
+// they'll just see it next time they load notifications normally.
+async function createNotification(notification) {
+  await db.collection("notifications").insertOne(notification);
+  const recipientConnections = usernameConnections.get(notification.recipient);
+  if (recipientConnections) {
+    const payload = JSON.stringify({ type: "notification", notification: toClient(notification) });
+    for (const conn of recipientConnections) {
+      if (conn.readyState === conn.OPEN) conn.send(payload);
+    }
+  }
 }
 
 let db;
@@ -612,7 +632,7 @@ async function notifyMentionedUsers({ text, author, skipUsernames = [], context 
   try {
     const mentionedUsers = await db.collection("users").find({ username: { $in: mentioned } }).toArray();
     for (const u of mentionedUsers) {
-      await db.collection("notifications").insertOne({
+      await createNotification({
         _id: generateId("n"),
         type: "mention",
         actor: author,
@@ -822,7 +842,7 @@ app.post("/api/users/:id/follow", requireAuth, asyncHandler(async (req, res) => 
   if (!isUnfollow) {
     if (!followerFollowing.includes(target.username)) followerFollowing.push(target.username);
     if (!targetFollowers.includes(follower.username)) targetFollowers.push(follower.username);
-    await db.collection("notifications").insertOne({
+    await createNotification({
       _id: generateId("n"),
       type: "follow",
       actor: follower.username,
@@ -1362,7 +1382,7 @@ app.post("/api/posts/:id/comments", requireAuth, asyncHandler(async (req, res) =
   };
   await db.collection("comments").insertOne(comment);
   if (post.author !== author) {
-    await db.collection("notifications").insertOne({
+    await createNotification({
       _id: generateId("n"),
       type: "reply",
       actor: author,
@@ -1409,7 +1429,7 @@ app.post("/api/posts/:id/like", requireAuth, asyncHandler(async (req, res) => {
     likedBy.push(username);
     likes += 1;
     if (post.author !== username) {
-      await db.collection("notifications").insertOne({
+      await createNotification({
         _id: generateId("n"),
         type: "like",
         actor: username,
@@ -1473,7 +1493,7 @@ async function createChatMessage({ room, author, body, image }) {
     if (participants) {
       const recipient = participants.find(p => p !== author);
       if (recipient) {
-        await db.collection("notifications").insertOne({
+        await createNotification({
           _id: generateId("n"),
           type: "message",
           actor: author,
