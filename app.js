@@ -11,6 +11,14 @@ const ICONS = {
   clock: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>`
 };
 
+// Updates the browser tab title to show "(N) PageTitle" when there are
+// unseen notifications, so users see the count even when the tab is in the
+// background. Passing 0 (or nothing) restores the original title.
+function updateTitleBadge(count) {
+  const base = document.title.replace(/^\(\d+\)\s*/, "");
+  document.title = count > 0 ? `(${count}) ${base}` : base;
+}
+
 const BADGES = {
   reader: { label: "Avid Reader", description: "Enjoys reading entries and exploring the community.", icon: "📚" },
   supporter: { label: "Community Supporter", description: "Leaves thoughtful feedback and encourages others.", icon: "🤝" },
@@ -686,6 +694,7 @@ function wireDropdowns() {
       renderNotifDropdown();
       const badge = document.getElementById("bellBadge");
       if (badge) badge.classList.add("hidden");
+      updateTitleBadge(0);
     }
   });
 
@@ -1045,11 +1054,12 @@ function notificationHref(n) {
 function handleIncomingNotification(notification) {
   Progress.addNotification(notification);
   const badge = document.getElementById("bellBadge");
+  const unseen = Progress.unseenCount();
   if (badge) {
-    const unseen = Progress.unseenCount();
     badge.textContent = unseen;
     badge.classList.toggle("hidden", !unseen);
   }
+  updateTitleBadge(unseen);
   const notifDD = document.getElementById("notifDropdown");
   if (notifDD && notifDD.classList.contains("open")) {
     renderNotifDropdown();
@@ -1139,11 +1149,12 @@ function initShell(activePage) {
       const banned = await applyBannedOverlayIfNeeded();
       if (!banned) applyLockedOverlayIfNeeded();
       const badge = document.getElementById("bellBadge");
+      const unseen = Progress.unseenCount();
       if (badge) {
-        const unseen = Progress.unseenCount();
         badge.textContent = unseen;
         badge.classList.toggle("hidden", !unseen);
       }
+      updateTitleBadge(unseen);
       const notifDD = document.getElementById("notifDropdown");
       if (notifDD && notifDD.classList.contains("open")) {
         renderNotifDropdown();
