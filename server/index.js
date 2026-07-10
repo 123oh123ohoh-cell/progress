@@ -1,5 +1,6 @@
 require("dotenv").config();
 const express = require("express");
+const helmet = require("helmet");
 const path = require("path");
 const crypto = require("crypto");
 const http = require("http");
@@ -630,25 +631,50 @@ async function notifyMentionedUsers({ text, author, skipUsernames = [], context 
 
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
+// Only these origins can call the API at all - a malicious site can no
+// longer make requests to this backend on a visitor's behalf just by
+// including a <script> that calls fetch(). Local dev origins are included
+// so testing against a local server still works.
+const ALLOWED_ORIGINS = new Set([
+  "https://progressing.online",
+  "https://progressing.vercel.app",
+  "http://127.0.0.1:5500",
+  "http://localhost:5500",
+  "http://127.0.0.1:3000",
+  "http://localhost:3000"
+]);
+
 app.use((req, res, next) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  const origin = req.headers.origin;
+  if (origin && ALLOWED_ORIGINS.has(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin");
+  }
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,PATCH,DELETE,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   if (req.method === "OPTIONS") return res.status(204).end();
   next();
 });
 
-// Helmet-equivalent security headers, hand-rolled to avoid pulling in the
-// actual helmet package for something this small - same spirit as the rest
-// of this app's approach to dependencies.
-app.use((req, res, next) => {
-  res.setHeader("X-Content-Type-Options", "nosniff"); // stop browsers guessing a file's type differently than the server says
-  res.setHeader("X-Frame-Options", "DENY"); // stop this site being embedded in an iframe on someone else's page (clickjacking)
-  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin"); // don't leak full URLs to third-party sites via the Referer header
-  res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains"); // force HTTPS for a year once a browser's seen it once
-  res.removeHeader("X-Powered-By"); // don't advertise "this is Express" to anyone probing the server
-  next();
-});
+app.use(helmet({
+  // This app serves cross-origin embeds (Spotify/YouTube iframes) and
+  // loads Google Fonts, so the strictest defaults would break real
+  // features - configured deliberately rather than just disabling CSP
+  // outright.
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "https:"],
+      frameSrc: ["https://open.spotify.com", "https://www.youtube-nocookie.com", "https://www.youtube.com"],
+      connectSrc: ["'self'", "https://progress-351h.onrender.com", "wss://progress-351h.onrender.com"]
+    }
+  },
+  crossOriginEmbedderPolicy: false // would otherwise block the Spotify/YouTube embeds
+}));
+
 app.use(express.static(publicPath));
 app.use("/api", generalApiRateLimit);
 
@@ -1552,6 +1578,43 @@ app.post("/api/login", loginRateLimit, asyncHandler(async (req, res) => {
   await ensureUsernameBadges(user);
   const token = signJWT({ username: user.username, id: user._id });
   res.json({ ...publicUser(normalizeUser(user)), token });
+}));
+
+app.get("/api/admin/stats", requireAuth, asyncHandler(async (req, res) => {
+  if (!ALLOWED_CREATOR_USERNAMES.has(req.user.username.toLowerCase())) {
+    return res.status(403).json({ error: "Only admins can view this." });
+  }
+  const users = db.collection("users");
+  const posts = db.collection("posts");
+  const comments = db.collection("comments");
+  const messages = db.collection("messages");
+
+  const [userCount, postCount, commentCount, messageCount, bannedCount, lockedCount, recentUsers, recentPosts] = await Promise.all([
+    users.estimatedDocumentCount(),
+    posts.estimatedDocumentCount(),
+    comments.estimatedDocumentCount(),
+    messages.estimatedDocumentCount(),
+    users.countDocuments({ banned: true }),
+    users.countDocuments({ locked: true }),
+    users.find({}, { projection: { password: 0 } }).sort({ joined: -1 }).limit(10).toArray(),
+    // Excludes `content` here too, same reasoning as the public list endpoint -
+    // a dashboard summary doesn't need full post bodies, just enough to
+    // identify each one.
+    posts.find({}, { projection: { content: 0 } }).sort({ createdAt: -1 }).limit(10).toArray()
+  ]);
+
+  res.json({
+    counts: {
+      users: userCount,
+      posts: postCount,
+      comments: commentCount,
+      messages: messageCount,
+      banned: bannedCount,
+      locked: lockedCount
+    },
+    recentUsers: recentUsers.map(u => publicUser(normalizeUser(u))),
+    recentPosts: recentPosts.map(normalizePost)
+  });
 }));
 
 app.get("/api/online-users", (req, res) => {
