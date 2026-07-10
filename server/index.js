@@ -248,10 +248,54 @@ function publicUser(user) {
   };
 }
 
+// Post content is real HTML from the rich-text editor (bold, headings,
+// Spotify/YouTube embeds, etc.) rather than escaped plain text, since the
+// whole point is to preserve formatting - but nothing stops someone from
+// calling POST /api/posts directly with a `content` field containing a
+// <script> tag or an iframe pointing anywhere they want, which would then
+// run for every single visitor who views that post. This sanitizes on
+// both the write path (new posts) and the read path (defense in depth,
+// so any already-stored malicious content also gets neutralized without
+// needing a data migration).
+//
+// This is a pragmatic regex-based allowlist, not a full HTML parser like
+// the `sanitize-html` npm package would give you - it covers the realistic
+// attack surface for what this editor actually produces, but a real
+// parser-based library is the more bulletproof choice if this app's
+// user-generated content ever needs to withstand serious adversarial
+// testing.
+const SANITIZE_ALLOWED_TAGS = new Set(["p", "h2", "blockquote", "strong", "b", "em", "i", "u", "ul", "ol", "li", "a", "img", "br", "div", "span", "iframe"]);
+const SANITIZE_ALLOWED_IFRAME_HOSTS = [/^https:\/\/open\.spotify\.com\//i, /^https:\/\/www\.youtube-nocookie\.com\//i, /^https:\/\/www\.youtube\.com\//i];
+
+function sanitizePostContent(html) {
+  if (!html) return "";
+  // Strip entire dangerous elements, including their content.
+  let clean = html.replace(/<(script|style|object|embed|link|meta|form|base)\b[^>]*>[\s\S]*?<\/\1>/gi, "");
+  clean = clean.replace(/<(script|style|object|embed|link|meta|form|base)\b[^>]*\/?>/gi, "");
+  // Strip every on*="..." event handler attribute (onerror, onload, onclick, ...).
+  clean = clean.replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "");
+  // Neutralize javascript:/data: URIs that could otherwise execute code via href/src.
+  clean = clean.replace(/(href|src)\s*=\s*"(javascript|data):[^"]*"/gi, '$1="#"');
+  clean = clean.replace(/(href|src)\s*=\s*'(javascript|data):[^']*'/gi, "$1='#'");
+  // Drop any tag not on the allowlist (keeps its text content, strips the wrapping tag itself).
+  clean = clean.replace(/<\/?([a-zA-Z0-9]+)([^>]*)>/g, (match, tagName, attrs) => {
+    const tag = tagName.toLowerCase();
+    if (!SANITIZE_ALLOWED_TAGS.has(tag)) return "";
+    if (tag === "iframe") {
+      const srcMatch = attrs.match(/src\s*=\s*"([^"]*)"/i) || attrs.match(/src\s*=\s*'([^']*)'/i);
+      const src = srcMatch ? srcMatch[1] : "";
+      if (!SANITIZE_ALLOWED_IFRAME_HOSTS.some(re => re.test(src))) return "";
+    }
+    return match;
+  });
+  return clean;
+}
+
 function normalizePost(doc) {
   const post = toClient(doc);
   return {
     ...post,
+    content: typeof post.content === "string" ? sanitizePostContent(post.content) : post.content,
     likes: typeof post.likes === "number" ? post.likes : 0,
     likedBy: Array.isArray(post.likedBy) ? post.likedBy : []
   };
@@ -591,6 +635,18 @@ app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,PATCH,DELETE,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   if (req.method === "OPTIONS") return res.status(204).end();
+  next();
+});
+
+// Helmet-equivalent security headers, hand-rolled to avoid pulling in the
+// actual helmet package for something this small - same spirit as the rest
+// of this app's approach to dependencies.
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff"); // stop browsers guessing a file's type differently than the server says
+  res.setHeader("X-Frame-Options", "DENY"); // stop this site being embedded in an iframe on someone else's page (clickjacking)
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin"); // don't leak full URLs to third-party sites via the Referer header
+  res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains"); // force HTTPS for a year once a browser's seen it once
+  res.removeHeader("X-Powered-By"); // don't advertise "this is Express" to anyone probing the server
   next();
 });
 app.use(express.static(publicPath));
@@ -1215,8 +1271,9 @@ app.get("/api/posts/:id", asyncHandler(async (req, res) => {
 }));
 
 app.post("/api/posts", requireAuth, asyncHandler(async (req, res) => {
-  const { title, content, cover, excerpt } = req.body;
+  const { title, cover, excerpt } = req.body;
   const author = req.user.username;
+  const content = sanitizePostContent(req.body.content);
   if (!title || !content) return res.status(400).json({ error: "title and content are required" });
   if (await isUsernameBanned(author)) return res.status(403).json({ error: "This account has been banned." });
   const createdAt = new Date().toISOString();
