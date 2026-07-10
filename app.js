@@ -874,6 +874,25 @@ function showToast(msg) {
   setTimeout(() => t.classList.remove("show"), 2600);
 }
 
+const THEME_STORAGE_KEY = "progressTheme";
+
+// Dark mode lives entirely in localStorage rather than the user's account -
+// it applies instantly on every page load (including for logged-out
+// visitors) with zero server round-trip, and the tiny inline snippet in
+// each page's <head> reads this same key before first paint, so there's
+// no flash of the wrong theme while the page loads.
+function getStoredTheme() {
+  try { return localStorage.getItem(THEME_STORAGE_KEY) === "dark" ? "dark" : "light"; } catch (e) { return "light"; }
+}
+function applyTheme(theme) {
+  if (theme === "dark") document.documentElement.setAttribute("data-theme", "dark");
+  else document.documentElement.removeAttribute("data-theme");
+}
+function setTheme(theme) {
+  try { localStorage.setItem(THEME_STORAGE_KEY, theme); } catch (e) {}
+  applyTheme(theme);
+}
+
 function setDeviceMode() {
   const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent || "");
   document.body.classList.toggle("mobile", isMobile);
@@ -1020,6 +1039,7 @@ function openPresenceSocket(activePage) {
 }
 
 function initShell(activePage) {
+  applyTheme(getStoredTheme());
   setDeviceMode();
   window.addEventListener("resize", setDeviceMode);
   renderNav(activePage);

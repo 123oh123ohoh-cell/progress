@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;1,500;1,600&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<script>(function(){try{if(localStorage.getItem("progressTheme")==="dark")document.documentElement.setAttribute("data-theme","dark");}catch(e){}})();</script>
 </head>
 <body>
 
@@ -222,6 +223,14 @@ refreshNowPlaying();
           <p class="field-note">Sample time in this zone: <span id="timezonePreview">${formatZonePreview(user.timezone)}</span></p>
           <p class="field-note">Your timestamps will now display in the selected timezone.</p>
         </div>
+        <div class="settings-section">
+          <h3>Appearance</h3>
+          <label style="display:flex; align-items:center; gap:12px; cursor:pointer;">
+            <span class="theme-toggle-switch" id="themeToggleSwitch" data-on="${getStoredTheme() === "dark" ? "1" : "0"}"><span class="theme-toggle-knob"></span></span>
+            <span style="font-size:14px;">Dark mode</span>
+          </label>
+          <p class="field-note">Saved to this browser - it'll stay set here even if you log in on another device.</p>
+        </div>
         <button class="btn primary" id="saveSettingsBtn">Save changes</button>
         <div class="settings-section" style="margin-top:40px; padding-top:40px; border-top:1px solid var(--border-color);">
           <h3 style="color:var(--error);">Danger Zone</h3>
@@ -229,6 +238,13 @@ refreshNowPlaying();
           <button class="btn danger" id="deleteAccountBtn">Delete account</button>
         </div>
       `;
+      document.getElementById("themeToggleSwitch").addEventListener("click", (e) => {
+        const el = e.currentTarget;
+        const nowOn = el.dataset.on !== "1";
+        el.dataset.on = nowOn ? "1" : "0";
+        setTheme(nowOn ? "dark" : "light");
+      });
+
       document.getElementById("saveSettingsBtn").addEventListener("click", async () => {
         const name = document.getElementById("nameField").value.trim();
         const bio = document.getElementById("bioField").value.trim();

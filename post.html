@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;1,500;1,600&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<script>(function(){try{if(localStorage.getItem("progressTheme")==="dark")document.documentElement.setAttribute("data-theme","dark");}catch(e){}})();</script>
 </head>
 <body>
 
@@ -44,7 +45,7 @@
   });
 
   async function renderPost() {
-    const post = Progress.getPost(postId);
+    let post = Progress.getPost(postId);
     const comments = await Progress.loadComments(postId);
     if (!post) {
       await Progress.loadFromApi().catch(() => {});
@@ -54,6 +55,15 @@
         return;
       }
       return renderPost();
+    }
+    // The cached copy from Progress.db.posts comes from the list endpoint,
+    // which deliberately excludes `content` (it's the field that can
+    // balloon a post's size with embedded images) - the feed never needs
+    // full content, but this page does, so fetch the individual post
+    // directly here to get it back.
+    if (!post.content) {
+      const full = await apiFetch(`/api/posts/${postId}`);
+      if (full && full.content) post = { ...post, content: full.content };
     }
     const user = Progress.getCurrentUser();
     const likedByMe = post.likedBy.includes(user ? user.username : "guest");
