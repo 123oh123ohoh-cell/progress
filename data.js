@@ -30,6 +30,23 @@ const API_BASE = (() => {
   return BACKEND_RENDER_URL;
 })();
 
+const AUTH_TOKEN_KEY = "progress:authToken";
+
+// The JWT proving who's actually logged in - kept separate from the user
+// profile object entirely, since it's a security credential, not user
+// data. apiFetch/apiFetchAuth below attach it automatically to every
+// request, so the server can verify identity instead of trusting
+// whatever username the client claims in a request body.
+function getAuthToken() {
+  try { return localStorage.getItem(AUTH_TOKEN_KEY); } catch (e) { return null; }
+}
+function setAuthToken(token) {
+  try {
+    if (token) localStorage.setItem(AUTH_TOKEN_KEY, token);
+    else localStorage.removeItem(AUTH_TOKEN_KEY);
+  } catch (e) {}
+}
+
 async function apiFetch(path, options = {}) {
   try {
     let url = path;
@@ -40,7 +57,10 @@ async function apiFetch(path, options = {}) {
     }
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 3500);
-    const res = await fetch(url, { ...options, signal: controller.signal });
+    const token = getAuthToken();
+    const headers = { ...(options.headers || {}) };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const res = await fetch(url, { ...options, headers, signal: controller.signal });
     clearTimeout(timeout);
     if (!res.ok) return null;
     if (res.status === 204) return {};
@@ -61,9 +81,12 @@ async function apiFetchAuth(path, options = {}, timeoutMs = 8000) {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    const token = getAuthToken();
+    const headers = { ...(options.headers || {}) };
+    if (token) headers.Authorization = `Bearer ${token}`;
     let res;
     try {
-      res = await fetch(url, { ...options, signal: controller.signal });
+      res = await fetch(url, { ...options, headers, signal: controller.signal });
     } finally {
       clearTimeout(timeout);
     }
@@ -478,11 +501,13 @@ const Progress = {
         result = await apiFetchAuth("/api/login", { method: "POST", headers, body: loginBody }, 20000);
       }
       if (result.ok) {
-        const user = { ...result.data, password };
+        const { token, ...userData } = result.data;
+        const user = { ...userData, password };
         const existing = this.db.users.find(u => u.username === user.username);
         if (existing) Object.assign(existing, user);
         else this.db.users.push(user);
         this.db.currentUser = user.username;
+        setAuthToken(token);
         this.persist();
         return { ok: true, user };
       }
@@ -527,11 +552,13 @@ const Progress = {
         result = await apiFetchAuth("/api/users", { method: "POST", headers, body: signupBody }, 20000);
       }
       if (result.ok) {
-        const user = { ...result.data, password };
+        const { token, ...userData } = result.data;
+        const user = { ...userData, password };
         const existing = this.db.users.find(u => u.username === user.username);
         if (existing) Object.assign(existing, user);
         else this.db.users.push(user);
         this.db.currentUser = user.username;
+        setAuthToken(token);
         this.persist();
         return { ok: true, user };
       }
@@ -558,6 +585,7 @@ const Progress = {
 
   logout() {
     this.db.currentUser = null;
+    setAuthToken(null);
     this.persist();
   },
 

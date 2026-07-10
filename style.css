@@ -1408,47 +1408,45 @@ body.modal-open { overflow: hidden; }
 
 .theme-toggle-switch {
   position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: space-between;
+  display: inline-block;
   cursor: pointer;
-  width: 52px;
-  height: 28px;
+  width: 40px;
+  height: 22px;
   flex-shrink: 0;
-  border-radius: 8px;
-  padding: 0 5px;
+  border-radius: 7px;
   background: var(--mocha-light);
   border: 1px solid var(--mocha-light);
   transition: background .18s ease;
 }
 .theme-toggle-switch[data-on="1"] { background: var(--mocha-wash); border-color: var(--mocha); }
-.theme-toggle-icon {
-  width: 13px;
-  height: 13px;
-  flex-shrink: 0;
-  position: relative;
-  z-index: 1;
-}
-.theme-toggle-icon.sun { color: var(--mocha-dark); }
-.theme-toggle-icon.moon { color: var(--mocha); }
 .theme-toggle-knob {
   position: absolute;
   top: 2px;
   left: 2px;
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
   background: var(--paper);
   border: 1px solid var(--mocha-light);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13px;
-  line-height: 1;
   transition: transform .18s ease;
   box-shadow: 0 1px 3px rgba(0,0,0,0.15);
 }
-.theme-toggle-switch[data-on="1"] .theme-toggle-knob { transform: translateX(24px); }
+.theme-toggle-switch[data-on="1"] .theme-toggle-knob { transform: translateX(18px); }
+
+/* Sun/moon sit outside the track entirely, one on each side - the active
+   one is highlighted, the other dimmed. Nothing ever shares space with
+   the sliding knob, so there's no overlap to worry about. */
+.theme-flank-icon {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  opacity: 0.35;
+  transition: opacity .15s ease, color .15s ease;
+}
+.theme-flank-icon.sun { color: var(--mocha-dark); }
+.theme-flank-icon.moon { color: var(--mocha); }
+label:has(#themeToggleSwitch[data-on="0"]) .theme-flank-icon.sun { opacity: 1; }
+label:has(#themeToggleSwitch[data-on="1"]) .theme-flank-icon.moon { opacity: 1; }
 
 .spotify-embed { border-radius: 12px; overflow: hidden; background: var(--mocha-wash); line-height: 0; }
 .spotify-embed iframe { display: block; border: none; }

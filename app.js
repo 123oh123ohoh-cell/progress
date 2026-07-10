@@ -1004,14 +1004,15 @@ let presenceSocket = null;
 function openPresenceSocket(activePage) {
   if (activePage === "chat") return;
   const user = Progress.getCurrentUser();
-  if (!user) return;
+  const token = getAuthToken();
+  if (!user || !token) return;
   try {
     // Must point at the actual backend (API_BASE, e.g. Render), not
     // location.host - the current page's own origin (Vercel) doesn't run
     // a WebSocket server at all, which is exactly why this was failing
     // with NS_ERROR_WEBSOCKET... every request.
     const wsBase = API_BASE.replace(/^http/, "ws");
-    presenceSocket = new WebSocket(`${wsBase}/ws/chat?username=${encodeURIComponent(user.username)}&room=presence`);
+    presenceSocket = new WebSocket(`${wsBase}/ws/chat?token=${encodeURIComponent(token)}&room=presence`);
 
     // Tells the server whether THIS specific tab is currently focused, so
     // someone can show as "Idle" rather than fully "Online" while every

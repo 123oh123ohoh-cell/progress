@@ -48,10 +48,10 @@
     return "dm:" + [a, b].sort().join(":");
   }
 
-  function wsUrl(room, username) {
+  function wsUrl(room) {
     const httpBase = API_BASE.replace(/\/$/, "");
     const wsBase = httpBase.replace(/^https:/, "wss:").replace(/^http:/, "ws:");
-    return `${wsBase}/ws/chat?room=${encodeURIComponent(room)}&username=${encodeURIComponent(username)}`;
+    return `${wsBase}/ws/chat?room=${encodeURIComponent(room)}&token=${encodeURIComponent(getAuthToken())}`;
   }
 
   function setStatus(text, cls) {
@@ -187,7 +187,7 @@
 
     let ws;
     try {
-      ws = new WebSocket(wsUrl(currentRoom, currentUser.username));
+      ws = new WebSocket(wsUrl(currentRoom));
     } catch (e) {
       setStatus("Can't connect", "offline");
       scheduleReconnect();
@@ -245,7 +245,7 @@
     log.innerHTML = `<div class="chat-empty">Loading…</div>`;
     seenMessageIds = new Set();
     lastRenderedDateKey = null;
-    const url = `/api/chat/messages?room=${encodeURIComponent(currentRoom)}&limit=${HISTORY_LIMIT}&username=${encodeURIComponent(currentUser.username)}`;
+    const url = `/api/chat/messages?room=${encodeURIComponent(currentRoom)}&limit=${HISTORY_LIMIT}`;
     const history = await apiFetch(url);
     if (!history) {
       log.innerHTML = `<div class="chat-empty">Couldn't load history — messages sent from here will still go out live.</div>`;
@@ -328,7 +328,7 @@
   async function loadSidebar() {
     const list = document.getElementById("chatRoomList");
     if (!list) return;
-    const conversations = await apiFetch(`/api/chat/conversations?username=${encodeURIComponent(currentUser.username)}`);
+    const conversations = await apiFetch(`/api/chat/conversations`);
     const items = [
       roomListItemHTML({ room: GLOBAL_ROOM, label: "Global", sub: "Everyone", active: currentRoom === GLOBAL_ROOM, avatarUser: undefined })
     ];
@@ -371,7 +371,7 @@
       apiFetch("/api/chat/mark-read", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: currentUser.username, room })
+        body: JSON.stringify({ room })
       }).then(() => loadSidebar());
     }
   }

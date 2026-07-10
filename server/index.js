@@ -408,6 +408,147 @@ async function seedIfNeeded() {
   }
 }
 
+// Simple in-memory rate limiter - a sliding window of request timestamps
+// per IP, kept per-route via a dedicated Map for each limiter instance.
+// This is intentionally not distributed (no Redis) since the app runs as
+// Minimal JWT sign/verify using Node's built-in crypto (HMAC-SHA256) -
+// this is a well-defined, simple enough format that a small dependency-free
+// implementation is entirely reasonable here, same spirit as the rest of
+// this app's approach to avoiding unnecessary dependencies.
+//
+// IMPORTANT: set a real JWT_SECRET environment variable in production. If
+// it's not set, this falls back to a random value generated at boot, which
+// means every existing token becomes invalid (forcing everyone to log back
+// in) on every server restart/redeploy.
+const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(32).toString("hex");
+if (!process.env.JWT_SECRET) {
+  console.warn("[jwt] JWT_SECRET is not set - using a random secret for this run. Sessions will not survive a restart. Set JWT_SECRET in your environment for persistent logins.");
+}
+const JWT_EXPIRES_IN_SECONDS = 30 * 24 * 60 * 60; // 30 days
+
+function base64url(input) {
+  return Buffer.from(input).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function base64urlDecode(input) {
+  input = input.replace(/-/g, "+").replace(/_/g, "/");
+  while (input.length % 4) input += "=";
+  return Buffer.from(input, "base64").toString();
+}
+function signJWT(payload) {
+  const header = { alg: "HS256", typ: "JWT" };
+  const now = Math.floor(Date.now() / 1000);
+  const fullPayload = { ...payload, iat: now, exp: now + JWT_EXPIRES_IN_SECONDS };
+  const headerB64 = base64url(JSON.stringify(header));
+  const payloadB64 = base64url(JSON.stringify(fullPayload));
+  const signature = crypto.createHmac("sha256", JWT_SECRET).update(`${headerB64}.${payloadB64}`).digest("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return `${headerB64}.${payloadB64}.${signature}`;
+}
+function verifyJWT(token) {
+  if (!token || typeof token !== "string") return null;
+  const parts = token.split(".");
+  if (parts.length !== 3) return null;
+  const [headerB64, payloadB64, signature] = parts;
+  const expectedSignature = crypto.createHmac("sha256", JWT_SECRET).update(`${headerB64}.${payloadB64}`).digest("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  try {
+    const sigBuffer = Buffer.from(signature);
+    const expectedBuffer = Buffer.from(expectedSignature);
+    if (sigBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(sigBuffer, expectedBuffer)) return null;
+  } catch (e) {
+    return null;
+  }
+  try {
+    const payload = JSON.parse(base64urlDecode(payloadB64));
+    if (payload.exp && Math.floor(Date.now() / 1000) > payload.exp) return null;
+    return payload;
+  } catch (e) {
+    return null;
+  }
+}
+
+// Requires a valid token and populates req.user = { username, id }. Use on
+// any route where the acting identity must be verified rather than trusted
+// from the request body.
+function requireAuth(req, res, next) {
+  const authHeader = req.headers.authorization || "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  const payload = verifyJWT(token);
+  if (!payload || !payload.username) {
+    return res.status(401).json({ error: "Please log in again." });
+  }
+  req.user = payload;
+  next();
+}
+
+// Same as requireAuth, but never rejects the request - just populates
+// req.user if a valid token happens to be present. Useful for routes that
+// behave the same for everyone but want to know who's asking (none of the
+// current routes need this yet, kept here for future use).
+function optionalAuth(req, res, next) {
+  const authHeader = req.headers.authorization || "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  const payload = verifyJWT(token);
+  req.user = payload || null;
+  next();
+}
+
+// Simple in-memory rate limiter - a sliding window of request timestamps
+// per IP, kept per-route via a dedicated Map for each limiter instance.
+// This is intentionally not distributed (no Redis) since the app runs as
+// a single Render instance - fine at this scale, and avoids adding a new
+// dependency just for this.
+function rateLimit({ windowMs, max, message }) {
+  const hits = new Map(); // ip -> array of timestamps within the window
+
+  // Periodic sweep so IPs that stop making requests don't sit in memory
+  // forever - runs far less often than the window itself, just tidying up.
+  setInterval(() => {
+    const now = Date.now();
+    for (const [ip, timestamps] of hits) {
+      const fresh = timestamps.filter(t => now - t < windowMs);
+      if (fresh.length === 0) hits.delete(ip);
+      else hits.set(ip, fresh);
+    }
+  }, Math.max(windowMs, 60000)).unref();
+
+  return (req, res, next) => {
+    const ip = (req.headers["x-forwarded-for"] || "").split(",")[0].trim() || req.socket.remoteAddress || "unknown";
+    const now = Date.now();
+    const timestamps = (hits.get(ip) || []).filter(t => now - t < windowMs);
+    if (timestamps.length >= max) {
+      return res.status(429).json({ error: message || "Too many requests. Please slow down and try again shortly." });
+    }
+    timestamps.push(now);
+    hits.set(ip, timestamps);
+    next();
+  };
+}
+
+const loginRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: "Too many login attempts. Please wait a few minutes and try again."
+});
+const signupRateLimit = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 8,
+  message: "Too many accounts created from this connection recently. Please try again later."
+});
+const generalApiRateLimit = rateLimit({
+  windowMs: 60 * 1000,
+  max: 180,
+  message: "Too many requests. Please slow down."
+});
+const uploadRateLimit = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 20,
+  message: "Too many image uploads recently. Please wait a bit and try again."
+});
+const linkPreviewRateLimit = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 30,
+  message: "Too many link previews requested recently. Please slow down."
+});
+
 function asyncHandler(fn) {
   return (req, res, next) => fn(req, res, next).catch(next);
 }
@@ -453,6 +594,7 @@ app.use((req, res, next) => {
   next();
 });
 app.use(express.static(publicPath));
+app.use("/api", generalApiRateLimit);
 
 app.get("/api/users", asyncHandler(async (req, res) => {
   const filter = {};
@@ -469,7 +611,7 @@ app.get("/api/users/:id", asyncHandler(async (req, res) => {
   res.json(publicUser(normalizeUser(doc)));
 }));
 
-app.post("/api/users", asyncHandler(async (req, res) => {
+app.post("/api/users", signupRateLimit, asyncHandler(async (req, res) => {
   const { username, name, password, timezone } = req.body;
   if (!username || !name || !password) return res.status(400).json({ error: "username, name, and password are required" });
   const normalizedUsername = username.trim().toLowerCase();
@@ -492,13 +634,15 @@ app.post("/api/users", asyncHandler(async (req, res) => {
   };
   await db.collection("users").insertOne(user);
   await notifyBadgesAwarded(normalizedUsername, user.badges);
-  res.status(201).json(publicUser(normalizeUser(user)));
+  const token = signJWT({ username: user.username, id: user._id });
+  res.status(201).json({ ...publicUser(normalizeUser(user)), token });
 }));
 
-app.patch("/api/users/:id", asyncHandler(async (req, res) => {
+app.patch("/api/users/:id", requireAuth, asyncHandler(async (req, res) => {
   const users = db.collection("users");
   const doc = await users.findOne({ _id: req.params.id });
   if (!doc) return res.status(404).json({ error: "User not found" });
+  if (req.user.id !== doc._id) return res.status(403).json({ error: "You can only edit your own profile." });
   const { name, timezone, avatar, bio, displayBadge, spotify } = req.body;
   const update = {};
   if (typeof name === "string") update.name = name;
@@ -533,13 +677,14 @@ app.patch("/api/users/:id", asyncHandler(async (req, res) => {
   res.json(publicUser(normalizeUser(updated)));
 }));
 
-app.delete("/api/users/:id", asyncHandler(async (req, res) => {
+app.delete("/api/users/:id", requireAuth, asyncHandler(async (req, res) => {
   const users = db.collection("users");
   const posts = db.collection("posts");
   const comments = db.collection("comments");
   const notifications = db.collection("notifications");
 
   const user = await users.findOne({ _id: req.params.id });
+  if (user && req.user.id !== user._id) return res.status(403).json({ error: "You can only delete your own account." });
   if (!user) return res.status(404).json({ error: "User not found" });
 
   const username = user.username;
@@ -572,10 +717,11 @@ app.delete("/api/users/:id", asyncHandler(async (req, res) => {
   res.status(204).end();
 }));
 
-app.post("/api/users/:id/follow", asyncHandler(async (req, res) => {
+app.post("/api/users/:id/follow", requireAuth, asyncHandler(async (req, res) => {
   const users = db.collection("users");
   const target = await users.findOne({ _id: req.params.id });
-  const { followerId, action } = req.body;
+  const { action } = req.body;
+  const followerId = req.user.id;
   if (!target) return res.status(404).json({ error: "User not found" });
   const follower = await users.findOne({ _id: followerId });
   if (!follower) return res.status(404).json({ error: "Follower user not found" });
@@ -610,10 +756,10 @@ app.post("/api/users/:id/follow", asyncHandler(async (req, res) => {
   res.json({ follower: follower.username, target: target.username, following: followerFollowing, followers: targetFollowers });
 }));
 
-app.post("/api/users/:id/unfollow", asyncHandler(async (req, res) => {
+app.post("/api/users/:id/unfollow", requireAuth, asyncHandler(async (req, res) => {
   const users = db.collection("users");
   const target = await users.findOne({ _id: req.params.id });
-  const { followerId } = req.body;
+  const followerId = req.user.id;
   if (!target) return res.status(404).json({ error: "User not found" });
   const follower = await users.findOne({ _id: followerId });
   if (!follower) return res.status(404).json({ error: "Follower user not found" });
@@ -632,15 +778,15 @@ app.post("/api/users/:id/unfollow", asyncHandler(async (req, res) => {
   res.json({ follower: follower.username, target: target.username });
 }));
 
-app.post("/api/users/:id/lock", asyncHandler(async (req, res) => {
-  const { requesterUsername, locked } = req.body || {};
-  if (!requesterUsername || !ALLOWED_CREATOR_USERNAMES.has(requesterUsername.toLowerCase())) {
+app.post("/api/users/:id/lock", requireAuth, asyncHandler(async (req, res) => {
+  const { locked } = req.body || {};
+  if (!ALLOWED_CREATOR_USERNAMES.has(req.user.username.toLowerCase())) {
     return res.status(403).json({ error: "Only admins can lock or unlock accounts." });
   }
   const users = db.collection("users");
   const target = await users.findOne({ _id: req.params.id });
   if (!target) return res.status(404).json({ error: "User not found" });
-  if (target.username === requesterUsername.toLowerCase()) {
+  if (target.username === req.user.username.toLowerCase()) {
     return res.status(400).json({ error: "You can't lock your own account." });
   }
   await users.updateOne({ _id: req.params.id }, { $set: { locked: !!locked } });
@@ -648,15 +794,14 @@ app.post("/api/users/:id/lock", asyncHandler(async (req, res) => {
   res.json(publicUser(normalizeUser(updated)));
 }));
 
-app.post("/api/users/:id/ban", asyncHandler(async (req, res) => {
-  const { requesterUsername } = req.body || {};
-  if (!requesterUsername || !ALLOWED_CREATOR_USERNAMES.has(requesterUsername.toLowerCase())) {
+app.post("/api/users/:id/ban", requireAuth, asyncHandler(async (req, res) => {
+  if (!ALLOWED_CREATOR_USERNAMES.has(req.user.username.toLowerCase())) {
     return res.status(403).json({ error: "Only admins can ban accounts." });
   }
   const users = db.collection("users");
   const target = await users.findOne({ _id: req.params.id });
   if (!target) return res.status(404).json({ error: "User not found" });
-  if (target.username === requesterUsername.toLowerCase()) {
+  if (target.username === req.user.username.toLowerCase()) {
     return res.status(400).json({ error: "You can't ban your own account." });
   }
   await users.updateOne({ _id: req.params.id }, { $set: { banned: true } });
@@ -664,9 +809,8 @@ app.post("/api/users/:id/ban", asyncHandler(async (req, res) => {
   res.json(publicUser(normalizeUser(updated)));
 }));
 
-app.post("/api/users/:id/unban", asyncHandler(async (req, res) => {
-  const { requesterUsername } = req.body || {};
-  if (!requesterUsername || !ALLOWED_CREATOR_USERNAMES.has(requesterUsername.toLowerCase())) {
+app.post("/api/users/:id/unban", requireAuth, asyncHandler(async (req, res) => {
+  if (!ALLOWED_CREATOR_USERNAMES.has(req.user.username.toLowerCase())) {
     return res.status(403).json({ error: "Only admins can unban accounts." });
   }
   const users = db.collection("users");
@@ -817,10 +961,11 @@ app.get("/api/users/:id/spotify/now-playing", asyncHandler(async (req, res) => {
   }
 }));
 
-app.post("/api/users/:id/spotify/disconnect", asyncHandler(async (req, res) => {
+app.post("/api/users/:id/spotify/disconnect", requireAuth, asyncHandler(async (req, res) => {
   const users = db.collection("users");
   const doc = await users.findOne({ _id: req.params.id });
   if (!doc) return res.status(404).json({ error: "User not found" });
+  if (req.user.id !== doc._id) return res.status(403).json({ error: "You can only manage your own Spotify connection." });
   await users.updateOne({ _id: req.params.id }, { $unset: { spotifyAccount: "" } });
   const updated = await users.findOne({ _id: req.params.id });
   res.json(publicUser(normalizeUser(updated)));
@@ -882,8 +1027,8 @@ async function refreshListenSessionFromHost(sessionDoc) {
   }
 }
 
-app.post("/api/listen/sessions", asyncHandler(async (req, res) => {
-  const { hostId } = req.body || {};
+app.post("/api/listen/sessions", requireAuth, asyncHandler(async (req, res) => {
+  const hostId = req.user.id;
   const hostDoc = await db.collection("users").findOne({ _id: hostId });
   if (!hostDoc) return res.status(404).json({ error: "User not found" });
   if (hostDoc.banned) return res.status(403).json({ error: "This account has been banned." });
@@ -921,8 +1066,8 @@ app.get("/api/listen/sessions/:id", asyncHandler(async (req, res) => {
   res.json(publicListenSession(refreshed));
 }));
 
-app.post("/api/listen/sessions/:id/join", asyncHandler(async (req, res) => {
-  const { userId } = req.body || {};
+app.post("/api/listen/sessions/:id/join", requireAuth, asyncHandler(async (req, res) => {
+  const userId = req.user.id;
   const userDoc = await db.collection("users").findOne({ _id: userId });
   if (!userDoc) return res.status(404).json({ error: "User not found" });
   const doc = await db.collection("listenSessions").findOne({ _id: req.params.id, active: true });
@@ -939,8 +1084,8 @@ app.post("/api/listen/sessions/:id/join", asyncHandler(async (req, res) => {
   res.json(publicListenSession(refreshed));
 }));
 
-app.post("/api/listen/sessions/:id/leave", asyncHandler(async (req, res) => {
-  const { userId } = req.body || {};
+app.post("/api/listen/sessions/:id/leave", requireAuth, asyncHandler(async (req, res) => {
+  const userId = req.user.id;
   await db.collection("listenSessions").updateOne(
     { _id: req.params.id },
     { $pull: { participants: { userId } } }
@@ -948,8 +1093,8 @@ app.post("/api/listen/sessions/:id/leave", asyncHandler(async (req, res) => {
   res.json({ left: true });
 }));
 
-app.post("/api/listen/sessions/:id/end", asyncHandler(async (req, res) => {
-  const { userId } = req.body || {};
+app.post("/api/listen/sessions/:id/end", requireAuth, asyncHandler(async (req, res) => {
+  const userId = req.user.id;
   const doc = await db.collection("listenSessions").findOne({ _id: req.params.id });
   if (!doc) return res.status(404).json({ error: "Session not found" });
   if (doc.hostUserId !== userId) return res.status(403).json({ error: "Only the host can end this session." });
@@ -957,8 +1102,8 @@ app.post("/api/listen/sessions/:id/end", asyncHandler(async (req, res) => {
   res.json({ ended: true });
 }));
 
-app.post("/api/listen/sessions/:id/sync-me", asyncHandler(async (req, res) => {
-  const { userId } = req.body || {};
+app.post("/api/listen/sessions/:id/sync-me", requireAuth, asyncHandler(async (req, res) => {
+  const userId = req.user.id;
   const userDoc = await db.collection("users").findOne({ _id: userId });
   if (!userDoc || !userDoc.spotifyAccount || !userDoc.spotifyAccount.connected) {
     return res.status(400).json({ synced: false, reason: "Connect Spotify first." });
@@ -996,7 +1141,7 @@ app.post("/api/listen/sessions/:id/sync-me", asyncHandler(async (req, res) => {
 // (plain regex over the raw HTML) rather than pulling in an HTML parser
 // just for this. A short timeout keeps a slow/unresponsive external site
 // from hanging the request.
-app.get("/api/link-preview", asyncHandler(async (req, res) => {
+app.get("/api/link-preview", linkPreviewRateLimit, asyncHandler(async (req, res) => {
   const url = (req.query.url || "").toString();
   if (!/^https?:\/\//i.test(url)) {
     return res.status(400).json({ error: "A valid http(s) URL is required." });
@@ -1035,7 +1180,7 @@ app.get("/api/link-preview", asyncHandler(async (req, res) => {
   }
 }));
 
-app.post("/api/upload-image", asyncHandler(async (req, res) => {
+app.post("/api/upload-image", uploadRateLimit, asyncHandler(async (req, res) => {
   const { image } = req.body || {};
   if (!image || typeof image !== "string" || !image.startsWith("data:image/")) {
     return res.status(400).json({ error: "A base64 image data URI is required." });
@@ -1069,9 +1214,10 @@ app.get("/api/posts/:id", asyncHandler(async (req, res) => {
   res.json(normalizePost(doc));
 }));
 
-app.post("/api/posts", asyncHandler(async (req, res) => {
-  const { author, title, content, cover, excerpt } = req.body;
-  if (!author || !title || !content) return res.status(400).json({ error: "author, title and content are required" });
+app.post("/api/posts", requireAuth, asyncHandler(async (req, res) => {
+  const { title, content, cover, excerpt } = req.body;
+  const author = req.user.username;
+  if (!title || !content) return res.status(400).json({ error: "title and content are required" });
   if (await isUsernameBanned(author)) return res.status(403).json({ error: "This account has been banned." });
   const createdAt = new Date().toISOString();
   const post = {
@@ -1095,9 +1241,11 @@ app.post("/api/posts", asyncHandler(async (req, res) => {
   res.status(201).json(toClient(post));
 }));
 
-app.delete("/api/posts/:id", asyncHandler(async (req, res) => {
-  const result = await db.collection("posts").deleteOne({ _id: req.params.id });
-  if (!result.deletedCount) return res.status(404).json({ error: "Post not found" });
+app.delete("/api/posts/:id", requireAuth, asyncHandler(async (req, res) => {
+  const post = await db.collection("posts").findOne({ _id: req.params.id });
+  if (!post) return res.status(404).json({ error: "Post not found" });
+  if (post.author !== req.user.username) return res.status(403).json({ error: "You can only delete your own entries." });
+  await db.collection("posts").deleteOne({ _id: req.params.id });
   await db.collection("comments").deleteMany({ postId: req.params.id });
   await db.collection("notifications").deleteMany({ postId: req.params.id });
   res.status(204).end();
@@ -1109,11 +1257,12 @@ app.get("/api/posts/:id/comments", asyncHandler(async (req, res) => {
   res.json(comments);
 }));
 
-app.post("/api/posts/:id/comments", asyncHandler(async (req, res) => {
+app.post("/api/posts/:id/comments", requireAuth, asyncHandler(async (req, res) => {
   const post = await db.collection("posts").findOne({ _id: req.params.id });
-  const { author, body, image } = req.body;
+  const { body, image } = req.body;
+  const author = req.user.username;
   if (!post) return res.status(404).json({ error: "Post not found" });
-  if (!author || (!body && !image)) return res.status(400).json({ error: "author and body or image are required" });
+  if (!body && !image) return res.status(400).json({ error: "body or image are required" });
   if (await isUsernameBanned(author)) return res.status(403).json({ error: "This account has been banned." });
   const comment = {
     _id: generateId("c"),
@@ -1146,18 +1295,24 @@ app.post("/api/posts/:id/comments", asyncHandler(async (req, res) => {
   res.status(201).json(toClient(comment));
 }));
 
-app.delete("/api/posts/:id/comments/:commentId", asyncHandler(async (req, res) => {
-  const result = await db.collection("comments").deleteOne({ _id: req.params.commentId, postId: req.params.id });
-  if (!result.deletedCount) return res.status(404).json({ error: "Comment not found" });
+app.delete("/api/posts/:id/comments/:commentId", requireAuth, asyncHandler(async (req, res) => {
+  const comment = await db.collection("comments").findOne({ _id: req.params.commentId, postId: req.params.id });
+  if (!comment) return res.status(404).json({ error: "Comment not found" });
+  const post = await db.collection("posts").findOne({ _id: req.params.id });
+  const isCommentAuthor = comment.author === req.user.username;
+  const isPostAuthor = post && post.author === req.user.username;
+  if (!isCommentAuthor && !isPostAuthor) {
+    return res.status(403).json({ error: "You can only delete your own replies." });
+  }
+  await db.collection("comments").deleteOne({ _id: req.params.commentId, postId: req.params.id });
   res.status(204).end();
 }));
 
-app.post("/api/posts/:id/like", asyncHandler(async (req, res) => {
+app.post("/api/posts/:id/like", requireAuth, asyncHandler(async (req, res) => {
   const posts = db.collection("posts");
   const post = await posts.findOne({ _id: req.params.id });
-  const { username } = req.body;
+  const username = req.user.username;
   if (!post) return res.status(404).json({ error: "Post not found" });
-  if (!username) return res.status(400).json({ error: "username is required" });
   if (await isUsernameBanned(username)) return res.status(403).json({ error: "This account has been banned." });
   const likedBy = Array.isArray(post.likedBy) ? post.likedBy : [];
   let likes = typeof post.likes === "number" ? post.likes : 0;
@@ -1262,9 +1417,9 @@ async function createChatMessage({ room, author, body, image }) {
   return clientMessage;
 }
 
-app.get("/api/chat/messages", asyncHandler(async (req, res) => {
+app.get("/api/chat/messages", requireAuth, asyncHandler(async (req, res) => {
   const room = (req.query.room || DEFAULT_CHAT_ROOM).toString().slice(0, 200);
-  const viewer = (req.query.username || "").toString();
+  const viewer = req.user.username;
   if (dmParticipants(room) && !canAccessRoom(room, viewer)) {
     return res.status(403).json({ error: "Not a participant in this conversation" });
   }
@@ -1277,9 +1432,8 @@ app.get("/api/chat/messages", asyncHandler(async (req, res) => {
   res.json(docs.map(normalizeChatMessage).reverse());
 }));
 
-app.get("/api/chat/conversations", asyncHandler(async (req, res) => {
-  const username = (req.query.username || "").toString();
-  if (!username) return res.status(400).json({ error: "username is required" });
+app.get("/api/chat/conversations", requireAuth, asyncHandler(async (req, res) => {
+  const username = req.user.username;
   const rooms = await db.collection("messages").distinct("room", { room: { $regex: "^dm:" } });
   const mine = rooms.filter(room => canAccessRoom(room, username));
   const conversations = await Promise.all(mine.map(async room => {
@@ -1311,9 +1465,10 @@ app.get("/api/chat/conversations", asyncHandler(async (req, res) => {
 // Called when someone actually opens/views a conversation - records "now"
 // as their last-read point for that room, so unread counts on future
 // /api/chat/conversations calls only count messages after this moment.
-app.post("/api/chat/mark-read", asyncHandler(async (req, res) => {
-  const { username, room } = req.body || {};
-  if (!username || !room) return res.status(400).json({ error: "username and room are required" });
+app.post("/api/chat/mark-read", requireAuth, asyncHandler(async (req, res) => {
+  const { room } = req.body || {};
+  const username = req.user.username;
+  if (!room) return res.status(400).json({ error: "room is required" });
   await db.collection("chatReadState").updateOne(
     { _id: `${username}:${room}` },
     { $set: { username, room, lastReadAt: new Date().toISOString() } },
@@ -1322,13 +1477,13 @@ app.post("/api/chat/mark-read", asyncHandler(async (req, res) => {
   res.status(204).end();
 }));
 
-app.post("/api/chat/messages", asyncHandler(async (req, res) => {
-  const message = await createChatMessage(req.body);
-  if (!message) return res.status(400).json({ error: "author and (body or image) are required" });
+app.post("/api/chat/messages", requireAuth, asyncHandler(async (req, res) => {
+  const message = await createChatMessage({ ...req.body, author: req.user.username });
+  if (!message) return res.status(400).json({ error: "body or image are required" });
   res.status(201).json(message);
 }));
 
-app.post("/api/login", asyncHandler(async (req, res) => {
+app.post("/api/login", loginRateLimit, asyncHandler(async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) return res.status(400).json({ error: "username and password are required" });
   const user = await db.collection("users").findOne({ username: { $regex: `^${escapeRegex(username)}$`, $options: "i" } });
@@ -1338,7 +1493,8 @@ app.post("/api/login", asyncHandler(async (req, res) => {
     await db.collection("users").updateOne({ _id: user._id }, { $set: { password: user.password } });
   }
   await ensureUsernameBadges(user);
-  res.json(publicUser(normalizeUser(user)));
+  const token = signJWT({ username: user.username, id: user._id });
+  res.json({ ...publicUser(normalizeUser(user)), token });
 }));
 
 app.get("/api/online-users", (req, res) => {
@@ -1426,7 +1582,9 @@ connect()
         socket.destroy();
         return;
       }
-      const username = (url.searchParams.get("username") || "").trim();
+      const token = url.searchParams.get("token") || "";
+      const payload = verifyJWT(token);
+      const username = payload && payload.username ? payload.username : null;
       const room = (url.searchParams.get("room") || DEFAULT_CHAT_ROOM).trim().slice(0, 200) || DEFAULT_CHAT_ROOM;
       if (!username || !canAccessRoom(room, username)) {
         socket.destroy();
