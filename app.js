@@ -913,8 +913,11 @@ function setTheme(theme) {
 }
 
 function setDeviceMode() {
-  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent || "");
-  document.body.classList.toggle("mobile", isMobile);
+  // Treat as mobile if: UA says so, OR the viewport is narrow enough that
+  // the desktop layout wouldn't fit (iPad in portrait, small browser window).
+  const uaMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent || "");
+  const narrowViewport = window.innerWidth <= 768;
+  document.body.classList.toggle("mobile", uaMobile || narrowViewport);
 }
 
 function attachNavScrollWatcher() {

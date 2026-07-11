@@ -2592,3 +2592,222 @@ label:has(#themeToggleSwitch[data-on="1"]) .theme-flank-icon.moon { opacity: 1; 
   .signup-card { padding: 24px 20px; border-radius: 8px; }
   .signup-features { gap: 16px; }
 }
+
+/* ============================================================
+   MOBILE WRITE EDITOR
+   On mobile the editor becomes a full-height native-app-like
+   experience: sticky title header with Publish inline, content
+   area that scrolls freely, and the formatting toolbar pinned
+   at the bottom so it rises with the keyboard.
+   ============================================================ */
+
+/* The main layout wrapper becomes a flex column */
+body.mobile .editor-wrap {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - var(--nav-h));
+  min-height: calc(100dvh - var(--nav-h));
+}
+
+/* ── Mobile sticky header: title + Publish ── */
+.editor-mobile-bar {
+  display: none; /* shown only on mobile below */
+}
+body.mobile .editor-mobile-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--mocha-light);
+  background: var(--paper);
+  position: sticky;
+  top: var(--nav-h);
+  z-index: 90;
+}
+body.mobile .editor-mobile-bar .editor-mobile-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--muted);
+  flex: 1;
+}
+body.mobile .editor-mobile-bar .editor-mobile-cancel {
+  background: none;
+  border: none;
+  font-size: 13px;
+  color: var(--muted);
+  padding: 6px 10px;
+  cursor: pointer;
+  border-radius: var(--radius);
+}
+body.mobile .editor-mobile-bar .editor-mobile-cancel:active { background: var(--mocha-wash); }
+body.mobile .editor-mobile-bar .editor-mobile-publish {
+  background: var(--ink);
+  color: var(--cream);
+  border: none;
+  border-radius: 18px;
+  font-size: 13.5px;
+  font-weight: 600;
+  padding: 8px 20px;
+  cursor: pointer;
+  transition: opacity .15s;
+}
+body.mobile .editor-mobile-bar .editor-mobile-publish:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+body.mobile .editor-mobile-bar .editor-mobile-publish:active { opacity: .75; }
+
+/* ── Cover drop: compact strip on mobile ── */
+body.mobile .editor-cover-drop {
+  min-height: 80px;
+  margin: 0;
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  border-bottom: 1px dashed var(--mocha-light);
+  font-size: 12px;
+  padding: 14px 16px;
+}
+body.mobile .editor-cover-drop img {
+  max-height: 180px;
+}
+
+/* ── Title input on mobile ── */
+body.mobile .editor-title-input {
+  font-size: 26px;
+  padding: 18px 16px 10px;
+  margin-bottom: 0;
+  line-height: 1.25;
+}
+
+/* ── Category row: horizontal scroll, no wrap ── */
+body.mobile .editor-category-row {
+  padding: 10px 16px 10px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-bottom: 1px solid var(--mocha-wash);
+  gap: 6px;
+}
+body.mobile .editor-category-row::-webkit-scrollbar { display: none; }
+
+/* ── Canvas: fills remaining height, generous bottom padding for toolbar ── */
+body.mobile .editor-canvas {
+  flex: 1;
+  min-height: 280px;
+  padding: 18px 16px 140px; /* 140px = toolbar height + keyboard safe gap */
+  font-size: 17px;
+  line-height: 1.75;
+}
+
+/* ── Desktop fixed Publish/Cancel: hidden on mobile (moved to mobile-bar) ── */
+body.mobile .editor-actions { display: none !important; }
+
+/* ── Toolbar: sticks to the BOTTOM on mobile, rises with the keyboard ── */
+body.mobile .toolbar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  top: auto !important;       /* override sticky top */
+  z-index: 200;
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
+  border-bottom: none;
+  border-top: 1px solid var(--mocha-light);
+  margin: 0;
+  padding: 8px 10px;
+  padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+  display: flex !important;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  gap: 0;
+  box-shadow: 0 -2px 12px rgba(28,25,23,.06);
+  scrollbar-width: none;
+  /* keyboard-aware: JS sets --kb-offset from visualViewport */
+  transform: translateY(calc(var(--kb-offset, 0px) * -1));
+  transition: transform 0.05s linear;
+  will-change: transform;
+}
+body.mobile .toolbar::-webkit-scrollbar { display: none; }
+body.mobile .tb-btn {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  font-size: 16px;
+  border-radius: var(--radius);
+}
+body.mobile .tb-btn svg { width: 18px; height: 18px; }
+body.mobile .tb-sep {
+  width: 1px;
+  margin: 6px 6px;
+  flex-shrink: 0;
+}
+
+/* ── Inline URL input overlay (replaces prompt() on mobile) ── */
+.editor-url-overlay {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 300;
+  background: var(--paper);
+  border-top: 1px solid var(--mocha-light);
+  padding: 14px 16px;
+  padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  box-shadow: 0 -4px 20px rgba(28,25,23,.12);
+  animation: slide-up .18s ease;
+}
+.editor-url-overlay.open { display: block; }
+@keyframes slide-up {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+.editor-url-overlay-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.editor-url-overlay-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.editor-url-overlay-row input {
+  flex: 1;
+  padding: 11px 13px;
+  border: 1px solid var(--mocha-light);
+  border-radius: var(--radius);
+  font-size: 15px;
+  font-family: var(--font-body);
+  background: var(--cream);
+  color: var(--ink);
+}
+.editor-url-overlay-row input:focus { outline: none; border-color: var(--ink); }
+.editor-url-overlay-row button {
+  padding: 11px 18px;
+  border-radius: var(--radius);
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.editor-url-overlay-confirm {
+  background: var(--ink);
+  color: var(--cream);
+}
+.editor-url-overlay-cancel {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--mocha-light) !important;
+}
