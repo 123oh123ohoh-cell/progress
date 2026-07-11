@@ -41,9 +41,9 @@
   let currentRoom = GLOBAL_ROOM;
   let currentPeer = null; // username, or null for the global room
 
-  // Call state broadcasting — keeps the global call bar in sync on all pages
-  const CALL_CHANNEL   = "progress-call";
-  const CALL_STATE_KEY = "progress:callActive";
+  // Call state broadcasting — CALL_CHANNEL and CALL_STATE_KEY are declared
+  // in app.js (which loads first); re-declaring them here as const would
+  // throw a SyntaxError in every browser. Just declare the local var.
   let _callBC = null;
 
   function initCallBroadcast() {
