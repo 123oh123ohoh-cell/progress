@@ -43,8 +43,29 @@
       </div>
     </div>
 
-    <div style="margin-top:36px; padding-top:24px; border-top:1px solid var(--mocha-light);">
+    <div style="margin-top:36px; padding-top:24px; border-top:1px solid var(--mocha-light); display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
       <a href="users.html" class="btn" style="display:inline-block;">Manage users (lock / ban) &rarr;</a>
+    </div>
+
+    <!-- Full post management -->
+    <div style="margin-top:40px; padding-top:32px; border-top:1px solid var(--mocha-light);">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; gap:12px; flex-wrap:wrap;">
+        <h2 style="font-family:var(--font-display); font-size:22px; margin:0;">All Posts</h2>
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+          <input id="adminPostSearch" type="search" placeholder="Search posts…" style="padding:7px 12px; border:1px solid var(--mocha-light); border-radius:var(--radius); font-size:13px; background:var(--paper); color:var(--ink); width:180px;">
+          <select id="adminPostCatFilter" style="padding:7px 12px; border:1px solid var(--mocha-light); border-radius:var(--radius); font-size:13px; background:var(--paper); color:var(--ink);">
+            <option value="">All categories</option>
+            <option value="development">Development</option>
+            <option value="creative">Creative</option>
+            <option value="random">Random</option>
+            <option value="none">No category</option>
+          </select>
+        </div>
+      </div>
+      <div id="adminPostsList">
+        <p style="color:var(--muted); font-size:14px;">Loading posts…</p>
+      </div>
+      <div id="adminPostsPager" style="display:flex; gap:8px; margin-top:16px; flex-wrap:wrap;"></div>
     </div>
   </div>
 </main>
@@ -132,7 +153,145 @@
         <div style="font-size:12px; color:var(--muted);">@${p.author} &middot; ${Progress.formatDateShort(p.date)}</div>
       </a>
     `).join("") || `<p style="color:var(--muted); font-size:14px;">No entries yet.</p>`;
+
+    // Load the full post management table
+    loadAllPosts();
   }
+
+  let allAdminPosts = [];
+  let adminPostPage = 0;
+  const ADMIN_PAGE_SIZE = 20;
+
+  async function loadAllPosts() {
+    const listEl   = document.getElementById("adminPostsList");
+    const pagerEl  = document.getElementById("adminPostsPager");
+    if (!listEl) return;
+    listEl.innerHTML = `<p style="color:var(--muted); font-size:14px;">Loading…</p>`;
+
+    // Fetch all posts — the admin stats endpoint gives us recentPosts but we
+    // need everything; fall back to the public /api/posts endpoint.
+    const result = await apiFetch("/api/posts?limit=500");
+    if (!result) {
+      listEl.innerHTML = `<p style="color:var(--danger); font-size:14px;">Couldn't load posts.</p>`;
+      return;
+    }
+    allAdminPosts = Array.isArray(result) ? result : (result.posts || []);
+    renderAdminPosts();
+  }
+
+  function renderAdminPosts() {
+    const listEl  = document.getElementById("adminPostsList");
+    const pagerEl = document.getElementById("adminPostsPager");
+    if (!listEl) return;
+    const query     = (document.getElementById("adminPostSearch")?.value || "").toLowerCase();
+    const catFilter = document.getElementById("adminPostCatFilter")?.value || "";
+    let filtered = allAdminPosts.filter(p => {
+      if (query && !p.title.toLowerCase().includes(query) && !p.author.toLowerCase().includes(query)) return false;
+      if (catFilter === "none" && p.category) return false;
+      if (catFilter && catFilter !== "none" && (p.category || "").toLowerCase() !== catFilter) return false;
+      return true;
+    });
+    const total    = filtered.length;
+    const pages    = Math.ceil(total / ADMIN_PAGE_SIZE);
+    adminPostPage  = Math.max(0, Math.min(adminPostPage, pages - 1));
+    const slice    = filtered.slice(adminPostPage * ADMIN_PAGE_SIZE, (adminPostPage + 1) * ADMIN_PAGE_SIZE);
+
+    if (!slice.length) {
+      listEl.innerHTML = `<p style="color:var(--muted); font-size:14px;">No posts match this filter.</p>`;
+      pagerEl.innerHTML = "";
+      return;
+    }
+
+    listEl.innerHTML = slice.map(p => `
+      <div class="admin-post-row" data-post-id="${p.id}">
+        <div class="admin-post-info">
+          <a class="admin-post-title" href="post.html?id=${p.id}" target="_blank">${escapeHTML(p.title || "(untitled)")}</a>
+          <div class="admin-post-meta">@${escapeHTML(p.author)} &middot; ${Progress.formatDateShort(p.date)}
+            ${p.category ? `&middot; <span style="color:var(--accent);">${escapeHTML(p.category)}</span>` : ""}
+          </div>
+        </div>
+        <select class="admin-cat-select" data-post-id="${p.id}" title="Set category">
+          <option value="">No category</option>
+          <option value="development" ${p.category === "development" ? "selected" : ""}>Development</option>
+          <option value="creative"    ${p.category === "creative"    ? "selected" : ""}>Creative</option>
+          <option value="random"      ${p.category === "random"      ? "selected" : ""}>Random</option>
+        </select>
+        <button class="admin-delete-btn" data-post-id="${p.id}" title="Delete post">Delete</button>
+      </div>
+    `).join("");
+
+    // Category change
+    listEl.querySelectorAll(".admin-cat-select").forEach(sel => {
+      sel.addEventListener("change", async () => {
+        const postId  = sel.dataset.postId;
+        const cat     = sel.value;
+        const user    = Progress.getCurrentUser();
+        if (!user) return;
+        sel.disabled = true;
+        const r = await apiFetch(`/api/posts/${postId}/category`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ category: cat || null, requesterUsername: user.username })
+        });
+        sel.disabled = false;
+        if (r) {
+          showToast("Category updated.");
+          const post = allAdminPosts.find(p => p.id === postId);
+          if (post) post.category = cat || null;
+          renderAdminPosts();
+        } else {
+          showToast("Couldn't update category.");
+          sel.value = allAdminPosts.find(p => p.id === postId)?.category || "";
+        }
+      });
+    });
+
+    // Delete
+    listEl.querySelectorAll(".admin-delete-btn").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const postId = btn.dataset.postId;
+        const post   = allAdminPosts.find(p => p.id === postId);
+        if (!confirm(`Delete "${post?.title || postId}"? This can't be undone.`)) return;
+        const user = Progress.getCurrentUser();
+        if (!user) return;
+        btn.disabled = true;
+        const r = await apiFetch(`/api/posts/${postId}`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ requesterUsername: user.username })
+        });
+        if (r !== null) {
+          showToast("Post deleted.");
+          allAdminPosts = allAdminPosts.filter(p => p.id !== postId);
+          renderAdminPosts();
+        } else {
+          showToast("Couldn't delete that post.");
+          btn.disabled = false;
+        }
+      });
+    });
+
+    // Pagination
+    if (pagerEl) {
+      pagerEl.innerHTML = Array.from({ length: pages }, (_, i) => `
+        <button class="btn ${i === adminPostPage ? "primary" : ""}" data-page="${i}"
+          style="padding:6px 14px; font-size:13px;">${i + 1}</button>
+      `).join("");
+      pagerEl.querySelectorAll("button").forEach(btn => {
+        btn.addEventListener("click", () => {
+          adminPostPage = Number(btn.dataset.page);
+          renderAdminPosts();
+          listEl.scrollIntoView({ behavior: "smooth" });
+        });
+      });
+    }
+  }
+
+  // Wire search/filter inputs
+  ["adminPostSearch","adminPostCatFilter"].forEach(id => {
+    document.addEventListener("input", e => { if (e.target.id === id) { adminPostPage = 0; renderAdminPosts(); } });
+    document.addEventListener("change", e => { if (e.target.id === id) { adminPostPage = 0; renderAdminPosts(); } });
+  });
 
   async function start() {
     initShell("admin");

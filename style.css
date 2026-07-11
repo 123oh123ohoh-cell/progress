@@ -2811,3 +2811,338 @@ body.mobile .tb-sep {
   color: var(--muted);
   border: 1px solid var(--mocha-light) !important;
 }
+
+/* ============================================================
+   CHAT — SEND BUTTON (icon-only on mobile, text on desktop)
+   ============================================================ */
+
+.chat-send-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 20px;
+  height: 46px;
+  border-radius: var(--radius);
+  border: none;
+  background: var(--ink);
+  color: var(--cream);
+  font-size: 14.5px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: opacity .15s;
+}
+.chat-send-btn:hover { opacity: .85; }
+.chat-send-btn:active { opacity: .7; }
+.chat-send-icon { width: 16px; height: 16px; flex-shrink: 0; }
+/* Hide label text on mobile — icon only */
+@media (max-width: 600px) {
+  .chat-input-row { padding: 10px 12px; gap: 6px; }
+  .chat-emoji-btn { width: 38px; font-size: 18px; }
+  .chat-send-label { display: none; }
+  .chat-send-btn { width: 42px; padding: 0; justify-content: center; border-radius: 50%; }
+}
+
+/* ============================================================
+   CHAT — CALL BUTTON IN PANEL HEADER
+   ============================================================ */
+
+.chat-call-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--mocha-light);
+  border-radius: 50%;
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background .15s, border-color .15s;
+}
+.chat-call-btn:hover { background: #e6ffe6; border-color: #00aa44; color: #006622; }
+
+/* ============================================================
+   CHAT — DM LISTEN-TOGETHER COMPACT BANNER
+   ============================================================ */
+
+.dm-listen-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: linear-gradient(90deg, var(--mocha-wash), transparent);
+  border-bottom: 1px solid var(--mocha-wash);
+  font-size: 13px;
+  color: var(--mocha-dark);
+  animation: slide-down .2s ease;
+}
+@keyframes slide-down { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
+.dm-listen-banner-icon { font-size: 16px; flex-shrink: 0; }
+.dm-listen-banner-track { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+.dm-listen-banner-artist { color: var(--muted); font-size: 12px; flex-shrink: 0; }
+.dm-listen-action {
+  flex-shrink: 0;
+  padding: 4px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--mocha-light);
+  background: var(--paper);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--ink);
+}
+.dm-listen-action:hover { background: var(--mocha-wash); }
+.dm-listen-leave { color: var(--muted); }
+
+/* ============================================================
+   VOICE CALL OVERLAY
+   ============================================================ */
+
+.call-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  background: rgba(10, 6, 20, .55);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .25s ease;
+}
+.call-overlay.open {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.call-card {
+  background: var(--paper);
+  border-radius: 20px;
+  padding: 40px 32px 32px;
+  text-align: center;
+  min-width: 240px;
+  max-width: 320px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.3);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.call-avatar-wrap {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  overflow: hidden;
+  margin-bottom: 4px;
+  border: 3px solid var(--mocha-light);
+}
+.call-avatar-wrap img, .call-avatar-wrap .initials-lg {
+  width: 72px !important;
+  height: 72px !important;
+}
+.call-name {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.call-state-label {
+  font-size: 14px;
+  color: var(--muted);
+}
+.call-controls {
+  display: flex;
+  gap: 16px;
+  margin-top: 12px;
+}
+.call-ctrl {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform .12s ease, opacity .15s;
+}
+.call-ctrl:active { transform: scale(.9); }
+.call-ctrl svg { width: 24px; height: 24px; }
+.call-ctrl-accept {
+  background: #00cc55;
+  color: #fff;
+}
+.call-ctrl-accept:hover { background: #00aa44; }
+.call-ctrl-end {
+  background: #ff3b30;
+  color: #fff;
+}
+.call-ctrl-end:hover { background: #cc2a22; }
+.call-ctrl-mute {
+  background: var(--mocha-wash);
+  color: var(--ink);
+}
+.call-ctrl-mute:hover { background: var(--mocha-light); }
+.call-ctrl-mute.active {
+  background: var(--ink);
+  color: var(--cream);
+}
+/* Incoming call: ring animation on avatar */
+.call-overlay.open .call-avatar-wrap {
+  animation: call-ring 1.4s ease-in-out infinite;
+}
+@keyframes call-ring {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(0, 204, 85, .5); }
+  50%       { box-shadow: 0 0 0 14px rgba(0, 204, 85, 0); }
+}
+
+/* ============================================================
+   MEXICAN CANDY MODE 🍭
+   Applied via body.candy-mode — stacks on top of dark/light.
+   ============================================================ */
+
+body.candy-mode {
+  --ink: #1e0044;
+  --paper: #fff3fc;
+  --cream: #fff8fe;
+  --bg: #fce5f8;
+  --bg-card: #fff0fb;
+  --muted: #b84fac;
+  --mocha: #d455c0;
+  --mocha-light: #f4b0ea;
+  --mocha-wash: #fde4f8;
+  --mocha-dark: #8a1e7a;
+  --border-color: #f4b0ea;
+  --accent: #ff1a8c;
+  --danger: #ff4433;
+}
+[data-theme="dark"].candy-mode,
+[data-theme="dark"] body.candy-mode {
+  --ink: #ffd6f5;
+  --paper: #2a0040;
+  --cream: #35004d;
+  --bg: #1a0030;
+  --bg-card: #2a0040;
+  --muted: #cc66cc;
+  --mocha: #e080d0;
+  --mocha-light: #5a205a;
+  --mocha-wash: #380050;
+  --mocha-dark: #f099e0;
+  --border-color: #5a205a;
+  --accent: #ff44aa;
+}
+
+/* Rainbow nav */
+body.candy-mode .nav {
+  background: linear-gradient(90deg,
+    #ff1a8c 0%, #ff6600 16%, #ffdd00 33%,
+    #00cc44 50%, #0088ff 66%, #aa00ff 83%, #ff1a8c 100%) !important;
+  background-size: 200% 100% !important;
+  animation: candy-nav 4s linear infinite !important;
+}
+@keyframes candy-nav {
+  from { background-position: 0% 0%; }
+  to   { background-position: 200% 0%; }
+}
+body.candy-mode .nav-logo,
+body.candy-mode .nav-logo *,
+body.candy-mode .nav a,
+body.candy-mode .nav button { color: #fff !important; }
+body.candy-mode .nav-new { background: rgba(255,255,255,.25) !important; border-color: rgba(255,255,255,.4) !important; }
+
+/* Rainbow header text */
+body.candy-mode .feed-header h1,
+body.candy-mode .post-title {
+  background: linear-gradient(90deg, #ff1a8c, #ff6600, #ffdd00, #00cc44, #0088ff, #aa00ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+body.candy-mode .header-icon { filter: hue-rotate(280deg) saturate(3); }
+
+/* Candy buttons */
+body.candy-mode .btn.primary {
+  background: linear-gradient(135deg, #ff1a8c, #aa00ff) !important;
+  border-color: transparent !important;
+}
+body.candy-mode .btn.primary:hover { opacity: .88; }
+
+/* Candy card hover */
+body.candy-mode .entry:hover { background: var(--mocha-wash); }
+
+/* Candy scrollbar */
+body.candy-mode ::-webkit-scrollbar-thumb { background: linear-gradient(#ff1a8c, #aa00ff); }
+
+/* Candy modal */
+body.candy-mode .modal { border-top: 4px solid; border-image: linear-gradient(90deg, #ff1a8c, #ffdd00, #00cc44, #aa00ff) 1; }
+
+/* Candy input focus */
+body.candy-mode input:focus,
+body.candy-mode textarea:focus,
+body.candy-mode .editor-canvas:focus { outline-color: #ff1a8c; }
+
+/* Lollipop cursor on candy mode for fun */
+body.candy-mode { cursor: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'><circle cx='14' cy='14' r='10' fill='%23ff1a8c' stroke='%23fff' stroke-width='2'/><line x1='22' y1='22' x2='30' y2='30' stroke='%231e0044' stroke-width='3' stroke-linecap='round'/></svg>") 14 14, auto; }
+
+/* Candy toolbar */
+body.candy-mode .toolbar { background: linear-gradient(90deg, #fff3fc, #fce5f8); border-color: #f4b0ea; }
+body.candy-mode .tb-btn.active { background: linear-gradient(135deg, #ff1a8c, #aa00ff); }
+
+/* Candy chat */
+body.candy-mode .chat-msg.mine .chat-bubble { background: linear-gradient(135deg, #ff1a8c, #cc44ff); }
+body.candy-mode .chat-send-btn { background: linear-gradient(135deg, #ff1a8c, #aa00ff); }
+
+/* Candy profile badges */
+body.candy-mode .badge-icon { filter: hue-rotate(280deg) saturate(2); }
+
+/* ============================================================
+   ADMIN — POST MANAGEMENT SECTION
+   ============================================================ */
+
+.admin-post-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--mocha-wash);
+}
+.admin-post-row:last-child { border-bottom: none; }
+.admin-post-info { flex: 1; min-width: 0; }
+.admin-post-title {
+  font-size: 14px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink);
+  text-decoration: none;
+}
+.admin-post-title:hover { text-decoration: underline; }
+.admin-post-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.admin-cat-select {
+  font-size: 11px;
+  padding: 3px 7px;
+  border: 1px solid var(--mocha-light);
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.admin-delete-btn {
+  flex-shrink: 0;
+  padding: 5px 10px;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--danger);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.admin-delete-btn:hover { background: var(--danger); color: #fff; }

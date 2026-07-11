@@ -248,6 +248,17 @@ refreshNowPlaying();
           <p class="field-note" id="notifStatusNote">Get a popup for likes, replies, follows, and messages while this browser's open - even if you've tabbed away. Doesn't work if the tab is fully closed.</p>
         </div>
         <div class="settings-section">
+          <h3>🍭 Mexican Candy Mode</h3>
+          <label style="display:flex; align-items:center; gap:12px; cursor:pointer;">
+            <span class="theme-toggle-switch" id="candyToggleSwitch">
+              <span class="theme-toggle-knob"></span>
+            </span>
+            <span style="font-size:14px;">Turn on Mexican Candy mode</span>
+          </label>
+          <p class="field-note">Rainbow nav, hot pink accents, lollipop cursor, and pure sugar energy. Pair with dark mode for extra drama.</p>
+        </div>
+
+        <div class="settings-section">
           <h3>Post categories</h3>
           <label style="display:flex; align-items:center; gap:12px; cursor:pointer;">
             <span class="theme-toggle-switch" id="categoryToggleSwitch" data-on="${getCategoryTabsEnabled() ? "1" : "0"}">
@@ -264,6 +275,20 @@ refreshNowPlaying();
           <button class="btn danger" id="deleteAccountBtn">Delete account</button>
         </div>
       `;
+      // Mexican Candy mode toggle
+      const candyToggle = document.getElementById("candyToggleSwitch");
+      if (candyToggle) {
+        candyToggle.dataset.on = getCandyMode() ? "1" : "0";
+        if (getCandyMode()) candyToggle.classList.add("on");
+        candyToggle.addEventListener("click", () => {
+          const nowOn = candyToggle.dataset.on !== "1";
+          candyToggle.dataset.on = nowOn ? "1" : "0";
+          candyToggle.classList.toggle("on", nowOn);
+          setCandyMode(nowOn);
+          showToast(nowOn ? "🍭 Mexican Candy mode activated!" : "Candy mode off.");
+        });
+      }
+
       // Category tabs toggle
       const catToggle = document.getElementById("categoryToggleSwitch");
       if (catToggle) {

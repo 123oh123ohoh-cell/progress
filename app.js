@@ -285,7 +285,7 @@ function renderListenSessionCard(session, opts) {
   const hasProgress = typeof session.progressMs === "number" && typeof session.durationMs === "number" && session.durationMs > 0;
   const pct = hasProgress ? Math.min(100, (session.progressMs / session.durationMs) * 100) : 0;
   const dataAttrs = hasProgress
-    ? `data-duration-ms="${session.durationMs}" data-progress-ms="${session.progressMs}" data-fetched-at="${session.updatedAt || Date.now()}" data-is-playing="${session.isPlaying ? "1" : "0"}"`
+    ? `data-duration-ms="${session.durationMs}" data-progress-ms="${session.progressMs}" data-fetched-at="${Date.now()}" data-is-playing="${session.isPlaying ? "1" : "0"}"`
     : "";
   const viewer = Progress.getCurrentUser();
   const isHost = viewer && viewer.username === session.hostUsername;
@@ -912,6 +912,23 @@ function setTheme(theme) {
   applyTheme(theme);
 }
 
+/* ============================================================
+   MEXICAN CANDY MODE — a wild, joyful accent theme
+   Applied as a body class so it stacks on top of dark/light.
+   ============================================================ */
+const CANDY_MODE_KEY = "progressCandyMode";
+
+function getCandyMode() {
+  try { return localStorage.getItem(CANDY_MODE_KEY) === "1"; } catch (e) { return false; }
+}
+function setCandyMode(on) {
+  try { localStorage.setItem(CANDY_MODE_KEY, on ? "1" : ""); } catch (e) {}
+  document.body.classList.toggle("candy-mode", on);
+}
+function applyCandy() {
+  document.body.classList.toggle("candy-mode", getCandyMode());
+}
+
 function setDeviceMode() {
   // Treat as mobile if: UA says so, OR the viewport is narrow enough that
   // the desktop layout wouldn't fit (iPad in portrait, small browser window).
@@ -1155,6 +1172,7 @@ function openPresenceSocket(activePage) {
 
 function initShell(activePage) {
   applyTheme(getStoredTheme());
+  applyCandy();
   setDeviceMode();
   window.addEventListener("resize", setDeviceMode);
   renderNav(activePage);
