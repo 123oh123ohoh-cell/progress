@@ -1065,6 +1065,15 @@ function handleIncomingNotification(notification) {
     renderNotifDropdown();
   }
 
+  // Play a subtle sound whenever a notification arrives, regardless of
+  // focus state - muted by default so it only fires if the browser allows
+  // autoplay (i.e. the user has interacted with the page at some point).
+  try {
+    const sfx = new Audio("sounds/notification.mp3");
+    sfx.volume = 0.45;
+    sfx.play().catch(() => {}); // silently ignore autoplay blocks
+  } catch (e) {}
+
   // Fire an OS notification whenever the browser window isn't focused -
   // this covers tabbing away to another app, minimising, locking the screen,
   // or switching to a different Chrome window. We use !document.hasFocus()
@@ -1170,4 +1179,220 @@ function initShell(activePage) {
         renderNotifDropdown();
       }
     });
+}
+/* ============================================================
+   MENTION AUTOCOMPLETE
+   Shared utility - attach to any <input> or <textarea>.
+   Shows a floating dropdown of matching @usernames as the user
+   types, with keyboard navigation. Works in chat and the write
+   editor's title field.
+   ============================================================ */
+
+function createMentionAutocomplete(input, opts = {}) {
+  // The dropdown is appended to opts.container (defaults to the input's
+  // parent). That element needs position:relative - callers set it if needed.
+  const container = opts.container || input.parentElement;
+  if (container) container.style.position = "relative";
+
+  let dropdownEl = null;
+  let activeIdx = -1;
+  let currentMention = null; // { start, text }
+
+  function getMatchingUsers(query) {
+    const q = (query || "").toLowerCase();
+    return (Progress.db.users || [])
+      .filter(u => u.username && (
+        u.username.toLowerCase().startsWith(q) ||
+        (u.name || "").toLowerCase().includes(q)
+      ))
+      .slice(0, 6);
+  }
+
+  function renderDropdown(matches, mention) {
+    currentMention = mention;
+    activeIdx = -1;
+    if (!dropdownEl) {
+      dropdownEl = document.createElement("div");
+      dropdownEl.className = "mention-dropdown";
+      container.appendChild(dropdownEl);
+    }
+    dropdownEl.innerHTML = matches.map((u, i) => `
+      <button type="button" class="mention-dd-item" data-username="${escapeHTML(u.username)}">
+        ${u.avatar
+          ? `<img class="mention-dd-avatar" src="${u.avatar}" alt="">`
+          : `<div class="mention-dd-avatar mention-dd-initials">${initials(u.name)}</div>`}
+        <span class="mention-dd-name">${escapeHTML(u.name || u.username)}</span>
+        <span class="mention-dd-user">@${escapeHTML(u.username)}</span>
+      </button>
+    `).join("");
+    dropdownEl.querySelectorAll(".mention-dd-item").forEach(btn => {
+      btn.addEventListener("mousedown", e => { e.preventDefault(); selectUser(btn.dataset.username); });
+    });
+    dropdownEl.style.display = "block";
+  }
+
+  function hideDropdown() {
+    currentMention = null;
+    activeIdx = -1;
+    if (dropdownEl) dropdownEl.style.display = "none";
+  }
+
+  function setActive(idx) {
+    const items = dropdownEl ? dropdownEl.querySelectorAll(".mention-dd-item") : [];
+    items.forEach(el => el.classList.remove("active"));
+    activeIdx = Math.max(-1, Math.min(idx, items.length - 1));
+    if (activeIdx >= 0) {
+      items[activeIdx].classList.add("active");
+      items[activeIdx].scrollIntoView({ block: "nearest" });
+    }
+  }
+
+  function selectUser(username) {
+    if (!currentMention) return;
+    const val = input.value;
+    const before = val.slice(0, currentMention.start);
+    const after = val.slice(currentMention.start + currentMention.text.length + 1);
+    const inserted = before + "@" + username + " " + after;
+    input.value = inserted;
+    const cursor = before.length + username.length + 2;
+    input.selectionStart = input.selectionEnd = cursor;
+    input.focus();
+    hideDropdown();
+    opts.onInsert && opts.onInsert();
+  }
+
+  function findMentionAtCursor() {
+    const val = input.value;
+    const pos = input.selectionStart;
+    let i = pos - 1;
+    while (i >= 0) {
+      const ch = val[i];
+      if (ch === "@") {
+        const text = val.slice(i + 1, pos);
+        if (/^[a-zA-Z0-9_.]*$/.test(text)) return { start: i, text };
+        break;
+      }
+      if (ch === " " || ch === "\n") break;
+      i--;
+    }
+    return null;
+  }
+
+  function update() {
+    const mention = findMentionAtCursor();
+    if (mention && mention.text.length >= 1) {
+      const matches = getMatchingUsers(mention.text);
+      if (matches.length) { renderDropdown(matches, mention); return; }
+    } else if (mention && mention.text.length === 0) {
+      const matches = getMatchingUsers("");
+      if (matches.length) { renderDropdown(matches, mention); return; }
+    }
+    hideDropdown();
+  }
+
+  input.addEventListener("input", update);
+  input.addEventListener("keyup", e => {
+    if (["ArrowLeft","ArrowRight","Home","End"].includes(e.key)) update();
+  });
+
+  input.addEventListener("keydown", e => {
+    if (!dropdownEl || dropdownEl.style.display === "none") return;
+    const items = dropdownEl.querySelectorAll(".mention-dd-item");
+    if (!items.length) return;
+    if (e.key === "ArrowDown") { e.preventDefault(); setActive(activeIdx + 1); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setActive(activeIdx - 1); }
+    else if ((e.key === "Enter" || e.key === "Tab") && activeIdx >= 0) {
+      e.preventDefault();
+      selectUser(items[activeIdx].dataset.username);
+    } else if (e.key === "Escape") { e.preventDefault(); hideDropdown(); }
+  });
+
+  input.addEventListener("blur", () => setTimeout(hideDropdown, 180));
+  return { hide: hideDropdown };
+}
+
+/* ============================================================
+   PULL-TO-REFRESH
+   Touch-only. Call initPullToRefresh(onRefreshFn) on any page
+   that wants the pull-down-to-reload gesture. Shows a random
+   emoticon while the user pulls, spins it while refreshing.
+   ============================================================ */
+
+function initPullToRefresh(onRefresh) {
+  if (!("ontouchstart" in window)) return;
+  const THRESHOLD = 72;
+  let startY = 0;
+  let lastY = 0;
+  let pulling = false;
+  let indicator = null;
+  let emoteName = null;
+  let triggered = false;
+
+  document.addEventListener("touchstart", e => {
+    if (window.scrollY > 2) return;
+    startY = e.touches[0].clientY;
+    lastY = startY;
+    pulling = true;
+    triggered = false;
+    emoteName = EMOTICON_NAMES[Math.floor(Math.random() * EMOTICON_NAMES.length)];
+  }, { passive: true });
+
+  document.addEventListener("touchmove", e => {
+    if (!pulling) return;
+    lastY = e.touches[0].clientY;
+    const dy = Math.max(0, lastY - startY);
+    if (dy < 8) return;
+    if (!indicator) {
+      indicator = document.createElement("div");
+      indicator.className = "ptr-indicator";
+      indicator.innerHTML = `<img class="ptr-emote" src="images/emoticons/${emoteName}.png" alt=""><span class="ptr-label">Pull to refresh</span>`;
+      document.body.appendChild(indicator);
+    }
+    const pct = Math.min(dy / THRESHOLD, 1);
+    const travel = Math.min(dy * 0.42, 72);
+    indicator.style.transform = `translateX(-50%) translateY(${travel}px)`;
+    indicator.style.opacity = String(Math.min(pct * 1.6, 1));
+    indicator.querySelector(".ptr-label").textContent = pct >= 1 ? "Release to refresh ✓" : "Pull to refresh";
+    if (pct >= 1) indicator.querySelector(".ptr-emote").classList.add("ptr-ready");
+    else indicator.querySelector(".ptr-emote").classList.remove("ptr-ready");
+  }, { passive: true });
+
+  document.addEventListener("touchend", async () => {
+    if (!pulling) return;
+    pulling = false;
+    const dy = Math.max(0, lastY - startY);
+    if (!indicator) return;
+    if (dy >= THRESHOLD && !triggered) {
+      triggered = true;
+      indicator.querySelector(".ptr-label").textContent = "Refreshing…";
+      indicator.querySelector(".ptr-emote").classList.add("ptr-spinning");
+      try { await onRefresh(); } catch (e) {}
+    }
+    indicator.style.transition = "opacity .25s ease, transform .25s ease";
+    indicator.style.opacity = "0";
+    indicator.style.transform = "translateX(-50%) translateY(-40px)";
+    const el = indicator;
+    setTimeout(() => el.remove(), 280);
+    indicator = null;
+  }, { passive: true });
+}
+
+/* ============================================================
+   CATEGORY TABS — post feed filtering
+   Stored in localStorage so the preference persists.
+   ============================================================ */
+const CATEGORY_FEATURE_KEY = "progressCategoryTabs";
+const CATEGORY_ACTIVE_KEY  = "progressActiveCategory";
+
+function getCategoryTabsEnabled() {
+  try { return localStorage.getItem(CATEGORY_FEATURE_KEY) === "true"; } catch (e) { return false; }
+}
+function setCategoryTabsEnabled(v) {
+  try { localStorage.setItem(CATEGORY_FEATURE_KEY, v ? "true" : "false"); } catch (e) {}
+}
+function getActiveCategory() {
+  try { return localStorage.getItem(CATEGORY_ACTIVE_KEY) || "all"; } catch (e) { return "all"; }
+}
+function setActiveCategory(v) {
+  try { localStorage.setItem(CATEGORY_ACTIVE_KEY, v); } catch (e) {}
 }

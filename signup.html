@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Join Progress — a journal for what you're building</title>
+<meta property="og:site_name" content="Progress">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://progressing.online/signup.html">
+<meta property="og:title" content="Join Progress">
+<meta property="og:description" content="A running record of things made, fixed, rebuilt, and understood a little better than yesterday.">
+<meta property="og:image" content="https://progressing.online/images/nearheader.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Join Progress">
+<meta name="twitter:description" content="A running record of things made, fixed, rebuilt, and understood a little better than yesterday.">
+<meta name="twitter:image" content="https://progressing.online/images/nearheader.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;1,500;1,600&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script>(function(){try{var t=localStorage.getItem("progressTheme");var dark=(t==="dark")||(t!=="light"&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);if(dark)document.documentElement.setAttribute("data-theme","dark");}catch(e){}})();</script>
+</head>
+<body class="signup-page">
+
+<div id="modal-root">
+  <!-- toast lives here even on standalone pages -->
+  <div class="toast" id="toast"></div>
+</div>
+
+<div class="signup-hero">
+
+  <!-- Logo -->
+  <img class="signup-logo" src="images/nearheader.png" alt="Progress">
+
+  <!-- Headline -->
+  <h1>progress<span class="signup-dot">.</span></h1>
+  <p class="signup-tagline">A running record of things made, fixed, rebuilt, and understood a little better than yesterday.</p>
+
+  <!-- Auth card — switches between signup / login / notification step -->
+  <div class="signup-card" id="authCard">
+
+    <!-- ── Signup pane ── -->
+    <div id="signupPane">
+      <h2>Start your journal</h2>
+      <p class="signup-sub">It takes a minute. Everyone's welcome.</p>
+      <div class="signup-error" id="signupError"></div>
+      <div class="signup-field">
+        <label for="signupName">Display name</label>
+        <input id="signupName" type="text" placeholder="Mara Studios" autocapitalize="words" spellcheck="false">
+      </div>
+      <div class="signup-field">
+        <label for="signupUsername">Username</label>
+        <input id="signupUsername" type="text" placeholder="mara" autocapitalize="none" spellcheck="false" autocorrect="off">
+      </div>
+      <div class="signup-field">
+        <label for="signupPassword">Password</label>
+        <input id="signupPassword" type="password" autocomplete="new-password" placeholder="••••••••" autocapitalize="none">
+      </div>
+      <button class="signup-submit" id="signupSubmit">Create account</button>
+      <p class="signup-switch">Already have an account? <button id="toLogin">Log in</button></p>
+    </div>
+
+    <!-- ── Login pane ── -->
+    <div id="loginPane" style="display:none;">
+      <h2>Welcome back</h2>
+      <p class="signup-sub">Good to see you again.</p>
+      <div class="signup-error" id="loginError"></div>
+      <div class="signup-field">
+        <label for="loginUsername">Username</label>
+        <input id="loginUsername" type="text" placeholder="mara" autocapitalize="none" spellcheck="false" autocorrect="off" autocomplete="username">
+      </div>
+      <div class="signup-field">
+        <label for="loginPassword">Password</label>
+        <input id="loginPassword" type="password" autocomplete="current-password" placeholder="••••••••" autocapitalize="none">
+      </div>
+      <button class="signup-submit" id="loginSubmit">Log in</button>
+      <p class="signup-switch">New here? <button id="toSignup">Create an account</button></p>
+      <p class="signup-switch" style="margin-top:6px; font-size:11.5px;">
+        Demo account: <strong>mara</strong> / <strong>demo1234</strong>
+      </p>
+    </div>
+
+    <!-- ── Notification permission step ── -->
+    <div id="notifPane" style="display:none;">
+      <div class="notif-step">
+        <div class="notif-step-icon">🔔</div>
+        <h2>Stay in the loop</h2>
+        <p>Get notified when someone likes your post, replies, or starts following you — even when Progress isn't open.</p>
+        <button class="signup-submit" id="notifAllow">Turn on notifications</button>
+        <button class="notif-step-skip" id="notifSkip">Maybe later</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Feature highlights -->
+  <div class="signup-features">
+    <div class="signup-feature">
+      <div class="signup-feature-icon">✍️</div>
+      <div class="signup-feature-text">Write about what you're building, learning, or figuring out</div>
+    </div>
+    <div class="signup-feature">
+      <div class="signup-feature-icon">💬</div>
+      <div class="signup-feature-text">Chat live with others and send direct messages</div>
+    </div>
+    <div class="signup-feature">
+      <div class="signup-feature-icon">🎵</div>
+      <div class="signup-feature-text">Share what you're listening to with Spotify integration</div>
+    </div>
+    <div class="signup-feature">
+      <div class="signup-feature-icon">🌙</div>
+      <div class="signup-feature-text">Dark mode, custom badges, and a cozy aesthetic</div>
+    </div>
+  </div>
+
+</div><!-- /.signup-hero -->
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+<script>
+  // Apply theme (no nav on this page)
+  applyTheme(getStoredTheme());
+
+  // If already logged in, skip straight to the feed
+  (async () => {
+    await Progress.loadFromApi().catch(() => {});
+    if (Progress.getCurrentUser()) {
+      location.replace("index.html");
+    }
+  })();
+
+  // ── Panel switching ──────────────────────────────────────────────────────
+  function showPane(id) {
+    ["signupPane","loginPane","notifPane"].forEach(p => {
+      document.getElementById(p).style.display = p === id ? "block" : "none";
+    });
+  }
+
+  document.getElementById("toLogin").addEventListener("click", () => showPane("loginPane"));
+  document.getElementById("toSignup").addEventListener("click", () => showPane("signupPane"));
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+  function showToast(msg) {
+    const t = document.getElementById("toast");
+    if (!t) return;
+    t.textContent = msg;
+    t.classList.add("show");
+    setTimeout(() => t.classList.remove("show"), 2600);
+  }
+
+  function setBtn(id, enabled, label) {
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    btn.disabled = !enabled;
+    if (label) btn.textContent = label;
+  }
+
+  function showErr(id, msg) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = msg;
+    el.classList.toggle("show", !!msg);
+  }
+
+  function goToFeed() {
+    location.replace("index.html");
+  }
+
+  // ── Notification permission step ─────────────────────────────────────────
+  async function offerNotifications() {
+    if (!("Notification" in window) || Notification.permission === "granted") {
+      goToFeed();
+      return;
+    }
+    showPane("notifPane");
+  }
+
+  document.getElementById("notifAllow").addEventListener("click", async () => {
+    setBtn("notifAllow", false, "Requesting permission…");
+    const granted = await requestNotificationPermission();
+    if (granted) showToast("Notifications enabled! You're all set.");
+    else showToast("Couldn't enable — you can turn them on in Settings later.");
+    goToFeed();
+  });
+
+  document.getElementById("notifSkip").addEventListener("click", goToFeed);
+
+  // ── Signup ────────────────────────────────────────────────────────────────
+  document.getElementById("signupSubmit").addEventListener("click", async () => {
+    const name     = document.getElementById("signupName").value.trim();
+    const username = document.getElementById("signupUsername").value.trim();
+    const password = document.getElementById("signupPassword").value;
+    showErr("signupError", "");
+    if (!name || !username || !password) {
+      showErr("signupError", "Fill in every field to continue.");
+      return;
+    }
+    if (password.length < 6) {
+      showErr("signupError", "Password must be at least 6 characters.");
+      return;
+    }
+    setBtn("signupSubmit", false, "Creating account…");
+    // Give a waking-server hint after 4 s
+    const wakingTimer = setTimeout(() => setBtn("signupSubmit", false, "Waking up server…"), 4000);
+    const res = await Progress.signup(username, name, password);
+    clearTimeout(wakingTimer);
+    setBtn("signupSubmit", true, "Create account");
+    if (!res.ok) {
+      showErr("signupError", res.error || "Something went wrong. Try again.");
+      return;
+    }
+    // Signed up — offer notifications then go to feed
+    await offerNotifications();
+  });
+
+  // ── Login ─────────────────────────────────────────────────────────────────
+  document.getElementById("loginSubmit").addEventListener("click", async () => {
+    const username = document.getElementById("loginUsername").value.trim();
+    const password = document.getElementById("loginPassword").value;
+    showErr("loginError", "");
+    if (!username || !password) {
+      showErr("loginError", "Enter your username and password.");
+      return;
+    }
+    setBtn("loginSubmit", false, "Logging in…");
+    const wakingTimer = setTimeout(() => setBtn("loginSubmit", false, "Waking up server…"), 4000);
+    const res = await Progress.login(username, password);
+    clearTimeout(wakingTimer);
+    setBtn("loginSubmit", true, "Log in");
+    if (!res.ok) {
+      showErr("loginError", res.error || "That username and password don't match.");
+      return;
+    }
+    goToFeed();
+  });
+
+  // ── Enter key on inputs ───────────────────────────────────────────────────
+  ["signupName","signupUsername","signupPassword"].forEach(id => {
+    document.getElementById(id).addEventListener("keydown", e => {
+      if (e.key === "Enter") document.getElementById("signupSubmit").click();
+    });
+  });
+  ["loginUsername","loginPassword"].forEach(id => {
+    document.getElementById(id).addEventListener("keydown", e => {
+      if (e.key === "Enter") document.getElementById("loginSubmit").click();
+    });
+  });
+</script>
+
+</body>
+</html>

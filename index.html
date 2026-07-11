@@ -30,6 +30,16 @@
     <p>A running record of things made, fixed, rebuilt, and understood a little better than yesterday.</p>
   </header>
 
+  <!-- Category tabs — only rendered when the feature is enabled in settings -->
+  <div id="feedTabsWrap" style="display:none;">
+    <div class="feed-tabs" id="feedTabs" role="tablist" aria-label="Filter posts by category">
+      <button class="feed-tab-btn active" data-cat="all" role="tab" aria-selected="true">All</button>
+      <button class="feed-tab-btn" data-cat="development" role="tab" aria-selected="false"><span class="feed-tab-dot"></span>Development</button>
+      <button class="feed-tab-btn" data-cat="creative" role="tab" aria-selected="false"><span class="feed-tab-dot"></span>Creative</button>
+      <button class="feed-tab-btn" data-cat="random" role="tab" aria-selected="false"><span class="feed-tab-dot"></span>Random</button>
+    </div>
+  </div>
+
   <div class="timeline" id="timeline">
     <div class="feed-empty" id="feedLoading"><h3>Loading&hellip;</h3></div>
   </div>
@@ -38,26 +48,63 @@
 <script src="data.js"></script>
 <script src="app.js"></script>
 <script>
+  const CATEGORY_COLORS = { development: "cat-development", creative: "cat-creative", random: "cat-random" };
+
+  let activeCategory = getActiveCategory(); // from app.js helper
+
+  // ── Category tabs ──────────────────────────────────────────────────────────
+  function initCategoryTabs() {
+    const wrap = document.getElementById("feedTabsWrap");
+    if (!getCategoryTabsEnabled()) { wrap.style.display = "none"; return; }
+    wrap.style.display = "block";
+
+    const tabs = document.querySelectorAll(".feed-tab-btn");
+    tabs.forEach(btn => {
+      btn.classList.toggle("active", btn.dataset.cat === activeCategory);
+      btn.setAttribute("aria-selected", String(btn.dataset.cat === activeCategory));
+      btn.addEventListener("click", () => {
+        activeCategory = btn.dataset.cat;
+        setActiveCategory(activeCategory);
+        tabs.forEach(t => {
+          t.classList.toggle("active", t.dataset.cat === activeCategory);
+          t.setAttribute("aria-selected", String(t.dataset.cat === activeCategory));
+        });
+        renderFeed();
+      });
+    });
+  }
+
+  // ── Feed rendering ─────────────────────────────────────────────────────────
   function renderFeed() {
-    const posts = Progress.getPosts();
+    let posts = Progress.getPosts();
+
+    // Filter by category if tabs enabled and a non-all tab is selected
+    if (getCategoryTabsEnabled() && activeCategory && activeCategory !== "all") {
+      posts = posts.filter(p => (p.category || "").toLowerCase() === activeCategory);
+    }
+
     const timeline = document.getElementById("timeline");
 
     if (!posts.length) {
       timeline.innerHTML = Progress.apiOnline === false
         ? bootingUpHTML()
-        : `
-        <div class="feed-empty">
-          <h3>Nothing here yet</h3>
-          <p>The first entry is always the hardest one to publish.</p>
-        </div>`;
+        : `<div class="feed-empty">
+            <h3>${activeCategory && activeCategory !== "all" ? "Nothing in this category yet" : "Nothing here yet"}</h3>
+            <p>${activeCategory && activeCategory !== "all" ? "Be the first to post in this category." : "The first entry is always the hardest one to publish."}</p>
+          </div>`;
       return;
     }
 
     timeline.innerHTML = posts.map(p => {
       const author = Progress.getUser(p.author);
+      const catClass = p.category ? (CATEGORY_COLORS[p.category.toLowerCase()] || "") : "";
+      const catChip  = catClass && getCategoryTabsEnabled()
+        ? `<span class="entry-category ${catClass}">${escapeHTML(p.category)}</span>`
+        : "";
       return `
       <div class="entry" data-post-href="post.html?id=${p.id}">
         <div class="entry-body">
+          ${catChip}
           <span class="entry-date">${Progress.formatDateShort(p.date)}</span>
           <h2 class="entry-title"><a class="entry-link" href="post.html?id=${p.id}"><span class="underline">${renderEmoticonsText(p.title, "inline-emoticon")}</span></a></h2>
           <p class="entry-excerpt">${renderEmoticonsText(p.excerpt, "inline-emoticon")}</p>
@@ -67,24 +114,32 @@
           </div>
         </div>
         ${p.cover ? `<div class="entry-thumb"><img src="${p.cover}" alt="" loading="lazy"></div>` : ""}
-      </div>
-    `;
+      </div>`;
     }).join("");
 
-    timeline.querySelectorAll('.entry').forEach(entry => {
-      entry.addEventListener('click', event => {
-        if (event.target.closest('a.username-link')) return;
+    timeline.querySelectorAll(".entry").forEach(entry => {
+      entry.addEventListener("click", event => {
+        if (event.target.closest("a.username-link")) return;
         const href = entry.dataset.postHref;
         if (href) location.href = href;
       });
     });
   }
 
- async function start() {
-    const ready = initShell("feed"); // initShell already calls loadFromApi
-    renderFeed();                    // render from cache immediately
-    ready.then(renderFeed).catch(() => {}); // re-render when fresh data arrives
-}
+  // ── Start ──────────────────────────────────────────────────────────────────
+  async function start() {
+    const ready = initShell("feed");
+    initCategoryTabs();
+    renderFeed();
+    ready.then(() => { initCategoryTabs(); renderFeed(); }).catch(() => {});
+
+    // Pull-to-refresh: on mobile, pull down at the top of the page to
+    // reload and show a random emoticon while doing it.
+    initPullToRefresh(async () => {
+      await Progress.loadFromApi().catch(() => {});
+      renderFeed();
+    });
+  }
 
   start();
 </script>

@@ -43,6 +43,7 @@
     const user = Progress.getCurrentUser();
     let coverData = null;
     let pendingImageUploads = 0;
+    let selectedCategory = "";
 
     if (!user) {
       wrap.innerHTML = `
@@ -58,6 +59,14 @@
         <div class="cover-hint">Click to add a cover image (optional)</div>
       </div>
       <input class="editor-title-input" id="titleInput" placeholder="Give this entry a title">
+
+      <div class="editor-category-row" id="categoryRow">
+        <span class="editor-category-label">Category</span>
+        <button type="button" class="editor-cat-btn active" data-cat="">No category</button>
+        <button type="button" class="editor-cat-btn" data-cat="development">Development</button>
+        <button type="button" class="editor-cat-btn" data-cat="creative">Creative</button>
+        <button type="button" class="editor-cat-btn" data-cat="random">Random</button>
+      </div>
 
       <div class="toolbar" id="toolbar">
         <button class="tb-btn" data-cmd="bold" title="Bold"><strong>B</strong></button>
@@ -90,6 +99,15 @@
         <button class="btn primary" id="publishBtn">Publish</button>
       </div>
     `;
+
+    // Wire category selector chips
+    document.getElementById("categoryRow").querySelectorAll(".editor-cat-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".editor-cat-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        selectedCategory = btn.dataset.cat || "";
+      });
+    });
 
     const coverDrop = document.getElementById("coverDrop");
     const coverInput = document.getElementById("coverInput");
@@ -207,7 +225,7 @@
       if (!content) { showToast("Write something before publishing."); return; }
       const plain = document.getElementById("canvas").innerText.trim();
       const excerpt = plain.slice(0, 140) + (plain.length > 140 ? "…" : "");
-      const post = await Progress.createPost({ title, content, cover: coverData, excerpt });
+      const post = await Progress.createPost({ title, content, cover: coverData, excerpt, category: selectedCategory || null });
       if (!post) {
         showToast("Could not publish your entry. Try again.");
         return;

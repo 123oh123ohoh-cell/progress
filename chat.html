@@ -14,12 +14,9 @@
 <div id="nav-root"></div>
 <div id="modal-root"></div>
 
-<main class="container container-wide">
-  <header class="feed-header">
-    <h1>Chat</h1>
-    <p>A live, shared room — plus direct messages with people you know here.</p>
-  </header>
+<div id="chatSidebarOverlay" class="chat-sidebar-overlay"></div>
 
+<main class="chat-page-main">
   <div class="chat-wrap" id="chatWrap">
     <!-- filled by JS -->
   </div>
@@ -168,9 +165,9 @@
     if (!username || username === currentUser.username) return;
     const el = document.getElementById("chatTyping");
     if (!el) return;
-    el.textContent = `@${username} is typing…`;
+    el.innerHTML = `<span>@${escapeHTML(username)} is typing</span><span class="typing-dots"><span></span><span></span><span></span></span>`;
     clearTimeout(typingHintTimer);
-    typingHintTimer = setTimeout(() => { el.textContent = ""; }, 2500);
+    typingHintTimer = setTimeout(() => { el.innerHTML = ""; }, 2800);
   }
 
   function closeSocket() {
@@ -353,6 +350,7 @@
     list.querySelectorAll(".chat-room-item").forEach(btn => {
       btn.addEventListener("click", () => {
         switchRoom(btn.dataset.room, btn.dataset.label, btn.dataset.peer || null);
+        closeChatSidebar(); // auto-close on mobile after picking a room
       });
     });
   }
@@ -517,11 +515,22 @@
 
   document.addEventListener("listen-session-updated", () => loadListenRail());
 
+  function openChatSidebar() {
+    document.querySelector(".chat-sidebar").classList.add("open");
+    document.getElementById("chatSidebarOverlay").classList.add("open");
+  }
+
+  function closeChatSidebar() {
+    document.querySelector(".chat-sidebar") && document.querySelector(".chat-sidebar").classList.remove("open");
+    document.getElementById("chatSidebarOverlay").classList.remove("open");
+  }
+
   function renderChat() {
     const wrap = document.getElementById("chatWrap");
     wrap.innerHTML = `
       <div class="chat-shell">
         <aside class="chat-sidebar">
+          <button type="button" class="chat-sidebar-close" id="chatSidebarClose" aria-label="Close sidebar">&times;</button>
           <div class="chat-listen-rail" id="chatListenRail"></div>
           <form class="chat-new-dm" id="newDmForm">
             <input type="text" id="newDmInput" placeholder="Message @username…" autocomplete="off">
@@ -530,6 +539,9 @@
         </aside>
         <div class="chat-panel">
           <div class="chat-panel-head">
+            <button type="button" class="chat-sidebar-toggle" id="chatSidebarToggle" aria-label="Open rooms">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+            </button>
             <span class="chat-room-title" id="chatRoomTitle">Global</span>
             <span class="chat-status" id="chatStatus">Connecting…</span>
             <span class="chat-presence" id="chatPresence"></span>
@@ -583,6 +595,37 @@
     });
 
     setupChatEmojiPicker();
+
+    // Mention autocomplete for the chat input
+    createMentionAutocomplete(document.getElementById("chatInput"), {
+      container: document.getElementById("chatForm")
+    });
+
+    // Sidebar toggle (hamburger) — only visible on mobile via CSS
+    const sidebarToggle = document.getElementById("chatSidebarToggle");
+    if (sidebarToggle) sidebarToggle.addEventListener("click", openChatSidebar);
+    const sidebarClose = document.getElementById("chatSidebarClose");
+    if (sidebarClose) sidebarClose.addEventListener("click", closeChatSidebar);
+    const overlay = document.getElementById("chatSidebarOverlay");
+    if (overlay) overlay.addEventListener("click", closeChatSidebar);
+
+    // Swipe right from left edge to open sidebar; swipe left to close
+    let touchStartX = 0;
+    let touchStartY = 0;
+    const shell = wrap.querySelector(".chat-shell");
+    if (shell) {
+      shell.addEventListener("touchstart", (e) => {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+      }, { passive: true });
+      shell.addEventListener("touchend", (e) => {
+        const dx = e.changedTouches[0].clientX - touchStartX;
+        const dy = e.changedTouches[0].clientY - touchStartY;
+        if (Math.abs(dx) < Math.abs(dy) * 1.5) return; // mostly vertical — ignore
+        if (dx > 48 && touchStartX < 40) openChatSidebar(); // swipe right from edge
+        if (dx < -48) closeChatSidebar(); // swipe left anywhere
+      }, { passive: true });
+    }
 
     loadSidebar();
     loadHistory();

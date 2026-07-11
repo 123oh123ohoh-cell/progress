@@ -25,7 +25,9 @@
 <script>
   const wrap = document.getElementById("settingsWrap");
   const params = new URLSearchParams(location.search);
-  let activeTab = params.get("tab") === "settings" ? "settings" : "profile";
+  // If Spotify just redirected back here (spotify=connected / spotify=error),
+  // force the settings tab open so the user lands on the section that matters.
+  let activeTab = (params.get("tab") === "settings" || params.get("spotify")) ? "settings" : "profile";
   let user;
   const timezoneOptions = [
     { value: "America/Los_Angeles", label: "Pacific Time - US & Canada" },
@@ -243,7 +245,17 @@ refreshNowPlaying();
             </span>
             <span style="font-size:14px;">Browser notifications</span>
           </label>
-          <p class="field-note" id="notifStatusNote">Get a popup for likes, replies, follows, and messages even when you're in another app or window - as long as this tab is open somewhere in the background.</p>
+          <p class="field-note" id="notifStatusNote">Get a popup for likes, replies, follows, and messages while this browser's open - even if you've tabbed away. Doesn't work if the tab is fully closed.</p>
+        </div>
+        <div class="settings-section">
+          <h3>Post categories</h3>
+          <label style="display:flex; align-items:center; gap:12px; cursor:pointer;">
+            <span class="theme-toggle-switch" id="categoryToggleSwitch" data-on="${getCategoryTabsEnabled() ? "1" : "0"}">
+              <span class="theme-toggle-knob"></span>
+            </span>
+            <span style="font-size:14px;">Show category tabs on home feed</span>
+          </label>
+          <p class="field-note">Adds All / Development / Creative / Random filter tabs to the home page. You can tag your posts with a category when writing.</p>
         </div>
         <button class="btn primary" id="saveSettingsBtn">Save changes</button>
         <div class="settings-section" style="margin-top:40px; padding-top:40px; border-top:1px solid var(--border-color);">
@@ -252,6 +264,18 @@ refreshNowPlaying();
           <button class="btn danger" id="deleteAccountBtn">Delete account</button>
         </div>
       `;
+      // Category tabs toggle
+      const catToggle = document.getElementById("categoryToggleSwitch");
+      if (catToggle) {
+        catToggle.dataset.on = getCategoryTabsEnabled() ? "1" : "0";
+        catToggle.addEventListener("click", () => {
+          const nowOn = catToggle.dataset.on !== "1";
+          catToggle.dataset.on = nowOn ? "1" : "0";
+          setCategoryTabsEnabled(nowOn);
+          showToast(nowOn ? "Category tabs enabled." : "Category tabs hidden.");
+        });
+      }
+
       document.getElementById("themeToggleSwitch").addEventListener("click", (e) => {
         const el = e.currentTarget;
         const nowOn = el.dataset.on !== "1";

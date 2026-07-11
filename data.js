@@ -32,23 +32,139 @@ const API_BASE = (() => {
 })();
 
 const AUTH_TOKEN_KEY = "progress:authToken";
+const SESSION_COOKIE = "progress_session"; // cookie name for cross-context persistence
+const SESSION_COOKIE_DAYS = 90;            // stay logged in for 90 days
 
-// The JWT proving who's actually logged in - kept separate from the user
-// profile object entirely, since it's a security credential, not user
-// data. apiFetch/apiFetchAuth below attach it automatically to every
-// request, so the server can verify identity instead of trusting
-// whatever username the client claims in a request body.
-function getAuthToken() {
-  try { return localStorage.getItem(AUTH_TOKEN_KEY); } catch (e) { return null; }
-}
-function setAuthToken(token) {
+// ── Cookie helpers ──────────────────────────────────────────────────────────
+// Cookies are used as a durable backup alongside localStorage. This matters
+// for two real situations users hit:
+//
+//   1. Safari ITP clears localStorage after 7 days without a visit.
+//      Cookies with an explicit Max-Age are NOT subject to the same rule.
+//
+//   2. iOS "Add to Home Screen" (standalone mode) has its OWN localStorage,
+//      completely separate from the Safari browser. Cookies, however, ARE
+//      shared between standalone mode and Safari on the same device, so a
+//      session started in the browser survives opening from the home screen.
+//
+// We never send credentials in the cookie to the server - it's purely a
+// client-side store that getAuthToken() falls back to when localStorage is
+// empty or unavailable.
+
+function setCookie(name, value, days) {
   try {
-    if (token) localStorage.setItem(AUTH_TOKEN_KEY, token);
-    else localStorage.removeItem(AUTH_TOKEN_KEY);
+    const expires = new Date(Date.now() + days * 864e5).toUTCString();
+    document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Lax`;
   } catch (e) {}
 }
 
-async function apiFetch(path, options = {}) {
+function _getCookie(name) {
+  try {
+    const match = document.cookie.match(new RegExp("(?:^|; )" + name + "=([^;]*)"));
+    return match ? decodeURIComponent(match[1]) : null;
+  } catch (e) { return null; }
+}
+
+function deleteCookie(name) {
+  try { document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; SameSite=Lax`; } catch (e) {}
+}
+
+// ── Auth token ───────────────────────────────────────────────────────────────
+// The JWT proving who's actually logged in. Stored in both localStorage (fast,
+// first choice) and a long-lived cookie (fallback for Safari ITP + standalone
+// mode). apiFetch/apiFetchAuth attach it automatically to every request.
+
+function getAuthToken() {
+  try {
+    return localStorage.getItem(AUTH_TOKEN_KEY) || _getCookie(SESSION_COOKIE + "_token") || null;
+  } catch (e) {
+    return _getCookie(SESSION_COOKIE + "_token") || null;
+  }
+}
+
+function setAuthToken(token) {
+  try {
+    if (token) {
+      localStorage.setItem(AUTH_TOKEN_KEY, token);
+      setCookie(SESSION_COOKIE + "_token", token, SESSION_COOKIE_DAYS);
+    } else {
+      localStorage.removeItem(AUTH_TOKEN_KEY);
+      deleteCookie(SESSION_COOKIE + "_token");
+    }
+  } catch (e) {
+    if (token) setCookie(SESSION_COOKIE + "_token", token, SESSION_COOKIE_DAYS);
+    else deleteCookie(SESSION_COOKIE + "_token");
+  }
+}
+
+// ── Current-user cookie backup ───────────────────────────────────────────────
+// Mirrors db.currentUser in a cookie so that even if localStorage is cleared
+// (Safari ITP, standalone/browser mismatch), we can remember who was logged in
+// and kick off a silent re-login with the stored password.
+
+function setCurrentUserCookie(username) {
+  if (username) setCookie(SESSION_COOKIE + "_user", username, SESSION_COOKIE_DAYS);
+  else deleteCookie(SESSION_COOKIE + "_user");
+}
+
+function getCurrentUserCookie() {
+  return _getCookie(SESSION_COOKIE + "_user");
+}
+
+// ── Silent re-login ──────────────────────────────────────────────────────────
+// When the server rejects our token (e.g. Render free-tier restarted and
+// regenerated its JWT secret, or the token simply expired), we try to get a
+// fresh token automatically using the stored password rather than forcing the
+// user to type their credentials again.
+//
+// This is safe: passwords are already persisted locally (the login response
+// merges `password` into the user object that goes into localStorage/the DB).
+// All we're doing is reusing them for a silent re-auth in the background.
+
+let _silentReloginInProgress = false;
+
+async function silentRelogin() {
+  if (_silentReloginInProgress) return false;
+  _silentReloginInProgress = true;
+  try {
+    // Read credentials directly from localStorage so this function works even
+    // before the Progress object is fully initialised.
+    let username = null;
+    let password = null;
+    try {
+      const raw = localStorage.getItem(DB_KEY);
+      if (raw) {
+        const db = JSON.parse(raw);
+        username = db.currentUser || getCurrentUserCookie();
+        if (username && db.users) {
+          const u = db.users.find(x => x.username === username);
+          password = u && u.password;
+        }
+      }
+    } catch (e) {
+      username = getCurrentUserCookie();
+    }
+
+    if (!username || !password) return false;
+
+    const result = await apiFetchAuth("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password })
+    });
+
+    if (result.ok && result.data && result.data.token) {
+      setAuthToken(result.data.token);
+      setCurrentUserCookie(username);
+      return true;
+    }
+    return false;
+  } finally {
+    _silentReloginInProgress = false;
+  }
+}
+
+async function apiFetch(path, options = {}, _retry = false) {
   try {
     let url = path;
     if (path.startsWith("/api/")) {
@@ -63,6 +179,17 @@ async function apiFetch(path, options = {}) {
     if (token) headers.Authorization = `Bearer ${token}`;
     const res = await fetch(url, { ...options, headers, signal: controller.signal });
     clearTimeout(timeout);
+
+    // 401 = server rejected our token (expired, or Render restarted and
+    // regenerated its JWT secret). Try a silent re-login once; if that gets
+    // us a fresh token, replay the original request transparently.
+    if (res.status === 401 && !_retry) {
+      const refreshed = await silentRelogin();
+      if (refreshed) return apiFetch(path, options, true);
+      // Couldn't get a fresh token - the user will need to log in manually.
+      return null;
+    }
+
     if (!res.ok) return null;
     if (res.status === 204) return {};
     return await res.json();
@@ -150,10 +277,21 @@ const SEED = {
 };
 
 function loadDB() {
-  const raw = localStorage.getItem(DB_KEY);
+  let raw = null;
+  try { raw = localStorage.getItem(DB_KEY); } catch (e) {}
+
   if (!raw) {
-    localStorage.setItem(DB_KEY, JSON.stringify(SEED));
-    return JSON.parse(JSON.stringify(SEED));
+    // localStorage is empty or unavailable (Safari ITP cleared it, or the user is
+    // in a standalone home-screen context with separate storage). Check if we have
+    // a cookie that says who was logged in - if so, start from SEED but with that
+    // username set as currentUser so the app shows them as "logged in" immediately.
+    // silentRelogin() will fire on the first authenticated request and get a fresh
+    // JWT, completing the session restore invisibly.
+    const cookieUser = getCurrentUserCookie();
+    const base = JSON.parse(JSON.stringify(SEED));
+    if (cookieUser) base.currentUser = cookieUser;
+    try { localStorage.setItem(DB_KEY, JSON.stringify(base)); } catch (e) {}
+    return base;
   }
   try {
     const parsed = JSON.parse(raw);
@@ -244,7 +382,11 @@ function saveDB(db) {
     comments: [],
     notifications: []
   };
-  localStorage.setItem(DB_KEY, JSON.stringify(minimalDb));
+  try { localStorage.setItem(DB_KEY, JSON.stringify(minimalDb)); } catch (e) {}
+  // Mirror currentUser in a cookie so the session survives Safari ITP clearing
+  // localStorage, and so standalone (home-screen) mode shares the session with
+  // the Safari browser on the same device.
+  setCurrentUserCookie(db.currentUser || null);
 }
 
 const Progress = {
@@ -619,11 +761,11 @@ const Progress = {
     return this.db.posts.find(p => p.id === id) || null;
   },
 
-  async createPost({ title, content, cover, excerpt }) {
+  async createPost({ title, content, cover, excerpt, category }) {
     const user = this.getCurrentUser();
     if (!user) return null;
     if (API_ENABLED) {
-      const body = JSON.stringify({ author: user.username, title, content, cover, excerpt });
+      const body = JSON.stringify({ author: user.username, title, content, cover, excerpt, category: category || null });
       let payload = await apiFetch("/api/posts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
