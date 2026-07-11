@@ -1174,6 +1174,7 @@ function initShell(activePage) {
   applyTheme(getStoredTheme());
   applyCandy();
   setDeviceMode();
+  initCallBar();
   window.addEventListener("resize", setDeviceMode);
   renderNav(activePage);
   mountModals();
@@ -1416,4 +1417,154 @@ function getActiveCategory() {
 }
 function setActiveCategory(v) {
   try { localStorage.setItem(CATEGORY_ACTIVE_KEY, v); } catch (e) {}
+}
+
+/* ============================================================
+   GLOBAL CALL BAR
+   Persists across every page via BroadcastChannel + localStorage.
+   chat.html writes call state on every transition; app.js reads
+   it on every page load and listens for live updates so the bar
+   appears/disappears/ticks without a page reload.
+   ============================================================ */
+
+const CALL_STATE_KEY = "progress:callActive";
+const CALL_CHANNEL   = "progress-call";
+let _callBarBC    = null;
+let _callBarTimer = null;
+
+function _writeCallState(state) {
+  try {
+    if (state) localStorage.setItem(CALL_STATE_KEY, JSON.stringify(state));
+    else        localStorage.removeItem(CALL_STATE_KEY);
+  } catch (e) {}
+}
+
+function _readCallState() {
+  try {
+    const raw = localStorage.getItem(CALL_STATE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) { return null; }
+}
+
+function _renderCallBar(state) {
+  let bar = document.getElementById("globalCallBar");
+
+  if (!state) {
+    if (bar) { bar.style.opacity = "0"; setTimeout(() => bar.remove(), 200); }
+    document.body.classList.remove("has-call-bar");
+    clearInterval(_callBarTimer); _callBarTimer = null;
+    return;
+  }
+
+  document.body.classList.add("has-call-bar");
+  const isConnected = state.status === "connected";
+  const peer        = Progress.getUser(state.peer);
+  const peerName    = (peer && peer.name) || state.peer || "Unknown";
+
+  if (!bar) {
+    bar = document.createElement("div");
+    bar.id = "globalCallBar";
+    bar.className = "call-bar";
+    bar.innerHTML = `
+      <div class="call-bar-inner">
+        <span class="call-bar-live-dot" aria-hidden="true"></span>
+        <span class="call-bar-name" id="cbName"></span>
+        <span class="call-bar-sep" aria-hidden="true">&middot;</span>
+        <span class="call-bar-timer" id="cbTimer">0:00</span>
+        <span class="call-bar-sep" aria-hidden="true">&middot;</span>
+        <span class="call-bar-status" id="cbStatus"></span>
+        <div class="call-bar-spacer"></div>
+        <a class="call-bar-action call-bar-return" id="cbReturn" href="chat.html">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13">
+            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+            <polyline points="10 17 15 12 10 7"/>
+            <line x1="15" y1="12" x2="3" y2="12"/>
+          </svg>
+          <span class="cbReturnLabel">Return to call</span>
+        </a>
+        <button type="button" class="call-bar-action call-bar-end" id="cbEnd" aria-label="End call">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14">
+            <path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1-9.4 0-17-7.6-17-17 0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z" transform="rotate(135 12 12)"/>
+          </svg>
+          End
+        </button>
+      </div>`;
+
+    // Inject right after the nav (which lives in #nav-root)
+    const navRoot = document.getElementById("nav-root");
+    if (navRoot) navRoot.insertAdjacentElement("afterend", bar);
+    else document.body.prepend(bar);
+
+    // End call — tell chat.html via BroadcastChannel, clear state immediately
+    document.getElementById("cbEnd").addEventListener("click", () => {
+      if (_callBarBC) _callBarBC.postMessage({ type: "end-call-request" });
+      _writeCallState(null);
+      _renderCallBar(null);
+    });
+
+    // Return to call — if already on chat.html, re-open the overlay instead of navigating
+    document.getElementById("cbReturn").addEventListener("click", (e) => {
+      const onChatPage = window.location.pathname.includes("chat.html");
+      if (onChatPage && typeof renderCallOverlay === "function" && typeof _callState !== "undefined" && _callState) {
+        e.preventDefault();
+        renderCallOverlay(_callState);
+      }
+      // Otherwise the href takes them to chat.html naturally
+    });
+
+    // Animate in
+    requestAnimationFrame(() => { bar.style.transition = "opacity .2s"; bar.style.opacity = "1"; });
+  }
+
+  // Update data attribute for CSS status styling (calling = yellow dot, connected = green)
+  bar.dataset.status = state.status || "calling";
+
+  // Update text fields without full re-render
+  const cbName   = document.getElementById("cbName");
+  const cbStatus = document.getElementById("cbStatus");
+  const cbReturn = document.getElementById("cbReturn");
+  if (cbName)   cbName.textContent   = peerName;
+  if (cbStatus) cbStatus.textContent = isConnected ? "In call" : "Calling...";
+  if (cbReturn && state.peer) {
+    cbReturn.href = `chat.html?with=${encodeURIComponent(state.peer)}`;
+  }
+
+  // Tick the timer
+  clearInterval(_callBarTimer); _callBarTimer = null;
+  const cbTimer = document.getElementById("cbTimer");
+  const tick = () => {
+    if (!cbTimer) return;
+    if (isConnected && state.startTime) {
+      const secs = Math.floor((Date.now() - state.startTime) / 1000);
+      cbTimer.textContent = Math.floor(secs / 60) + ":" + String(secs % 60).padStart(2, "0");
+    } else {
+      cbTimer.textContent = isConnected ? "0:00" : "\u2013:\u2013\u2013";
+    }
+  };
+  tick();
+  if (isConnected && state.startTime) {
+    _callBarTimer = setInterval(tick, 1000);
+  }
+}
+
+function initCallBar() {
+  // Render from whatever's persisted (user navigated here during a call)
+  _renderCallBar(_readCallState());
+
+  // BroadcastChannel for instant cross-tab updates from chat.html
+  if (window.BroadcastChannel) {
+    _callBarBC = new BroadcastChannel(CALL_CHANNEL);
+    _callBarBC.onmessage = (e) => {
+      if (!e.data) return;
+      if (e.data.type === "call-state") {
+        _writeCallState(e.data.state);
+        _renderCallBar(e.data.state);
+      }
+    };
+  }
+
+  // Storage event = another tab wrote localStorage (BroadcastChannel fallback)
+  window.addEventListener("storage", (e) => {
+    if (e.key === CALL_STATE_KEY) _renderCallBar(_readCallState());
+  });
 }

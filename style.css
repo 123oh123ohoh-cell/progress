@@ -3146,3 +3146,146 @@ body.candy-mode .badge-icon { filter: hue-rotate(280deg) saturate(2); }
   cursor: pointer;
 }
 .admin-delete-btn:hover { background: var(--danger); color: #fff; }
+
+/* ============================================================
+   GLOBAL CALL BAR
+   Sits sticky just below the nav. Uses position:sticky at
+   top:var(--nav-h) so it scrolls with the page initially then
+   locks right under the nav — same technique as the nav itself.
+   Content flows naturally below it (no padding hacks needed).
+   ============================================================ */
+
+:root { --call-bar-h: 0px; }
+body.has-call-bar { --call-bar-h: 40px; }
+
+.call-bar {
+  position: sticky;
+  top: var(--nav-h);
+  z-index: 199;             /* just below nav (200) */
+  height: 40px;
+  background: #1a7a4a;      /* forest green — distinct, not too neon */
+  color: #fff;
+  display: flex;
+  align-items: center;
+  box-shadow: 0 2px 12px rgba(0,0,0,.18);
+  opacity: 0;               /* fades in after JS sets it to 1 */
+}
+
+/* Adjust chat page height to account for the bar being in the flow */
+body.has-call-bar .chat-page-main {
+  height: calc(100vh - var(--nav-h) - 40px) !important;
+  height: calc(100dvh - var(--nav-h) - 40px) !important;
+}
+
+.call-bar-inner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 24px;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* ── Pulsing live dot ── */
+.call-bar-live-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #4ade80;
+  flex-shrink: 0;
+  animation: cb-pulse 2.4s ease-in-out infinite;
+}
+@keyframes cb-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(74,222,128,.55); }
+  60%       { box-shadow: 0 0 0 6px rgba(74,222,128,0); }
+}
+
+/* Yellow dot during "calling" */
+.call-bar[data-status="calling"] .call-bar-live-dot {
+  background: #facc15;
+  animation: cb-pulse-calling 1.1s ease-in-out infinite;
+}
+@keyframes cb-pulse-calling {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: .45; transform: scale(.75); }
+}
+
+/* ── Text fields ── */
+.call-bar-name {
+  font-weight: 700;
+  font-size: 13.5px;
+  color: #fff;
+  letter-spacing: .01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+}
+.call-bar-sep {
+  color: rgba(255,255,255,.38);
+  font-size: 11px;
+  user-select: none;
+  flex-shrink: 0;
+}
+.call-bar-timer {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: rgba(255,255,255,.92);
+  letter-spacing: .06em;
+  min-width: 36px;
+  flex-shrink: 0;
+}
+.call-bar-status {
+  font-size: 12.5px;
+  color: rgba(255,255,255,.7);
+  white-space: nowrap;
+}
+.call-bar-spacer { flex: 1; }
+
+/* ── Buttons ── */
+.call-bar-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border-radius: 18px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  border: none;
+  flex-shrink: 0;
+  white-space: nowrap;
+  transition: background .15s, opacity .15s;
+  line-height: 1;
+}
+.call-bar-return {
+  background: rgba(255,255,255,.15);
+  color: #fff;
+}
+.call-bar-return:hover { background: rgba(255,255,255,.26); color: #fff; }
+.call-bar-end {
+  background: #ef4444;
+  color: #fff;
+  margin-left: 4px;
+}
+.call-bar-end:hover { background: #dc2626; }
+
+/* ── Mobile: hide verbose text, keep icons ── */
+@media (max-width: 600px) {
+  .call-bar-inner { padding: 0 14px; gap: 7px; }
+  .call-bar-name  { max-width: 110px; }
+  .call-bar-status { display: none; }
+  .call-bar-sep:last-of-type { display: none; }
+  .cbReturnLabel  { display: none; }
+  .call-bar-return { padding: 5px 9px; }
+  .call-bar-end    { padding: 5px 9px; }
+}
+
+/* ── The overlay "minimize" button — appears only on connected state ── */
+.call-ctrl-minimize {
+  background: rgba(255,255,255,.18);
+  color: #fff;
+}
+.call-ctrl-minimize:hover { background: rgba(255,255,255,.3); }
