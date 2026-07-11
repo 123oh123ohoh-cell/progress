@@ -138,6 +138,8 @@
   function appendMessage(msg) {
     if (seenMessageIds.has(msg.id)) return;
     seenMessageIds.add(msg.id);
+    // Silently skip call-signal messages in history.
+    if (msg && msg.body && msg.body.startsWith(CALL_SIG)) return;
     const log = document.getElementById("chatLog");
     if (!log) return;
     const empty = log.querySelector(".chat-empty");
@@ -203,7 +205,14 @@
       let data;
       try { data = JSON.parse(event.data); } catch (e) { return; }
       if (data.type === "message") {
-        appendMessage(data.message);
+        const msg = data.message;
+        // Intercept call-signaling messages before appendMessage sees them.
+        if (msg && msg.body && msg.body.startsWith(CALL_SIG) && msg.author !== currentUser.username) {
+          try { routeCallSignal(JSON.parse(msg.body.slice(CALL_SIG.length))); } catch (e) {}
+          seenMessageIds.add(msg.id);
+          return;
+        }
+        appendMessage(msg);
         if (currentRoom.startsWith("dm:")) loadSidebar();
       } else if (data.type === "presence") {
         renderPresence(data.users);
@@ -220,18 +229,9 @@
         // chat.html doesn't open the shared presence socket app.js uses on
         // every other page, so it needs its own handling of this too.
         handleIncomingNotification(data.notification);
-      } else if (data.type === "call-offer" && data.from !== currentUser.username) {
-        handleCallOffer(data.from || data.username, data.sdp);
-      } else if (data.type === "call-answer" && data.from !== currentUser.username) {
-        handleCallAnswer(data.from || data.username, data.sdp);
-      } else if (data.type === "call-ice" && data.from !== currentUser.username) {
-        handleCallIce(data.candidate);
-      } else if (data.type === "call-reject" && data.from !== currentUser.username) {
-        showToast("Call declined.");
-        endCall(true);
-      } else if (data.type === "call-end" && data.from !== currentUser.username) {
-        endCall(true);
       }
+      // Call signals arrive as regular "message" packets with a special body prefix.
+      // They are intercepted above in the data.type==="message" branch.
     });
 
     ws.addEventListener("close", () => {
@@ -829,53 +829,67 @@
 
   /* ============================================================
      WEBRTC VOICE CALL SYSTEM
-     Signaling goes through the existing DM WebSocket room.
-     Audio streams go peer-to-peer via WebRTC.
+     ─────────────────────────────────────────────────────────
+     SIGNALING APPROACH
+     The chat server only relays "send" and "typing" WebSocket
+     messages — custom types like "call-offer" are silently
+     dropped.  We piggyback on regular DM messages instead:
+     each signal body starts with CALL_SIG (📞::), which the
+     ws message handler above intercepts before appendMessage
+     runs, routes to routeCallSignal(), and marks as seen so
+     it never appears in the chat log — not even from history.
      ============================================================ */
+
+  const CALL_SIG = "\u{1F4DE}::"; // 📞:: — unique prefix for call signals
 
   const ICE_SERVERS = [
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
-    { urls: "stun:stun2.l.google.com:19302" }
+    { urls: "stun:stun2.l.google.com:19302" },
+    { urls: "stun:stun.services.mozilla.com" }
   ];
 
-  let _callState = null; // null | "calling" | "receiving" | "connected"
-  let _peerConn   = null;
-  let _localStream = null;
-  let _callPeer   = null;
-  let _callTimer  = null;
-  let _pendingOffer = null; // SDP from incoming offer, saved until user accepts
+  let _callState    = null;  // null | "calling" | "receiving" | "connected"
+  let _peerConn     = null;
+  let _localStream  = null;
+  let _callPeer     = null;
+  let _callTimer    = null;
+  let _pendingOffer = null;
+  let _muted        = false;
 
-  function sendSignal(type, extra) {
-    if (!socket || socket.readyState !== WebSocket.OPEN) return;
-    socket.send(JSON.stringify({ type, from: currentUser.username, ...extra }));
-  }
-
-  async function startCall(targetUsername) {
-    if (_callState) { showToast("Already in a call."); return; }
-    if (!navigator.mediaDevices) { showToast("Your browser doesn't support voice calls."); return; }
-    try {
-      _localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-    } catch (e) {
-      showToast("Couldn't access your microphone. Check browser permissions.");
-      return;
+  // Send a signal as a regular DM message with the CALL_SIG prefix
+  function sendSignal(type, payload) {
+    const body = CALL_SIG + JSON.stringify({ type, from: currentUser.username, ...payload });
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ type: "send", body }));
+    } else {
+      apiFetch("/api/chat/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ room: currentRoom, author: currentUser.username, body })
+      });
     }
-    _callPeer  = targetUsername;
-    _callState = "calling";
-    renderCallOverlay("calling");
-
-    _peerConn = buildPeerConn(targetUsername);
-    _localStream.getTracks().forEach(t => _peerConn.addTrack(t, _localStream));
-    _peerConn.onicecandidate = e => { if (e.candidate) sendSignal("call-ice", { candidate: e.candidate }); };
-
-    const offer = await _peerConn.createOffer();
-    await _peerConn.setLocalDescription(offer);
-    sendSignal("call-offer", { sdp: offer });
   }
 
-  function buildPeerConn(peer) {
+  // Route an intercepted call signal to the right handler
+  function routeCallSignal(sig) {
+    switch (sig.type) {
+      case "call-offer":  handleCallOffer(sig.from, sig.sdp); break;
+      case "call-answer": handleCallAnswer(sig.sdp);          break;
+      case "call-ice":    handleCallIce(sig.candidate);       break;
+      case "call-reject": showToast("Call declined."); endCall(true); break;
+      case "call-end":    if (_callState) endCall(true);      break;
+    }
+  }
+
+  // Build a peer connection — all handlers set before tracks/offer
+  function buildPeerConn() {
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
-    pc.ontrack = e => {
+    // MUST be set first — candidates can fire as soon as setLocalDescription runs
+    pc.onicecandidate = (e) => {
+      if (e.candidate) sendSignal("call-ice", { candidate: e.candidate.toJSON() });
+    };
+    pc.ontrack = (e) => {
       let audio = document.getElementById("callRemoteAudio");
       if (!audio) {
         audio = document.createElement("audio");
@@ -883,7 +897,7 @@
         audio.autoplay = true;
         document.body.appendChild(audio);
       }
-      audio.srcObject = e.streams[0];
+      if (e.streams && e.streams[0]) audio.srcObject = e.streams[0];
     };
     pc.onconnectionstatechange = () => {
       if (["disconnected","failed","closed"].includes(pc.connectionState)) {
@@ -893,67 +907,80 @@
     return pc;
   }
 
-  async function handleCallOffer(from, sdp) {
-    if (_callState) {
-      // Already busy — auto-reject
-      sendSignal("call-reject", {});
+  // ── Caller side ───────────────────────────────────────────────────────────
+  async function startCall(targetUsername) {
+    if (_callState) { showToast("Already in a call."); return; }
+    if (!navigator.mediaDevices) { showToast("Voice calls not supported in this browser."); return; }
+    try {
+      _localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    } catch (e) {
+      const m = e.name === "NotAllowedError" ? "Microphone permission denied — allow access and try again."
+              : e.name === "NotFoundError"   ? "No microphone found on this device."
+              : "Couldn't access your microphone.";
+      showToast(m);
       return;
     }
-    _callPeer = from;
-    _callState = "receiving";
-    _pendingOffer = sdp;
+    _callPeer = targetUsername; _callState = "calling"; _muted = false;
+    renderCallOverlay("calling");
+    _peerConn = buildPeerConn();
+    _localStream.getTracks().forEach(t => _peerConn.addTrack(t, _localStream));
+    const offer = await _peerConn.createOffer();
+    await _peerConn.setLocalDescription(offer);
+    sendSignal("call-offer", { sdp: _peerConn.localDescription.toJSON() });
+  }
+
+  // ── Callee — incoming ─────────────────────────────────────────────────────
+  async function handleCallOffer(from, sdp) {
+    if (_callState) { sendSignal("call-reject", {}); return; }
+    _callPeer = from; _callState = "receiving"; _pendingOffer = sdp;
     renderCallOverlay("receiving");
-    // Play a ring sound if we have the notification sound
-    try { new Audio("sounds/notification.mp3").play().catch(() => {}); } catch(e) {}
+    try { new Audio("sounds/notification.mp3").play().catch(() => {}); } catch (e) {}
   }
 
   async function acceptCall() {
     if (!_pendingOffer) return;
-    if (!navigator.mediaDevices) { showToast("Your browser doesn't support voice calls."); rejectCall(); return; }
+    if (!navigator.mediaDevices) { showToast("Voice calls not supported here."); rejectCall(); return; }
     try {
       _localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-    } catch (e) {
-      showToast("Couldn't access your microphone.");
-      rejectCall();
-      return;
-    }
-    _callState = "connected";
-    _peerConn = buildPeerConn(_callPeer);
+    } catch (e) { showToast("Couldn't access your microphone."); rejectCall(); return; }
+    _muted = false; _callState = "connected";
+    _peerConn = buildPeerConn();
     _localStream.getTracks().forEach(t => _peerConn.addTrack(t, _localStream));
-    _peerConn.onicecandidate = e => { if (e.candidate) sendSignal("call-ice", { candidate: e.candidate }); };
     await _peerConn.setRemoteDescription(new RTCSessionDescription(_pendingOffer));
     const answer = await _peerConn.createAnswer();
     await _peerConn.setLocalDescription(answer);
-    sendSignal("call-answer", { sdp: answer });
+    sendSignal("call-answer", { sdp: _peerConn.localDescription.toJSON() });
     _pendingOffer = null;
     renderCallOverlay("connected");
     startCallTimer();
   }
 
-  function rejectCall() {
-    sendSignal("call-reject", {});
-    endCall(true);
-  }
+  function rejectCall() { sendSignal("call-reject", {}); endCall(true); }
 
-  async function handleCallAnswer(from, sdp) {
+  // ── Caller — receives answer ──────────────────────────────────────────────
+  async function handleCallAnswer(sdp) {
     if (!_peerConn) return;
-    await _peerConn.setRemoteDescription(new RTCSessionDescription(sdp));
-    _callState = "connected";
-    renderCallOverlay("connected");
-    startCallTimer();
+    try {
+      await _peerConn.setRemoteDescription(new RTCSessionDescription(sdp));
+      _callState = "connected";
+      renderCallOverlay("connected");
+      startCallTimer();
+    } catch (e) { console.error("[Call] setRemoteDescription:", e); showToast("Call failed to connect."); endCall(); }
   }
 
   async function handleCallIce(candidate) {
-    if (!_peerConn) return;
-    try { await _peerConn.addIceCandidate(new RTCIceCandidate(candidate)); } catch (e) {}
+    if (!_peerConn || !candidate) return;
+    try { await _peerConn.addIceCandidate(new RTCIceCandidate(candidate)); }
+    catch (e) { console.warn("[Call] addIceCandidate:", e.message); }
   }
 
+  // ── Hang up ───────────────────────────────────────────────────────────────
   function endCall(silent) {
     if (!silent) sendSignal("call-end", {});
-    if (_peerConn) { _peerConn.close(); _peerConn = null; }
+    if (_peerConn)    { _peerConn.close(); _peerConn = null; }
     if (_localStream) { _localStream.getTracks().forEach(t => t.stop()); _localStream = null; }
     clearInterval(_callTimer); _callTimer = null;
-    _callState = null; _callPeer = null; _pendingOffer = null;
+    _callState = null; _callPeer = null; _pendingOffer = null; _muted = false;
     const audio = document.getElementById("callRemoteAudio");
     if (audio) { audio.srcObject = null; audio.remove(); }
     const overlay = document.getElementById("callOverlay");
@@ -964,24 +991,20 @@
     let secs = 0;
     _callTimer = setInterval(() => {
       secs++;
-      const m = Math.floor(secs / 60);
-      const s = String(secs % 60).padStart(2, "0");
+      const m = Math.floor(secs / 60), s = String(secs % 60).padStart(2,"0");
       const el = document.getElementById("callTimerEl");
-      if (el) el.textContent = `${m}:${s}`;
+      if (el) el.textContent = m + ":" + s;
     }, 1000);
   }
 
-  let _muted = false;
   function toggleMute() {
     _muted = !_muted;
     if (_localStream) _localStream.getAudioTracks().forEach(t => t.enabled = !_muted);
-    const muteBtn = document.getElementById("callMuteBtn");
-    if (muteBtn) {
-      muteBtn.classList.toggle("active", _muted);
-      muteBtn.title = _muted ? "Unmute" : "Mute";
-    }
+    const btn = document.getElementById("callMuteBtn");
+    if (btn) { btn.classList.toggle("active", _muted); btn.title = _muted ? "Unmute" : "Mute"; }
   }
 
+  // ── Call overlay UI ───────────────────────────────────────────────────────
   function renderCallOverlay(state) {
     let overlay = document.getElementById("callOverlay");
     if (!overlay) {
@@ -992,37 +1015,40 @@
     }
     const user = Progress.getUser(_callPeer);
     const name = escapeHTML((user && user.name) || _callPeer || "Unknown");
-    const av = avatarHTML(user, 72);
-    const stateLabel = { calling: "Calling…", receiving: "Incoming call", connected: "Connected" }[state] || state;
-
-    overlay.innerHTML = `
-      <div class="call-card">
-        <div class="call-avatar-wrap">${av}</div>
-        <div class="call-name">${name}</div>
-        <div class="call-state-label">${stateLabel}${state === "connected" ? ' · <span id="callTimerEl">0:00</span>' : ''}</div>
-        <div class="call-controls">
-          ${state === "receiving" ? `
-            <button type="button" class="call-ctrl call-ctrl-accept" id="callAcceptBtn" title="Accept">
-              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1-9.4 0-17-7.6-17-17 0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"/></svg>
-            </button>
-          ` : ""}
-          ${state === "connected" ? `
-            <button type="button" class="call-ctrl call-ctrl-mute" id="callMuteBtn" title="Mute">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-            </button>
-          ` : ""}
-          <button type="button" class="call-ctrl call-ctrl-end" id="callEndBtn" title="${state === "receiving" ? "Decline" : "End call"}">
-            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.5 6.5a9 9 0 0 0-11 0l-2-2A12 12 0 0 1 12 1a12 12 0 0 1 7.5 3.5l-2 2zm-8.8 3.3a5 5 0 0 1 6.6 0l2-2a8 8 0 0 0-10.6 0l2 2zM15.9 12l2-2a5 5 0 0 0-.4-.5L15.4 11.6c.2.1.4.3.5.4zm-2.4 2.4L12 15.9l-1.5-1.5a5 5 0 0 1-.4-.5L12 12l1.9 1.9a5 5 0 0 1-.4.5z" transform="rotate(135 12 12)"/><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1-9.4 0-17-7.6-17-17 0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"/></svg>
-          </button>
-        </div>
-      </div>`;
+    const av   = avatarHTML(user, 72);
+    const labels = { calling: "Calling\u2026", receiving: "Incoming call", connected: "Connected" };
+    overlay.innerHTML =
+      '<div class="call-card">' +
+        '<div class="call-avatar-wrap">' + av + '</div>' +
+        '<div class="call-name">' + name + '</div>' +
+        '<div class="call-state-label">' + (labels[state] || state) +
+          (state === "connected" ? ' &middot; <span id="callTimerEl">0:00</span>' : '') +
+        '</div>' +
+        '<div class="call-controls">' +
+          (state === "receiving"
+            ? '<button type="button" class="call-ctrl call-ctrl-accept" id="callAcceptBtn" title="Accept">' +
+              '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1-9.4 0-17-7.6-17-17 0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"/></svg>' +
+              '</button>' : "") +
+          (state === "connected"
+            ? '<button type="button" class="call-ctrl call-ctrl-mute" id="callMuteBtn" title="Mute">' +
+              '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+              '<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>' +
+              '<path d="M19 10v2a7 7 0 0 1-14 0v-2"/>' +
+              '<line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>' +
+              '</svg></button>' : "") +
+          '<button type="button" class="call-ctrl call-ctrl-end" id="callEndBtn">' +
+          '<svg viewBox="0 0 24 24" fill="currentColor">' +
+          '<path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1-9.4 0-17-7.6-17-17 0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z" transform="rotate(135 12 12)"/>' +
+          '</svg></button>' +
+        '</div>' +
+      '</div>';
     overlay.classList.add("open");
     const acceptBtn = document.getElementById("callAcceptBtn");
+    const endBtn    = document.getElementById("callEndBtn");
+    const muteBtn   = document.getElementById("callMuteBtn");
     if (acceptBtn) acceptBtn.addEventListener("click", acceptCall);
-    const endBtn = document.getElementById("callEndBtn");
-    if (endBtn) endBtn.addEventListener("click", () => { if (_callState === "receiving") rejectCall(); else endCall(); });
-    const muteBtn = document.getElementById("callMuteBtn");
-    if (muteBtn) muteBtn.addEventListener("click", toggleMute);
+    if (endBtn)    endBtn.addEventListener("click", () => { if (_callState === "receiving") rejectCall(); else endCall(); });
+    if (muteBtn)   muteBtn.addEventListener("click", toggleMute);
   }
 
   window.addEventListener("beforeunload", () => { closeSocket(); closeListenRailPolling(); endCall(true); });
