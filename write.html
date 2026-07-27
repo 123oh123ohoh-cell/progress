@@ -289,7 +289,10 @@
       imageInput.value = "";
     });
 
-    // ── Video upload ────────────────────────────────────────────────────────
+    // ── Video upload — direct browser → Supabase (bypasses Render) ────────────
+    // Render's free tier kills connections for large uploads (ECONNABORTED).
+    // Instead: server hands out a signed URL, browser uploads straight to
+    // Supabase. No Render timeout, works for files up to Supabase's 50 MB limit.
     const videoInput = document.getElementById("videoInput");
     document.getElementById("insertVideoBtn").addEventListener("click", () => videoInput.click());
     videoInput.addEventListener("change", async () => {
@@ -297,7 +300,6 @@
       if (!file) return;
       videoInput.value = "";
 
-      // 50 MB client cap (base64 adds ~33% overhead; server body limit is 75 MB)
       if (file.size > 50 * 1024 * 1024) {
         showToast("Video over 50 MB — compress it or use the YouTube button instead.");
         return;
@@ -313,18 +315,22 @@
 
       let videoUrl = null;
       try {
-        const b64 = await new Promise((resolve, reject) => {
-          const r = new FileReader();
-          r.onload = () => resolve(r.result);
-          r.onerror = reject;
-          r.readAsDataURL(file);
-        });
-        const result = await apiFetch("/api/upload-image", {
+        // Step 1: get a signed upload URL from our server (tiny fast request)
+        const urlData = await apiFetch("/api/storage-upload-url", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ image: b64 })
+          body: JSON.stringify({ filename: file.name, mimeType: file.type })
         });
-        if (result && result.url) videoUrl = result.url;
+
+        if (urlData && urlData.uploadUrl) {
+          // Step 2: upload the file DIRECTLY to Supabase — never touches Render
+          const uploadRes = await fetch(urlData.uploadUrl, {
+            method: "PUT",
+            headers: { "Content-Type": file.type },
+            body: file
+          });
+          if (uploadRes.ok) videoUrl = urlData.publicUrl;
+        }
       } catch (e) {}
 
       pendingImageUploads--;
@@ -337,7 +343,7 @@
         ph.replaceWith(fig);
       } else {
         if (ph) ph.remove();
-        showToast("Could not upload that video. Try a shorter clip or use the YouTube button.");
+        showToast("Could not upload that video. Try again.");
       }
     });
 
