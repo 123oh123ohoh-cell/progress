@@ -289,10 +289,7 @@
       imageInput.value = "";
     });
 
-    // ── Video upload — direct browser → Supabase (bypasses Render) ────────────
-    // Render's free tier kills connections for large uploads (ECONNABORTED).
-    // Instead: server hands out a signed URL, browser uploads straight to
-    // Supabase. No Render timeout, works for files up to Supabase's 50 MB limit.
+    // ── Video upload — direct browser to Supabase via signed URL ──────────────
     const videoInput = document.getElementById("videoInput");
     document.getElementById("insertVideoBtn").addEventListener("click", () => videoInput.click());
     videoInput.addEventListener("change", async () => {
@@ -301,7 +298,7 @@
       videoInput.value = "";
 
       if (file.size > 50 * 1024 * 1024) {
-        showToast("Video over 50 MB — compress it or use the YouTube button instead.");
+        showToast("Video over 50 MB — compress it or use the YouTube button.");
         return;
       }
 
@@ -315,21 +312,20 @@
 
       let videoUrl = null;
       try {
-        // Step 1: get a signed upload URL from our server (tiny fast request)
+        // Step 1: get a signed URL from the server (tiny request)
         const urlData = await apiFetch("/api/storage-upload-url", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ filename: file.name, mimeType: file.type })
         });
-
         if (urlData && urlData.uploadUrl) {
-          // Step 2: upload the file DIRECTLY to Supabase — never touches Render
-          const uploadRes = await fetch(urlData.uploadUrl, {
+          // Step 2: upload directly to Supabase — never touches Render
+          const up = await fetch(urlData.uploadUrl, {
             method: "PUT",
             headers: { "Content-Type": file.type },
             body: file
           });
-          if (uploadRes.ok) videoUrl = urlData.publicUrl;
+          if (up.ok) videoUrl = urlData.publicUrl;
         }
       } catch (e) {}
 

@@ -1317,47 +1317,22 @@ app.post("/api/upload-video", uploadRateLimit, asyncHandler(async (req, res) => 
   }
 }));
 
-// ── Direct-to-Supabase signed upload URL ─────────────────────────────────────
-// Returns a short-lived signed URL the browser can use to upload a file
-// directly to Supabase Storage — the file never passes through Render, so
-// there are no Render body-size limits or connection timeouts on uploads.
 app.post("/api/storage-upload-url", requireAuth, uploadRateLimit, asyncHandler(async (req, res) => {
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
-    return res.status(503).json({ error: "Storage not configured." });
-  }
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return res.status(503).json({ error: "Storage not configured." });
   const { filename, mimeType } = req.body || {};
-  if (!filename || !mimeType) {
-    return res.status(400).json({ error: "filename and mimeType are required." });
-  }
-  const ext      = (filename.split(".").pop() || "bin").toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (!filename || !mimeType) return res.status(400).json({ error: "filename and mimeType required." });
+  const ext = (filename.split(".").pop() || "bin").toLowerCase().replace(/[^a-z0-9]/g, "");
   const safePath = Date.now() + "-" + Math.random().toString(36).slice(2, 9) + "." + ext;
-
   const signRes = await fetch(
     `${SUPABASE_URL}/storage/v1/object/upload/sign/${SUPABASE_BUCKET}/${safePath}`,
-    {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${SUPABASE_SERVICE_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ expiresIn: 300 })
-    }
+    { method: "POST", headers: { "Authorization": `Bearer ${SUPABASE_SERVICE_KEY}`, "Content-Type": "application/json" }, body: JSON.stringify({ expiresIn: 300 }) }
   );
-
-  if (!signRes.ok) {
-    const errText = await signRes.text().catch(() => "");
-    return res.status(502).json({ error: `Could not get upload URL: ${signRes.status} ${errText}` });
-  }
-
+  if (!signRes.ok) { const e = await signRes.text().catch(() => ""); return res.status(502).json({ error: `Sign failed: ${signRes.status} ${e}` }); }
   const signData = await signRes.json();
   const signedPath = signData.signedURL || signData.url || "";
-  const uploadUrl  = signedPath.startsWith("http") ? signedPath : SUPABASE_URL + signedPath;
-  if (!uploadUrl || uploadUrl === SUPABASE_URL) {
-    return res.status(502).json({ error: "Supabase did not return a signed URL." });
-  }
-
-  const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${SUPABASE_BUCKET}/${safePath}`;
-  res.json({ uploadUrl, publicUrl });
+  const uploadUrl = signedPath.startsWith("http") ? signedPath : SUPABASE_URL + signedPath;
+  if (!uploadUrl || uploadUrl === SUPABASE_URL) return res.status(502).json({ error: "No signed URL returned." });
+  res.json({ uploadUrl, publicUrl: `${SUPABASE_URL}/storage/v1/object/public/${SUPABASE_BUCKET}/${safePath}` });
 }));
 
 app.get("/api/posts", asyncHandler(async (req, res) => {

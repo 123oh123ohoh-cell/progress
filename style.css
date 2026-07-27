@@ -665,53 +665,14 @@ body.account-banned .mobile-fab {
   font-family: var(--font-display); font-size: 27px; margin: 40px 0 16px; color: var(--ink);
 }
 .post-content img { border-radius: var(--radius); margin: 30px 0; border: 1px solid var(--mocha-light); }
-
-/* ── Video embeds in posts and in the write editor ── */
-.post-video-wrap {
-  display: block;
-  margin: 28px 0;
-  border-radius: var(--radius);
-  overflow: hidden;
-  border: 1px solid var(--mocha-light);
-  background: #000;
-}
-.post-content figure.post-video-wrap { margin: 28px 0; }
-.post-content figure { margin: 0; }
-.post-video {
-  display: block;
-  width: 100%;
-  max-height: 540px;
-  background: #000;
-  outline: none;
-}
-
-/* Loading placeholder shown while a video is uploading in the editor */
-.post-video-uploading {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 14px 18px;
-  background: var(--mocha-wash);
-  border: 1px dashed var(--mocha-light);
-  border-radius: var(--radius);
-  font-size: 13.5px;
-  color: var(--muted);
-  margin: 16px 0;
-  user-select: none;
-}
-.post-video-spinner {
-  width: 16px; height: 16px;
-  border: 2px solid var(--mocha-light);
-  border-top-color: var(--mocha-dark);
-  border-radius: 50%;
-  flex-shrink: 0;
-  animation: vid-spin .8s linear infinite;
-}
-@keyframes vid-spin { to { transform: rotate(360deg); } }
-
-@media (max-width: 600px) {
-  .post-video { max-height: 280px; }
-}
+.post-video-wrap { display:block; margin:28px 0; border-radius:var(--radius); overflow:hidden; border:1px solid var(--mocha-light); background:#000; }
+.post-content figure.post-video-wrap { margin:28px 0; }
+.post-content figure { margin:0; }
+.post-video { display:block; width:100%; max-height:540px; background:#000; outline:none; }
+.post-video-uploading { display:flex; align-items:center; gap:10px; padding:14px 18px; background:var(--mocha-wash); border:1px dashed var(--mocha-light); border-radius:var(--radius); font-size:13.5px; color:var(--muted); margin:16px 0; user-select:none; }
+.post-video-spinner { width:16px; height:16px; border:2px solid var(--mocha-light); border-top-color:var(--mocha-dark); border-radius:50%; flex-shrink:0; animation:vid-spin .8s linear infinite; }
+@keyframes vid-spin { to { transform:rotate(360deg); } }
+@media (max-width:600px) { .post-video { max-height:280px; } }
 .post-content a { color: var(--mocha-dark); border-bottom: 1px solid var(--mocha); }
 .post-content blockquote {
   margin: 28px 0; padding: 14px 20px 14px 24px; border-left: 2px solid var(--ink);
