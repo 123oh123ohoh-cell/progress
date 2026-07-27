@@ -6,6 +6,34 @@ const http = require("http");
 const { MongoClient } = require("mongodb");
 const { WebSocketServer } = require("ws");
 
+const webpush = require("web-push");
+
+// VAPID keys — generate once with: npx web-push generate-vapid-keys
+// Then add VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_EMAIL to Render env vars
+const VAPID_PUBLIC_KEY  = process.env.VAPID_PUBLIC_KEY  || "";
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || "";
+const VAPID_EMAIL       = process.env.VAPID_EMAIL       || "mailto:hello@progressing.online";
+if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails(VAPID_EMAIL, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+}
+
+async function sendPushToUser(username, payload) {
+  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) return;
+  try {
+    const doc = await db.collection("pushSubscriptions").findOne({ username });
+    if (!doc || !doc.subscription) return;
+    await webpush.sendNotification(doc.subscription, JSON.stringify(payload));
+    console.log(`[push] sent to ${username}: ${payload.title}`);
+  } catch (e) {
+    if (e.statusCode === 410 || e.statusCode === 404) {
+      // Subscription expired — remove it
+      await db.collection("pushSubscriptions").deleteOne({ username }).catch(() => {});
+    } else {
+      console.warn("[push] failed:", e.message);
+    }
+  }
+}
+
 const app = express();
 const port = process.env.PORT || 3000;
 const publicPath = path.join(__dirname, "..");
@@ -60,52 +88,6 @@ async function uploadToSupabase(base64DataUri) {
   }
   return `${SUPABASE_URL}/storage/v1/object/public/${SUPABASE_BUCKET}/${filename}`;
 }
-const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
-const RESEND_FROM    = process.env.RESEND_FROM    || "Progress <notifications@progressing.online>";
-
-async function sendEmail({ to, subject, html }) {
-  if (!RESEND_API_KEY) { console.warn("[email] RESEND_API_KEY not set in env"); return; }
-  if (!to) { console.warn("[email] no recipient email"); return; }
-  try {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from: RESEND_FROM, to: [to], subject, html })
-    });
-    if (!res.ok) {
-      const err = await res.text().catch(() => "");
-      console.error(`[email] Resend error (${res.status}): ${err}`);
-    } else {
-      console.log(`[email] sent to ${to}: ${subject}`);
-    }
-  } catch (e) { console.warn("[email] fetch failed:", e.message); }
-}
-
-async function sendNotificationEmail(recipientDoc, notification) {
-  if (!recipientDoc || !recipientDoc.email) return;
-  if (recipientDoc.emailNotifications === false) return;
-  const site = process.env.RENDER_EXTERNAL_URL || "https://progressing.online";
-  let subject, body;
-  if (notification.type === "like") {
-    subject = `@${notification.actor} liked your post`;
-    body = `<p><strong>@${notification.actor}</strong> liked "<em>${notification.postTitle || ""}</em>".</p>${notification.postId ? `<p><a href="${site}/post.html?id=${notification.postId}">View post →</a></p>` : ""}`;
-  } else if (notification.type === "reply") {
-    subject = `@${notification.actor} replied to your post`;
-    body = `<p><strong>@${notification.actor}</strong> replied: "${notification.body || ""}"</p>${notification.postId ? `<p><a href="${site}/post.html?id=${notification.postId}">View →</a></p>` : ""}`;
-  } else if (notification.type === "follow") {
-    subject = `@${notification.actor} started following you`;
-    body = `<p><strong>@${notification.actor}</strong> is now following you on Progress.</p><p><a href="${site}/user.html?username=${notification.actor}">View profile →</a></p>`;
-  } else if (notification.type === "mention") {
-    subject = `@${notification.actor} mentioned you`;
-    body = `<p><strong>@${notification.actor}</strong> mentioned you: "${notification.body || ""}"</p>${notification.postId ? `<p><a href="${site}/post.html?id=${notification.postId}">View →</a></p>` : ""}`;
-  } else { return; }
-  await sendEmail({
-    to: recipientDoc.email,
-    subject,
-    html: `<div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:24px;"><p style="font-size:22px;font-weight:700;margin:0 0 16px;">progress.</p>${body}<hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;"><p style="font-size:12px;color:#6b7280;">You have email notifications on. <a href="${site}/profile.html?tab=settings">Manage</a></p></div>`
-  });
-}
-
 const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET || "";
 const SPOTIFY_REDIRECT_URI = process.env.SPOTIFY_REDIRECT_URI || "http://127.0.0.1:3000/api/spotify/callback";
 const SPOTIFY_SCOPES = "user-read-currently-playing user-read-private user-read-playback-state user-modify-playback-state";
@@ -262,13 +244,11 @@ function normalizeUser(doc) {
     bio: user.bio || "",
     spotify: user.spotify || "",
     locked: !!user.locked,
-    banned: !!user.banned,
-    email: user.email || null,
-    emailNotifications: user.emailNotifications !== false
+    banned: !!user.banned
   };
 }
 
-function publicUser(user, includePrivate) {
+function publicUser(user) {
   const badges = Array.isArray(user.badges) ? user.badges.filter(b => b !== "creator") : [];
   let displayBadge = user.displayBadge || null;
   if (ALLOWED_CREATOR_USERNAMES.has(user.username)) {
@@ -294,8 +274,7 @@ function publicUser(user, includePrivate) {
     followers: user.followers || [],
     following: user.following || [],
     locked: !!user.locked,
-    banned: !!user.banned,
-    ...(includePrivate ? { email: user.email || null, emailNotifications: user.emailNotifications !== false } : {})
+    banned: !!user.banned
   };
 }
 
@@ -459,10 +438,23 @@ async function createNotification(notification) {
       if (conn.readyState === conn.OPEN) conn.send(payload);
     }
   }
-  // Send email notification in background
   if (notification.recipient && ["like","reply","follow","mention"].includes(notification.type)) {
+    const site = process.env.RENDER_EXTERNAL_URL || "https://progressing.online";
+    // Email notification
     db.collection("users").findOne({ username: notification.recipient })
       .then(doc => sendNotificationEmail(doc, notification)).catch(() => {});
+    // Push notification (PWA)
+    const pushPayload = {
+      title: notification.type === "like"    ? `@${notification.actor} liked your post`
+           : notification.type === "reply"   ? `@${notification.actor} replied to your post`
+           : notification.type === "follow"  ? `@${notification.actor} is now following you`
+           : notification.type === "mention" ? `@${notification.actor} mentioned you`
+           : "New notification",
+      body: (notification.body || notification.postTitle || "").slice(0, 100),
+      url:  notification.postId ? `${site}/post.html?id=${notification.postId}` : site,
+      tag:  notification.type
+    };
+    sendPushToUser(notification.recipient, pushPayload).catch(() => {});
   }
 }
 
@@ -773,12 +765,6 @@ app.get("/api/users/:id", asyncHandler(async (req, res) => {
   res.json(publicUser(normalizeUser(doc)));
 }));
 
-app.get("/api/me", requireAuth, asyncHandler(async (req, res) => {
-  const user = await db.collection("users").findOne({ _id: req.user.id });
-  if (!user) return res.status(404).json({ error: "Not found" });
-  res.json(publicUser(normalizeUser(user), true));
-}));
-
 app.post("/api/users", signupRateLimit, asyncHandler(async (req, res) => {
   const { username, name, password, timezone } = req.body;
   if (!username || !name || !password) return res.status(400).json({ error: "username, name, and password are required" });
@@ -803,7 +789,7 @@ app.post("/api/users", signupRateLimit, asyncHandler(async (req, res) => {
   await db.collection("users").insertOne(user);
   await notifyBadgesAwarded(normalizedUsername, user.badges);
   const token = signJWT({ username: user.username, id: user._id });
-  res.status(201).json({ ...publicUser(normalizeUser(user), true), token });
+  res.status(201).json({ ...publicUser(normalizeUser(user)), token });
 }));
 
 app.patch("/api/users/:id", requireAuth, asyncHandler(async (req, res) => {
@@ -811,7 +797,7 @@ app.patch("/api/users/:id", requireAuth, asyncHandler(async (req, res) => {
   const doc = await users.findOne({ _id: req.params.id });
   if (!doc) return res.status(404).json({ error: "User not found" });
   if (req.user.id !== doc._id) return res.status(403).json({ error: "You can only edit your own profile." });
-  const { name, timezone, avatar, bio, displayBadge, spotify, email, emailNotifications } = req.body;
+  const { name, timezone, avatar, bio, displayBadge, spotify } = req.body;
   const update = {};
   if (typeof name === "string") update.name = name;
   if (typeof timezone === "string") update.timezone = timezone;
@@ -824,10 +810,6 @@ app.patch("/api/users/:id", requireAuth, asyncHandler(async (req, res) => {
     }
     update.spotify = trimmedSpotify;
   }
-  if (typeof email === "string") {
-    update.email = email.trim().toLowerCase() || null;
-  }
-  if (typeof emailNotifications === "boolean") update.emailNotifications = emailNotifications;
   if (typeof displayBadge !== "undefined") {
     if (displayBadge === null) {
       update.displayBadge = null;
@@ -846,7 +828,7 @@ app.patch("/api/users/:id", requireAuth, asyncHandler(async (req, res) => {
     await users.updateOne({ _id: req.params.id }, { $set: update });
   }
   const updated = await users.findOne({ _id: req.params.id });
-  res.json(publicUser(normalizeUser(updated), true));
+  res.json(publicUser(normalizeUser(updated)));
 }));
 
 app.delete("/api/users/:id", requireAuth, asyncHandler(async (req, res) => {
@@ -1381,6 +1363,27 @@ app.post("/api/upload-video", uploadRateLimit, asyncHandler(async (req, res) => 
   }
 }));
 
+app.get("/api/vapid-public-key", (req, res) => {
+  if (!VAPID_PUBLIC_KEY) return res.status(503).json({ error: "Push not configured" });
+  res.json({ publicKey: VAPID_PUBLIC_KEY });
+});
+
+app.post("/api/push-subscribe", requireAuth, asyncHandler(async (req, res) => {
+  const { subscription } = req.body || {};
+  if (!subscription) return res.status(400).json({ error: "subscription required" });
+  await db.collection("pushSubscriptions").updateOne(
+    { username: req.user.username },
+    { $set: { username: req.user.username, subscription, updatedAt: new Date() } },
+    { upsert: true }
+  );
+  res.json({ ok: true });
+}));
+
+app.delete("/api/push-subscribe", requireAuth, asyncHandler(async (req, res) => {
+  await db.collection("pushSubscriptions").deleteOne({ username: req.user.username });
+  res.json({ ok: true });
+}));
+
 app.get("/api/posts", asyncHandler(async (req, res) => {
   const filter = {};
   if (req.query.author) {
@@ -1682,7 +1685,7 @@ app.post("/api/login", loginRateLimit, asyncHandler(async (req, res) => {
   }
   await ensureUsernameBadges(user);
   const token = signJWT({ username: user.username, id: user._id });
-  res.json({ ...publicUser(normalizeUser(user), true), token });
+  res.json({ ...publicUser(normalizeUser(user)), token });
 }));
 
 app.get("/api/admin/stats", requireAuth, asyncHandler(async (req, res) => {

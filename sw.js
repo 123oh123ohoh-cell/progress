@@ -62,3 +62,40 @@ self.addEventListener('fetch', e => {
     )
   );
 });
+
+// ── Push notifications ──────────────────────────────────────────────────────
+self.addEventListener('push', event => {
+  let data = {};
+  try { data = event.data?.json() || {}; } catch(e) {}
+
+  const title   = data.title || 'Progress';
+  const options = {
+    body:              data.body || '',
+    icon:              '/images/nearheader.png',
+    badge:             '/images/nearheader.png',
+    tag:               data.tag  || 'progress-notif',
+    renotify:          true,   // vibrate even if same tag
+    requireInteraction: false, // auto-dismiss after a few seconds
+    silent:            false,  // play sound + vibrate
+    vibrate:           [150, 75, 150, 75, 300], // double-tap pattern
+    data:              { url: data.url || '/' },
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const url = event.notification.data?.url || '/';
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windowClients => {
+      for (const client of windowClients) {
+        if (client.url.includes(self.location.origin) && 'focus' in client) {
+          client.navigate(url);
+          return client.focus();
+        }
+      }
+      return clients.openWindow(url);
+    })
+  );
+});

@@ -1261,6 +1261,19 @@ function initPWA() {
   if (_isIOS() || _isSafari()) {
     if (_shouldShowInstallPrompt()) setTimeout(_showInstallBanner, 4000);
   }
+
+  // Push notifications — auto-enable when running as installed PWA
+  if ("serviceWorker" in navigator && "PushManager" in window) {
+    navigator.serviceWorker.ready.then(reg => {
+      if (_isInStandaloneMode()) {
+        // Already installed as app — request permission automatically
+        _subscribeToPush(reg);
+      } else if (Notification.permission === "granted") {
+        // Permission already granted elsewhere — subscribe quietly
+        _subscribeToPush(reg);
+      }
+    }).catch(() => {});
+  }
 }
 
 /* ── PWA helpers ─────────────────────────────────────────────────────────── */
@@ -1302,7 +1315,7 @@ function _showSplash() {
   el.innerHTML =
     '<div class="pwa-splash-inner">' +
       '<img src="/images/nearheader.png" class="pwa-splash-logo" alt="">' +
-      '<div class="pwa-splash-word">progress.</div>' +
+      '<div class="pwa-splash-word">progress<span class="pwa-splash-dot">.</span></div>' +
     '</div>';
   document.body.appendChild(el);
   const hide = () => { el.classList.add("pwa-splash-hide"); setTimeout(() => el.remove(), 400); };
@@ -1328,7 +1341,7 @@ function _showInstallBanner() {
   if (canInstall) {
     banner.innerHTML = '<div class="pwa-banner-inner"><img class="pwa-banner-icon" src="/images/nearheader.png" alt=""><div class="pwa-banner-text"><strong>Install Progress</strong><span>Faster, no browser bar, works offline</span></div><button class="pwa-banner-install" id="pwaBannerInstall">Install</button>' + closeBtn + '</div>';
   } else if (ios) {
-    banner.innerHTML = '<div class="pwa-banner-inner"><img class="pwa-banner-icon" src="/images/nearheader.png" alt=""><div class="pwa-banner-text"><strong>Add to Home Screen</strong><span>Tap ' + shareIcon + ' then <em>Add to Home Screen</em></span></div>' + closeBtn + '</div>';
+    banner.innerHTML = '<div class="pwa-banner-inner"><img class="pwa-banner-icon" src="/images/nearheader.png" alt=""><div class="pwa-banner-text"><strong>Add to Home Screen</strong><span>Tap ' + shareIcon + ' then <em>Add to Home Screen</em></span></div><a class="pwa-banner-install" href="/install.html">How?</a>' + closeBtn + '</div>';
   } else {
     banner.innerHTML = '<div class="pwa-banner-inner"><img class="pwa-banner-icon" src="/images/nearheader.png" alt=""><div class="pwa-banner-text"><strong>Install Progress</strong><span>Open on iPhone: tap ' + shareIcon + ' then <em>Add to Home Screen</em></span></div><a class="pwa-banner-install" href="/install.html">How to install</a>' + closeBtn + '</div>';
   }
@@ -1356,6 +1369,40 @@ function _hideInstallBanner() {
   if (!b) return;
   b.classList.remove("visible");
   setTimeout(() => b.remove(), 300);
+}
+
+function _urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - base64String.length % 4) % 4);
+  const base64  = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw     = atob(base64);
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+}
+
+async function _subscribeToPush(reg) {
+  try {
+    if (!reg) reg = await navigator.serviceWorker.ready;
+    // Check if already subscribed
+    const existing = await reg.pushManager.getSubscription();
+    if (existing) return;
+    // Request permission — in standalone/PWA mode do it automatically
+    let perm = Notification.permission;
+    if (perm === "default") perm = await Notification.requestPermission();
+    if (perm !== "granted") return;
+    // Get VAPID key from server
+    const keyData = await apiFetch("/api/vapid-public-key");
+    if (!keyData || !keyData.publicKey) return;
+    // Subscribe with vibration support
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: _urlBase64ToUint8Array(keyData.publicKey)
+    });
+    // Send subscription to server
+    await apiFetch("/api/push-subscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ subscription: sub })
+    });
+  } catch(e) { /* push not supported or user denied */ }
 }
 
 function initShell(activePage) {
