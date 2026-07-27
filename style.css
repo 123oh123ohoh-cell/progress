@@ -3294,59 +3294,28 @@ body.candy-mode .badge-icon { filter: hue-rotate(280deg) saturate(2); }
 }
 .pwa-banner-close:hover { color: #fff; }
 @media (max-width: 480px) {
-  .pwa-banner-inner { padding: 10px 14px; gap: 10px; }
-  .pwa-banner-text span { display: none; }
+  .pwa-banner-inner { padding: 10px 14px; gap: 8px; }
+  .pwa-banner-text strong { font-size: 12.5px; }
+  .pwa-banner-text span { font-size: 11px; }
 }
-/* ============================================================
-   MOBILE BOTTOM NAV — hidden on desktop, visible on mobile/PWA
-   display:none by default ensures it NEVER shows on desktop.
-   Only body.mobile (set by setDeviceMode in app.js) shows it.
-   ============================================================ */
-.mobile-bottom-nav {
-  display: none !important; /* hidden everywhere by default */
-}
+/* ── Mobile bottom nav ── */
+.mobile-bottom-nav { display: none !important; }
 body.mobile .mobile-bottom-nav {
-  display: flex !important; /* only show on mobile */
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 198;
-  background: var(--paper);
-  border-top: 1px solid var(--mocha-light);
-  box-shadow: 0 -1px 0 var(--mocha-wash);
+  display: flex !important;
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 198;
+  background: var(--paper); border-top: 1px solid var(--mocha-light);
   padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 4px);
-  align-items: stretch;
-  justify-content: space-around;
+  align-items: stretch; justify-content: space-around;
 }
-body.mobile .mobile-fab {
-  display: none !important;
-}
-body.mobile main.container {
-  padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
-}
+body.mobile .mobile-fab { display: none !important; }
+body.mobile main.container { padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px)); }
 .mbn-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  flex: 1;
-  min-height: 52px;
-  text-decoration: none;
-  color: var(--muted);
-  font-family: var(--font-mono);
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: .04em;
-  padding: 6px 4px 0;
-  -webkit-tap-highlight-color: transparent;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3px; flex: 1; min-height: 52px; text-decoration: none; color: var(--muted);
+  font-family: var(--font-mono); font-size: 9px; text-transform: uppercase;
+  letter-spacing: .04em; padding: 6px 4px 0; -webkit-tap-highlight-color: transparent;
 }
-.mbn-item svg {
-  width: 22px;
-  height: 22px;
-  flex-shrink: 0;
-}
+.mbn-item svg { width: 22px; height: 22px; flex-shrink: 0; }
 .mbn-item.active { color: var(--ink); }
 .mbn-item.active svg { stroke-width: 2.5; }
 .mbn-item:active { opacity: .5; }
