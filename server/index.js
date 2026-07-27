@@ -1317,22 +1317,61 @@ app.post("/api/upload-video", uploadRateLimit, asyncHandler(async (req, res) => 
   }
 }));
 
+app.post("/api/upload-video", uploadRateLimit, asyncHandler(async (req, res) => {
+  const data = (req.body || {}).video || (req.body || {}).image;
+  if (!data || typeof data !== "string" || !data.startsWith("data:")) {
+    return res.status(400).json({ error: "A base64 video data URI is required." });
+  }
+  try { res.json({ url: await uploadToSupabase(data) }); }
+  catch (e) { console.error("Video upload failed:", e); res.status(502).json({ error: "Could not upload video." }); }
+}));
+
 app.post("/api/storage-upload-url", requireAuth, uploadRateLimit, asyncHandler(async (req, res) => {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return res.status(503).json({ error: "Storage not configured." });
   const { filename, mimeType } = req.body || {};
   if (!filename || !mimeType) return res.status(400).json({ error: "filename and mimeType required." });
-  const ext = (filename.split(".").pop() || "bin").toLowerCase().replace(/[^a-z0-9]/g, "");
+
+  const ext      = (filename.split(".").pop() || "bin").toLowerCase().replace(/[^a-z0-9]/g, "");
   const safePath = Date.now() + "-" + Math.random().toString(36).slice(2, 9) + "." + ext;
+
   const signRes = await fetch(
     `${SUPABASE_URL}/storage/v1/object/upload/sign/${SUPABASE_BUCKET}/${safePath}`,
-    { method: "POST", headers: { "Authorization": `Bearer ${SUPABASE_SERVICE_KEY}`, "Content-Type": "application/json" }, body: JSON.stringify({ expiresIn: 300 }) }
+    {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${SUPABASE_SERVICE_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ expiresIn: 300 })
+    }
   );
-  if (!signRes.ok) { const e = await signRes.text().catch(() => ""); return res.status(502).json({ error: `Sign failed: ${signRes.status} ${e}` }); }
+
+  if (!signRes.ok) {
+    const e = await signRes.text().catch(() => "");
+    return res.status(502).json({ error: `Sign failed: ${signRes.status} ${e}` });
+  }
+
   const signData = await signRes.json();
-  const signedPath = signData.signedURL || signData.url || "";
-  const uploadUrl = signedPath.startsWith("http") ? signedPath : SUPABASE_URL + signedPath;
-  if (!uploadUrl || uploadUrl === SUPABASE_URL) return res.status(502).json({ error: "No signed URL returned." });
-  res.json({ uploadUrl, publicUrl: `${SUPABASE_URL}/storage/v1/object/public/${SUPABASE_BUCKET}/${safePath}` });
+
+  // Supabase may return the path with or without /storage/v1 prefix depending on
+  // API version. Extract the token and reconstruct the canonical URL ourselves.
+  const rawPath    = signData.signedURL || signData.url || "";
+  const tokenMatch = rawPath.match(/[?&]token=([^&]+)/);
+  const token      = signData.token || (tokenMatch && tokenMatch[1]);
+
+  let uploadUrl;
+  if (token) {
+    uploadUrl = `${SUPABASE_URL}/storage/v1/object/upload/sign/${SUPABASE_BUCKET}/${safePath}?token=${token}`;
+  } else if (rawPath.startsWith("http")) {
+    uploadUrl = rawPath;
+  } else {
+    const normalized = rawPath.startsWith("/storage/v1") ? rawPath : "/storage/v1" + (rawPath.startsWith("/") ? rawPath : "/" + rawPath);
+    uploadUrl = SUPABASE_URL + normalized;
+  }
+
+  if (!uploadUrl) return res.status(502).json({ error: "No signed URL returned from Supabase." });
+
+  res.json({
+    uploadUrl,
+    publicUrl: `${SUPABASE_URL}/storage/v1/object/public/${SUPABASE_BUCKET}/${safePath}`
+  });
 }));
 
 app.get("/api/posts", asyncHandler(async (req, res) => {
