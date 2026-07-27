@@ -1305,13 +1305,20 @@ window.addEventListener("beforeinstallprompt", (e) => {
 window.addEventListener("appinstalled", () => {
   _hideInstallBanner();
   _installPromptEvent = null;
+  // Ask for push notification permission immediately after install
+  if ("serviceWorker" in navigator && "PushManager" in window) {
+    setTimeout(() => {
+      navigator.serviceWorker.ready.then(_subscribeToPush).catch(() => {});
+    }, 1500); // small delay so the install animation finishes first
+  }
 });
 
 function _showSplash() {
   if (document.getElementById("pwaSplash")) return;
   const el = document.createElement("div");
   el.id = "pwaSplash";
-  el.className = "pwa-splash";
+  // Apply dark theme class immediately so the background matches before CSS loads
+  el.className = "pwa-splash" + (document.documentElement.getAttribute("data-theme") === "dark" ? " pwa-splash-dark" : "");
   el.innerHTML =
     '<div class="pwa-splash-inner">' +
       '<img src="/images/nearheader.png" class="pwa-splash-logo" alt="">' +

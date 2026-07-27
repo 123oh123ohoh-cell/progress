@@ -3302,37 +3302,48 @@ body.candy-mode .badge-icon { filter: hue-rotate(280deg) saturate(2); }
   position: fixed;
   inset: 0;
   z-index: 9999;
-  background: var(--paper);
+  background: #faf5ee; /* --cream light */
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: opacity .35s ease;
+  transition: opacity .4s ease;
 }
+/* Dark mode — matched via JS class and CSS data-theme */
+[data-theme="dark"] .pwa-splash,
+.pwa-splash.pwa-splash-dark { background: #17130f; }
+[data-theme="dark"] .pwa-splash .pwa-splash-word,
+.pwa-splash.pwa-splash-dark .pwa-splash-word { color: #faf5ee; }
+[data-theme="dark"] .pwa-splash .pwa-splash-dot,
+.pwa-splash.pwa-splash-dark .pwa-splash-dot { color: #8c6e58; }
 .pwa-splash-hide { opacity: 0; }
 .pwa-splash-inner {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 18px;
-  animation: splash-pop .4s cubic-bezier(.34,1.56,.64,1);
+  gap: 10px;
+  animation: splash-fade .3s ease;
 }
-@keyframes splash-pop {
-  from { opacity: 0; transform: scale(.85); }
-  to   { opacity: 1; transform: none; }
+@keyframes splash-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
+/* Exactly matches the nav-title styling */
 .pwa-splash-logo {
-  width: 80px;
-  height: 80px;
-  border-radius: 20px;
-  box-shadow: 0 8px 32px rgba(28,25,23,.14);
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  object-fit: cover;
 }
 .pwa-splash-word {
-  font-family: var(--font-serif);
+  font-family: "Fraunces", "Iowan Old Style", serif;
   font-style: italic;
-  font-size: 30px;
   font-weight: 600;
-  color: var(--ink);
-  letter-spacing: -.5px;
+  font-size: 24px;
+  letter-spacing: .2px;
+  color: var(--ink, #1c1917);
+}
+.pwa-splash-dot {
+  color: var(--mocha, #8c6e58);
+  font-style: normal;
 }
 
 /* ── Page fade-in transition ── */
@@ -3392,18 +3403,22 @@ body.mobile .mobile-bottom-nav {
   display: flex !important;
   position: fixed; bottom: 0; left: 0; right: 0; z-index: 198;
   background: var(--paper); border-top: 1px solid var(--mocha-light);
-  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 4px);
+  /* Extra padding so the home indicator bar doesn't overlap the nav items */
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
   align-items: stretch; justify-content: space-around;
 }
 body.mobile .mobile-fab { display: none !important; }
-body.mobile main.container { padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px)); }
+body.mobile main.container {
+  /* Push content above nav + home indicator + extra breathing room */
+  padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+}
 .mbn-item {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 3px; flex: 1; min-height: 52px; text-decoration: none; color: var(--muted);
+  gap: 4px; flex: 1; min-height: 56px; text-decoration: none; color: var(--muted);
   font-family: var(--font-mono); font-size: 9px; text-transform: uppercase;
-  letter-spacing: .04em; padding: 6px 4px 0; -webkit-tap-highlight-color: transparent;
+  letter-spacing: .04em; padding: 8px 4px 0; -webkit-tap-highlight-color: transparent;
 }
-.mbn-item svg { width: 22px; height: 22px; flex-shrink: 0; }
+.mbn-item svg { width: 24px; height: 24px; flex-shrink: 0; }
 .mbn-item.active { color: var(--ink); }
 .mbn-item.active svg { stroke-width: 2.5; }
 .mbn-item:active { opacity: .5; }
