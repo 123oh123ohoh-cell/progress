@@ -438,28 +438,21 @@ async function createNotification(notification) {
       if (conn.readyState === conn.OPEN) conn.send(payload);
     }
   }
-  if (notification.recipient && ["like","reply","follow","mention","message"].includes(notification.type)) {
+  if (notification.recipient && ["like","reply","follow","mention"].includes(notification.type)) {
     const site = process.env.RENDER_EXTERNAL_URL || "https://progressing.online";
-    // Email notification (not for DMs)
-    if (notification.type !== "message") {
-      db.collection("users").findOne({ username: notification.recipient })
-        .then(doc => sendNotificationEmail(doc, notification)).catch(() => {});
-    }
+    // Email notification
+    db.collection("users").findOne({ username: notification.recipient })
+      .then(doc => sendNotificationEmail(doc, notification)).catch(() => {});
     // Push notification (PWA)
     const pushPayload = {
       title: notification.type === "like"    ? `@${notification.actor} liked your post`
            : notification.type === "reply"   ? `@${notification.actor} replied to your post`
            : notification.type === "follow"  ? `@${notification.actor} is now following you`
            : notification.type === "mention" ? `@${notification.actor} mentioned you`
-           : notification.type === "message" ? `@${notification.actor}`
            : "New notification",
-      body: notification.type === "message"
-           ? (notification.body || "Sent you a message").slice(0, 100)
-           : (notification.body || notification.postTitle || "").slice(0, 100),
-      url:  notification.type === "message"
-           ? `${site}/chat.html?with=${encodeURIComponent(notification.actor)}`
-           : notification.postId ? `${site}/post.html?id=${notification.postId}` : site,
-      tag:  notification.type === "message" ? `dm-${notification.actor}` : notification.type
+      body: (notification.body || notification.postTitle || "").slice(0, 100),
+      url:  notification.postId ? `${site}/post.html?id=${notification.postId}` : site,
+      tag:  notification.type
     };
     sendPushToUser(notification.recipient, pushPayload).catch(() => {});
   }
@@ -1009,7 +1002,8 @@ app.get("/api/spotify/login", asyncHandler(async (req, res) => {
 }));
 
 app.get("/api/spotify/callback", asyncHandler(async (req, res) => {
-  const redirectError = () => res.redirect("/profile.html?tab=settings&spotify=error");
+  const SITE = "https://progressing.online";
+  const redirectError = () => res.redirect(`${SITE}/profile.html?tab=settings&spotify=error`);
   const { code, state, error } = req.query;
   if (error || !code || !state || !spotifyOAuthStates.has(state)) return redirectError();
 
@@ -1051,7 +1045,7 @@ app.get("/api/spotify/callback", asyncHandler(async (req, res) => {
       }
     }});
 
-    res.redirect("/profile.html?tab=settings&spotify=connected");
+    res.redirect(`${SITE}/profile.html?tab=settings&spotify=connected`);
   } catch (e) {
     console.error("Spotify OAuth callback failed:", e);
     redirectError();
