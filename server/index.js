@@ -100,11 +100,11 @@ function cleanupSpotifyOAuthStates() {
 }
 
 const SIGNUP_BADGE_AWARDS = {
-  mara: ["dexterity"],
-  own: ["dexterity"],
-  progresstesting1: ["dexterity", "817x2"],
-  "817x2": ["817x2"],
-  testuser: ["817x2", "dexterity"]
+  mara:             ["dexterity", "dark", "tester"],
+  own:              ["dexterity", "dark", "tester"],
+  progresstesting1: ["dexterity", "817x2", "dark", "tester"],
+  "817x2":          ["817x2", "dark", "tester"],
+  testuser:         ["817x2", "dexterity", "dark", "tester"]
 };
 
 const DEFAULT_SEED = {
@@ -818,7 +818,7 @@ app.patch("/api/users/:id", requireAuth, asyncHandler(async (req, res) => {
       if (ALLOWED_CREATOR_USERNAMES.has(doc.username) && !ownedBadges.includes("creator")) {
         ownedBadges.push("creator");
       }
-      if (displayBadge === "dexterity" || !ownedBadges.includes(displayBadge)) {
+      if (!ownedBadges.includes(displayBadge)) {
         return res.status(400).json({ error: "You don't own that badge" });
       }
       update.displayBadge = displayBadge;

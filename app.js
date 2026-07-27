@@ -27,6 +27,7 @@ const BADGES = {
   "817x2": { label: "817x2", description: "Awarded for 817x2, OurSpawn easter egg!", image: "images/emoticons/817x2.png" },
   creator: { label: "Creator", description: "Awarded for creator contributions.", image: "images/creator.png" },
   dark: { label: "Dark", description: "Awarded for being a early supporter, one and only!", image: "images/emoticons/dark.png" },
+  tester: { label: "Early Tester", description: "Helped test and shape Progress before it launched.", icon: "🧪" },
 };
 
 const BROWSE_ALLOWED_USERNAMES = new Set(["mara", "own", "progresstesting1"]);
