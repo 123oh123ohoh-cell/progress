@@ -266,7 +266,7 @@ function publicUser(user) {
 // parser-based library is the more bulletproof choice if this app's
 // user-generated content ever needs to withstand serious adversarial
 // testing.
-const SANITIZE_ALLOWED_TAGS = new Set(["p", "h2", "blockquote", "strong", "b", "em", "i", "u", "ul", "ol", "li", "a", "img", "br", "div", "span", "iframe"]);
+const SANITIZE_ALLOWED_TAGS = new Set(["p", "h2", "blockquote", "strong", "b", "em", "i", "u", "ul", "ol", "li", "a", "img", "br", "div", "span", "iframe", "figure", "video", "source"]);
 const SANITIZE_ALLOWED_IFRAME_HOSTS = [/^https:\/\/open\.spotify\.com\//i, /^https:\/\/www\.youtube-nocookie\.com\//i, /^https:\/\/www\.youtube\.com\//i];
 
 function sanitizePostContent(html) {
@@ -287,6 +287,11 @@ function sanitizePostContent(html) {
       const srcMatch = attrs.match(/src\s*=\s*"([^"]*)"/i) || attrs.match(/src\s*=\s*'([^']*)'/i);
       const src = srcMatch ? srcMatch[1] : "";
       if (!SANITIZE_ALLOWED_IFRAME_HOSTS.some(re => re.test(src))) return "";
+    }
+    if (tag === "video" || tag === "source") {
+      const srcMatch = attrs.match(/src\s*=\s*"([^"]*)"/i) || attrs.match(/src\s*=\s*'([^']*)'/i);
+      const src = srcMatch ? srcMatch[1] : "";
+      if (src && !src.startsWith("https://")) return "";
     }
     return match;
   });
