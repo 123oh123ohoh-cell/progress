@@ -90,7 +90,7 @@
         </div>
       </div>
       ${post.cover ? `<img class="post-cover" src="${post.cover}" alt="">` : ""}
-      <article class="post-content">${renderEmoticonsInHTML(post.content, "inline-emoticon")}</article>
+      <article class="post-content">${renderMentionsInHTML(renderEmoticonsInHTML(post.content, "inline-emoticon"), "post-mention-link")}</article>
       <div class="post-footer">
         <button class="react-btn ${likedByMe ? "liked" : ""}" id="likeBtn">
           ${ICONS.heart} <span id="likeCount">${post.likes}</span>

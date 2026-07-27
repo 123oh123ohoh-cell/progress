@@ -77,7 +77,10 @@
           ${!mine && currentRoom === GLOBAL_ROOM ? `<span class="chat-author">@${escapeHTML(msg.author)}</span>` : ""}
           ${imageHTML}
           ${bodyHTML}
-          <span class="chat-time">${Progress.timeAgo(msg.time)}</span>
+          <div class="chat-meta-row">
+            <span class="chat-time">${Progress.timeAgo(msg.time)}</span>
+            ${mine && currentRoom.startsWith("dm:") ? '<span class="chat-seen-tick" id="seen-' + msg.id + '"></span>' : ""}
+          </div>
         </div>
       </div>`;
   }
@@ -203,8 +206,16 @@
       let data;
       try { data = JSON.parse(event.data); } catch (e) { return; }
       if (data.type === "message") {
-        appendMessage(data.message);
-        if (currentRoom.startsWith("dm:")) loadSidebar();
+        const msg = data.message;
+        appendMessage(msg);
+        if (currentRoom.startsWith("dm:")) {
+          loadSidebar();
+          if (msg.author !== currentUser.username) {
+            _seenByPeer.set(currentRoom, msg.id);
+            updateSeenTicks();
+          }
+          if (msg.author === currentUser.username) updateSeenTicks();
+        }
       } else if (data.type === "presence") {
         renderPresence(data.users);
       } else if (data.type === "typing") {
@@ -270,6 +281,7 @@
     log.innerHTML = "";
     history.forEach(appendMessage);
     scrollToBottom(true);
+    updateSeenTicks();
   }
 
   function sendMessage(text, imageUrl) {
@@ -364,6 +376,33 @@
         closeChatSidebar(); // auto-close on mobile after picking a room
       });
     });
+  }
+
+  // Track seen state per DM room
+  const _seenByPeer = new Map(); // room -> last seen message id from peer
+
+  function updateSeenTicks() {
+    // Mark all my outgoing messages as "seen" if the other person has read past them
+    const log = document.getElementById("chatLog");
+    if (!log || !currentRoom.startsWith("dm:")) return;
+    const myMsgs = Array.from(log.querySelectorAll(".chat-msg.mine"));
+    if (!myMsgs.length) return;
+    // Show "Seen" on the last outgoing message only
+    myMsgs.forEach((el, i) => {
+      const tick = el.querySelector(".chat-seen-tick");
+      if (!tick) return;
+      tick.textContent = "";
+      tick.className = "chat-seen-tick";
+    });
+    const lastMine = myMsgs[myMsgs.length - 1];
+    const tick = lastMine && lastMine.querySelector(".chat-seen-tick");
+    if (tick && _seenByPeer.has(currentRoom)) {
+      tick.textContent = "Seen";
+      tick.classList.add("seen");
+    } else if (tick) {
+      tick.textContent = "Sent";
+      tick.classList.add("sent");
+    }
   }
 
   function switchRoom(room, label, peer) {

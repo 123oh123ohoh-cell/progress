@@ -34,6 +34,7 @@
   <div id="feedTabsWrap" style="display:none;">
     <div class="feed-tabs" id="feedTabs" role="tablist" aria-label="Filter posts by category">
       <button class="feed-tab-btn active" data-cat="all" role="tab" aria-selected="true">All</button>
+      <button class="feed-tab-btn" data-cat="following" role="tab" aria-selected="false">Following</button>
       <button class="feed-tab-btn" data-cat="development" role="tab" aria-selected="false"><span class="feed-tab-dot"></span>Development</button>
       <button class="feed-tab-btn" data-cat="creative" role="tab" aria-selected="false"><span class="feed-tab-dot"></span>Creative</button>
       <button class="feed-tab-btn" data-cat="random" role="tab" aria-selected="false"><span class="feed-tab-dot"></span>Random</button>
@@ -78,9 +79,15 @@
   function renderFeed() {
     let posts = Progress.getPosts();
 
-    // Filter by category if tabs enabled and a non-all tab is selected
+    // Filter by category / following
     if (getCategoryTabsEnabled() && activeCategory && activeCategory !== "all") {
-      posts = posts.filter(p => (p.category || "").toLowerCase() === activeCategory);
+      if (activeCategory === "following") {
+        const me = Progress.getCurrentUser();
+        const following = (me && me.following) ? me.following : [];
+        posts = posts.filter(p => following.includes(p.author));
+      } else {
+        posts = posts.filter(p => (p.category || "").toLowerCase() === activeCategory);
+      }
     }
 
     const timeline = document.getElementById("timeline");
@@ -89,8 +96,8 @@
       timeline.innerHTML = Progress.apiOnline === false
         ? bootingUpHTML()
         : `<div class="feed-empty">
-            <h3>${activeCategory && activeCategory !== "all" ? "Nothing in this category yet" : "Nothing here yet"}</h3>
-            <p>${activeCategory && activeCategory !== "all" ? "Be the first to post in this category." : "The first entry is always the hardest one to publish."}</p>
+            <h3>${activeCategory === "following" ? "Nothing from people you follow yet" : activeCategory && activeCategory !== "all" ? "Nothing in this category yet" : "Nothing here yet"}</h3>
+            <p>${activeCategory === "following" ? "Follow some writers and their posts will show up here." : activeCategory && activeCategory !== "all" ? "Be the first to post in this category." : "The first entry is always the hardest one to publish."}</p>
           </div>`;
       return;
     }

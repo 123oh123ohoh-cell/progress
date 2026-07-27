@@ -25,9 +25,7 @@ const BADGES = {
   early: { label: "Early Adopter", description: "Joined early and helped shape the experience.", icon: "🚀" },
   dexterity: { label: "Dexterity", description: "Awarded for playing during the Valorant ban on July 4th.", image: "images/emoticons/dexterity.png" },
   "817x2": { label: "817x2", description: "Awarded for 817x2, OurSpawn easter egg!", image: "images/emoticons/817x2.png" },
-  creator: { label: "Creator", description: "Awarded for creator contributions.", image: "images/creator.png" },
-  tester: { label: "Early Tester", description: "Awarded for joining during the early testing!", image: "images/emoticons/asleep_couch.png" },
-  dark: { label: "Dark", description: "Awarded for being dark and mysterious.", image: "images/emoticons/dark.png" }
+  creator: { label: "Creator", description: "Awarded for creator contributions.", image: "images/creator.png" }
 };
 
 const BROWSE_ALLOWED_USERNAMES = new Set(["mara", "own", "progresstesting1"]);
@@ -1172,11 +1170,79 @@ function openPresenceSocket(activePage) {
   }
 }
 
+/* ============================================================
+   PWA — Progressive Web App setup
+   Registers the service worker (offline cache + fast loads)
+   and injects the manifest + theme-color meta tag so the
+   browser's "Add to Home Screen" prompt works on every page.
+   ============================================================ */
+function initPWA() {
+  // Register service worker
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
+  }
+
+  // Inject manifest link dynamically so every page gets it without
+  // having to edit every HTML file
+  if (!document.querySelector('link[rel="manifest"]')) {
+    const link = document.createElement("link");
+    link.rel  = "manifest";
+    link.href = "/manifest.json";
+    document.head.appendChild(link);
+  }
+
+  // theme-color meta tag — controls the browser chrome colour on mobile.
+  // Matches the site theme and updates when the user switches dark/light.
+  function syncThemeColor() {
+    const isDark   = document.documentElement.getAttribute("data-theme") === "dark";
+    const isCandy  = document.body.classList.contains("candy-mode");
+    let color = isDark ? "#1c1917" : "#faf8f5";
+    if (isCandy) color = "#ff1a8c";
+    let meta = document.querySelector('meta[name="theme-color"]');
+    if (!meta) {
+      meta = document.createElement("meta");
+      meta.name = "theme-color";
+      document.head.appendChild(meta);
+    }
+    meta.content = color;
+  }
+  syncThemeColor();
+
+  // Apple-specific meta tags for standalone mode
+  if (!document.querySelector('meta[name="apple-mobile-web-app-capable"]')) {
+    [
+      ["apple-mobile-web-app-capable",            "yes"],
+      ["apple-mobile-web-app-status-bar-style",   "default"],
+      ["apple-mobile-web-app-title",              "Progress"],
+      ["mobile-web-app-capable",                  "yes"]
+    ].forEach(([name, content]) => {
+      const m = document.createElement("meta");
+      m.name = name; m.content = content;
+      document.head.appendChild(m);
+    });
+    const icon = document.createElement("link");
+    icon.rel = "apple-touch-icon";
+    icon.href = "/images/nearheader.png";
+    document.head.appendChild(icon);
+  }
+
+  // Keep theme-color in sync if user changes theme mid-session
+  new MutationObserver(syncThemeColor).observe(
+    document.documentElement,
+    { attributes: true, attributeFilter: ["data-theme"] }
+  );
+  new MutationObserver(syncThemeColor).observe(
+    document.body,
+    { attributes: true, attributeFilter: ["class"] }
+  );
+}
+
 function initShell(activePage) {
   applyTheme(getStoredTheme());
   applyCandy();
   setDeviceMode();
   window.addEventListener("resize", setDeviceMode);
+  initPWA();
   renderNav(activePage);
   mountModals();
   attachNavScrollWatcher();
