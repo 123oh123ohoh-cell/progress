@@ -64,14 +64,21 @@ const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
 const RESEND_FROM    = process.env.RESEND_FROM    || "Progress <notifications@progressing.online>";
 
 async function sendEmail({ to, subject, html }) {
-  if (!RESEND_API_KEY || !to) return;
+  if (!RESEND_API_KEY) { console.warn("[email] RESEND_API_KEY not set"); return; }
+  if (!to) { console.warn("[email] no recipient"); return; }
   try {
-    await fetch("https://api.resend.com/emails", {
+    const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { "Authorization": `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({ from: RESEND_FROM, to: [to], subject, html })
     });
-  } catch (e) { console.warn("[email] failed:", e.message); }
+    if (!res.ok) {
+      const err = await res.text().catch(() => "");
+      console.error(`[email] Resend rejected (${res.status}): ${err}`);
+    } else {
+      console.log(`[email] sent to ${to}: ${subject}`);
+    }
+  } catch (e) { console.warn("[email] fetch failed:", e.message); }
 }
 
 async function sendNotificationEmail(recipientDoc, notification) {

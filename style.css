@@ -665,6 +665,50 @@ body.account-banned .mobile-fab {
   font-family: var(--font-display); font-size: 27px; margin: 40px 0 16px; color: var(--ink);
 }
 .post-content img { border-radius: var(--radius); margin: 30px 0; border: 1px solid var(--mocha-light); }
+
+/* Video embeds in posts — constrained size so they don't fill the screen */
+.post-content figure { margin: 24px 0; }
+.post-video-wrap {
+  display: block;
+  margin: 24px 0;
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--mocha-light);
+  background: #000;
+  max-width: 100%;
+}
+.post-video {
+  display: block;
+  width: 100%;
+  max-height: 360px;   /* not too tall — readable alongside text */
+  object-fit: contain; /* letterbox rather than crop */
+  background: #000;
+  outline: none;
+}
+/* Upload loading placeholder shown in the editor */
+.post-video-uploading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: var(--mocha-wash);
+  border: 1px dashed var(--mocha-light);
+  border-radius: var(--radius);
+  font-size: 13px;
+  color: var(--muted);
+  margin: 12px 0;
+  user-select: none;
+}
+.post-video-spinner {
+  width: 14px; height: 14px;
+  border: 2px solid var(--mocha-light);
+  border-top-color: var(--mocha-dark);
+  border-radius: 50%;
+  animation: vid-spin .8s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes vid-spin { to { transform: rotate(360deg); } }
+@media (max-width: 600px) { .post-video { max-height: 220px; } }
 .post-content a { color: var(--mocha-dark); border-bottom: 1px solid var(--mocha); }
 .post-content blockquote {
   margin: 28px 0; padding: 14px 20px 14px 24px; border-left: 2px solid var(--ink);
@@ -3175,53 +3219,3 @@ body.candy-mode .badge-icon { filter: hue-rotate(280deg) saturate(2); }
   border-bottom: 1px solid var(--mocha-light);
 }
 .post-mention-link:hover { border-bottom-color: var(--mocha-dark); }
-/* ============================================================
-   MOBILE BOTTOM NAV TAB BAR
-   ============================================================ */
-.mobile-bottom-nav {
-  display: none;
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 198;
-  background: var(--paper);
-  border-top: 1px solid var(--mocha-light);
-  box-shadow: 0 -1px 0 var(--mocha-wash);
-  /* Safe area: pushes above iPhone home indicator, +4px extra breathing room */
-  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 4px);
-  align-items: stretch;
-  justify-content: space-around;
-}
-body.mobile .mobile-bottom-nav { display: flex; }
-body.mobile .mobile-fab { display: none !important; }
-body.mobile main.container {
-  padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
-}
-
-.mbn-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  flex: 1;
-  min-height: 52px;
-  text-decoration: none;
-  color: var(--muted);
-  font-family: var(--font-mono);
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: .04em;
-  padding: 6px 4px 0;
-  transition: color .15s;
-  -webkit-tap-highlight-color: transparent;
-}
-.mbn-item svg {
-  width: 22px;
-  height: 22px;
-  flex-shrink: 0;
-}
-.mbn-item.active { color: var(--ink); }
-.mbn-item.active svg { stroke-width: 2.5; }
-.mbn-item:active { opacity: .5; }
