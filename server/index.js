@@ -438,21 +438,28 @@ async function createNotification(notification) {
       if (conn.readyState === conn.OPEN) conn.send(payload);
     }
   }
-  if (notification.recipient && ["like","reply","follow","mention"].includes(notification.type)) {
+  if (notification.recipient && ["like","reply","follow","mention","message"].includes(notification.type)) {
     const site = process.env.RENDER_EXTERNAL_URL || "https://progressing.online";
-    // Email notification
-    db.collection("users").findOne({ username: notification.recipient })
-      .then(doc => sendNotificationEmail(doc, notification)).catch(() => {});
+    // Email notification (not for DMs)
+    if (notification.type !== "message") {
+      db.collection("users").findOne({ username: notification.recipient })
+        .then(doc => sendNotificationEmail(doc, notification)).catch(() => {});
+    }
     // Push notification (PWA)
     const pushPayload = {
       title: notification.type === "like"    ? `@${notification.actor} liked your post`
            : notification.type === "reply"   ? `@${notification.actor} replied to your post`
            : notification.type === "follow"  ? `@${notification.actor} is now following you`
            : notification.type === "mention" ? `@${notification.actor} mentioned you`
+           : notification.type === "message" ? `@${notification.actor}`
            : "New notification",
-      body: (notification.body || notification.postTitle || "").slice(0, 100),
-      url:  notification.postId ? `${site}/post.html?id=${notification.postId}` : site,
-      tag:  notification.type
+      body: notification.type === "message"
+           ? (notification.body || "Sent you a message").slice(0, 100)
+           : (notification.body || notification.postTitle || "").slice(0, 100),
+      url:  notification.type === "message"
+           ? `${site}/chat.html?with=${encodeURIComponent(notification.actor)}`
+           : notification.postId ? `${site}/post.html?id=${notification.postId}` : site,
+      tag:  notification.type === "message" ? `dm-${notification.actor}` : notification.type
     };
     sendPushToUser(notification.recipient, pushPayload).catch(() => {});
   }
@@ -1373,22 +1380,9 @@ app.post("/api/push-subscribe", requireAuth, asyncHandler(async (req, res) => {
   if (!subscription) return res.status(400).json({ error: "subscription required" });
   await db.collection("pushSubscriptions").updateOne(
     { username: req.user.username },
-    { $set: { username: req.user.username, subscription, vapidKey: VAPID_PUBLIC_KEY, updatedAt: new Date() } },
+    { $set: { username: req.user.username, subscription, updatedAt: new Date() } },
     { upsert: true }
   );
-  console.log(`[push] subscription saved for ${req.user.username}`);
-  res.json({ ok: true });
-}));
-
-// Test endpoint — sends a real push to yourself to verify everything works
-app.post("/api/push-test", requireAuth, asyncHandler(async (req, res) => {
-  const site = process.env.RENDER_EXTERNAL_URL || "https://progressing.online";
-  await sendPushToUser(req.user.username, {
-    title: "progress. notifications work! 🎉",
-    body: "You'll get notified when someone likes, replies, or follows you.",
-    url: site,
-    tag: "test"
-  });
   res.json({ ok: true });
 }));
 
