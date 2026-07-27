@@ -648,8 +648,8 @@ async function notifyMentionedUsers({ text, author, skipUsernames = [], context 
   }
 }
 
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ limit: "50mb", extended: true }));
+app.use(express.json({ limit: "100mb" }));
+app.use(express.urlencoded({ limit: "100mb", extended: true }));
 // Only these origins can call the API at all - a malicious site can no
 // longer make requests to this backend on a visitor's behalf just by
 // including a <script> that calls fetch(). Local dev origins are included
