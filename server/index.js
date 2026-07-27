@@ -770,6 +770,12 @@ app.get("/api/users/:id", asyncHandler(async (req, res) => {
   res.json(publicUser(normalizeUser(doc)));
 }));
 
+app.get("/api/me", requireAuth, asyncHandler(async (req, res) => {
+  const user = await db.collection("users").findOne({ _id: req.user.id });
+  if (!user) return res.status(404).json({ error: "Not found" });
+  res.json(publicUser(normalizeUser(user), true)); // always includes email + private fields
+}));
+
 app.post("/api/users", signupRateLimit, asyncHandler(async (req, res) => {
   const { username, name, password, timezone } = req.body;
   if (!username || !name || !password) return res.status(400).json({ error: "username, name, and password are required" });

@@ -473,6 +473,22 @@ const Progress = {
       this.db.posts = [];
     }
     if (notifications && notifications.length) this.db.notifications = notifications;
+
+    // Fetch private fields (email, emailNotifications) for the current user.
+    // GET /api/users never returns these, so we need a dedicated call.
+    if (savedCurrent) {
+      try {
+        const me = await apiFetch("/api/me");
+        if (me && me.id) {
+          const meUser = this.db.users.find(u => u.username === me.username);
+          if (meUser) {
+            if (me.email) meUser.email = me.email;
+            if (typeof me.emailNotifications !== "undefined") meUser.emailNotifications = me.emailNotifications;
+          }
+        }
+      } catch (e) {}
+    }
+
     this.persist();
     return this.db;
   },

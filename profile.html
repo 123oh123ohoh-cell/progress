@@ -196,7 +196,7 @@ refreshNowPlaying();
           <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
             <input type="email" id="emailInput" placeholder="your@email.com" autocomplete="email"
               style="flex:1; padding:10px 12px; border:1px solid var(--mocha-light); border-radius:var(--radius); font-size:14px; background:var(--paper); color:var(--ink);"
-              value="${escapeHTML(user.email || '')}">
+              value="${escapeHTML(user.email || localStorage.getItem('progress:myEmail') || '')}">
             <button class="btn primary" id="saveEmailBtn" style="white-space:nowrap; padding:10px 16px;">Save</button>
           </div>
           <label style="display:flex; align-items:center; gap:12px; cursor:pointer; margin-top:4px;">
