@@ -1262,16 +1262,20 @@ function initPWA() {
     if (_shouldShowInstallPrompt()) setTimeout(_showInstallBanner, 4000);
   }
 
-  // Push notifications — auto-enable when running as installed PWA
+  // Push notifications
+  // On iOS: ONLY subscribe from the installed PWA (standalone mode).
+  // A Safari subscription is completely separate and won't deliver
+  // notifications to the installed app — they must be the same context.
   if ("serviceWorker" in navigator && "PushManager" in window) {
     navigator.serviceWorker.ready.then(reg => {
       if (_isInStandaloneMode()) {
-        // Already installed as app — request permission automatically
+        // Running as installed PWA — subscribe here
         _subscribeToPush(reg);
-      } else if (Notification.permission === "granted") {
-        // Permission already granted elsewhere — subscribe quietly
+      } else if (!_isIOS() && Notification.permission === "granted") {
+        // Non-iOS browser with permission — subscribe
         _subscribeToPush(reg);
       }
+      // iOS + not standalone = do nothing (wrong context)
     }).catch(() => {});
   }
 }
