@@ -192,6 +192,19 @@ refreshNowPlaying();
           <div class="field-note">Use <code>:computer:</code>, <code>:dead:</code>, <code>:two:</code> for custom emoticons.</div>
         </div>
         <div class="settings-section">
+          <h3>Email notifications</h3>
+          <div style="display:flex; align-items:center; gap:12px; margin-bottom:8px;">
+            <input type="email" id="emailInput" placeholder="your@email.com" autocomplete="email"
+              style="flex:1; padding:10px 12px; border:1px solid var(--mocha-light); border-radius:var(--radius); font-size:14px; background:var(--paper); color:var(--ink);"
+              value="${escapeHTML(user.email || '')}">
+            <span class="theme-toggle-switch" id="emailNotifsToggle"
+              data-on="${user.emailNotifications !== false && user.email ? '1' : '0'}">
+              <span class="theme-toggle-knob"></span>
+            </span>
+          </div>
+          <p class="field-note">Get emailed when someone likes, replies, or follows you. On by default once you add an email. Never shown publicly.</p>
+        </div>
+        <div class="settings-section">
           <h3>Spotify account</h3>
           <div id="spotifyAccountBox">
             ${user.spotifyAccount && user.spotifyAccount.connected ? `
@@ -328,6 +341,17 @@ refreshNowPlaying();
         }
       });
 
+      // Email notifications toggle
+      const emailNotifsToggle = document.getElementById("emailNotifsToggle");
+      if (emailNotifsToggle) {
+        if (emailNotifsToggle.dataset.on === "1") emailNotifsToggle.classList.add("on");
+        emailNotifsToggle.addEventListener("click", () => {
+          const on = emailNotifsToggle.dataset.on !== "1";
+          emailNotifsToggle.dataset.on = on ? "1" : "0";
+          emailNotifsToggle.classList.toggle("on", on);
+        });
+      }
+
       document.getElementById("saveSettingsBtn").addEventListener("click", async () => {
         const name = document.getElementById("nameField").value.trim();
         const bio = document.getElementById("bioField").value.trim();
@@ -335,7 +359,9 @@ refreshNowPlaying();
         const spotify = document.getElementById("spotifyField").value.trim();
         if (!name) { showToast("Display name can't be empty."); return; }
         if (spotify && !spotifyEmbedUrl(spotify)) { showToast("That doesn't look like a valid Spotify link."); return; }
-        const updated = await Progress.updateProfile({ name, bio, timezone, spotify });
+        const emailVal = (document.getElementById("emailInput")?.value || "").trim() || null;
+        const emailOn = document.getElementById("emailNotifsToggle")?.dataset.on === "1";
+        const updated = await Progress.updateProfile({ name, bio, timezone, spotify, email: emailVal, emailNotifications: emailOn });
         if (!updated) {
           showToast("Could not save settings.");
           return;

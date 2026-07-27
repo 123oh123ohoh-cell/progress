@@ -60,6 +60,45 @@ async function uploadToSupabase(base64DataUri) {
   }
   return `${SUPABASE_URL}/storage/v1/object/public/${SUPABASE_BUCKET}/${filename}`;
 }
+const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
+const RESEND_FROM    = process.env.RESEND_FROM    || "Progress <notifications@progressing.online>";
+
+async function sendEmail({ to, subject, html }) {
+  if (!RESEND_API_KEY || !to) return;
+  try {
+    await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ from: RESEND_FROM, to: [to], subject, html })
+    });
+  } catch (e) { console.warn("[email] failed:", e.message); }
+}
+
+async function sendNotificationEmail(recipientDoc, notification) {
+  if (!recipientDoc || !recipientDoc.email) return;
+  if (recipientDoc.emailNotifications === false) return;
+  const site = process.env.RENDER_EXTERNAL_URL || "https://progressing.online";
+  let subject, body;
+  if (notification.type === "like") {
+    subject = `@${notification.actor} liked your post`;
+    body = `<p><strong>@${notification.actor}</strong> liked "<em>${notification.postTitle || ""}</em>".</p>${notification.postId ? `<p><a href="${site}/post.html?id=${notification.postId}">View post →</a></p>` : ""}`;
+  } else if (notification.type === "reply") {
+    subject = `@${notification.actor} replied to your post`;
+    body = `<p><strong>@${notification.actor}</strong> replied: "${notification.body || ""}"</p>${notification.postId ? `<p><a href="${site}/post.html?id=${notification.postId}">View →</a></p>` : ""}`;
+  } else if (notification.type === "follow") {
+    subject = `@${notification.actor} started following you`;
+    body = `<p><strong>@${notification.actor}</strong> is now following you on Progress.</p><p><a href="${site}/user.html?username=${notification.actor}">View profile →</a></p>`;
+  } else if (notification.type === "mention") {
+    subject = `@${notification.actor} mentioned you`;
+    body = `<p><strong>@${notification.actor}</strong> mentioned you: "${notification.body || ""}"</p>${notification.postId ? `<p><a href="${site}/post.html?id=${notification.postId}">View →</a></p>` : ""}`;
+  } else { return; }
+  await sendEmail({
+    to: recipientDoc.email,
+    subject,
+    html: `<div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:24px;"><p style="font-size:22px;font-weight:700;margin:0 0 16px;">progress.</p>${body}<hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;"><p style="font-size:12px;color:#6b7280;">You're receiving this because email notifications are on. <a href="${site}/profile.html?tab=settings">Manage</a></p></div>`
+  });
+}
+
 const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET || "";
 const SPOTIFY_REDIRECT_URI = process.env.SPOTIFY_REDIRECT_URI || "http://127.0.0.1:3000/api/spotify/callback";
 const SPOTIFY_SCOPES = "user-read-currently-playing user-read-private user-read-playback-state user-modify-playback-state";
@@ -216,11 +255,13 @@ function normalizeUser(doc) {
     bio: user.bio || "",
     spotify: user.spotify || "",
     locked: !!user.locked,
-    banned: !!user.banned
+    banned: !!user.banned,
+    email: user.email || null,
+    emailNotifications: user.emailNotifications !== false
   };
 }
 
-function publicUser(user) {
+function publicUser(user, includePrivate) {
   const badges = Array.isArray(user.badges) ? user.badges.filter(b => b !== "creator") : [];
   let displayBadge = user.displayBadge || null;
   if (ALLOWED_CREATOR_USERNAMES.has(user.username)) {
@@ -246,7 +287,8 @@ function publicUser(user) {
     followers: user.followers || [],
     following: user.following || [],
     locked: !!user.locked,
-    banned: !!user.banned
+    banned: !!user.banned,
+    ...(includePrivate ? { email: user.email || null, emailNotifications: user.emailNotifications !== false } : {})
   };
 }
 
@@ -414,6 +456,10 @@ async function createNotification(notification) {
     for (const conn of recipientConnections) {
       if (conn.readyState === conn.OPEN) conn.send(payload);
     }
+  }
+  if (notification.recipient && ["like","reply","follow","mention"].includes(notification.type)) {
+    db.collection("users").findOne({ username: notification.recipient })
+      .then(doc => sendNotificationEmail(doc, notification)).catch(() => {});
   }
 }
 
@@ -756,7 +802,7 @@ app.patch("/api/users/:id", requireAuth, asyncHandler(async (req, res) => {
   const doc = await users.findOne({ _id: req.params.id });
   if (!doc) return res.status(404).json({ error: "User not found" });
   if (req.user.id !== doc._id) return res.status(403).json({ error: "You can only edit your own profile." });
-  const { name, timezone, avatar, bio, displayBadge, spotify } = req.body;
+  const { name, timezone, avatar, bio, displayBadge, spotify, email, emailNotifications } = req.body;
   const update = {};
   if (typeof name === "string") update.name = name;
   if (typeof timezone === "string") update.timezone = timezone;
@@ -769,6 +815,12 @@ app.patch("/api/users/:id", requireAuth, asyncHandler(async (req, res) => {
     }
     update.spotify = trimmedSpotify;
   }
+  if (typeof email === "string") {
+    const trimEmail = email.trim().toLowerCase();
+    if (trimEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(trimEmail)) return res.status(400).json({ error: "Invalid email." });
+    update.email = trimEmail || null;
+  }
+  if (typeof emailNotifications === "boolean") update.emailNotifications = emailNotifications;
   if (typeof displayBadge !== "undefined") {
     if (displayBadge === null) {
       update.displayBadge = null;
@@ -787,7 +839,7 @@ app.patch("/api/users/:id", requireAuth, asyncHandler(async (req, res) => {
     await users.updateOne({ _id: req.params.id }, { $set: update });
   }
   const updated = await users.findOne({ _id: req.params.id });
-  res.json(publicUser(normalizeUser(updated)));
+  res.json(publicUser(normalizeUser(updated), true));
 }));
 
 app.delete("/api/users/:id", requireAuth, asyncHandler(async (req, res) => {
@@ -1706,7 +1758,7 @@ app.post("/api/login", loginRateLimit, asyncHandler(async (req, res) => {
   }
   await ensureUsernameBadges(user);
   const token = signJWT({ username: user.username, id: user._id });
-  res.json({ ...publicUser(normalizeUser(user)), token });
+  res.json({ ...publicUser(normalizeUser(user), true), token });
 }));
 
 app.get("/api/admin/stats", requireAuth, asyncHandler(async (req, res) => {
