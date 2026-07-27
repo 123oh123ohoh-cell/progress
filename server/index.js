@@ -1400,12 +1400,13 @@ app.get("/api/posts/:id", asyncHandler(async (req, res) => {
 }));
 
 app.post("/api/posts", requireAuth, asyncHandler(async (req, res) => {
-  const { title, cover, excerpt } = req.body;
+  const { title, cover, excerpt, category } = req.body;
   const author = req.user.username;
   const content = sanitizePostContent(req.body.content);
   if (!title || !content) return res.status(400).json({ error: "title and content are required" });
   if (await isUsernameBanned(author)) return res.status(403).json({ error: "This account has been banned." });
   const createdAt = new Date().toISOString();
+  const VALID_CATEGORIES = new Set(["development", "creative", "random"]);
   const post = {
     _id: generateId("p"),
     author,
@@ -1415,6 +1416,7 @@ app.post("/api/posts", requireAuth, asyncHandler(async (req, res) => {
     cover: cover || null,
     excerpt: excerpt || content.replace(/<[^>]+>/g, "").slice(0, 140),
     content,
+    category: (category && VALID_CATEGORIES.has(category.toLowerCase())) ? category.toLowerCase() : null,
     likes: 0,
     likedBy: []
   };
@@ -1427,10 +1429,34 @@ app.post("/api/posts", requireAuth, asyncHandler(async (req, res) => {
   res.status(201).json(toClient(post));
 }));
 
+app.patch("/api/posts/:id", requireAuth, asyncHandler(async (req, res) => {
+  const post = await db.collection("posts").findOne({ _id: req.params.id });
+  if (!post) return res.status(404).json({ error: "Post not found" });
+  const isAdmin = ALLOWED_CREATOR_USERNAMES.has(req.user.username.toLowerCase());
+  if (post.author !== req.user.username && !isAdmin) {
+    return res.status(403).json({ error: "You can only edit your own posts." });
+  }
+  const update = {};
+  if (typeof req.body.category !== "undefined") {
+    const VALID_CATEGORIES = new Set(["development", "creative", "random"]);
+    const cat = req.body.category;
+    update.category = (cat && VALID_CATEGORIES.has(cat.toLowerCase())) ? cat.toLowerCase() : null;
+  }
+  if (typeof req.body.title === "string" && req.body.title.trim()) {
+    update.title = req.body.title.trim();
+  }
+  if (Object.keys(update).length) {
+    await db.collection("posts").updateOne({ _id: req.params.id }, { $set: update });
+  }
+  const updated = await db.collection("posts").findOne({ _id: req.params.id });
+  res.json(normalizePost(updated));
+}));
+
 app.delete("/api/posts/:id", requireAuth, asyncHandler(async (req, res) => {
   const post = await db.collection("posts").findOne({ _id: req.params.id });
   if (!post) return res.status(404).json({ error: "Post not found" });
-  if (post.author !== req.user.username) return res.status(403).json({ error: "You can only delete your own entries." });
+  const isAdmin = ALLOWED_CREATOR_USERNAMES.has(req.user.username.toLowerCase());
+  if (post.author !== req.user.username && !isAdmin) return res.status(403).json({ error: "You can only delete your own entries." });
   await db.collection("posts").deleteOne({ _id: req.params.id });
   await db.collection("comments").deleteMany({ postId: req.params.id });
   await db.collection("notifications").deleteMany({ postId: req.params.id });
