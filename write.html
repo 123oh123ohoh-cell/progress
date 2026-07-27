@@ -40,6 +40,7 @@
 
 <input type="file" id="coverInput" accept="image/*" style="display:none;">
 <input type="file" id="imageInput" accept="image/*" style="display:none;">
+<input type="file" id="videoInput" accept="video/*" style="display:none;">
 
 <script src="data.js"></script>
 <script src="app.js"></script>
@@ -144,6 +145,9 @@
         </button>
         <button class="tb-btn" id="insertYoutubeBtn" title="Insert YouTube video">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2.5" y="5" width="19" height="14" rx="4"/><path d="M10.5 9.5l5 2.5-5 2.5z" fill="currentColor" stroke="none"/></svg>
+        </button>
+        <button class="tb-btn" id="insertVideoBtn" title="Upload a video file">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 10l4.553-2.276A1 1 0 0 1 21 8.618v6.764a1 1 0 0 1-1.447.894L15 14"/><rect x="2" y="6" width="13" height="12" rx="2"/></svg>
         </button>
       </div>
 
@@ -283,6 +287,80 @@
       };
       reader.readAsDataURL(file);
       imageInput.value = "";
+    });
+
+    // ── Video upload ────────────────────────────────────────────────────────
+    const videoInput = document.getElementById("videoInput");
+    document.getElementById("insertVideoBtn").addEventListener("click", () => videoInput.click());
+    videoInput.addEventListener("change", async () => {
+      const file = videoInput.files[0];
+      if (!file) return;
+      videoInput.value = "";
+
+      if (file.size > 100 * 1024 * 1024) {
+        showToast("Video is over 100 MB — upload it to YouTube and use the YouTube button instead.");
+        return;
+      }
+
+      document.getElementById("canvas").focus();
+      const pid = "vid-" + Date.now();
+      document.execCommand("insertHTML", false,
+        '<div id="' + pid + '" class="post-video-uploading" contenteditable="false">' +
+        '<span class="post-video-spinner"></span>' +
+        '<span>Uploading video…</span>' +
+        '</div><p><br></p>');
+      pendingImageUploads++;
+
+      let videoUrl = null;
+
+      // Strategy A: FormData to /api/upload-video
+      try {
+        const fd = new FormData();
+        fd.append("video", file);
+        const res = await fetch(API_BASE + "/api/upload-video", {
+          method: "POST",
+          headers: { Authorization: "Bearer " + getAuthToken() },
+          body: fd
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.url) videoUrl = data.url;
+        }
+      } catch (e) {}
+
+      // Strategy B: base64 to /api/upload-image (works for files under ~35 MB)
+      if (!videoUrl && file.size <= 35 * 1024 * 1024) {
+        try {
+          const b64 = await new Promise((resolve, reject) => {
+            const r = new FileReader();
+            r.onload = () => resolve(r.result);
+            r.onerror = reject;
+            r.readAsDataURL(file);
+          });
+          const data = await apiFetch("/api/upload-image", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ image: b64 })
+          });
+          if (data && data.url) videoUrl = data.url;
+        } catch (e) {}
+      }
+
+      pendingImageUploads--;
+      const ph = document.getElementById(pid);
+
+      if (videoUrl && ph) {
+        const fig = document.createElement("figure");
+        fig.className = "post-video-wrap";
+        fig.contentEditable = "false";
+        fig.innerHTML = '<video class="post-video" controls preload="metadata" src="' + videoUrl + '"></video>';
+        ph.replaceWith(fig);
+      } else {
+        if (ph) ph.remove();
+        showToast(file.size > 35 * 1024 * 1024
+          ? "Video too large for direct upload. Use the YouTube button for longer videos."
+          : "Could not upload that video. Try again.");
+      }
     });
 
     // ── Spotify embed ───────────────────────────────────────────────────────

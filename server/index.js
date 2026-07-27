@@ -25,40 +25,40 @@ const SPOTIFY_LINK_RE = /^(?:https:\/\/open\.spotify\.com\/(?:intl-[a-zA-Z-]+\/)
 
 const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID || "";
 
-const CLOUDINARY_CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME || "";
-const CLOUDINARY_API_KEY = process.env.CLOUDINARY_API_KEY || "";
-const CLOUDINARY_API_SECRET = process.env.CLOUDINARY_API_SECRET || "";
+const SUPABASE_URL         = process.env.SUPABASE_URL         || "";
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || "";
+const SUPABASE_BUCKET      = "progress";
 
-// Uploads a base64 data URI to Cloudinary and returns the hosted URL.
-// Signed server-side (not an unsigned upload preset) so the API secret
-// never has to be exposed to the browser. This is what actually fixes the
-// payload-bloat bug: once a post stores a short Cloudinary URL instead of
-// a multi-MB embedded base64 string, /api/posts stays small no matter how
-// many images get published.
-async function uploadImageToCloudinary(base64DataUri) {
-  if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_API_KEY || !CLOUDINARY_API_SECRET) {
-    throw new Error("Cloudinary is not configured on this server yet.");
+// Uploads a base64 data URI (image or video) to Supabase Storage and
+// returns the public URL. Uses the Supabase REST API directly via fetch —
+// no extra npm package needed.
+// Bucket must be created in Supabase dashboard as PUBLIC, named "progress".
+async function uploadToSupabase(base64DataUri) {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+    throw new Error("Supabase storage is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_KEY.");
   }
-  const timestamp = Math.round(Date.now() / 1000);
-  const signature = crypto.createHash("sha1").update(`timestamp=${timestamp}${CLOUDINARY_API_SECRET}`).digest("hex");
-
-  const body = new URLSearchParams();
-  body.set("file", base64DataUri);
-  body.set("api_key", CLOUDINARY_API_KEY);
-  body.set("timestamp", String(timestamp));
-  body.set("signature", signature);
-
-  const uploadRes = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
+  const matches = base64DataUri.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9+.\-]+);base64,([\s\S]+)$/);
+  if (!matches) throw new Error("Invalid data URI format.");
+  const mimeType = matches[1];
+  const extMap = { jpeg: "jpg", quicktime: "mov", "x-msvideo": "avi", "x-matroska": "mkv", "x-ms-wmv": "wmv" };
+  const rawExt = mimeType.split("/")[1].split("+")[0].split(";")[0];
+  const ext    = extMap[rawExt] || rawExt;
+  const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}.${ext}`;
+  const buffer   = Buffer.from(matches[2], "base64");
+  const uploadRes = await fetch(`${SUPABASE_URL}/storage/v1/object/${SUPABASE_BUCKET}/${filename}`, {
     method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: body.toString()
+    headers: {
+      "Authorization": `Bearer ${SUPABASE_SERVICE_KEY}`,
+      "Content-Type": mimeType,
+      "x-upsert": "false"
+    },
+    body: buffer
   });
   if (!uploadRes.ok) {
     const errText = await uploadRes.text().catch(() => "");
-    throw new Error(`Cloudinary upload failed: ${uploadRes.status} ${errText}`);
+    throw new Error(`Supabase upload failed (${uploadRes.status}): ${errText}`);
   }
-  const data = await uploadRes.json();
-  return data.secure_url;
+  return `${SUPABASE_URL}/storage/v1/object/public/${SUPABASE_BUCKET}/${filename}`;
 }
 const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET || "";
 const SPOTIFY_REDIRECT_URI = process.env.SPOTIFY_REDIRECT_URI || "http://127.0.0.1:3000/api/spotify/callback";
@@ -686,6 +686,7 @@ const CSP_HEADER = [
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com",
   "img-src 'self' data: https:",
+  "media-src 'self' https:",
   "frame-src https://open.spotify.com https://www.youtube-nocookie.com https://www.youtube.com",
   "connect-src 'self' https://progress-351h.onrender.com wss://progress-351h.onrender.com"
 ].join("; ");
@@ -1289,15 +1290,30 @@ app.get("/api/link-preview", linkPreviewRateLimit, asyncHandler(async (req, res)
 
 app.post("/api/upload-image", uploadRateLimit, asyncHandler(async (req, res) => {
   const { image } = req.body || {};
-  if (!image || typeof image !== "string" || !image.startsWith("data:image/")) {
-    return res.status(400).json({ error: "A base64 image data URI is required." });
+  if (!image || typeof image !== "string" || !image.startsWith("data:")) {
+    return res.status(400).json({ error: "A base64 data URI is required." });
   }
   try {
-    const url = await uploadImageToCloudinary(image);
+    const url = await uploadToSupabase(image);
     res.json({ url });
   } catch (e) {
-    console.error("Image upload failed:", e);
-    res.status(502).json({ error: "Could not upload image. Try again." });
+    console.error("Upload failed:", e);
+    res.status(502).json({ error: "Could not upload file. Try again." });
+  }
+}));
+
+// Dedicated video upload endpoint — accepts base64 data URI in `video` or `image` field.
+app.post("/api/upload-video", uploadRateLimit, asyncHandler(async (req, res) => {
+  const data = (req.body || {}).video || (req.body || {}).image;
+  if (!data || typeof data !== "string" || !data.startsWith("data:")) {
+    return res.status(400).json({ error: "A base64 video data URI is required." });
+  }
+  try {
+    const url = await uploadToSupabase(data);
+    res.json({ url });
+  } catch (e) {
+    console.error("Video upload failed:", e);
+    res.status(502).json({ error: "Could not upload video. Try again." });
   }
 }));
 
@@ -1704,6 +1720,12 @@ connect()
           // still correctly keeps someone "online".
           ws.isActiveTab = !!data.active;
           broadcastGlobalPresenceUpdate();
+        } else {
+          // Relay any other message type (e.g. WebRTC call signaling:
+          // call-offer, call-answer, call-ice, call-reject, call-end)
+          // to all participants in the same room. Not stored, not logged,
+          // just forwarded — lets voice calls work without server changes.
+          broadcastToRoom(ws.room, { ...data, from: ws.username });
         }
       });
 
