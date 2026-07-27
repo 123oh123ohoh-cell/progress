@@ -133,18 +133,61 @@
     });
   }
 
+  // ── New posts button ──────────────────────────────────────────────────────
+  let _lastPostCount = 0;
+  let _newPostsAvailable = 0;
+
+  function showNewPostsBtn(count) {
+    let btn = document.getElementById("newPostsBtn");
+    if (!btn) {
+      btn = document.createElement("button");
+      btn.id = "newPostsBtn";
+      btn.className = "new-posts-btn";
+      const timeline = document.getElementById("timeline");
+      timeline.parentNode.insertBefore(btn, timeline);
+    }
+    btn.textContent = count === 1 ? "1 new post ↑" : `${count} new posts ↑`;
+    btn.classList.add("visible");
+    btn.onclick = () => {
+      btn.classList.remove("visible");
+      renderFeed();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      _newPostsAvailable = 0;
+    };
+  }
+
+  async function checkForNewPosts() {
+    await Progress.loadFromApi().catch(() => {});
+    const posts = Progress.getPosts();
+    if (_lastPostCount === 0) { _lastPostCount = posts.length; return; }
+    const diff = posts.length - _lastPostCount;
+    if (diff > 0) {
+      _newPostsAvailable += diff;
+      _lastPostCount = posts.length;
+      showNewPostsBtn(_newPostsAvailable);
+    }
+  }
+
   // ── Start ──────────────────────────────────────────────────────────────────
   async function start() {
     const ready = initShell("feed");
     initCategoryTabs();
     renderFeed();
-    ready.then(() => { initCategoryTabs(); renderFeed(); }).catch(() => {});
+    ready.then(() => {
+      initCategoryTabs();
+      renderFeed();
+      _lastPostCount = Progress.getPosts().length;
+      // Poll every 45 seconds for new posts
+      setInterval(checkForNewPosts, 45000);
+    }).catch(() => {});
 
-    // Pull-to-refresh: on mobile, pull down at the top of the page to
-    // reload and show a random emoticon while doing it.
     initPullToRefresh(async () => {
       await Progress.loadFromApi().catch(() => {});
       renderFeed();
+      _lastPostCount = Progress.getPosts().length;
+      _newPostsAvailable = 0;
+      const btn = document.getElementById("newPostsBtn");
+      if (btn) btn.classList.remove("visible");
     });
   }
 

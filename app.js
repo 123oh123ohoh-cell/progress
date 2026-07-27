@@ -1388,28 +1388,45 @@ function _urlBase64ToUint8Array(base64String) {
 async function _subscribeToPush(reg) {
   try {
     if (!reg) reg = await navigator.serviceWorker.ready;
-    // Check if already subscribed
+
+    // Get current VAPID key from server first
+    const keyData = await apiFetch("/api/vapid-public-key");
+    if (!keyData || !keyData.publicKey) return;
+
+    // Check existing subscription — if VAPID key changed, unsubscribe and re-subscribe
     const existing = await reg.pushManager.getSubscription();
-    if (existing) return;
-    // Request permission — in standalone/PWA mode do it automatically
+    if (existing) {
+      const storedKey = localStorage.getItem("progress:vapidKey");
+      if (storedKey === keyData.publicKey) return; // all good, already subscribed
+      // Key changed — unsubscribe old
+      await existing.unsubscribe().catch(() => {});
+    }
+
+    // Request permission
     let perm = Notification.permission;
     if (perm === "default") perm = await Notification.requestPermission();
     if (perm !== "granted") return;
-    // Get VAPID key from server
-    const keyData = await apiFetch("/api/vapid-public-key");
-    if (!keyData || !keyData.publicKey) return;
-    // Subscribe with vibration support
+
+    // Subscribe with new key
     const sub = await reg.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: _urlBase64ToUint8Array(keyData.publicKey)
     });
-    // Send subscription to server
-    await apiFetch("/api/push-subscribe", {
+
+    // Save subscription to server
+    const res = await apiFetch("/api/push-subscribe", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ subscription: sub })
     });
-  } catch(e) { /* push not supported or user denied */ }
+
+    if (res && res.ok) {
+      // Remember which VAPID key we subscribed with
+      try { localStorage.setItem("progress:vapidKey", keyData.publicKey); } catch(e) {}
+    }
+  } catch(e) {
+    console.warn("[push] subscribe failed:", e.message);
+  }
 }
 
 function initShell(activePage) {

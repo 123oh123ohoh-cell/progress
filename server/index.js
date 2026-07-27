@@ -1373,9 +1373,22 @@ app.post("/api/push-subscribe", requireAuth, asyncHandler(async (req, res) => {
   if (!subscription) return res.status(400).json({ error: "subscription required" });
   await db.collection("pushSubscriptions").updateOne(
     { username: req.user.username },
-    { $set: { username: req.user.username, subscription, updatedAt: new Date() } },
+    { $set: { username: req.user.username, subscription, vapidKey: VAPID_PUBLIC_KEY, updatedAt: new Date() } },
     { upsert: true }
   );
+  console.log(`[push] subscription saved for ${req.user.username}`);
+  res.json({ ok: true });
+}));
+
+// Test endpoint — sends a real push to yourself to verify everything works
+app.post("/api/push-test", requireAuth, asyncHandler(async (req, res) => {
+  const site = process.env.RENDER_EXTERNAL_URL || "https://progressing.online";
+  await sendPushToUser(req.user.username, {
+    title: "progress. notifications work! 🎉",
+    body: "You'll get notified when someone likes, replies, or follows you.",
+    url: site,
+    tag: "test"
+  });
   res.json({ ok: true });
 }));
 
