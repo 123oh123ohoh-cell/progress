@@ -5,26 +5,16 @@
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui", "browser"],
   "background_color": "#faf8f5",
   "theme_color": "#1c1917",
   "orientation": "portrait-primary",
   "lang": "en",
   "categories": ["social", "productivity"],
   "icons": [
-    {
-      "src": "/images/nearheader.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/images/nearheader.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    }
+    { "src": "/images/nearheader.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/images/nearheader.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
-  "screenshots": [],
   "shortcuts": [
     {
       "name": "New entry",
@@ -39,6 +29,15 @@
       "description": "Open the chat",
       "url": "/chat.html",
       "icons": [{ "src": "/images/nearheader.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Profile",
+      "short_name": "Profile",
+      "description": "View your profile",
+      "url": "/profile.html",
+      "icons": [{ "src": "/images/nearheader.png", "sizes": "192x192" }]
     }
-  ]
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false
 }

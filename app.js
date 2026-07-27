@@ -1190,14 +1190,110 @@ function openPresenceSocket(activePage) {
    and injects the manifest + theme-color meta tag so the
    browser's "Add to Home Screen" prompt works on every page.
    ============================================================ */
+// Holds the deferred beforeinstallprompt event so we can trigger it later
+let _installPromptEvent = null;
+
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault(); // stop browser mini-bar
+  _installPromptEvent = e;
+  _showInstallBanner();
+});
+
+window.addEventListener("appinstalled", () => {
+  _hideInstallBanner();
+  _installPromptEvent = null;
+});
+
+function _isInStandaloneMode() {
+  return window.matchMedia("(display-mode: standalone)").matches
+    || window.navigator.standalone === true;
+}
+
+function _isIOS() {
+  return /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
+}
+
+function _showInstallBanner() {
+  if (_isInStandaloneMode()) return; // already installed
+  if (document.getElementById("pwaBanner")) return; // already showing
+
+  const banner = document.createElement("div");
+  banner.id = "pwaBanner";
+  banner.className = "pwa-banner";
+
+  if (_isIOS()) {
+    // iOS doesn't support beforeinstallprompt — show manual instructions
+    banner.innerHTML =
+      '<div class="pwa-banner-inner">' +
+        '<img class="pwa-banner-icon" src="/images/nearheader.png" alt="Progress">' +
+        '<div class="pwa-banner-text">' +
+          '<strong>Install Progress</strong>' +
+          '<span>Tap <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin:0 2px"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg> then <em>Add to Home Screen</em></span>' +
+        '</div>' +
+        '<button class="pwa-banner-close" id="pwaBannerClose" aria-label="Dismiss">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
+        '</button>' +
+      '</div>';
+  } else {
+    // Android / desktop Chrome — use the native prompt
+    banner.innerHTML =
+      '<div class="pwa-banner-inner">' +
+        '<img class="pwa-banner-icon" src="/images/nearheader.png" alt="Progress">' +
+        '<div class="pwa-banner-text">' +
+          '<strong>Install Progress</strong>' +
+          '<span>Get the app for a faster, cleaner experience</span>' +
+        '</div>' +
+        '<button class="pwa-banner-install" id="pwaBannerInstall">Install</button>' +
+        '<button class="pwa-banner-close" id="pwaBannerClose" aria-label="Dismiss">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
+        '</button>' +
+      '</div>';
+  }
+
+  // Insert below nav
+  const navRoot = document.getElementById("nav-root");
+  if (navRoot) navRoot.insertAdjacentElement("afterend", banner);
+  else document.body.prepend(banner);
+  requestAnimationFrame(() => banner.classList.add("visible"));
+
+  document.getElementById("pwaBannerClose")?.addEventListener("click", () => {
+    _hideInstallBanner();
+    // Don't show again for 7 days
+    try { localStorage.setItem("progress:pwaPromptDismissed", Date.now()); } catch(e) {}
+  });
+
+  document.getElementById("pwaBannerInstall")?.addEventListener("click", async () => {
+    if (!_installPromptEvent) return;
+    _installPromptEvent.prompt();
+    const { outcome } = await _installPromptEvent.userChoice;
+    if (outcome === "accepted") _hideInstallBanner();
+    _installPromptEvent = null;
+  });
+}
+
+function _hideInstallBanner() {
+  const banner = document.getElementById("pwaBanner");
+  if (!banner) return;
+  banner.classList.remove("visible");
+  setTimeout(() => banner.remove(), 300);
+}
+
+function _shouldShowInstallPrompt() {
+  // Don't show if dismissed in last 7 days
+  try {
+    const dismissed = localStorage.getItem("progress:pwaPromptDismissed");
+    if (dismissed && Date.now() - parseInt(dismissed) < 7 * 24 * 60 * 60 * 1000) return false;
+  } catch(e) {}
+  return !_isInStandaloneMode();
+}
+
 function initPWA() {
   // Register service worker
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("/sw.js").catch(() => {});
   }
 
-  // Inject manifest link dynamically so every page gets it without
-  // having to edit every HTML file
+  // Manifest link
   if (!document.querySelector('link[rel="manifest"]')) {
     const link = document.createElement("link");
     link.rel  = "manifest";
@@ -1205,50 +1301,41 @@ function initPWA() {
     document.head.appendChild(link);
   }
 
-  // theme-color meta tag — controls the browser chrome colour on mobile.
-  // Matches the site theme and updates when the user switches dark/light.
+  // theme-color meta
   function syncThemeColor() {
-    const isDark   = document.documentElement.getAttribute("data-theme") === "dark";
-    const isCandy  = document.body.classList.contains("candy-mode");
+    const isDark  = document.documentElement.getAttribute("data-theme") === "dark";
+    const isCandy = document.body.classList.contains("candy-mode");
     let color = isDark ? "#1c1917" : "#faf8f5";
     if (isCandy) color = "#ff1a8c";
     let meta = document.querySelector('meta[name="theme-color"]');
-    if (!meta) {
-      meta = document.createElement("meta");
-      meta.name = "theme-color";
-      document.head.appendChild(meta);
-    }
+    if (!meta) { meta = document.createElement("meta"); meta.name = "theme-color"; document.head.appendChild(meta); }
     meta.content = color;
   }
   syncThemeColor();
 
-  // Apple-specific meta tags for standalone mode
+  // Apple meta tags
   if (!document.querySelector('meta[name="apple-mobile-web-app-capable"]')) {
     [
-      ["apple-mobile-web-app-capable",            "yes"],
-      ["apple-mobile-web-app-status-bar-style",   "default"],
-      ["apple-mobile-web-app-title",              "Progress"],
-      ["mobile-web-app-capable",                  "yes"]
+      ["apple-mobile-web-app-capable",          "yes"],
+      ["apple-mobile-web-app-status-bar-style", "black-translucent"],
+      ["apple-mobile-web-app-title",            "Progress"],
+      ["mobile-web-app-capable",                "yes"]
     ].forEach(([name, content]) => {
-      const m = document.createElement("meta");
-      m.name = name; m.content = content;
+      const m = document.createElement("meta"); m.name = name; m.content = content;
       document.head.appendChild(m);
     });
     const icon = document.createElement("link");
-    icon.rel = "apple-touch-icon";
-    icon.href = "/images/nearheader.png";
+    icon.rel = "apple-touch-icon"; icon.href = "/images/nearheader.png";
     document.head.appendChild(icon);
   }
 
-  // Keep theme-color in sync if user changes theme mid-session
-  new MutationObserver(syncThemeColor).observe(
-    document.documentElement,
-    { attributes: true, attributeFilter: ["data-theme"] }
-  );
-  new MutationObserver(syncThemeColor).observe(
-    document.body,
-    { attributes: true, attributeFilter: ["class"] }
-  );
+  new MutationObserver(syncThemeColor).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  new MutationObserver(syncThemeColor).observe(document.body, { attributes: true, attributeFilter: ["class"] });
+
+  // Show iOS install banner after a short delay (beforeinstallprompt handles Android/desktop)
+  if (_isIOS() && _shouldShowInstallPrompt()) {
+    setTimeout(_showInstallBanner, 3000);
+  }
 }
 
 function initShell(activePage) {
