@@ -666,28 +666,26 @@ body.account-banned .mobile-fab {
 }
 .post-content img { border-radius: var(--radius); margin: 30px 0; border: 1px solid var(--mocha-light); }
 
-/* Native video embeds in posts and in the editor canvas */
+/* ── Video embeds in posts and in the write editor ── */
 .post-video-wrap {
+  display: block;
   margin: 28px 0;
   border-radius: var(--radius);
   overflow: hidden;
   border: 1px solid var(--mocha-light);
   background: #000;
-  display: block;
-  position: relative;
 }
+.post-content figure.post-video-wrap { margin: 28px 0; }
+.post-content figure { margin: 0; }
 .post-video {
   display: block;
   width: 100%;
   max-height: 540px;
-  border-radius: var(--radius);
-  outline: none;
   background: #000;
+  outline: none;
 }
-.editor-canvas .post-video-wrap,
-.editor-canvas figure.post-video-wrap { margin: 20px 0; }
 
-/* Upload in-progress placeholder (shown in the editor while uploading) */
+/* Loading placeholder shown while a video is uploading in the editor */
 .post-video-uploading {
   display: flex;
   align-items: center;
@@ -702,21 +700,15 @@ body.account-banned .mobile-fab {
   user-select: none;
 }
 .post-video-spinner {
-  width: 16px;
-  height: 16px;
+  width: 16px; height: 16px;
   border: 2px solid var(--mocha-light);
   border-top-color: var(--mocha-dark);
   border-radius: 50%;
   flex-shrink: 0;
-  animation: spin .8s linear infinite;
+  animation: vid-spin .8s linear infinite;
 }
-@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes vid-spin { to { transform: rotate(360deg); } }
 
-/* Post view: make sure figures dont add default browser margin */
-.post-content figure.post-video-wrap { margin: 28px 0; }
-.post-content figure { margin: 0; }
-
-/* Mobile: full-width video with appropriate max-height */
 @media (max-width: 600px) {
   .post-video { max-height: 280px; }
 }
