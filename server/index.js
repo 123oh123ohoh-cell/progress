@@ -64,8 +64,8 @@ const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
 const RESEND_FROM    = process.env.RESEND_FROM    || "Progress <notifications@progressing.online>";
 
 async function sendEmail({ to, subject, html }) {
-  if (!RESEND_API_KEY) { console.warn("[email] RESEND_API_KEY not set"); return; }
-  if (!to) { console.warn("[email] no recipient"); return; }
+  if (!RESEND_API_KEY) { console.warn("[email] RESEND_API_KEY not set in env"); return; }
+  if (!to) { console.warn("[email] no recipient email"); return; }
   try {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -74,7 +74,7 @@ async function sendEmail({ to, subject, html }) {
     });
     if (!res.ok) {
       const err = await res.text().catch(() => "");
-      console.error(`[email] Resend rejected (${res.status}): ${err}`);
+      console.error(`[email] Resend error (${res.status}): ${err}`);
     } else {
       console.log(`[email] sent to ${to}: ${subject}`);
     }
@@ -102,7 +102,7 @@ async function sendNotificationEmail(recipientDoc, notification) {
   await sendEmail({
     to: recipientDoc.email,
     subject,
-    html: `<div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:24px;"><p style="font-size:22px;font-weight:700;margin:0 0 16px;">progress.</p>${body}<hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;"><p style="font-size:12px;color:#6b7280;">You're receiving this because email notifications are on. <a href="${site}/profile.html?tab=settings">Manage</a></p></div>`
+    html: `<div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:24px;"><p style="font-size:22px;font-weight:700;margin:0 0 16px;">progress.</p>${body}<hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;"><p style="font-size:12px;color:#6b7280;">You have email notifications on. <a href="${site}/profile.html?tab=settings">Manage</a></p></div>`
   });
 }
 
@@ -315,7 +315,7 @@ function publicUser(user, includePrivate) {
 // parser-based library is the more bulletproof choice if this app's
 // user-generated content ever needs to withstand serious adversarial
 // testing.
-const SANITIZE_ALLOWED_TAGS = new Set(["p", "h2", "blockquote", "strong", "b", "em", "i", "u", "ul", "ol", "li", "a", "img", "br", "div", "span", "iframe", "figure", "video", "source"]);
+const SANITIZE_ALLOWED_TAGS = new Set(["p", "h2", "blockquote", "strong", "b", "em", "i", "u", "ul", "ol", "li", "a", "img", "br", "div", "span", "iframe"]);
 const SANITIZE_ALLOWED_IFRAME_HOSTS = [/^https:\/\/open\.spotify\.com\//i, /^https:\/\/www\.youtube-nocookie\.com\//i, /^https:\/\/www\.youtube\.com\//i];
 
 function sanitizePostContent(html) {
@@ -336,11 +336,6 @@ function sanitizePostContent(html) {
       const srcMatch = attrs.match(/src\s*=\s*"([^"]*)"/i) || attrs.match(/src\s*=\s*'([^']*)'/i);
       const src = srcMatch ? srcMatch[1] : "";
       if (!SANITIZE_ALLOWED_IFRAME_HOSTS.some(re => re.test(src))) return "";
-    }
-    if (tag === "video" || tag === "source") {
-      const srcMatch = attrs.match(/src\s*=\s*"([^"]*)"/i) || attrs.match(/src\s*=\s*'([^']*)'/i);
-      const src = srcMatch ? srcMatch[1] : "";
-      if (src && !src.startsWith("https://")) return "";
     }
     return match;
   });
@@ -464,6 +459,7 @@ async function createNotification(notification) {
       if (conn.readyState === conn.OPEN) conn.send(payload);
     }
   }
+  // Send email notification in background
   if (notification.recipient && ["like","reply","follow","mention"].includes(notification.type)) {
     db.collection("users").findOne({ username: notification.recipient })
       .then(doc => sendNotificationEmail(doc, notification)).catch(() => {});
@@ -780,7 +776,7 @@ app.get("/api/users/:id", asyncHandler(async (req, res) => {
 app.get("/api/me", requireAuth, asyncHandler(async (req, res) => {
   const user = await db.collection("users").findOne({ _id: req.user.id });
   if (!user) return res.status(404).json({ error: "Not found" });
-  res.json(publicUser(normalizeUser(user), true)); // always includes email + private fields
+  res.json(publicUser(normalizeUser(user), true));
 }));
 
 app.post("/api/users", signupRateLimit, asyncHandler(async (req, res) => {
@@ -807,7 +803,7 @@ app.post("/api/users", signupRateLimit, asyncHandler(async (req, res) => {
   await db.collection("users").insertOne(user);
   await notifyBadgesAwarded(normalizedUsername, user.badges);
   const token = signJWT({ username: user.username, id: user._id });
-  res.status(201).json({ ...publicUser(normalizeUser(user)), token });
+  res.status(201).json({ ...publicUser(normalizeUser(user), true), token });
 }));
 
 app.patch("/api/users/:id", requireAuth, asyncHandler(async (req, res) => {
@@ -829,9 +825,7 @@ app.patch("/api/users/:id", requireAuth, asyncHandler(async (req, res) => {
     update.spotify = trimmedSpotify;
   }
   if (typeof email === "string") {
-    const trimEmail = email.trim().toLowerCase();
-    if (trimEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(trimEmail)) return res.status(400).json({ error: "Invalid email." });
-    update.email = trimEmail || null;
+    update.email = email.trim().toLowerCase() || null;
   }
   if (typeof emailNotifications === "boolean") update.emailNotifications = emailNotifications;
   if (typeof displayBadge !== "undefined") {
@@ -1387,63 +1381,6 @@ app.post("/api/upload-video", uploadRateLimit, asyncHandler(async (req, res) => 
   }
 }));
 
-app.post("/api/upload-video", uploadRateLimit, asyncHandler(async (req, res) => {
-  const data = (req.body || {}).video || (req.body || {}).image;
-  if (!data || typeof data !== "string" || !data.startsWith("data:")) {
-    return res.status(400).json({ error: "A base64 video data URI is required." });
-  }
-  try { res.json({ url: await uploadToSupabase(data) }); }
-  catch (e) { console.error("Video upload failed:", e); res.status(502).json({ error: "Could not upload video." }); }
-}));
-
-app.post("/api/storage-upload-url", requireAuth, uploadRateLimit, asyncHandler(async (req, res) => {
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return res.status(503).json({ error: "Storage not configured." });
-  const { filename, mimeType } = req.body || {};
-  if (!filename || !mimeType) return res.status(400).json({ error: "filename and mimeType required." });
-
-  const ext      = (filename.split(".").pop() || "bin").toLowerCase().replace(/[^a-z0-9]/g, "");
-  const safePath = Date.now() + "-" + Math.random().toString(36).slice(2, 9) + "." + ext;
-
-  const signRes = await fetch(
-    `${SUPABASE_URL}/storage/v1/object/upload/sign/${SUPABASE_BUCKET}/${safePath}`,
-    {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${SUPABASE_SERVICE_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ expiresIn: 300 })
-    }
-  );
-
-  if (!signRes.ok) {
-    const e = await signRes.text().catch(() => "");
-    return res.status(502).json({ error: `Sign failed: ${signRes.status} ${e}` });
-  }
-
-  const signData = await signRes.json();
-
-  // Supabase may return the path with or without /storage/v1 prefix depending on
-  // API version. Extract the token and reconstruct the canonical URL ourselves.
-  const rawPath    = signData.signedURL || signData.url || "";
-  const tokenMatch = rawPath.match(/[?&]token=([^&]+)/);
-  const token      = signData.token || (tokenMatch && tokenMatch[1]);
-
-  let uploadUrl;
-  if (token) {
-    uploadUrl = `${SUPABASE_URL}/storage/v1/object/upload/sign/${SUPABASE_BUCKET}/${safePath}?token=${token}`;
-  } else if (rawPath.startsWith("http")) {
-    uploadUrl = rawPath;
-  } else {
-    const normalized = rawPath.startsWith("/storage/v1") ? rawPath : "/storage/v1" + (rawPath.startsWith("/") ? rawPath : "/" + rawPath);
-    uploadUrl = SUPABASE_URL + normalized;
-  }
-
-  if (!uploadUrl) return res.status(502).json({ error: "No signed URL returned from Supabase." });
-
-  res.json({
-    uploadUrl,
-    publicUrl: `${SUPABASE_URL}/storage/v1/object/public/${SUPABASE_BUCKET}/${safePath}`
-  });
-}));
-
 app.get("/api/posts", asyncHandler(async (req, res) => {
   const filter = {};
   if (req.query.author) {
@@ -1465,13 +1402,12 @@ app.get("/api/posts/:id", asyncHandler(async (req, res) => {
 }));
 
 app.post("/api/posts", requireAuth, asyncHandler(async (req, res) => {
-  const { title, cover, excerpt, category } = req.body;
+  const { title, cover, excerpt } = req.body;
   const author = req.user.username;
   const content = sanitizePostContent(req.body.content);
   if (!title || !content) return res.status(400).json({ error: "title and content are required" });
   if (await isUsernameBanned(author)) return res.status(403).json({ error: "This account has been banned." });
   const createdAt = new Date().toISOString();
-  const VALID_CATEGORIES = new Set(["development", "creative", "random"]);
   const post = {
     _id: generateId("p"),
     author,
@@ -1481,7 +1417,6 @@ app.post("/api/posts", requireAuth, asyncHandler(async (req, res) => {
     cover: cover || null,
     excerpt: excerpt || content.replace(/<[^>]+>/g, "").slice(0, 140),
     content,
-    category: (category && VALID_CATEGORIES.has(category.toLowerCase())) ? category.toLowerCase() : null,
     likes: 0,
     likedBy: []
   };
@@ -1494,34 +1429,10 @@ app.post("/api/posts", requireAuth, asyncHandler(async (req, res) => {
   res.status(201).json(toClient(post));
 }));
 
-app.patch("/api/posts/:id", requireAuth, asyncHandler(async (req, res) => {
-  const post = await db.collection("posts").findOne({ _id: req.params.id });
-  if (!post) return res.status(404).json({ error: "Post not found" });
-  const isAdmin = ALLOWED_CREATOR_USERNAMES.has(req.user.username.toLowerCase());
-  if (post.author !== req.user.username && !isAdmin) {
-    return res.status(403).json({ error: "You can only edit your own posts." });
-  }
-  const update = {};
-  if (typeof req.body.category !== "undefined") {
-    const VALID_CATEGORIES = new Set(["development", "creative", "random"]);
-    const cat = req.body.category;
-    update.category = (cat && VALID_CATEGORIES.has(cat.toLowerCase())) ? cat.toLowerCase() : null;
-  }
-  if (typeof req.body.title === "string" && req.body.title.trim()) {
-    update.title = req.body.title.trim();
-  }
-  if (Object.keys(update).length) {
-    await db.collection("posts").updateOne({ _id: req.params.id }, { $set: update });
-  }
-  const updated = await db.collection("posts").findOne({ _id: req.params.id });
-  res.json(normalizePost(updated));
-}));
-
 app.delete("/api/posts/:id", requireAuth, asyncHandler(async (req, res) => {
   const post = await db.collection("posts").findOne({ _id: req.params.id });
   if (!post) return res.status(404).json({ error: "Post not found" });
-  const isAdmin = ALLOWED_CREATOR_USERNAMES.has(req.user.username.toLowerCase());
-  if (post.author !== req.user.username && !isAdmin) return res.status(403).json({ error: "You can only delete your own entries." });
+  if (post.author !== req.user.username) return res.status(403).json({ error: "You can only delete your own entries." });
   await db.collection("posts").deleteOne({ _id: req.params.id });
   await db.collection("comments").deleteMany({ postId: req.params.id });
   await db.collection("notifications").deleteMany({ postId: req.params.id });
