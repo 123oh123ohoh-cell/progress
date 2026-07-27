@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Install Progress — Get the App</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;1,500;1,600&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script>(function(){try{var t=localStorage.getItem("progressTheme");var dark=(t==="dark")||(t!=="light"&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);if(dark)document.documentElement.setAttribute("data-theme","dark");}catch(e){}})();</script>
+<style>
+  .install-wrap { max-width: 600px; margin: 0 auto; padding: 60px 24px 80px; }
+  .install-hero { text-align: center; margin-bottom: 48px; }
+  .install-hero-logo { width: 80px; height: 80px; border-radius: 20px; box-shadow: 0 8px 32px rgba(28,25,23,.12); margin-bottom: 20px; }
+  .install-hero h1 { font-family: var(--font-serif); font-size: 32px; font-weight: 600; color: var(--ink); margin: 0 0 10px; }
+  .install-hero p { font-size: 16px; color: var(--muted); line-height: 1.6; margin: 0; }
+  .install-tabs { display: flex; gap: 8px; margin-bottom: 32px; border-bottom: 1px solid var(--mocha-light); padding-bottom: 0; }
+  .install-tab {
+    padding: 10px 18px; border: none; background: none; cursor: pointer;
+    font-size: 14px; font-weight: 600; color: var(--muted);
+    border-bottom: 2px solid transparent; margin-bottom: -1px;
+    transition: color .15s, border-color .15s;
+  }
+  .install-tab.active { color: var(--ink); border-bottom-color: var(--ink); }
+  .install-panel { display: none; }
+  .install-panel.active { display: block; }
+  .install-steps { display: flex; flex-direction: column; gap: 24px; }
+  .install-step { display: flex; gap: 16px; align-items: flex-start; }
+  .install-step-num {
+    width: 32px; height: 32px; border-radius: 50%; background: var(--ink); color: var(--cream);
+    display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700;
+    flex-shrink: 0; margin-top: 2px;
+  }
+  .install-step-text strong { display: block; font-size: 15px; color: var(--ink); margin-bottom: 4px; }
+  .install-step-text span { font-size: 14px; color: var(--muted); line-height: 1.5; }
+  .install-step-icon {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 28px; height: 28px; background: var(--mocha-wash); border-radius: 6px;
+    vertical-align: middle; margin: 0 3px;
+  }
+  .install-note {
+    margin-top: 32px; padding: 16px 20px; background: var(--mocha-wash);
+    border-radius: 12px; font-size: 13.5px; color: var(--muted); line-height: 1.6;
+  }
+  .install-already {
+    text-align: center; margin-top: 40px; padding-top: 32px; border-top: 1px solid var(--mocha-light);
+    font-size: 14px; color: var(--muted);
+  }
+  .install-already a { color: var(--ink); font-weight: 600; }
+</style>
+</head>
+<body>
+<div id="nav-root"></div>
+<main class="container">
+  <div class="install-wrap">
+    <div class="install-hero">
+      <img class="install-hero-logo" src="images/nearheader.png" alt="Progress">
+      <h1>Get the Progress app</h1>
+      <p>Install Progress on your device for a faster, full-screen experience with no browser bar.</p>
+    </div>
+
+    <div class="install-tabs">
+      <button class="install-tab active" data-panel="ios">iPhone / iPad</button>
+      <button class="install-tab" data-panel="android">Android</button>
+      <button class="install-tab" data-panel="desktop">Desktop</button>
+    </div>
+
+    <!-- iOS -->
+    <div class="install-panel active" id="panel-ios">
+      <div class="install-steps">
+        <div class="install-step">
+          <div class="install-step-num">1</div>
+          <div class="install-step-text">
+            <strong>Open Safari</strong>
+            <span>Progress can only be installed from Safari. If you're using Chrome or another browser, switch to Safari first.</span>
+          </div>
+        </div>
+        <div class="install-step">
+          <div class="install-step-num">2</div>
+          <div class="install-step-text">
+            <strong>Tap the Share button</strong>
+            <span>At the bottom of the screen, tap the Share button
+              <span class="install-step-icon">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+              </span>
+              (the box with an arrow pointing up).
+            </span>
+          </div>
+        </div>
+        <div class="install-step">
+          <div class="install-step-num">3</div>
+          <div class="install-step-text">
+            <strong>Tap "Add to Home Screen"</strong>
+            <span>Scroll down in the share sheet and tap <em>Add to Home Screen</em>. Then tap <em>Add</em> in the top right.</span>
+          </div>
+        </div>
+        <div class="install-step">
+          <div class="install-step-num">4</div>
+          <div class="install-step-text">
+            <strong>Done! Open from your home screen</strong>
+            <span>Progress now appears on your home screen like any other app — full screen, no browser bar.</span>
+          </div>
+        </div>
+      </div>
+      <div class="install-note">💡 On iPad, the Share button is in the top-right toolbar next to the address bar.</div>
+    </div>
+
+    <!-- Android -->
+    <div class="install-panel" id="panel-android">
+      <div class="install-steps">
+        <div class="install-step">
+          <div class="install-step-num">1</div>
+          <div class="install-step-text">
+            <strong>Open Chrome</strong>
+            <span>Make sure you're using Google Chrome. Other browsers may not support installing apps.</span>
+          </div>
+        </div>
+        <div class="install-step">
+          <div class="install-step-num">2</div>
+          <div class="install-step-text">
+            <strong>Look for the install prompt</strong>
+            <span>Chrome will show a banner at the bottom or an Install button in the address bar. Tap it.</span>
+          </div>
+        </div>
+        <div class="install-step">
+          <div class="install-step-num">3</div>
+          <div class="install-step-text">
+            <strong>Or use the menu</strong>
+            <span>Tap the three-dot menu ⋮ in the top right, then tap <em>Add to Home screen</em> or <em>Install app</em>.</span>
+          </div>
+        </div>
+        <div class="install-step">
+          <div class="install-step-num">4</div>
+          <div class="install-step-text">
+            <strong>Tap Install and you're done</strong>
+            <span>Progress will appear in your app drawer and home screen.</span>
+          </div>
+        </div>
+      </div>
+      <div class="install-note">💡 If you don't see the option, make sure you're on <strong>progressing.online</strong> and using the latest version of Chrome.</div>
+    </div>
+
+    <!-- Desktop -->
+    <div class="install-panel" id="panel-desktop">
+      <div class="install-steps">
+        <div class="install-step">
+          <div class="install-step-num">1</div>
+          <div class="install-step-text">
+            <strong>Open Chrome or Edge</strong>
+            <span>Desktop installation works in Chrome and Edge. Firefox and Safari on Mac don't support it.</span>
+          </div>
+        </div>
+        <div class="install-step">
+          <div class="install-step-num">2</div>
+          <div class="install-step-text">
+            <strong>Click the install icon in the address bar</strong>
+            <span>Look for a small computer or download icon on the right side of the address bar and click it.</span>
+          </div>
+        </div>
+        <div class="install-step">
+          <div class="install-step-num">3</div>
+          <div class="install-step-text">
+            <strong>Click Install</strong>
+            <span>A dialog will appear. Click Install and Progress opens in its own window — no browser tabs.</span>
+          </div>
+        </div>
+      </div>
+      <div class="install-note">💡 On Mac, use Chrome for the best experience. Safari on Mac doesn't support PWA installation yet.</div>
+    </div>
+
+    <div class="install-already">
+      Already installed? <a href="index.html">Go to Progress →</a>
+    </div>
+  </div>
+</main>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+<script>
+  initShell("install");
+
+  // Tab switching
+  document.querySelectorAll(".install-tab").forEach(tab => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll(".install-tab").forEach(t => t.classList.remove("active"));
+      document.querySelectorAll(".install-panel").forEach(p => p.classList.remove("active"));
+      tab.classList.add("active");
+      document.getElementById("panel-" + tab.dataset.panel).classList.add("active");
+    });
+  });
+
+  // Auto-select the right tab based on device
+  (function() {
+    const ua = navigator.userAgent;
+    if (/iphone|ipad|ipod/i.test(ua)) {
+      document.querySelector('[data-panel="ios"]').click();
+    } else if (/android/i.test(ua)) {
+      document.querySelector('[data-panel="android"]').click();
+    }
+  })();
+</script>
+</body>
+</html>

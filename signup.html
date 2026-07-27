@@ -79,15 +79,37 @@
       </p>
     </div>
 
-    <!-- ── Notification permission step ── -->
+    <!-- ── Onboarding steps ── -->
     <div id="notifPane" style="display:none;">
-      <div class="notif-step">
-        <div class="notif-step-icon">🔔</div>
-        <h2>Stay in the loop</h2>
-        <p>Get notified when someone likes your post, replies, or starts following you — even when Progress isn't open.</p>
-        <button class="signup-submit" id="notifAllow">Turn on notifications</button>
-        <button class="notif-step-skip" id="notifSkip">Maybe later</button>
+
+      <!-- Step 1: notifications -->
+      <div id="onboardNotif">
+        <div style="text-align:center;margin-bottom:8px;font-size:40px;">🔔</div>
+        <p class="sp-pane-title" style="text-align:center;">Stay in the loop</p>
+        <p class="sp-pane-sub" style="text-align:center;margin-bottom:20px;">Get notified when someone likes your post, replies, or follows you.</p>
+        <button class="sp-submit" id="notifAllow">Turn on notifications</button>
+        <button class="sp-notif-skip" id="notifSkip">Skip for now</button>
+        <div class="ob-step-dots">
+          <span class="ob-dot ob-dot-active"></span>
+          <span class="ob-dot"></span>
+        </div>
       </div>
+
+      <!-- Step 2: install prompt -->
+      <div id="onboardInstall" style="display:none;">
+        <div style="text-align:center;margin-bottom:12px;">
+          <img src="images/nearheader.png" style="width:64px;height:64px;border-radius:16px;box-shadow:0 4px 16px rgba(28,25,23,.12);">
+        </div>
+        <p class="sp-pane-title" style="text-align:center;">Add to your home screen</p>
+        <p class="sp-pane-sub" style="text-align:center;margin-bottom:20px;">Install Progress for the best experience — full screen, works offline, feels like a real app.</p>
+        <a href="install.html" class="sp-submit" style="display:block;text-align:center;text-decoration:none;">How to install</a>
+        <button class="sp-notif-skip" id="installSkip">Go to Progress</button>
+        <div class="ob-step-dots">
+          <span class="ob-dot"></span>
+          <span class="ob-dot ob-dot-active"></span>
+        </div>
+      </div>
+
     </div>
 
   </div>
@@ -174,15 +196,21 @@
     showPane("notifPane");
   }
 
+  function showInstallStep() {
+    document.getElementById("onboardNotif").style.display = "none";
+    document.getElementById("onboardInstall").style.display = "block";
+  }
+
   document.getElementById("notifAllow").addEventListener("click", async () => {
     setBtn("notifAllow", false, "Requesting permission…");
     const granted = await requestNotificationPermission();
-    if (granted) showToast("Notifications enabled! You're all set.");
-    else showToast("Couldn't enable — you can turn them on in Settings later.");
-    goToFeed();
+    if (granted) showToast("Notifications enabled!");
+    else showToast("You can turn them on in Settings later.");
+    showInstallStep();
   });
 
-  document.getElementById("notifSkip").addEventListener("click", goToFeed);
+  document.getElementById("notifSkip").addEventListener("click", showInstallStep);
+  document.getElementById("installSkip").addEventListener("click", goToFeed);
 
   // ── Signup ────────────────────────────────────────────────────────────────
   document.getElementById("signupSubmit").addEventListener("click", async () => {
