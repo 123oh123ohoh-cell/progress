@@ -22,10 +22,11 @@ function updateTitleBadge(count) {
 const BADGES = {
   reader: { label: "Avid Reader", description: "Enjoys reading entries and exploring the community.", icon: "📚" },
   supporter: { label: "Community Supporter", description: "Leaves thoughtful feedback and encourages others.", icon: "🤝" },
-  early: { label: "Early Adopter", description: "Joined early and helped shape the experience.", icon: "🚀" },
+  early_supporter: { label: "Early Supporter", description: "Joined early and playtested during the initial development phase!", image: "images/emoticons/asleep_couch.png" },
   dexterity: { label: "Dexterity", description: "Awarded for playing during the Valorant ban on July 4th.", image: "images/emoticons/dexterity.png" },
   "817x2": { label: "817x2", description: "Awarded for 817x2, OurSpawn easter egg!", image: "images/emoticons/817x2.png" },
-  creator: { label: "Creator", description: "Awarded for creator contributions.", image: "images/creator.png" }
+  creator: { label: "Creator", description: "Awarded for creator contributions.", image: "images/creator.png" },
+  dark: { label: "Dark", description: "Awarded for being a early supporter, one and only!", image: "images/emoticons/dark.png" },
 };
 
 const BROWSE_ALLOWED_USERNAMES = new Set(["mara", "own", "progresstesting1"]);
