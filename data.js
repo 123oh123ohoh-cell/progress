@@ -17,7 +17,7 @@ const SIGNUP_BADGE_AWARDS = {
   mara: ["dexterity"],
   own: ["dexterity", "dark", "tester"],
   progresstesting1: ["dexterity", "817x2", "dark", "tester"],
-  "817x2": ["dexterity", "817x2", "dark", "tester"],
+  "817x2": ["dexterity", "817x2"],
   testuser: ["dexterity", "817x2", "dark", "tester"],
   dark: ["tester", "dark"],
   ohhmytesting: ["dexterity", "817x2", "dark", "tester"]
@@ -437,6 +437,10 @@ const Progress = {
             normalized.badges = Array.from(new Set([...(normalized.badges || []), ...existing.badges]));
           }
           if (existing.displayBadge && !normalized.displayBadge) normalized.displayBadge = existing.displayBadge;
+          // Preserve private fields not returned by GET /api/users
+          if (existing.email) normalized.email = existing.email;
+          if (typeof existing.emailNotifications !== "undefined") normalized.emailNotifications = existing.emailNotifications;
+          if (existing.password) normalized.password = existing.password;
         }
         return normalized;
       });
