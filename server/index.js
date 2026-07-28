@@ -425,6 +425,91 @@ function broadcastGlobalPresenceUpdate() {
   broadcastToRoom("presence", { type: "global-presence", statuses });
 }
 
+// ── Transactional email via Resend ───────────────────────────────────────────
+// Requires RESEND_API_KEY in .env.  Silently skips if the key is absent so the
+// rest of the app works without email configured.
+async function sendNotificationEmail(user, notification) {
+  const key = process.env.RESEND_API_KEY;
+  if (!key || !user || !user.email) return;
+  const site = process.env.RENDER_EXTERNAL_URL || "https://progressing.online";
+  let subject, html;
+  if (notification.type === "like") {
+    subject = `@${notification.actor} liked your post`;
+    html = `<p>@${notification.actor} liked <a href="${site}/post.html?id=${notification.postId}">${notification.postTitle || "your post"}</a>.</p>`;
+  } else if (notification.type === "reply") {
+    subject = `@${notification.actor} replied to your post`;
+    html = `<p>@${notification.actor} replied to <a href="${site}/post.html?id=${notification.postId}">${notification.postTitle || "your post"}</a>:</p><blockquote>${(notification.body || "").slice(0, 200)}</blockquote>`;
+  } else if (notification.type === "follow") {
+    subject = `@${notification.actor} is now following you`;
+    html = `<p><a href="${site}/user.html?id=${notification.actor}">@${notification.actor}</a> is now following you on Progress.</p>`;
+  } else if (notification.type === "mention") {
+    subject = `@${notification.actor} mentioned you`;
+    html = `<p>@${notification.actor} mentioned you in <a href="${site}/post.html?id=${notification.postId}">${notification.postTitle || "a post"}</a>.</p>`;
+  } else if (notification.type === "streak") {
+    subject = `🔥 ${notification.streak}-day login streak!`;
+    html = `<p>You've logged in ${notification.streak} days in a row. Keep it going! <a href="${site}">Visit Progress</a></p>`;
+  } else {
+    return;
+  }
+  const body = `<!DOCTYPE html><html><body style="font-family:sans-serif; color:#1C1917; max-width:540px; margin:0 auto; padding:24px;">
+    ${html}
+    <hr style="border:none; border-top:1px solid #e5e0db; margin:24px 0;">
+    <p style="font-size:12px; color:#9C8B7C;">You're receiving this because you have an account on <a href="${site}">Progress</a>. <a href="${site}/settings.html">Manage email preferences</a>.</p>
+  </body></html>`;
+  await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ from: "Progress <noreply@progressing.online>", to: user.email, subject, html: body })
+  }).then(r => { if (!r.ok) r.text().then(t => console.error("[email] Resend error:", t)); })
+    .catch(e => console.error("[email] fetch error:", e));
+}
+
+// Digest email — called by POST /api/admin/send-digest
+async function sendWeeklyDigest() {
+  const key = process.env.RESEND_API_KEY;
+  if (!key) return { sent: 0, skipped: "no RESEND_API_KEY" };
+  const site = process.env.RENDER_EXTERNAL_URL || "https://progressing.online";
+  const since = new Date(Date.now() - 7 * 24 * 3600 * 1000);
+  // All users with email addresses and at least one person they follow
+  const users = await db.collection("users").find({ email: { $exists: true, $ne: "" } }).toArray();
+  let sent = 0;
+  for (const user of users) {
+    const following = user.following || [];
+    if (!following.length) continue;
+    // Top 5 posts from people they follow in the last 7 days, sorted by likes
+    const posts = await db.collection("posts")
+      .find({ author: { $in: following }, date: { $gte: since.toISOString().slice(0,10) } })
+      .sort({ likes: -1 })
+      .limit(5)
+      .project({ _id: 1, title: 1, author: 1, excerpt: 1, likes: 1 })
+      .toArray();
+    if (!posts.length) continue;
+    const rows = posts.map(p => `
+      <tr>
+        <td style="padding:12px 0; border-bottom:1px solid #e5e0db;">
+          <a href="${site}/post.html?id=${p._id}" style="font-weight:600; color:#1C1917; text-decoration:none;">${p.title || "Untitled"}</a><br>
+          <span style="font-size:12px; color:#9C8B7C;">by @${p.author} &middot; ♥ ${p.likes || 0}</span>
+          ${p.excerpt ? `<p style="margin:4px 0 0; font-size:13px; color:#4A3728;">${(p.excerpt).replace(/<[^>]+>/g,"").slice(0,120)}</p>` : ""}
+        </td>
+      </tr>`).join("");
+    const html = `<!DOCTYPE html><html><body style="font-family:sans-serif; color:#1C1917; max-width:540px; margin:0 auto; padding:24px;">
+      <h2 style="font-family:Georgia,serif;">Your weekly digest from Progress</h2>
+      <p style="color:#4A3728;">Here's what people you follow published this week:</p>
+      <table style="width:100%; border-collapse:collapse;">${rows}</table>
+      <p style="margin-top:24px;"><a href="${site}" style="background:#1C1917; color:#FAF5EE; padding:10px 20px; border-radius:6px; text-decoration:none; font-size:14px;">Read more on Progress</a></p>
+      <hr style="border:none; border-top:1px solid #e5e0db; margin:24px 0;">
+      <p style="font-size:12px; color:#9C8B7C;"><a href="${site}/settings.html">Manage email preferences</a></p>
+    </body></html>`;
+    await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ from: "Progress <noreply@progressing.online>", to: user.email, subject: "Your weekly digest from Progress", html })
+    }).then(r => { if (r.ok) sent++; else r.text().then(t => console.error("[digest] Resend error:", t)); })
+      .catch(e => console.error("[digest] fetch error:", e));
+  }
+  return { sent };
+}
+
 // Every notification (like, reply, follow, badge, message, mention) should
 // go through this instead of inserting directly - it stores the
 // notification exactly as before, but also pushes it straight to the
@@ -750,6 +835,67 @@ app.use((req, res, next) => {
   res.removeHeader("X-Powered-By"); // don't advertise "this is Express" to anyone probing the server
   next();
 });
+
+// ── Share card routes ────────────────────────────────────────────────────────
+// /og/:id        — server-rendered HTML with real OG meta (for link crawlers)
+// /api/posts/:id/og.svg — SVG share image returned as image/svg+xml
+
+app.get("/api/posts/:id/og.svg", asyncHandler(async (req, res) => {
+  const post = await db.collection("posts").findOne({ _id: req.params.id }, { projection: { title: 1, author: 1, excerpt: 1, date: 1 } });
+  if (!post) return res.status(404).send("Not found");
+  const title = (post.title || "Untitled").slice(0, 80);
+  const author = `@${post.author || ""}`;
+  const excerpt = (post.excerpt || "").replace(/<[^>]+>/g, "").slice(0, 100);
+  // Wrap title text into ~38-char lines
+  const words = title.split(" ");
+  const lines = [];
+  let line = "";
+  for (const w of words) {
+    if ((line + " " + w).trim().length > 38 && line) { lines.push(line); line = w; }
+    else line = (line + " " + w).trim();
+  }
+  if (line) lines.push(line);
+  const titleSVG = lines.map((l, i) => `<text x="48" y="${100 + i * 52}" font-size="40" font-weight="600" fill="#1C1917" font-family="Georgia,serif">${l.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</text>`).join("");
+  const titleHeight = 100 + lines.length * 52;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#FAF5EE"/>
+  <rect x="0" y="0" width="8" height="630" fill="#1C1917"/>
+  <text x="48" y="60" font-size="18" fill="#8C6E58" font-family="monospace" letter-spacing="3">PROGRESS</text>
+  ${titleSVG}
+  <text x="48" y="${titleHeight + 28}" font-size="20" fill="#9C8B7C" font-family="Georgia,serif">${excerpt.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</text>
+  <text x="48" y="590" font-size="18" fill="#4A3728" font-family="monospace">${author} · progressing.online</text>
+</svg>`;
+  res.setHeader("Content-Type", "image/svg+xml");
+  res.setHeader("Cache-Control", "public, max-age=86400");
+  res.send(svg);
+}));
+
+app.get("/og/:id", asyncHandler(async (req, res) => {
+  const post = await db.collection("posts").findOne({ _id: req.params.id }, { projection: { title: 1, author: 1, excerpt: 1, date: 1, cover: 1 } });
+  if (!post) return res.redirect("/404.html");
+  const SITE = process.env.RENDER_EXTERNAL_URL || "https://progressing.online";
+  const title = (post.title || "Progress").replace(/"/g, "&quot;");
+  const description = (post.excerpt || "").replace(/<[^>]+>/g, "").replace(/"/g, "&quot;").slice(0, 200);
+  const ogImage = post.cover || `${SITE}/api/posts/${post._id}/og.svg`;
+  const postUrl = `${SITE}/post.html?id=${post._id}`;
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.send(`<!DOCTYPE html><html><head>
+<meta charset="UTF-8">
+<title>${title} — Progress</title>
+<meta property="og:site_name" content="Progress">
+<meta property="og:type" content="article">
+<meta property="og:url" content="${postUrl}">
+<meta property="og:title" content="${title}">
+<meta property="og:description" content="${description}">
+<meta property="og:image" content="${ogImage}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${title}">
+<meta name="twitter:description" content="${description}">
+<meta name="twitter:image" content="${ogImage}">
+<meta http-equiv="refresh" content="0;url=${postUrl}">
+<link rel="canonical" href="${postUrl}">
+</head><body><a href="${postUrl}">Read on Progress &rarr;</a></body></html>`);
+}));
 
 app.use(express.static(publicPath));
 app.use("/api", generalApiRateLimit);
@@ -1443,10 +1589,29 @@ app.post("/api/posts", requireAuth, asyncHandler(async (req, res) => {
   res.status(201).json(toClient(post));
 }));
 
+// Admin-only: update post fields (category, title, etc.)
+app.patch("/api/posts/:id", requireAuth, asyncHandler(async (req, res) => {
+  const post = await db.collection("posts").findOne({ _id: req.params.id });
+  if (!post) return res.status(404).json({ error: "Post not found" });
+  const isAdmin = ALLOWED_CREATOR_USERNAMES.has(req.user.username.toLowerCase());
+  const isAuthor = post.author === req.user.username;
+  if (!isAdmin && !isAuthor) return res.status(403).json({ error: "Not allowed." });
+  const allowed = ["category", "title", "excerpt", "cover"];
+  const update = {};
+  for (const key of allowed) {
+    if (key in req.body) update[key] = req.body[key] === "" ? null : req.body[key];
+  }
+  if (!Object.keys(update).length) return res.status(400).json({ error: "Nothing to update." });
+  await db.collection("posts").updateOne({ _id: req.params.id }, { $set: update });
+  const updated = await db.collection("posts").findOne({ _id: req.params.id });
+  res.json(normalizePost(updated));
+}));
+
 app.delete("/api/posts/:id", requireAuth, asyncHandler(async (req, res) => {
   const post = await db.collection("posts").findOne({ _id: req.params.id });
   if (!post) return res.status(404).json({ error: "Post not found" });
-  if (post.author !== req.user.username) return res.status(403).json({ error: "You can only delete your own entries." });
+  const isAdmin = ALLOWED_CREATOR_USERNAMES.has(req.user.username.toLowerCase());
+  if (post.author !== req.user.username && !isAdmin) return res.status(403).json({ error: "You can only delete your own entries." });
   await db.collection("posts").deleteOne({ _id: req.params.id });
   await db.collection("comments").deleteMany({ postId: req.params.id });
   await db.collection("notifications").deleteMany({ postId: req.params.id });
@@ -1735,6 +1900,57 @@ app.post("/api/login", loginRateLimit, asyncHandler(async (req, res) => {
   res.json({ ...publicUser(normalizeUser(user)), token });
 }));
 
+app.get("/api/admin/writing-stats", requireAuth, asyncHandler(async (req, res) => {
+  if (!ALLOWED_CREATOR_USERNAMES.has(req.user.username.toLowerCase())) {
+    return res.status(403).json({ error: "Only admins can view this." });
+  }
+  const posts = await db.collection("posts").find({}, { projection: { content: 0 } }).toArray();
+
+  // Per-author rollup
+  const byAuthor = {};
+  for (const p of posts) {
+    if (!byAuthor[p.author]) byAuthor[p.author] = { posts: 0, likes: 0, words: 0, comments: 0 };
+    byAuthor[p.author].posts += 1;
+    byAuthor[p.author].likes += typeof p.likes === "number" ? p.likes : 0;
+    byAuthor[p.author].words += ((p.excerpt || "") + " " + (p.title || "")).split(/\s+/).filter(Boolean).length;
+  }
+
+  // Attach comment counts
+  const commentCounts = await db.collection("comments").aggregate([
+    { $group: { _id: "$author", count: { $sum: 1 } } }
+  ]).toArray();
+  for (const c of commentCounts) {
+    if (byAuthor[c._id]) byAuthor[c._id].comments = c.count;
+  }
+
+  // Monthly post counts (last 12 months)
+  const twelveMonthsAgo = new Date();
+  twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 11);
+  twelveMonthsAgo.setDate(1);
+  twelveMonthsAgo.setHours(0, 0, 0, 0);
+  const monthly = {};
+  for (const p of posts) {
+    const d = new Date(p.createdAt || p.date);
+    if (d < twelveMonthsAgo) continue;
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    monthly[key] = (monthly[key] || 0) + 1;
+  }
+
+  const authors = Object.entries(byAuthor)
+    .map(([username, s]) => ({ username, ...s }))
+    .sort((a, b) => b.posts - a.posts);
+
+  res.json({ authors, monthly });
+}));
+
+app.post("/api/admin/send-digest", requireAuth, asyncHandler(async (req, res) => {
+  if (!ALLOWED_CREATOR_USERNAMES.has(req.user.username.toLowerCase())) {
+    return res.status(403).json({ error: "Only admins can trigger the digest." });
+  }
+  const result = await sendWeeklyDigest();
+  res.json(result);
+}));
+
 app.get("/api/admin/stats", requireAuth, asyncHandler(async (req, res) => {
   if (!ALLOWED_CREATOR_USERNAMES.has(req.user.username.toLowerCase())) {
     return res.status(403).json({ error: "Only admins can view this." });
@@ -1769,6 +1985,70 @@ app.get("/api/admin/stats", requireAuth, asyncHandler(async (req, res) => {
     },
     recentUsers: recentUsers.map(u => publicUser(normalizeUser(u))),
     recentPosts: recentPosts.map(normalizePost)
+  });
+}));
+
+// ── Bookmarks ───────────────────────────────────────────────────────────────
+app.get("/api/bookmarks", requireAuth, asyncHandler(async (req, res) => {
+  const username = req.user.username;
+  const docs = await db.collection("bookmarks").find({ username }).toArray();
+  const postIds = docs.map(d => d.postId);
+  if (!postIds.length) return res.json([]);
+  const posts = await db.collection("posts").find({ _id: { $in: postIds } }, { projection: { content: 0 } }).toArray();
+  res.json(posts.map(normalizePost));
+}));
+
+app.post("/api/bookmarks/:postId", requireAuth, asyncHandler(async (req, res) => {
+  const username = req.user.username;
+  const { postId } = req.params;
+  const post = await db.collection("posts").findOne({ _id: postId });
+  if (!post) return res.status(404).json({ error: "Post not found" });
+  const existing = await db.collection("bookmarks").findOne({ username, postId });
+  if (existing) {
+    await db.collection("bookmarks").deleteOne({ username, postId });
+    return res.json({ bookmarked: false });
+  }
+  await db.collection("bookmarks").insertOne({ username, postId, createdAt: new Date().toISOString() });
+  res.json({ bookmarked: true });
+}));
+
+app.get("/api/bookmarks/:postId/status", requireAuth, asyncHandler(async (req, res) => {
+  const username = req.user.username;
+  const existing = await db.collection("bookmarks").findOne({ username, postId: req.params.postId });
+  res.json({ bookmarked: !!existing });
+}));
+
+app.get("/api/explore", asyncHandler(async (req, res) => {
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const viewerUsername = req.query.viewer || null;
+
+  // Trending: most liked posts in the last 30 days
+  const trendingDocs = await db.collection("posts")
+    .find({ createdAt: { $gte: thirtyDaysAgo } }, { projection: { content: 0 } })
+    .sort({ likes: -1 })
+    .limit(20)
+    .toArray();
+
+  // Suggested users: most followers, excluding the viewer and anyone they follow
+  let excludeUsernames = viewerUsername ? [viewerUsername] : [];
+  if (viewerUsername) {
+    const viewer = await db.collection("users").findOne({ username: viewerUsername });
+    if (viewer && Array.isArray(viewer.following)) {
+      excludeUsernames = excludeUsernames.concat(viewer.following);
+    }
+  }
+  const suggestedDocs = await db.collection("users")
+    .find({ username: { $nin: excludeUsernames }, banned: { $ne: true } })
+    .sort({ "followers.0": -1 })
+    .limit(10)
+    .toArray();
+
+  // Sort suggested by follower count
+  suggestedDocs.sort((a, b) => (b.followers?.length || 0) - (a.followers?.length || 0));
+
+  res.json({
+    trending: trendingDocs.map(normalizePost),
+    suggested: suggestedDocs.map(d => publicUser(normalizeUser(d)))
   });
 }));
 

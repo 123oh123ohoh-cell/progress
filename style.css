@@ -23,6 +23,11 @@
 
   /* layout */
   --nav-h: 68px;
+  /* Full height of the top bar including any device safe area (notch/Dynamic
+     Island). On most devices this equals --nav-h. Overridden on body.mobile
+     to fold in env(safe-area-inset-top) so every sticky/fixed element that
+     wants to sit "just below the nav" only needs top: var(--nav-offset). */
+  --nav-offset: var(--nav-h);
   --radius: 3px;
   --shadow-soft: 0 1px 2px rgba(28, 25, 23, 0.04), 0 6px 20px rgba(28, 25, 23, 0.05);
 }
@@ -568,7 +573,7 @@ body.account-banned .mobile-fab {
 
 .progress-track {
   position: fixed;
-  top: var(--nav-h);
+  top: var(--nav-offset);
   left: 0;
   width: 100%;
   height: 2px;
@@ -1197,7 +1202,7 @@ body.account-banned .mobile-fab {
 
 .toolbar {
   position: sticky;
-  top: var(--nav-h);
+  top: var(--nav-offset);
   z-index: 100;
   display: flex;
   gap: 2px;
@@ -2135,7 +2140,7 @@ label:has(#themeToggleSwitch[data-on="1"]) .theme-flank-icon.moon { opacity: 1; 
   /* Sidebar slides in from the left as a drawer above the chat panel */
   .chat-sidebar {
     position: fixed;
-    top: var(--nav-h);
+    top: var(--nav-offset);
     left: 0;
     bottom: 0;
     width: 80vw;
@@ -2667,7 +2672,7 @@ body.mobile .editor-mobile-bar {
   border-bottom: 1px solid var(--mocha-light);
   background: var(--paper);
   position: sticky;
-  top: var(--nav-h);
+  top: var(--nav-offset);
   z-index: 90;
 }
 body.mobile .editor-mobile-bar .editor-mobile-label {
@@ -3223,7 +3228,7 @@ body.candy-mode .badge-icon { filter: hue-rotate(280deg) saturate(2); }
 /* ── PWA Install Banner ── */
 .pwa-banner {
   position: sticky;
-  top: var(--nav-h);
+  top: var(--nav-offset);
   z-index: 197;
   background: var(--ink);
   color: var(--cream);
@@ -3354,7 +3359,7 @@ body.candy-mode .badge-icon { filter: hue-rotate(280deg) saturate(2); }
 /* ── PWA Install Banner ── */
 .pwa-banner {
   position: sticky;
-  top: var(--nav-h);
+  top: var(--nav-offset);
   z-index: 197;
   background: var(--ink);
   color: #fff;
@@ -3398,20 +3403,50 @@ body.candy-mode .badge-icon { filter: hue-rotate(280deg) saturate(2); }
 }
 .pwa-banner-close:hover { color: #fff; }
 
+/* ── Mobile top nav: always fixed, never hidden by scroll ── */
+body.mobile {
+  /* Fold in the device safe area (notch / Dynamic Island) so every element
+     using --nav-offset automatically sits below the hardware chrome. */
+  --nav-offset: calc(var(--nav-h) + env(safe-area-inset-top, 0px));
+}
+
+body.mobile .nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  /* Ensure it can never be slid away by the JS scroll watcher */
+  transform: none !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  /* Respect iPhone notch / Dynamic Island */
+  padding-top: env(safe-area-inset-top, 0px);
+  height: var(--nav-offset);
+}
+
+/* Push page content below the now-fixed top nav */
+body.mobile main.container,
+body.mobile .container-wide {
+  padding-top: calc(var(--nav-offset) + 8px);
+}
+
 /* ── Mobile bottom nav ── */
 .mobile-bottom-nav { display: none !important; }
 body.mobile .mobile-bottom-nav {
   display: flex !important;
-  position: fixed; bottom: 0; left: 0; right: 0; z-index: 198;
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 200;
   background: var(--paper); border-top: 1px solid var(--mocha-light);
   /* Extra padding so the home indicator bar doesn't overlap the nav items */
   padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
   align-items: stretch; justify-content: space-around;
 }
 body.mobile .mobile-fab { display: none !important; }
+
+/* On mobile, the bottom nav covers Home/Write/Chat/Profile — hide the
+   redundant top-nav text links so the nav stays clean at every width. */
+body.mobile .nav-new { display: none !important; }
+body.mobile .nav-chat-link { display: none !important; }
 body.mobile main.container {
-  /* Push content above nav + home indicator + extra breathing room */
-  padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+  /* Push content above bottom nav + home indicator */
+  padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px) + 12px);
 }
 .mbn-item {
   display: flex; flex-direction: column; align-items: center; justify-content: center;

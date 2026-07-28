@@ -169,6 +169,10 @@
           <h3>Badges</h3>
           ${user.badges && user.badges.length ? renderBadgeDetails(user) : `<p style="color:var(--muted); font-size:14px;">No badges earned yet.</p>`}
         </div>
+        <div class="settings-section" id="bookmarksSection">
+          <h3>Bookmarks</h3>
+          <p style="color:var(--muted); font-size:14px;">Loading…</p>
+        </div>
         <div class="settings-section">
           <h3>Entries (${myPosts.length})</h3>
           ${myPosts.length ? myPosts.map(p => `
@@ -179,6 +183,21 @@
         </div>
       `;
 refreshNowPlaying();
+    // Load bookmarks async after render
+    apiFetch("/api/bookmarks").then(bookmarks => {
+      const sec = document.getElementById("bookmarksSection");
+      if (!sec) return;
+      if (!bookmarks || !bookmarks.length) {
+        sec.querySelector("p").textContent = "Nothing saved yet — bookmark posts to find them here.";
+        return;
+      }
+      sec.innerHTML = `<h3>Bookmarks</h3>` + bookmarks.map(p => `
+        <a href="post.html?id=${p.id}" style="display:block; padding:12px 0; border-bottom:1px solid var(--mocha-wash); font-size:14.5px; text-decoration:none; color:inherit;">
+          <span style="font-family:var(--font-mono); font-size:11px; color:var(--muted); text-transform:uppercase; margin-right:10px;">${Progress.formatDateShort(p.date)}</span>
+          ${p.title}
+          <span style="font-size:12px; color:var(--muted); margin-left:8px;">by @${p.author}</span>
+        </a>`).join("");
+    }).catch(() => {});
     } else {
       content.innerHTML = `
         <div class="settings-section">

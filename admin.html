@@ -47,6 +47,15 @@
       <a href="users.html" class="btn" style="display:inline-block;">Manage users (lock / ban) &rarr;</a>
     </div>
 
+    <!-- Writing stats -->
+    <div style="margin-top:40px; padding-top:32px; border-top:1px solid var(--mocha-light);">
+      <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:20px;">
+        <h2 style="font-family:var(--font-display); font-size:22px; margin:0;">Writing stats</h2>
+        <button class="upload-btn" id="sendDigestBtn" style="font-size:13px; padding:8px 16px;">📬 Send weekly digest</button>
+      </div>
+      <div id="writingStatsContent"><p style="color:var(--muted); font-size:14px;">Loading…</p></div>
+    </div>
+
     <!-- Full post management -->
     <div style="margin-top:40px; padding-top:32px; border-top:1px solid var(--mocha-light);">
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; gap:12px; flex-wrap:wrap;">
@@ -156,6 +165,76 @@
 
     // Load the full post management table
     loadAllPosts();
+    loadWritingStats();
+
+    // Weekly digest button
+    document.getElementById("sendDigestBtn").addEventListener("click", async () => {
+      const btn = document.getElementById("sendDigestBtn");
+      btn.disabled = true; btn.textContent = "Sending…";
+      const r = await apiFetch("/api/admin/send-digest", { method: "POST" });
+      btn.disabled = false; btn.textContent = "📬 Send weekly digest";
+      if (r && typeof r.sent === "number") {
+        showToast(`Digest sent to ${r.sent} user${r.sent !== 1 ? "s" : ""}.`);
+      } else if (r && r.skipped) {
+        showToast(`Not sent: ${r.skipped}`);
+      } else {
+        showToast("Something went wrong sending the digest.");
+      }
+    });
+  }
+
+  async function loadWritingStats() {
+    const el = document.getElementById("writingStatsContent");
+    if (!el) return;
+    const data = await apiFetch("/api/admin/writing-stats");
+    if (!data) { el.innerHTML = `<p style="color:var(--danger); font-size:14px;">Couldn't load writing stats.</p>`; return; }
+
+    // Monthly sparkline
+    const now = new Date();
+    const months = [];
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      const label = d.toLocaleDateString(undefined, { month: "short" });
+      months.push({ key, label, count: data.monthly[key] || 0 });
+    }
+    const maxCount = Math.max(...months.map(m => m.count), 1);
+    const sparkBars = months.map(m => {
+      const h = Math.max(4, Math.round((m.count / maxCount) * 56));
+      return `<div title="${m.label}: ${m.count} post${m.count !== 1 ? "s" : ""}" style="flex:1; display:flex; flex-direction:column; align-items:center; gap:4px;">
+        <div style="width:100%; height:${h}px; background:var(--ink); border-radius:2px; align-self:flex-end;"></div>
+        <div style="font-family:var(--font-mono); font-size:9px; color:var(--muted); text-transform:uppercase;">${m.label}</div>
+      </div>`;
+    }).join("");
+
+    // Author table
+    const rows = (data.authors || []).map((a, i) => `
+      <tr style="border-bottom:1px solid var(--mocha-wash);">
+        <td style="padding:10px 12px 10px 0; font-size:13px; font-weight:600; color:var(--mocha);">#${i + 1}</td>
+        <td style="padding:10px 8px;"><a href="user.html?username=${encodeURIComponent(a.username)}" style="font-size:14px; font-weight:600; color:var(--ink); text-decoration:none;">@${escapeHTML(a.username)}</a></td>
+        <td style="padding:10px 8px; text-align:right; font-family:var(--font-mono); font-size:13px;">${a.posts}</td>
+        <td style="padding:10px 8px; text-align:right; font-family:var(--font-mono); font-size:13px;">${a.likes}</td>
+        <td style="padding:10px 8px; text-align:right; font-family:var(--font-mono); font-size:13px;">${a.comments}</td>
+      </tr>
+    `).join("");
+
+    el.innerHTML = `
+      <div style="margin-bottom:28px;">
+        <div style="font-family:var(--font-mono); font-size:10.5px; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); margin-bottom:12px;">Posts per month (last 12 months)</div>
+        <div style="display:flex; align-items:flex-end; gap:4px; height:80px; padding-bottom:20px;">${sparkBars}</div>
+      </div>
+      <table style="width:100%; border-collapse:collapse;">
+        <thead>
+          <tr style="border-bottom:2px solid var(--mocha-light);">
+            <th style="text-align:left; padding:0 12px 8px 0; font-family:var(--font-mono); font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted);">#</th>
+            <th style="text-align:left; padding:0 8px 8px; font-family:var(--font-mono); font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted);">Author</th>
+            <th style="text-align:right; padding:0 8px 8px; font-family:var(--font-mono); font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted);">Posts</th>
+            <th style="text-align:right; padding:0 8px 8px; font-family:var(--font-mono); font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted);">Likes</th>
+            <th style="text-align:right; padding:0 8px 8px; font-family:var(--font-mono); font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted);">Replies</th>
+          </tr>
+        </thead>
+        <tbody>${rows || `<tr><td colspan="5" style="padding:16px 0; color:var(--muted); font-size:14px;">No posts yet.</td></tr>`}</tbody>
+      </table>`;
   }
 
   let allAdminPosts = [];
