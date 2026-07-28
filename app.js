@@ -625,6 +625,8 @@ function renderNotifDropdown() {
           const badge = BADGES[n.badgeId];
           const badgeName = badge ? badge.label : n.badgeId;
           text = `You've been awarded with '${escapeHTML(badgeName)}'!`;
+        } else if (n.type === "streak") {
+          text = `🔥 You've logged in ${n.streak} days in a row. Keep it going!`;
         } else if (n.type === "message") {
           text = `${actorText} has messaged you: "${renderEmoticonsText(n.body, "notif-emoticon")}"`;
         } else if (n.type === "mention") {
@@ -1073,6 +1075,7 @@ function describeNotificationForOS(n) {
   if (n.type === "message") return { title: `@${n.actor}`, body: n.body || "sent you a message" };
   if (n.type === "mention") return { title: "You were mentioned", body: `@${n.actor}: ${n.body || ""}` };
   if (n.type === "badge") return { title: "New badge!", body: "You've been awarded a new badge." };
+  if (n.type === "streak") return { title: `🔥 ${n.streak}-day streak!`, body: `You've logged in ${n.streak} days in a row. Keep it going!` };
   return { title: "New notification", body: "You have a new notification on Progress." };
 }
 

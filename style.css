@@ -1088,30 +1088,31 @@ body.account-banned .mobile-fab {
   background: transparent;
   border: none;
 }
+/* Display badge — small chip sitting inline with the name */
 .display-badge-image,
 .display-badge-text {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-left: 0.15rem;
+  vertical-align: middle;
+  margin-left: 6px;
+  background: var(--mocha-wash);
+  border-radius: 6px;
+  padding: 2px 4px;
+  border: 1px solid var(--mocha-light);
 }
 .display-badge-image {
-  width: 2em;
-  height: 2em;
+  width: 18px;
+  height: 18px;
   object-fit: contain;
-}
-.display-badge-image.creator-badge {
-  object-fit: cover;
-  object-position: center;
-  border-radius: 0.35em;
-  width: 2em;
-  height: 2em;
-  clip-path: inset(35% 25% 20% 25%);
-  transform: translate(0.05rem, 0.65em);
-  margin-left: 0.05rem;
+  border-radius: 4px;
+  background: transparent;
+  border: none;
+  padding: 0;
 }
 .display-badge-text {
-  font-size: 1em;
+  font-size: 14px;
+  line-height: 1;
 }
 .tooltip-badge-image {
   width: 1.2rem;

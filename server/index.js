@@ -244,7 +244,9 @@ function normalizeUser(doc) {
     bio: user.bio || "",
     spotify: user.spotify || "",
     locked: !!user.locked,
-    banned: !!user.banned
+    banned: !!user.banned,
+    streak: typeof user.streak === "number" ? user.streak : 0,
+    lastLoginDate: user.lastLoginDate || null
   };
 }
 
@@ -274,7 +276,8 @@ function publicUser(user) {
     followers: user.followers || [],
     following: user.following || [],
     locked: !!user.locked,
-    banned: !!user.banned
+    banned: !!user.banned,
+    streak: typeof user.streak === "number" ? user.streak : 0
   };
 }
 
@@ -438,7 +441,7 @@ async function createNotification(notification) {
       if (conn.readyState === conn.OPEN) conn.send(payload);
     }
   }
-  if (notification.recipient && ["like","reply","follow","mention"].includes(notification.type)) {
+  if (notification.recipient && ["like","reply","follow","mention","streak"].includes(notification.type)) {
     const site = process.env.RENDER_EXTERNAL_URL || "https://progressing.online";
     // Email notification
     db.collection("users").findOne({ username: notification.recipient })
@@ -449,6 +452,7 @@ async function createNotification(notification) {
            : notification.type === "reply"   ? `@${notification.actor} replied to your post`
            : notification.type === "follow"  ? `@${notification.actor} is now following you`
            : notification.type === "mention" ? `@${notification.actor} mentioned you`
+           : notification.type === "streak"  ? `🔥 ${notification.streak}-day streak!`
            : "New notification",
       body: (notification.body || notification.postTitle || "").slice(0, 100),
       url:  notification.postId ? `${site}/post.html?id=${notification.postId}` : site,
@@ -814,12 +818,18 @@ app.patch("/api/users/:id", requireAuth, asyncHandler(async (req, res) => {
     if (displayBadge === null) {
       update.displayBadge = null;
     } else {
-      const ownedBadges = Array.isArray(doc.badges) ? [...doc.badges] : [];
+      // Merge SIGNUP_BADGE_AWARDS so badges awarded after signup are recognised
+      const awardedBadges = SIGNUP_BADGE_AWARDS[doc.username] || [];
+      const ownedBadges = [...new Set([...(Array.isArray(doc.badges) ? doc.badges : []), ...awardedBadges])];
       if (ALLOWED_CREATOR_USERNAMES.has(doc.username) && !ownedBadges.includes("creator")) {
         ownedBadges.push("creator");
       }
-      if (!ownedBadges.includes(displayBadge)) {
+      if (displayBadge === "dexterity" || !ownedBadges.includes(displayBadge)) {
         return res.status(400).json({ error: "You don't own that badge" });
+      }
+      // Write badge into user doc permanently if not already there
+      if (!Array.isArray(doc.badges) || !doc.badges.includes(displayBadge)) {
+        update.badges = ownedBadges;
       }
       update.displayBadge = displayBadge;
     }
@@ -1675,16 +1685,52 @@ app.post("/api/chat/messages", requireAuth, asyncHandler(async (req, res) => {
   res.status(201).json(message);
 }));
 
+const STREAK_MILESTONES = new Set([3, 7, 14, 30, 50, 100]);
+
+async function computeAndSaveStreak(user) {
+  const today = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+  const lastDate = user.lastLoginDate || null;
+  if (lastDate === today) return user; // already logged in today, no change
+
+  let streak = typeof user.streak === "number" ? user.streak : 0;
+  if (lastDate) {
+    const diffMs = new Date(today + "T00:00:00Z") - new Date(lastDate + "T00:00:00Z");
+    const diffDays = Math.round(diffMs / 86400000);
+    streak = diffDays === 1 ? streak + 1 : 1;
+  } else {
+    streak = 1;
+  }
+
+  await db.collection("users").updateOne(
+    { _id: user._id },
+    { $set: { streak, lastLoginDate: today } }
+  );
+
+  if (STREAK_MILESTONES.has(streak)) {
+    await createNotification({
+      _id: generateId("n"),
+      type: "streak",
+      recipient: user.username,
+      streak,
+      time: new Date().toISOString(),
+      seen: false
+    });
+  }
+
+  return { ...user, streak, lastLoginDate: today };
+}
+
 app.post("/api/login", loginRateLimit, asyncHandler(async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) return res.status(400).json({ error: "username and password are required" });
-  const user = await db.collection("users").findOne({ username: { $regex: `^${escapeRegex(username)}$`, $options: "i" } });
+  let user = await db.collection("users").findOne({ username: { $regex: `^${escapeRegex(username)}$`, $options: "i" } });
   if (!user || !verifyPassword(password, user.password)) return res.status(401).json({ error: "Invalid credentials" });
   if (isLegacyPassword(user.password)) {
     user.password = hashPassword(password);
     await db.collection("users").updateOne({ _id: user._id }, { $set: { password: user.password } });
   }
   await ensureUsernameBadges(user);
+  user = await computeAndSaveStreak(user);
   const token = signJWT({ username: user.username, id: user._id });
   res.json({ ...publicUser(normalizeUser(user)), token });
 }));
