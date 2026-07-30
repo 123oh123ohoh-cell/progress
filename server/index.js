@@ -405,6 +405,18 @@ function canAccessRoom(room, username) {
 // "idle" only once every single one of their open tabs is backgrounded;
 // "offline" once they have no connections left at all.
 const usernameConnections = new Map(); // username -> Set of ws connections
+const postViewers = new Map(); // postId -> Map<ws, { username, avatar, name }>
+
+function broadcastPostViewers(postId) {
+  const map = postViewers.get(postId);
+  const viewers = map ? [...map.values()] : [];
+  const payload = JSON.stringify({ type: "post-viewers", postId, viewers });
+  for (const conns of usernameConnections.values()) {
+    for (const ws of conns) {
+      if (ws.readyState === 1) ws.send(payload);
+    }
+  }
+}
 
 function addUserConnection(username, ws) {
   if (!username) return;
@@ -1464,6 +1476,15 @@ app.get("/api/users/:id/stats", asyncHandler(async (req, res) => {
   // Top post
   const top = [...userPosts].sort((a, b) => (b.likes || 0) - (a.likes || 0))[0] || null;
 
+  // Daily post counts for the last 365 days (heatmap)
+  const yearAgo = new Date(Date.now() - 365 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+  const postsByDay = {};
+  for (const p of userPosts) {
+    if (!p.date) continue;
+    const d = p.date.slice(0, 10);
+    if (d >= yearAgo) postsByDay[d] = (postsByDay[d] || 0) + 1;
+  }
+
   res.json({
     totalPosts: userPosts.length,
     totalWords,
@@ -1472,7 +1493,8 @@ app.get("/api/users/:id/stats", asyncHandler(async (req, res) => {
     following: (userDoc.following || []).length,
     longestStreak,
     postsPerMonth: months.map(({ label, count }) => ({ label, count })),
-    topPost: top ? { id: top._id, title: top.title, likes: top.likes || 0 } : null
+    topPost: top ? { id: top._id, title: top.title, likes: top.likes || 0 } : null,
+    postsByDay
   });
 }));
 
@@ -3049,6 +3071,25 @@ connect()
           });
         } else if (data.type === "typing") {
           broadcastToRoom(ws.room, { type: "typing", room: ws.room, username: ws.username });
+        } else if (data.type === "viewing-post") {
+          const { postId, avatar, name } = data;
+          if (postId && typeof postId === "string") {
+            // Remove from previous post if switching
+            if (ws._viewingPost && ws._viewingPost !== postId) {
+              const prev = postViewers.get(ws._viewingPost);
+              if (prev) { prev.delete(ws); if (prev.size === 0) postViewers.delete(ws._viewingPost); broadcastPostViewers(ws._viewingPost); }
+            }
+            ws._viewingPost = postId;
+            if (!postViewers.has(postId)) postViewers.set(postId, new Map());
+            postViewers.get(postId).set(ws, { username: ws.username, avatar: avatar || null, name: name || ws.username });
+            broadcastPostViewers(postId);
+          }
+        } else if (data.type === "left-post") {
+          if (ws._viewingPost) {
+            const prev = postViewers.get(ws._viewingPost);
+            if (prev) { prev.delete(ws); if (prev.size === 0) postViewers.delete(ws._viewingPost); broadcastPostViewers(ws._viewingPost); }
+            ws._viewingPost = null;
+          }
         } else if (data.type === "activity") {
           // The client sends this whenever document.hidden changes on
           // THIS specific tab - active=true means focused, false means
@@ -3071,6 +3112,11 @@ connect()
         removeUserConnection(username, ws);
         broadcastToRoom(room, { type: "presence", room, users: roomPresence(room) });
         broadcastGlobalPresenceUpdate();
+        // Clean up post viewer tracking
+        if (ws._viewingPost) {
+          const prev = postViewers.get(ws._viewingPost);
+          if (prev) { prev.delete(ws); if (prev.size === 0) postViewers.delete(ws._viewingPost); broadcastPostViewers(ws._viewingPost); }
+        }
       });
     });
 

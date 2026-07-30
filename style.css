@@ -479,18 +479,13 @@ body.account-banned .mobile-fab {
 .entry:hover::before { background: var(--ink); border-color: var(--ink); }
 
 /* ── Read / visited state ──────────────────────────────────────────────────── */
-.entry--read {
-  opacity: 0.55;
-  transition: opacity .2s ease;
-}
-.entry--read:hover {
-  opacity: 0.85;
-}
 .entry--read::before {
   background: var(--mocha-light) !important;
   border-color: var(--mocha-light) !important;
 }
 .entry--read .entry-title { color: var(--muted); }
+.entry--read .entry-date,
+.entry--read .entry-meta { opacity: 0.55; }
 
 .entry-body { flex: 1; min-width: 0; }
 
@@ -537,6 +532,68 @@ body.account-banned .mobile-fab {
 }
 .entry-meta span { display: inline-flex; align-items: center; gap: 5px; }
 .entry-meta svg { width: 13px; height: 13px; }
+
+/* ── Live reader avatars ───────────────────────────── */
+.live-readers {
+  display: flex;
+  align-items: center;
+  min-height: 0;
+  overflow: hidden;
+  transition: min-height 0.25s ease, opacity 0.25s ease;
+  opacity: 0;
+}
+.live-readers:not(:empty) {
+  min-height: 28px;
+  margin-top: 10px;
+  opacity: 1;
+}
+.live-readers:not(:empty)::after {
+  content: "";
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--mocha-soft);
+  margin-left: 9px;
+  flex-shrink: 0;
+  animation: lv-pulse 2s ease-in-out infinite;
+}
+.live-av {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid var(--paper);
+  object-fit: cover;
+  flex-shrink: 0;
+  margin-left: -7px;
+  animation: lv-pop 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.live-av:first-child { margin-left: 0; }
+.live-av-init {
+  background: var(--mocha-soft);
+  color: var(--paper);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.live-av-more {
+  background: var(--mocha-light);
+  color: var(--mocha-dark);
+  font-size: 9px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+}
+@keyframes lv-pop {
+  from { opacity: 0; transform: scale(0.4) translateY(4px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes lv-pulse {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50%       { opacity: 0.85; transform: scale(1.15); }
+}
 .entry-author {
   display: inline-flex;
   align-items: center;
@@ -1681,6 +1738,10 @@ label:has(#themeToggleSwitch[data-on="1"]) .theme-flank-icon.moon { opacity: 1; 
   display: flex;
   flex-direction: column;
   background: var(--mocha-wash);
+  /* GPU-composited layer so open/close never triggers layout */
+  will-change: transform;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
 }
 
 .chat-new-dm { padding: 14px; border-bottom: 1px solid var(--mocha-light); }
@@ -1782,7 +1843,16 @@ label:has(#themeToggleSwitch[data-on="1"]) .theme-flank-icon.moon { opacity: 1; 
 }
 
 .chat-status { color: var(--muted); }
-.chat-status.online::before { content: "\25CF"; color: #3a8a5a; margin-right: 6px; }
+.chat-status.online::before {
+  content: "\25CF";
+  color: #3a8a5a;
+  margin-right: 6px;
+  animation: status-pulse 2.4s ease-in-out infinite;
+}
+@keyframes status-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.35; }
+}
 
 .online-dot {
   display: inline-block;
@@ -1818,6 +1888,10 @@ label:has(#themeToggleSwitch[data-on="1"]) .theme-flank-icon.moon { opacity: 1; 
   display: flex;
   flex-direction: column;
   gap: 16px;
+  /* Butter-smooth touch scrolling on iOS/PWA */
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  scroll-behavior: auto; /* JS controls smooth vs instant per-case */
 }
 
 .chat-empty {
@@ -1846,12 +1920,26 @@ label:has(#themeToggleSwitch[data-on="1"]) .theme-flank-icon.moon { opacity: 1; 
   background: var(--mocha-light);
 }
 
+/* New message slide-in — applied only to dynamically appended messages */
+@keyframes chat-msg-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 .chat-msg {
   display: flex;
   gap: 12px;
   max-width: 74%;
   align-items: flex-start;
 }
+.chat-msg.chat-msg-new {
+  animation: chat-msg-in 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+}
+
+/* Grouped messages: consecutive from same author — tighten + hide repeated avatar/name */
+.chat-msg.grouped { margin-top: -8px; }
+.chat-msg.grouped .chat-avatar { visibility: hidden; pointer-events: none; }
+.chat-msg.grouped .chat-author { display: none; }
 
 .chat-msg.mine {
   align-self: flex-end;
@@ -1930,9 +2018,9 @@ label:has(#themeToggleSwitch[data-on="1"]) .theme-flank-icon.moon { opacity: 1; 
 .chat-bubble {
   background: var(--mocha-wash);
   color: var(--ink);
-  padding: 11px 16px;
-  border-radius: 16px;
-  border-bottom-left-radius: 4px;
+  padding: 10px 16px;
+  border-radius: 20px;
+  border-bottom-left-radius: 5px;
   font-size: 15.5px;
   line-height: 1.5;
   word-break: break-word;
@@ -1940,8 +2028,18 @@ label:has(#themeToggleSwitch[data-on="1"]) .theme-flank-icon.moon { opacity: 1; 
 .chat-msg.mine .chat-bubble {
   background: var(--ink);
   color: var(--cream);
-  border-bottom-left-radius: 16px;
-  border-bottom-right-radius: 4px;
+  border-bottom-left-radius: 20px;
+  border-bottom-right-radius: 5px;
+}
+/* Grouped: both corners on the avatar side stay small (continuous bubble stack) */
+.chat-msg.grouped .chat-bubble {
+  border-top-left-radius: 5px;
+  border-bottom-left-radius: 5px;
+}
+.chat-msg.mine.grouped .chat-bubble {
+  border-top-right-radius: 5px;
+  border-bottom-right-radius: 5px;
+  border-bottom-left-radius: 20px;
 }
 .chat-msg.mine .mention-link {
   color: var(--cream);
@@ -1952,11 +2050,18 @@ label:has(#themeToggleSwitch[data-on="1"]) .theme-flank-icon.moon { opacity: 1; 
 .chat-time { font-size: 11px; color: var(--muted); padding: 0 2px; }
 
 .chat-typing {
-  min-height: 20px;
-  padding: 0 20px;
+  min-height: 24px;
+  padding: 0 20px 2px;
   font-size: 12.5px;
   color: var(--muted);
   font-style: italic;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: opacity 0.2s ease;
+}
+.chat-typing:not(:empty) {
+  animation: chat-msg-in 0.15s ease-out both;
 }
 
 .chat-image-staged { padding: 0 20px; }
@@ -2041,15 +2146,17 @@ label:has(#themeToggleSwitch[data-on="1"]) .theme-flank-icon.moon { opacity: 1; 
 
 .chat-input {
   flex: 1;
-  border: 1px solid var(--mocha-light);
-  border-radius: var(--radius);
-  padding: 12px 14px;
+  border: 1.5px solid var(--mocha-light);
+  border-radius: 22px;
+  padding: 11px 18px;
   font-family: var(--font-body);
   font-size: 15.5px;
   background: var(--cream);
   color: var(--ink);
+  transition: border-color 0.15s ease;
 }
-.chat-input:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
+.chat-input:focus { outline: none; border-color: var(--mocha-soft); }
+.chat-input:focus-visible { outline: none; border-color: var(--mocha-soft); }
 .chat-input-row .btn.primary { padding: 14px 24px; font-size: 15px; }
 
 /* ============================================================
@@ -2086,9 +2193,7 @@ body.mobile .chat-page-main {
   min-height: 0;
   height: 100%;
   border-radius: 0;
-  border-left: none;
-  border-right: none;
-  border-bottom: none;
+  border: none;
   box-shadow: none;
 }
 
@@ -2131,19 +2236,21 @@ body.mobile .chat-page-main {
 }
 .chat-sidebar-close:hover { background: var(--mocha-light); color: var(--ink); }
 
-/* Overlay that dims the chat panel when the sidebar drawer is open */
+/* Overlay that dims the chat panel when the sidebar drawer is open.
+   Uses pointer-events instead of display:none so the opacity transition
+   actually plays on open — display changes can't be transitioned. */
 .chat-sidebar-overlay {
-  display: none;
   position: fixed;
   inset: 0;
   background: rgba(28, 25, 23, 0.45);
   z-index: 299;
   opacity: 0;
-  transition: opacity .22s ease;
+  pointer-events: none;
+  transition: opacity .25s ease;
 }
 .chat-sidebar-overlay.open {
-  display: block;
   opacity: 1;
+  pointer-events: auto;
 }
 
 /* ============================================================
@@ -2208,11 +2315,13 @@ body.mobile .chat-page-main {
     max-width: 300px;
     z-index: 300;
     transform: translateX(-105%);
-    transition: transform .25s cubic-bezier(.4,0,.2,1);
+    /* Spring-like cubic: quick open, decisive close */
+    transition: transform .28s cubic-bezier(0.32, 0.72, 0, 1);
     border-right: 1px solid var(--mocha-light);
     border-radius: 0;
     flex-direction: column;
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
   .chat-sidebar.open {
     transform: translateX(0);

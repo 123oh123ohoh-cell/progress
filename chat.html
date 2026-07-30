@@ -37,6 +37,10 @@
   let seenMessageIds = new Set();
   let lastRenderedDateKey = null;
 
+  // Grouping: track last appended message to collapse consecutive same-author messages
+  let lastGroupAuthor = null;
+  let lastGroupTime   = null;
+
   let currentUser = null;
   let currentRoom = GLOBAL_ROOM;
   let currentPeer = null; // username, or null for the global room
@@ -56,23 +60,29 @@
     el.className = "chat-status" + (cls ? ` ${cls}` : "");
   }
 
-  function scrollToBottom(force) {
+  function scrollToBottom(force, smooth) {
     const log = document.getElementById("chatLog");
     if (!log) return;
     const nearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 120;
-    if (force || nearBottom) log.scrollTop = log.scrollHeight;
+    if (force || nearBottom) {
+      if (smooth) {
+        log.scrollTo({ top: log.scrollHeight, behavior: "smooth" });
+      } else {
+        log.scrollTop = log.scrollHeight;
+      }
+    }
   }
 
-  function messageRow(msg) {
+  function messageRow(msg, grouped) {
     const author = Progress.getUser(msg.author);
     const mine = currentUser && msg.author === currentUser.username;
     const imageHTML = msg.image ? `<div class="chat-image"><img src="${msg.image}" alt="Shared image" loading="lazy"></div>` : "";
     const bodyHTML = msg.body ? `<div class="chat-bubble">${renderMentionsInHTML(renderEmoticonsText(msg.body, "inline-emoticon"))}</div>` : "";
     return `
-      <div class="chat-msg ${mine ? "mine" : ""}" data-id="${msg.id}">
+      <div class="chat-msg ${mine ? "mine" : ""} ${grouped ? "grouped" : ""}" data-id="${msg.id}">
         ${!mine ? `<a href="user.html?username=${encodeURIComponent(msg.author)}" class="chat-avatar">${avatarHTML(author, 30)}</a>` : ""}
         <div class="chat-bubble-col">
-          ${!mine && currentRoom === GLOBAL_ROOM ? `<span class="chat-author">@${escapeHTML(msg.author)}</span>` : ""}
+          ${!mine && currentRoom === GLOBAL_ROOM && !grouped ? `<span class="chat-author">@${escapeHTML(msg.author)}</span>` : ""}
           ${imageHTML}
           ${bodyHTML}
           <div class="chat-meta-row">
@@ -136,20 +146,39 @@
     scrollToBottom();
   }
 
-  function appendMessage(msg) {
+  function appendMessage(msg, animate) {
     if (seenMessageIds.has(msg.id)) return;
     seenMessageIds.add(msg.id);
     const log = document.getElementById("chatLog");
     if (!log) return;
     const empty = log.querySelector(".chat-empty");
     if (empty) empty.remove();
+
     const dayKey = new Date(msg.time).toDateString();
     if (dayKey !== lastRenderedDateKey) {
       lastRenderedDateKey = dayKey;
+      lastGroupAuthor = null; // reset grouping on date break
+      lastGroupTime = null;
       log.insertAdjacentHTML("beforeend", `<div class="chat-date-separator"><span>${dateSeparatorLabel(msg.time)}</span></div>`);
     }
-    log.insertAdjacentHTML("beforeend", messageRow(msg));
-    scrollToBottom();
+
+    // Determine grouping: same author, within 3 minutes, no date separator just inserted
+    const msgTime = new Date(msg.time);
+    const grouped = lastGroupAuthor === msg.author
+      && lastGroupTime
+      && (msgTime - lastGroupTime) < 180000;
+
+    lastGroupAuthor = msg.author;
+    lastGroupTime = msgTime;
+
+    log.insertAdjacentHTML("beforeend", messageRow(msg, grouped));
+
+    if (animate) {
+      const el = log.querySelector(`[data-id="${msg.id}"]`);
+      if (el) el.classList.add("chat-msg-new");
+    }
+
+    scrollToBottom(false, animate); // smooth only for live messages, instant for history
     attachLinkPreview(msg);
   }
 
@@ -205,7 +234,7 @@
       try { data = JSON.parse(event.data); } catch (e) { return; }
       if (data.type === "message") {
         const msg = data.message;
-        appendMessage(msg);
+        appendMessage(msg, true);
         if (currentRoom.startsWith("dm:")) {
           loadSidebar();
           if (msg.author !== currentUser.username) {
@@ -266,6 +295,8 @@
     log.innerHTML = `<div class="chat-empty">Loading…</div>`;
     seenMessageIds = new Set();
     lastRenderedDateKey = null;
+    lastGroupAuthor = null;
+    lastGroupTime = null;
     const url = `/api/chat/messages?room=${encodeURIComponent(currentRoom)}&limit=${HISTORY_LIMIT}`;
     const history = await apiFetch(url);
     if (!history) {
@@ -414,6 +445,9 @@
     closeSocket();
     loadHistory();
     connectSocket();
+    // Autofocus input so you can start typing immediately after switching rooms
+    const chatInput = document.getElementById("chatInput");
+    if (chatInput) setTimeout(() => chatInput.focus(), 80);
     const url = new URL(location.href);
     if (peer) url.searchParams.set("with", peer); else url.searchParams.delete("with");
     history.replaceState(null, "", url);
@@ -568,11 +602,14 @@
   function openChatSidebar() {
     document.querySelector(".chat-sidebar").classList.add("open");
     document.getElementById("chatSidebarOverlay").classList.add("open");
+    // Prevent body scroll/rubber-band on iOS while drawer is open
+    document.body.style.overflow = "hidden";
   }
 
   function closeChatSidebar() {
     document.querySelector(".chat-sidebar") && document.querySelector(".chat-sidebar").classList.remove("open");
     document.getElementById("chatSidebarOverlay").classList.remove("open");
+    document.body.style.overflow = "";
   }
 
   function renderChat() {
@@ -641,7 +678,7 @@
 
     document.getElementById("chatInput").addEventListener("input", () => {
       const now = Date.now();
-      if (socket && socket.readyState === WebSocket.OPEN && now - lastTypingSent > 1500) {
+      if (socket && socket.readyState === WebSocket.OPEN && now - lastTypingSent > 800) {
         lastTypingSent = now;
         socket.send(JSON.stringify({ type: "typing" }));
       }

@@ -153,6 +153,7 @@
             <span>${ICONS.heart.replace('viewBox="0 0 24 24"','viewBox="0 0 24 24" width="13" height="13"')} ${p.likes}</span>
             <span class="entry-author">${avatarHTML(author, 22)}<a class="username-link" href="user.html?id=${author ? author.id : ""}" onclick="event.stopPropagation()">@${p.author}</a></span>
           </div>
+          <div class="live-readers" id="lv-${p.id}"></div>
         </div>
         ${p.cover ? `<div class="entry-thumb"><img src="${p.cover}" alt="" loading="lazy"></div>` : ""}
       </div>`;
@@ -237,6 +238,26 @@
   }
 
   start();
+
+  // Live reader avatars — update whenever the server broadcasts viewer changes
+  document.addEventListener("post-viewers", e => {
+    const { postId, viewers } = e.detail;
+    const el = document.getElementById(`lv-${postId}`);
+    if (!el) return;
+    const me = Progress.getCurrentUser();
+    const others = viewers.filter(v => v.username !== me?.username);
+    if (!others.length) { el.innerHTML = ""; return; }
+    const MAX = 5;
+    const shown = others.slice(0, MAX);
+    const extra = others.length - MAX;
+    el.innerHTML = shown.map(v => {
+      if (v.avatar) {
+        return `<img class="live-av" src="${escapeHTML(v.avatar)}" title="@${escapeHTML(v.username)} is reading" alt="@${escapeHTML(v.username)}">`;
+      }
+      const ini = (v.name || v.username).split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+      return `<div class="live-av live-av-init" title="@${escapeHTML(v.username)} is reading">${ini}</div>`;
+    }).join("") + (extra > 0 ? `<div class="live-av live-av-more">+${extra}</div>` : "");
+  });
 </script>
 
 </body>

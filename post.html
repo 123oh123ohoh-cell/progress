@@ -54,6 +54,23 @@
     if (fill) fill.style.width = Math.min(100, scrolled) + "%";
   });
 
+  // Announce to the presence layer that we're reading this post.
+  // Fires once the socket is ready (or immediately if already open).
+  function startViewingAnnounce() {
+    if (typeof announceViewingPost === "function") {
+      announceViewingPost(postId);
+    } else {
+      // presenceSocket may not be open yet — retry briefly
+      setTimeout(() => { if (typeof announceViewingPost === "function") announceViewingPost(postId); }, 1500);
+    }
+  }
+  startViewingAnnounce();
+  window.addEventListener("beforeunload", () => { if (typeof announceLeftPost === "function") announceLeftPost(); });
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) { if (typeof announceLeftPost === "function") announceLeftPost(); }
+    else startViewingAnnounce();
+  });
+
   async function renderPost() {
     let post = Progress.getPost(postId);
     const comments = await Progress.loadComments(postId);

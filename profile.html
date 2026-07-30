@@ -204,13 +204,61 @@ refreshNowPlaying();
       content.innerHTML = `<div style="padding-top:12px;"><p style="color:var(--muted);font-size:14px;">loading your stats…</p></div>`;
       apiFetch(`/api/users/${user.username}/stats`).then(s => {
         if (!s) { content.innerHTML = `<div style="padding-top:12px;"><p style="color:var(--muted);font-size:14px;">couldn't load stats.</p></div>`; return; }
-        const maxCount = Math.max(...s.postsPerMonth.map(m => m.count), 1);
         const fmt = n => n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, "") + "k" : String(n);
         const statCard = (num, label) => `
           <div style="background:var(--mocha-wash);border-radius:var(--radius);padding:20px 16px;text-align:center;">
             <span style="display:block;font-size:30px;font-weight:700;color:var(--ink);font-family:var(--font-display);line-height:1;margin-bottom:7px;">${fmt(num)}</span>
             <span style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.12em;">${label}</span>
           </div>`;
+
+        // ── Heatmap ──────────────────────────────────────────────
+        function buildHeatmap(postsByDay) {
+          const C = 11, G = 3; // cell size, gap
+          const today = new Date(); today.setHours(0,0,0,0);
+          const start = new Date(today); start.setDate(start.getDate() - 364);
+          start.setDate(start.getDate() - start.getDay()); // align to Sunday
+
+          const lvl = n => {
+            if (n <= 0) return "var(--mocha-wash)";
+            if (n === 1) return "#C8A87E";
+            if (n === 2) return "#A9866D";
+            return "#7A5840";
+          };
+
+          const weeks = [];
+          const cur = new Date(start);
+          while (cur <= today) {
+            const week = [];
+            for (let d = 0; d < 7; d++) {
+              const ds = cur.toISOString().slice(0,10);
+              week.push({ ds, count: cur <= today ? (postsByDay[ds] || 0) : -1,
+                month: cur.getDate() === 1 ? cur.toLocaleString("en-US",{month:"short"}) : "" });
+              cur.setDate(cur.getDate() + 1);
+            }
+            weeks.push(week);
+          }
+
+          const monthRow = weeks.map(w => {
+            const m = w.find(d => d.month);
+            return `<div style="width:${C}px;overflow:visible;white-space:nowrap;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em;">${m ? m.month : ""}</div>`;
+          }).join("");
+
+          const grid = weeks.map(w =>
+            `<div style="display:flex;flex-direction:column;gap:${G}px;">` +
+            w.map(d => d.count < 0
+              ? `<div style="width:${C}px;height:${C}px;"></div>`
+              : `<div style="width:${C}px;height:${C}px;border-radius:2px;background:${lvl(d.count)};cursor:default;" title="${d.ds}${d.count ? " · "+d.count+" post"+(d.count>1?"s":"") : ""}"></div>`
+            ).join("") + "</div>"
+          ).join("");
+
+          return `<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px;">
+            <div style="display:inline-flex;flex-direction:column;gap:${G}px;">
+              <div style="display:flex;gap:${G}px;">${monthRow}</div>
+              <div style="display:flex;gap:${G}px;">${grid}</div>
+            </div>
+          </div>`;
+        }
+
         content.innerHTML = `
           <div style="padding-top:12px;">
 
@@ -221,7 +269,7 @@ refreshNowPlaying();
               ${statCard(s.followers, "followers")}
             </div>
 
-            <div style="background:var(--mocha-wash);border-radius:var(--radius);padding:18px 20px;margin-bottom:16px;display:flex;align-items:stretch;gap:0;">
+            <div style="background:var(--mocha-wash);border-radius:var(--radius);padding:18px 20px;margin-bottom:16px;display:flex;align-items:stretch;">
               <div style="flex:1;text-align:center;">
                 <span style="display:block;font-size:26px;font-weight:700;color:var(--ink);font-family:var(--font-display);line-height:1;margin-bottom:6px;">${user.streak || 0}</span>
                 <span style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;">current streak</span>
@@ -234,15 +282,14 @@ refreshNowPlaying();
             </div>
 
             <div class="settings-section">
-              <h3>Activity — last 6 months</h3>
-              <div style="display:flex;align-items:flex-end;gap:6px;height:80px;margin-bottom:6px;">
-                ${s.postsPerMonth.map(m => {
-                  const h = maxCount > 0 ? Math.max(Math.round((m.count / maxCount) * 76), m.count > 0 ? 4 : 0) : 0;
-                  return `<div style="flex:1;background:var(--mocha-soft);border-radius:3px 3px 0 0;height:${h}px;" title="${m.count} post${m.count !== 1 ? 's' : ''}"></div>`;
-                }).join("")}
-              </div>
-              <div style="display:flex;gap:6px;">
-                ${s.postsPerMonth.map(m => `<div style="flex:1;text-align:center;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;">${m.label}</div>`).join("")}
+              <h3>Writing days — last year</h3>
+              ${buildHeatmap(s.postsByDay || {})}
+              <div style="display:flex;align-items:center;gap:6px;margin-top:10px;">
+                <span style="font-size:10px;color:var(--muted);">less</span>
+                ${["var(--mocha-wash)","#C8A87E","#A9866D","#7A5840"].map(c =>
+                  `<div style="width:11px;height:11px;border-radius:2px;background:${c};"></div>`
+                ).join("")}
+                <span style="font-size:10px;color:var(--muted);">more</span>
               </div>
             </div>
 

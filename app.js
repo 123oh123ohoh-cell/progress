@@ -1212,6 +1212,8 @@ function openPresenceSocket(activePage) {
         document.dispatchEvent(new CustomEvent("presence-update", { detail: data.statuses || {} }));
       } else if (data.type === "notification") {
         handleIncomingNotification(data.notification);
+      } else if (data.type === "post-viewers") {
+        document.dispatchEvent(new CustomEvent("post-viewers", { detail: data }));
       } else if (data.type === "maintenance") {
         if (data.on) {
           // Show a persistent banner; non-admins will get 503s on next API calls
@@ -1239,6 +1241,25 @@ function openPresenceSocket(activePage) {
     // just won't reflect while this connection is unavailable.
   }
 }
+
+// Announce that this user is actively reading a specific post.
+// Called by post.html on load. The server broadcasts this to all
+// presence connections so the home feed can show live reader avatars.
+window.announceViewingPost = function(postId) {
+  if (!presenceSocket || presenceSocket.readyState !== WebSocket.OPEN) return;
+  const user = Progress.getCurrentUser();
+  presenceSocket.send(JSON.stringify({
+    type: "viewing-post",
+    postId,
+    avatar: user?.avatar || null,
+    name: user?.name || user?.username || null
+  }));
+};
+
+window.announceLeftPost = function() {
+  if (!presenceSocket || presenceSocket.readyState !== WebSocket.OPEN) return;
+  presenceSocket.send(JSON.stringify({ type: "left-post" }));
+};
 
 /* ============================================================
    PWA — Progressive Web App setup
