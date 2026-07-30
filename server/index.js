@@ -452,23 +452,43 @@ function broadcastGlobalPresenceUpdate() {
  * Wraps email content in the Progress branded template.
  * All content params accept pre-escaped HTML strings.
  */
-function emailWrap({ accentEmoji = "✦", headlineHtml = "", bodyHtml = "", ctaText = "", ctaUrl = "", preview = "", site = "https://progressing.online" }) {
+/**
+ * Branded Progress email wrapper.
+ * Uses the site's cream/mocha palette and emoticon PNGs from /images/emoticons/.
+ * emoticon: full URL to a .png from images/emoticons/ (or null)
+ */
+function emailWrap({ emoticon = null, headlineHtml = "", bodyHtml = "", ctaText = "", ctaUrl = "", preview = "", site = "https://progressing.online" }) {
   const previewSnippet = preview
-    ? `<span style="display:none;font-size:0;max-height:0;max-width:0;opacity:0;overflow:hidden;">${preview}&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;</span>`
+    ? `<span style="display:none;font-size:0;max-height:0;max-width:0;opacity:0;overflow:hidden;">${preview}&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;</span>`
     : "";
-  const ctaRow = ctaText && ctaUrl
+
+  const emoticonBlock = emoticon
     ? `<tr>
-        <td bgcolor="#FAF5EE" align="center" style="padding:28px 40px 48px;">
+        <td align="center" style="padding:40px 0 8px;">
           <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center">
             <tr>
-              <td bgcolor="#1C1917" style="border-radius:30px;">
-                <a href="${ctaUrl}" style="display:inline-block;padding:15px 44px;font-family:Georgia,'Times New Roman',serif;font-size:15px;font-weight:bold;color:#FAF5EE;text-decoration:none;letter-spacing:0.06em;white-space:nowrap;">${ctaText} →</a>
+              <td width="108" height="108" bgcolor="#F1E7DB" align="center" valign="middle" style="border-radius:54px;font-size:0;line-height:0;overflow:hidden;">
+                <img src="${emoticon}" alt="" width="76" height="76" border="0" style="display:block;margin:16px auto;outline:none;-ms-interpolation-mode:bicubic;">
               </td>
             </tr>
           </table>
         </td>
       </tr>`
-    : `<tr><td bgcolor="#FAF5EE" height="44" style="font-size:0;line-height:0;">&nbsp;</td></tr>`;
+    : `<tr><td height="40" style="font-size:0;line-height:0;">&nbsp;</td></tr>`;
+
+  const ctaBlock = ctaText && ctaUrl
+    ? `<tr>
+        <td align="center" style="padding:28px 0 44px;">
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center">
+            <tr>
+              <td bgcolor="#1C1917" style="border-radius:100px;">
+                <a href="${ctaUrl}" style="display:inline-block;padding:13px 38px;font-family:Georgia,'Times New Roman',serif;font-size:14px;font-weight:bold;color:#FAF5EE;text-decoration:none;letter-spacing:0.04em;white-space:nowrap;">${ctaText}</a>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>`
+    : `<tr><td height="44" style="font-size:0;line-height:0;">&nbsp;</td></tr>`;
 
   return `<!DOCTYPE html>
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml">
@@ -478,93 +498,70 @@ function emailWrap({ accentEmoji = "✦", headlineHtml = "", bodyHtml = "", ctaT
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Progress</title>
 </head>
-<body style="margin:0;padding:0;background-color:#E8E0D6;-webkit-font-smoothing:antialiased;font-family:Georgia,'Times New Roman',serif;">
+<body style="margin:0;padding:0;background-color:#F1E7DB;-webkit-font-smoothing:antialiased;">
 ${previewSnippet}
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#E8E0D6">
-  <tr><td align="center" style="padding:40px 20px 60px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#F1E7DB">
+  <tr><td align="center" style="padding:36px 20px 60px;">
+
+    <!-- wordmark above card -->
+    <table role="presentation" width="460" cellpadding="0" cellspacing="0" border="0" style="max-width:460px;width:100%;">
+      <tr>
+        <td align="center" style="padding-bottom:14px;">
+          <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:10px;letter-spacing:0.42em;color:#A9866D;text-transform:uppercase;">Progress</p>
+        </td>
+      </tr>
+    </table>
 
     <!-- card -->
-    <table role="presentation" width="520" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;width:100%;">
+    <table role="presentation" width="460" cellpadding="0" cellspacing="0" border="0" bgcolor="#FAF5EE" style="max-width:460px;width:100%;border-radius:18px;border:1px solid #E4D5C4;">
 
-      <!-- ── TOP CORNER MARKS ──────────────────────────────────── -->
-      <tr>
-        <td height="20" style="font-size:13px;color:#9C8B7C;padding:0 4px 4px;letter-spacing:0.1em;line-height:1;">&#10022; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &#10022;</td>
-      </tr>
+      <!-- emoticon -->
+      ${emoticonBlock}
 
-      <!-- ── HEADER ──────────────────────────────────────────────── -->
+      <!-- headline -->
       <tr>
-        <td bgcolor="#1C1917" align="center" style="padding:36px 48px 30px;border-radius:4px 4px 0 0;">
-          <p style="margin:0 0 10px;font-family:Georgia,'Times New Roman',serif;font-size:9px;letter-spacing:0.55em;color:#6B5744;text-transform:uppercase;">— a letter from —</p>
-          <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:30px;font-weight:bold;letter-spacing:0.28em;color:#FAF5EE;text-transform:uppercase;line-height:1;">Progress</p>
-          <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin-top:18px;">
-            <tr>
-              <td width="36" height="1" bgcolor="#3D2E23" style="font-size:0;line-height:0;">&nbsp;</td>
-              <td width="8" height="8" bgcolor="#C9944A" style="font-size:0;line-height:0;border-radius:50%;margin:0 8px;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td>
-              <td width="36" height="1" bgcolor="#3D2E23" style="font-size:0;line-height:0;">&nbsp;</td>
-            </tr>
-          </table>
+        <td align="center" style="padding:8px 36px 22px;">
+          ${headlineHtml}
         </td>
       </tr>
 
-      <!-- ── AMBER STRIPE ────────────────────────────────────────── -->
+      <!-- rule -->
       <tr>
-        <td bgcolor="#C9944A" height="3" style="font-size:0;line-height:0;">&nbsp;</td>
-      </tr>
-
-      <!-- ── CREAM BODY CARD ────────────────────────────────────── -->
-      <tr>
-        <td bgcolor="#FAF7F2" style="padding:48px 48px 0;border-left:1px solid #DDD5C8;border-right:1px solid #DDD5C8;">
-          <!-- Emoji -->
+        <td style="padding:0 36px;">
           <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-            <tr>
-              <td align="center" style="padding-bottom:22px;font-size:52px;line-height:1;font-family:Apple Color Emoji,Segoe UI Emoji,sans-serif;">
-                ${accentEmoji}
-              </td>
-            </tr>
-            <!-- Headline -->
-            <tr>
-              <td align="center" style="padding-bottom:20px;">
-                ${headlineHtml}
-              </td>
-            </tr>
-            <!-- thin rule -->
-            <tr>
-              <td height="1" bgcolor="#E8DDD4" style="font-size:0;line-height:0;">&nbsp;</td>
-            </tr>
+            <tr><td height="1" bgcolor="#E4D5C4" style="font-size:0;line-height:0;">&nbsp;</td></tr>
           </table>
         </td>
       </tr>
 
-      <!-- ── BODY TEXT ───────────────────────────────────────────── -->
+      <!-- body -->
       <tr>
-        <td bgcolor="#FAF7F2" style="padding:28px 48px 0;border-left:1px solid #DDD5C8;border-right:1px solid #DDD5C8;">
+        <td style="padding:22px 36px 0;">
           ${bodyHtml}
         </td>
       </tr>
 
-      <!-- ── CTA ─────────────────────────────────────────────────── -->
-      ${ctaRow.replace('bgcolor="#FAF5EE"', 'bgcolor="#FAF7F2" border-left="1" border-right="1" style="padding:28px 48px 52px;border-left:1px solid #DDD5C8;border-right:1px solid #DDD5C8;"').replace('style="padding:28px 40px 48px;"', '')}
+      <!-- CTA -->
+      ${ctaBlock}
 
-      <!-- ── FOOTER ─────────────────────────────────────────────── -->
+    </table>
+
+    <!-- footer -->
+    <table role="presentation" width="460" cellpadding="0" cellspacing="0" border="0" style="max-width:460px;width:100%;margin-top:22px;">
       <tr>
-        <td bgcolor="#EDE7DF" align="center" style="padding:20px 48px 24px;border:1px solid #DDD5C8;border-top:2px solid #C9944A;border-radius:0 0 4px 4px;">
-          <p style="margin:0 0 5px;font-family:Georgia,'Times New Roman',serif;font-size:11px;color:#8C7B6E;line-height:1.8;">
-            Sent with warmth from <a href="${site}" style="color:#6B4F3A;text-decoration:none;font-weight:bold;">Progress</a>
+        <td align="center" style="padding:0 20px;">
+          <p style="margin:0 0 4px;font-family:Georgia,'Times New Roman',serif;font-size:11px;color:#A9866D;line-height:1.9;">
+            sent with warmth from <a href="${site}" style="color:#8C6E58;text-decoration:none;">progress</a>
           </p>
-          <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:11px;color:#A89880;line-height:1.8;">
-            <a href="${site}/profile.html" style="color:#8C7B6E;text-decoration:underline;">Manage preferences</a>
-            &nbsp;&#183;&nbsp;
-            <a href="${site}" style="color:#8C7B6E;text-decoration:none;">Visit Progress</a>
+          <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:11px;color:#C4AFA0;line-height:1.9;">
+            <a href="${site}/profile.html" style="color:#A9866D;text-decoration:underline;">manage preferences</a>
+            &nbsp;&middot;&nbsp;
+            <a href="${site}" style="color:#A9866D;text-decoration:none;">visit the site</a>
           </p>
         </td>
       </tr>
-
-      <!-- ── BOTTOM CORNER MARKS ────────────────────────────────── -->
-      <tr>
-        <td height="20" style="font-size:13px;color:#9C8B7C;padding:4px 4px 0;letter-spacing:0.1em;line-height:1;text-align:right;">&#10022; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &#10022;</td>
-      </tr>
-
     </table>
+
   </td></tr>
 </table>
 </body>
@@ -580,43 +577,39 @@ async function sendWelcomeEmail(user) {
   const displayName = esc(user.name || user.username || "friend");
 
   const step = (num, title, desc) => `
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:16px;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:14px;">
       <tr>
-        <td width="36" valign="top" style="padding-top:2px;">
-          <table role="presentation" cellpadding="0" cellspacing="0" border="0">
-            <tr>
-              <td width="28" height="28" bgcolor="#1C1917" align="center" style="font-family:Georgia,'Times New Roman',serif;font-size:13px;font-weight:bold;color:#FAF5EE;border-radius:50%;line-height:28px;">${num}</td>
-            </tr>
-          </table>
+        <td width="32" valign="top" style="padding-top:1px;">
+          <p style="margin:0;width:24px;height:24px;line-height:24px;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:12px;font-weight:bold;color:#FAF5EE;background-color:#1C1917;border-radius:50%;display:inline-block;">${num}</p>
         </td>
-        <td style="padding-left:14px;">
-          <p style="margin:0 0 3px;font-family:Georgia,'Times New Roman',serif;font-size:15px;font-weight:bold;color:#1C1917;line-height:1.3;">${title}</p>
-          <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:13px;color:#6B5744;line-height:1.65;">${desc}</p>
+        <td style="padding-left:10px;">
+          <p style="margin:0 0 2px;font-family:Georgia,'Times New Roman',serif;font-size:14px;font-weight:bold;color:#1C1917;line-height:1.35;">${title}</p>
+          <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:13px;color:#8C6E58;line-height:1.65;">${desc}</p>
         </td>
       </tr>
     </table>`;
 
   const bodyHtml = `
-    <p style="margin:0 0 28px;font-family:Georgia,'Times New Roman',serif;font-size:16px;color:#4A3728;line-height:1.85;text-align:center;">
-      You're officially part of the circle.<br>
-      <span style="color:#8C7B6E;font-size:14px;">Progress is a quiet corner of the internet for writing, reading, and showing up every day.</span>
+    <p style="margin:0 0 24px;font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#4A3728;line-height:1.85;text-align:center;">
+      you're officially in the circle.<br>
+      <span style="color:#9C8B7C;font-size:13px;">a quiet corner of the internet for writing,<br>reading, and showing up every day.</span>
     </p>
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#F5EEE6;border-radius:8px;border-left:3px solid #C9944A;margin-bottom:8px;">
-      <tr><td style="padding:22px 24px;">
-        <p style="margin:0 0 18px;font-family:Georgia,'Times New Roman',serif;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#9C8B7C;">Getting started</p>
-        ${step(1, "Write something", "Open a blank page. No audience, no pressure — just you and your thoughts.")}
-        ${step(2, "Follow some writers", "Find people whose words resonate with you and follow their journey.")}
-        ${step(3, "Build a streak", "Show up daily. Small consistent habits grow into something beautiful.")}
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#F1E7DB;border-radius:10px;">
+      <tr><td style="padding:20px 22px;">
+        <p style="margin:0 0 14px;font-family:Georgia,'Times New Roman',serif;font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:#A9866D;">where to begin</p>
+        ${step(1, "Write something", "Open a blank page. No audience, no pressure — just you.")}
+        ${step(2, "Follow some writers", "Find people whose words you love and follow along.")}
+        ${step(3, "Build a streak", "Show up daily. Small habits grow into beautiful things.")}
       </td></tr>
     </table>`;
 
   const html = emailWrap({
-    accentEmoji: "✦",
-    headlineHtml: `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:28px;font-weight:bold;color:#1C1917;line-height:1.2;letter-spacing:-0.01em;">Welcome, ${displayName}.</h1>`,
+    emoticon: `${site}/images/emoticons/hi.png`,
+    headlineHtml: `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:26px;font-weight:bold;color:#1C1917;line-height:1.25;letter-spacing:-0.01em;">welcome, ${displayName}.</h1>`,
     bodyHtml,
-    ctaText: "Start writing",
+    ctaText: "start writing",
     ctaUrl: `${site}/write.html`,
-    preview: `You're officially in the circle, ${user.name || user.username}. Welcome to Progress.`,
+    preview: `you're in. welcome to progress, ${user.name || user.username}.`,
     site
   });
 
@@ -626,7 +619,7 @@ async function sendWelcomeEmail(user) {
     body: JSON.stringify({
       from: "Progress <noreply@progressing.online>",
       to: user.email,
-      subject: `Welcome to Progress, ${user.name || user.username} ✦`,
+      subject: `welcome to progress, ${user.name || user.username} ✦`,
       html
     })
   }).then(r => { if (!r.ok) r.text().then(t => console.error("[welcome] Resend error:", t)); })
@@ -638,104 +631,98 @@ async function sendNotificationEmail(user, notification) {
   if (!key || !user || !user.email) return;
   const site = process.env.RENDER_EXTERNAL_URL || "https://progressing.online";
   const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const img = name => `${site}/images/emoticons/${name}`;
+  // Quoted card helper
+  const quote = (text) => `
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#F1E7DB;border-radius:8px;border-left:3px solid #A9866D;margin-top:16px;">
+      <tr><td style="padding:14px 18px;">
+        <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:14px;color:#4A3728;line-height:1.7;font-style:italic;">${text}</p>
+      </td></tr>
+    </table>`;
 
-  let subject, accentEmoji, headlineHtml, bodyHtml, ctaText, ctaUrl, preview;
+  let subject, emoticon, headlineHtml, bodyHtml, ctaText, ctaUrl, preview;
 
   if (notification.type === "like") {
-    subject  = `@${notification.actor} loved your post ♥`;
-    preview  = "Someone appreciated what you wrote.";
-    accentEmoji  = "♥";
-    headlineHtml = `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:26px;font-weight:bold;color:#1C1917;line-height:1.25;">Someone loved<br>your writing</h1>`;
+    subject      = `@${notification.actor} liked your post`;
+    preview      = "someone appreciated what you wrote.";
+    emoticon     = img("romantic.png");
+    headlineHtml = `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:24px;font-weight:bold;color:#1C1917;line-height:1.3;">someone loved your writing</h1>`;
     bodyHtml = `
-      <p style="margin:0 0 20px;font-family:Georgia,'Times New Roman',serif;font-size:16px;color:#4A3728;line-height:1.75;text-align:center;">
+      <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#4A3728;line-height:1.8;text-align:center;">
         <strong>@${esc(notification.actor)}</strong> liked your post.
       </p>
-      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#F5EEE8;border-radius:10px;border-left:4px solid #D4A96A;">
-        <tr>
-          <td style="padding:16px 20px;">
-            <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#1C1917;font-style:italic;line-height:1.6;">
-              ${esc(notification.postTitle || "Your post")}
-            </p>
-          </td>
-        </tr>
-      </table>`;
-    ctaText = "Read it again";
+      ${quote(`&ldquo;${esc(notification.postTitle || "your post")}&rdquo;`)}`;
+    ctaText = "read it again";
     ctaUrl  = `${site}/post.html?id=${notification.postId}`;
 
   } else if (notification.type === "reply") {
-    subject  = `@${notification.actor} replied to your post`;
-    preview  = "Someone joined your conversation.";
-    accentEmoji  = "💬";
-    headlineHtml = `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:26px;font-weight:bold;color:#1C1917;line-height:1.25;">A reply came in</h1>`;
-    const snippet = notification.body ? esc(String(notification.body).slice(0, 200)) + (notification.body.length > 200 ? "&hellip;" : "") : "";
+    subject      = `@${notification.actor} replied to your post`;
+    preview      = "someone joined your conversation.";
+    emoticon     = img("two.png");
+    headlineHtml = `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:24px;font-weight:bold;color:#1C1917;line-height:1.3;">a reply came in</h1>`;
+    const snippet = notification.body
+      ? esc(String(notification.body).slice(0, 200)) + (notification.body.length > 200 ? "&hellip;" : "")
+      : "";
     bodyHtml = `
-      <p style="margin:0 0 20px;font-family:Georgia,'Times New Roman',serif;font-size:16px;color:#4A3728;line-height:1.75;text-align:center;">
+      <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#4A3728;line-height:1.8;text-align:center;">
         <strong>@${esc(notification.actor)}</strong> replied to <em>${esc(notification.postTitle || "your post")}</em>.
       </p>
-      ${snippet ? `
-      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#F5EEE8;border-radius:10px;border-left:4px solid #D4A96A;">
-        <tr>
-          <td style="padding:16px 20px;">
-            <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:14px;color:#4A3728;line-height:1.7;font-style:italic;">
-              &ldquo;${snippet}&rdquo;
-            </p>
-          </td>
-        </tr>
-      </table>` : ""}`;
-    ctaText = "Join the conversation";
+      ${snippet ? quote(`&ldquo;${snippet}&rdquo;`) : ""}`;
+    ctaText = "join the conversation";
     ctaUrl  = `${site}/post.html?id=${notification.postId}`;
 
   } else if (notification.type === "follow") {
-    subject  = `@${notification.actor} is now following you on Progress`;
-    preview  = "Your writing is finding its people.";
-    accentEmoji  = "✨";
-    headlineHtml = `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:26px;font-weight:bold;color:#1C1917;line-height:1.25;">You have a new follower</h1>`;
+    subject      = `@${notification.actor} is now following you`;
+    preview      = "your writing is finding its people.";
+    emoticon     = img("wonder.png");
+    headlineHtml = `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:24px;font-weight:bold;color:#1C1917;line-height:1.3;">you have a new follower</h1>`;
     bodyHtml = `
-      <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:16px;color:#4A3728;line-height:1.75;text-align:center;">
+      <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#4A3728;line-height:1.8;text-align:center;">
         <strong>@${esc(notification.actor)}</strong> just started following you.<br>
-        <span style="color:#9C8B7C;">Your writing is finding its people.</span>
+        <span style="color:#9C8B7C;">your writing is finding its people.</span>
       </p>`;
-    ctaText = "View their profile";
+    ctaText = "view their profile";
     ctaUrl  = `${site}/user.html?id=${notification.actor}`;
 
   } else if (notification.type === "mention") {
-    subject  = `@${notification.actor} mentioned you`;
-    preview  = "You came up in conversation.";
-    accentEmoji  = "✦";
-    headlineHtml = `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:26px;font-weight:bold;color:#1C1917;line-height:1.25;">You were mentioned</h1>`;
+    subject      = `@${notification.actor} mentioned you`;
+    preview      = "you came up in conversation.";
+    emoticon     = img("kiss.png");
+    headlineHtml = `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:24px;font-weight:bold;color:#1C1917;line-height:1.3;">you were mentioned</h1>`;
     bodyHtml = `
-      <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:16px;color:#4A3728;line-height:1.75;text-align:center;">
+      <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#4A3728;line-height:1.8;text-align:center;">
         <strong>@${esc(notification.actor)}</strong> mentioned you in<br>
         <em>${esc(notification.postTitle || "a post")}</em>.
       </p>`;
-    ctaText = "See the post";
+    ctaText = "see the post";
     ctaUrl  = `${site}/post.html?id=${notification.postId}`;
 
   } else if (notification.type === "streak") {
-    subject  = `🔥 ${notification.streak}-day streak — keep it going`;
-    preview  = "You're on a roll. Don't stop now.";
-    accentEmoji  = "🔥";
-    headlineHtml = `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:26px;font-weight:bold;color:#1C1917;line-height:1.25;">${notification.streak} days in a row</h1>`;
+    subject      = `${notification.streak}-day streak — keep it going`;
+    preview      = "you're on a roll. don't stop now.";
+    emoticon     = img("pancake.png");
+    headlineHtml = `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:24px;font-weight:bold;color:#1C1917;line-height:1.3;">${notification.streak} days in a row</h1>`;
     bodyHtml = `
-      <p style="margin:0 0 24px;font-family:Georgia,'Times New Roman',serif;font-size:16px;color:#4A3728;line-height:1.75;text-align:center;">
-        You've logged in ${notification.streak} days in a row —<br>that's something worth celebrating.
+      <p style="margin:0 0 20px;font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#4A3728;line-height:1.8;text-align:center;">
+        you've shown up ${notification.streak} days in a row.<br>
+        <span style="color:#9C8B7C;">that's not nothing. keep going.</span>
       </p>
-      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#F5EEE8;border-radius:12px;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#F1E7DB;border-radius:10px;">
         <tr>
-          <td align="center" style="padding:24px 20px;">
-            <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:52px;font-weight:bold;color:#1C1917;line-height:1;">${notification.streak}</p>
-            <p style="margin:6px 0 0;font-family:Georgia,'Times New Roman',serif;font-size:11px;color:#9C8B7C;text-transform:uppercase;letter-spacing:0.15em;">day streak</p>
+          <td align="center" style="padding:20px;">
+            <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:48px;font-weight:bold;color:#1C1917;line-height:1;">${notification.streak}</p>
+            <p style="margin:4px 0 0;font-family:Georgia,'Times New Roman',serif;font-size:10px;color:#A9866D;text-transform:uppercase;letter-spacing:0.18em;">day streak</p>
           </td>
         </tr>
       </table>`;
-    ctaText = "Keep writing";
+    ctaText = "keep writing";
     ctaUrl  = site;
 
   } else {
     return;
   }
 
-  const html = emailWrap({ accentEmoji, headlineHtml, bodyHtml, ctaText, ctaUrl, preview, site });
+  const html = emailWrap({ emoticon, headlineHtml, bodyHtml, ctaText, ctaUrl, preview, site });
   await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
@@ -764,15 +751,14 @@ async function sendWeeklyDigest() {
       .toArray();
     if (!posts.length) continue;
 
-    const postCards = posts.map((p, i) => {
-      const bg = i % 2 === 0 ? "#FAF5EE" : "#F5EEE8";
-      const excerpt = p.excerpt ? esc(String(p.excerpt).replace(/<[^>]+>/g,"").slice(0, 130)) : "";
+    const postCards = posts.map(p => {
+      const excerpt = p.excerpt ? esc(String(p.excerpt).replace(/<[^>]+>/g,"").slice(0, 120)) : "";
       return `
-      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:12px;background-color:${bg};border-radius:10px;border-left:4px solid #D4A96A;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:10px;background-color:#F1E7DB;border-radius:8px;">
         <tr>
-          <td style="padding:16px 20px;">
-            <a href="${site}/post.html?id=${p._id}" style="font-family:Georgia,'Times New Roman',serif;font-size:16px;font-weight:bold;color:#1C1917;text-decoration:none;line-height:1.4;display:block;margin-bottom:6px;">${esc(p.title || "Untitled")}</a>
-            <p style="margin:0 0 ${excerpt ? "10px" : "0"};font-family:Georgia,'Times New Roman',serif;font-size:11px;color:#9C8B7C;letter-spacing:0.06em;">by @${esc(p.author)}&nbsp;&nbsp;&nbsp;&#9825;&nbsp;${p.likes || 0}</p>
+          <td style="padding:14px 18px;">
+            <a href="${site}/post.html?id=${p._id}" style="font-family:Georgia,'Times New Roman',serif;font-size:15px;font-weight:bold;color:#1C1917;text-decoration:none;line-height:1.4;display:block;margin-bottom:5px;">${esc(p.title || "Untitled")}</a>
+            <p style="margin:0 0 ${excerpt ? "8px" : "0"};font-family:Georgia,'Times New Roman',serif;font-size:11px;color:#A9866D;letter-spacing:0.05em;">by @${esc(p.author)} &nbsp;&#9825; ${p.likes || 0}</p>
             ${excerpt ? `<p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:13px;color:#4A3728;line-height:1.65;font-style:italic;">${excerpt}&hellip;</p>` : ""}
           </td>
         </tr>
@@ -780,17 +766,17 @@ async function sendWeeklyDigest() {
     }).join("");
 
     const bodyHtml = `
-      <p style="margin:0 0 28px;font-family:Georgia,'Times New Roman',serif;font-size:16px;color:#4A3728;line-height:1.8;text-align:center;">
-        Here's what the people you follow published this week.<br>
-        <span style="color:#9C8B7C;font-size:14px;">Make yourself something warm and settle in.</span>
+      <p style="margin:0 0 22px;font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#4A3728;line-height:1.85;text-align:center;">
+        here's what the people you follow<br>published this week.<br>
+        <span style="color:#9C8B7C;font-size:13px;">make yourself something warm and settle in.</span>
       </p>
       ${postCards}`;
 
     const html = emailWrap({
-      accentEmoji: "📖",
-      headlineHtml: `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:26px;font-weight:bold;color:#1C1917;line-height:1.25;">Your week in writing</h1>`,
+      emoticon: `${site}/images/emoticons/starbucks.png`,
+      headlineHtml: `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:24px;font-weight:bold;color:#1C1917;line-height:1.3;">your week in writing</h1>`,
       bodyHtml,
-      ctaText: "Read more on Progress",
+      ctaText: "read more",
       ctaUrl: site,
       preview: `${posts.length} new post${posts.length !== 1 ? "s" : ""} from people you follow this week.`,
       site
@@ -799,7 +785,7 @@ async function sendWeeklyDigest() {
     await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from: "Progress <noreply@progressing.online>", to: user.email, subject: "Your weekly digest from Progress ✦", html })
+      body: JSON.stringify({ from: "Progress <noreply@progressing.online>", to: user.email, subject: "your weekly digest ✦", html })
     }).then(r => { if (r.ok) sent++; else r.text().then(t => console.error("[digest] Resend error:", t)); })
       .catch(e => console.error("[digest] fetch error:", e));
   }
@@ -2386,10 +2372,10 @@ app.post("/api/admin/send-email", requireAuth, requireRole("admin"), asyncHandle
   const site = process.env.RENDER_EXTERNAL_URL || "https://progressing.online";
   const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
   const makeHtml = (text) => emailWrap({
-    accentEmoji: "✉",
-    headlineHtml: `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:24px;font-weight:bold;color:#1C1917;line-height:1.3;">${esc(subject)}</h1>`,
-    bodyHtml: `<div style="font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#4A3728;line-height:1.85;white-space:pre-wrap;">${esc(text)}</div>`,
-    ctaText: "Visit Progress",
+    emoticon: `${site}/images/emoticons/penguin.png`,
+    headlineHtml: `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:22px;font-weight:bold;color:#1C1917;line-height:1.35;">${esc(subject)}</h1>`,
+    bodyHtml: `<p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#4A3728;line-height:1.85;white-space:pre-wrap;">${esc(text)}</p>`,
+    ctaText: "visit progress",
     ctaUrl: site,
     preview: text.slice(0, 100).replace(/\n/g," "),
     site
