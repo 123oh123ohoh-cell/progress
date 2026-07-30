@@ -1154,10 +1154,10 @@ body.account-banned .mobile-fab {
   border: none;
   padding: 0;
 }
-/* Creator badge inline (feed/list) — slightly larger */
+/* Creator badge — larger so it's actually visible */
 .display-badge-image.creator-badge {
-  width: 28px;
-  height: 28px;
+  width: 40px;
+  height: 40px;
 }
 .display-badge-text {
   font-size: 14px;
