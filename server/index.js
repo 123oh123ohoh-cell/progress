@@ -88,6 +88,26 @@ async function uploadToSupabase(base64DataUri) {
   }
   return `${SUPABASE_URL}/storage/v1/object/public/${SUPABASE_BUCKET}/${filename}`;
 }
+
+// Finds every base64 data URI inside an HTML string (e.g. <img src="data:...">)
+// and uploads each one to Supabase, replacing the data URI with the public URL.
+async function uploadBase64InHtml(html) {
+  if (!html || !SUPABASE_URL || !SUPABASE_SERVICE_KEY) return html;
+  const regex = /src="(data:[^"]{20,})"/g;
+  let match;
+  const items = [];
+  while ((match = regex.exec(html)) !== null) {
+    items.push(match[1]);
+  }
+  let result = html;
+  for (const dataUri of items) {
+    try {
+      const url = await uploadToSupabase(dataUri);
+      result = result.split(dataUri).join(url);
+    } catch (e) { /* keep original on failure */ }
+  }
+  return result;
+}
 const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET || "";
 const SPOTIFY_REDIRECT_URI = process.env.SPOTIFY_REDIRECT_URI || "http://127.0.0.1:3000/api/spotify/callback";
 const SPOTIFY_SCOPES = "user-read-currently-playing user-read-private user-read-playback-state user-modify-playback-state";
@@ -1571,6 +1591,14 @@ app.post("/api/posts", requireAuth, asyncHandler(async (req, res) => {
   const content = sanitizePostContent(req.body.content);
   if (!title || !content) return res.status(400).json({ error: "title and content are required" });
   if (await isUsernameBanned(author)) return res.status(403).json({ error: "This account has been banned." });
+
+  // Upload base64 cover + embedded images to Supabase so they're stored as URLs
+  let coverUrl = cover || null;
+  if (coverUrl && coverUrl.startsWith("data:")) {
+    try { coverUrl = await uploadToSupabase(coverUrl); } catch (e) { /* keep base64 on failure */ }
+  }
+  const processedContent = await uploadBase64InHtml(content);
+
   const createdAt = new Date().toISOString();
   const post = {
     _id: generateId("p"),
@@ -1578,9 +1606,9 @@ app.post("/api/posts", requireAuth, asyncHandler(async (req, res) => {
     title,
     date: createdAt.slice(0, 10),
     createdAt,
-    cover: cover || null,
+    cover: coverUrl,
     excerpt: excerpt || content.replace(/<[^>]+>/g, "").slice(0, 140),
-    content,
+    content: processedContent,
     likes: 0,
     likedBy: []
   };
@@ -1600,12 +1628,19 @@ app.patch("/api/posts/:id", requireAuth, asyncHandler(async (req, res) => {
   const isAdmin = ALLOWED_CREATOR_USERNAMES.has(req.user.username.toLowerCase());
   const isAuthor = post.author === req.user.username;
   if (!isAdmin && !isAuthor) return res.status(403).json({ error: "Not allowed." });
-  const allowed = ["category", "title", "excerpt", "cover"];
+  const allowed = ["category", "title", "excerpt", "cover", "content"];
   const update = {};
   for (const key of allowed) {
     if (key in req.body) update[key] = req.body[key] === "" ? null : req.body[key];
   }
   if (!Object.keys(update).length) return res.status(400).json({ error: "Nothing to update." });
+  // Upload any base64 images to Supabase
+  if (update.cover && update.cover.startsWith("data:")) {
+    try { update.cover = await uploadToSupabase(update.cover); } catch (e) {}
+  }
+  if (update.content) {
+    update.content = await uploadBase64InHtml(update.content);
+  }
   await db.collection("posts").updateOne({ _id: req.params.id }, { $set: update });
   const updated = await db.collection("posts").findOne({ _id: req.params.id });
   res.json(normalizePost(updated));
@@ -2074,6 +2109,53 @@ app.get("/api/me", requireAuth, asyncHandler(async (req, res) => {
   if (!user) return res.status(404).json({ error: "User not found" });
   const pub = publicUser(normalizeUser(user));
   res.json({ ...pub, email: user.email || null, emailNotifications: typeof user.emailNotifications !== "undefined" ? user.emailNotifications : true });
+}));
+
+// ── Migration: move base64 images from MongoDB → Supabase ────────────────────
+app.post("/api/admin/migrate-posts-to-supabase", requireAuth, asyncHandler(async (req, res) => {
+  if (!ALLOWED_CREATOR_USERNAMES.has(req.user.username.toLowerCase())) {
+    return res.status(403).json({ error: "Admin only." });
+  }
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+    return res.status(503).json({ error: "Supabase not configured." });
+  }
+
+  const posts = await db.collection("posts").find({}).toArray();
+  let migrated = 0, skipped = 0, errors = 0;
+
+  for (const post of posts) {
+    const update = {};
+
+    // Cover image
+    if (post.cover && post.cover.startsWith("data:")) {
+      try {
+        update.cover = await uploadToSupabase(post.cover);
+      } catch (e) {
+        console.error(`migrate cover failed for ${post._id}:`, e.message);
+        errors++;
+      }
+    }
+
+    // Embedded images in content
+    if (post.content && post.content.includes("data:")) {
+      try {
+        const cleaned = await uploadBase64InHtml(post.content);
+        if (cleaned !== post.content) update.content = cleaned;
+      } catch (e) {
+        console.error(`migrate content failed for ${post._id}:`, e.message);
+        errors++;
+      }
+    }
+
+    if (Object.keys(update).length) {
+      await db.collection("posts").updateOne({ _id: post._id }, { $set: update });
+      migrated++;
+    } else {
+      skipped++;
+    }
+  }
+
+  res.json({ total: posts.length, migrated, skipped, errors });
 }));
 
 app.use((req, res) => {
