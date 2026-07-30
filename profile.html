@@ -539,16 +539,41 @@ refreshNowPlaying();
         }
         const isActive = user.displayBadge === badgeId;
         const nextBadge = isActive ? null : badgeId;
-        const updated = await Progress.updateProfile({ displayBadge: nextBadge });
-        if (updated) {
-          user = updated;
-          render();
-          showToast(isActive
-            ? `Removed ${BADGES[badgeId].label} from your name.`
-            : `Displayed ${BADGES[badgeId].label} on your name.`);
-        } else {
-          showToast("Could not update your badge. Please try again.");
+
+        // Dim the chip while saving so the user knows it's in flight
+        el.style.opacity = "0.45";
+        el.style.pointerEvents = "none";
+
+        // Call the API directly — updateProfile applies changes optimistically
+        // so we can't rely on it to detect a server rejection (it returns the
+        // locally-updated user even on API failure). Here we call PATCH ourselves
+        // and only commit to local state when the server confirms it.
+        const payload = await apiFetch(`/api/users/${user.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ displayBadge: nextBadge })
+        });
+
+        el.style.opacity = "";
+        el.style.pointerEvents = "";
+
+        if (!payload) {
+          showToast("Couldn't save badge — please try again.");
+          return;
         }
+
+        // Server confirmed — apply its authoritative response to local state
+        const localUser = Progress.db.users.find(u => u.username === user.username);
+        if (localUser) {
+          const preserved = { password: localUser.password, email: localUser.email };
+          Object.assign(localUser, payload, preserved);
+          Progress.persist();
+        }
+        user = Progress.getCurrentUser() || user;
+        render();
+        showToast(isActive
+          ? `Removed ${BADGES[badgeId]?.label ?? badgeId} from your name.`
+          : `Displaying ${BADGES[badgeId]?.label ?? badgeId} on your name.`);
       });
     });
   }
