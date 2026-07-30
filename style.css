@@ -469,6 +469,20 @@ body.account-banned .mobile-fab {
 }
 .entry:hover::before { background: var(--ink); border-color: var(--ink); }
 
+/* ── Read / visited state ──────────────────────────────────────────────────── */
+.entry--read {
+  opacity: 0.55;
+  transition: opacity .2s ease;
+}
+.entry--read:hover {
+  opacity: 0.85;
+}
+.entry--read::before {
+  background: var(--mocha-light) !important;
+  border-color: var(--mocha-light) !important;
+}
+.entry--read .entry-title { color: var(--muted); }
+
 .entry-body { flex: 1; min-width: 0; }
 
 .entry-date {
@@ -1132,13 +1146,18 @@ body.account-banned .mobile-fab {
   border: 1px solid var(--mocha-light);
 }
 .display-badge-image {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   object-fit: contain;
   border-radius: 4px;
   background: transparent;
   border: none;
   padding: 0;
+}
+/* Creator badge gets extra size so it's actually visible in the feed */
+.display-badge-image.creator-badge {
+  width: 28px;
+  height: 28px;
 }
 .display-badge-text {
   font-size: 14px;

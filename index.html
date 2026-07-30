@@ -55,6 +55,20 @@
 <script src="app.js"></script>
 <script>
   const CATEGORY_COLORS = { development: "cat-development", creative: "cat-creative", random: "cat-random" };
+  const READ_KEY = "progress:readPosts";
+
+  function getReadSet() {
+    try { return new Set(JSON.parse(localStorage.getItem(READ_KEY) || "[]")); } catch(e) { return new Set(); }
+  }
+  function markRead(postId) {
+    try {
+      const s = getReadSet();
+      s.add(postId);
+      // Keep only the last 500 to avoid unbounded growth
+      const arr = Array.from(s).slice(-500);
+      localStorage.setItem(READ_KEY, JSON.stringify(arr));
+    } catch(e) {}
+  }
 
   let activeCategory = getActiveCategory(); // from app.js helper
 
@@ -120,14 +134,16 @@
       return;
     }
 
+    const readSet = getReadSet();
     timeline.innerHTML = posts.map(p => {
       const author = Progress.getUser(p.author);
       const catClass = p.category ? (CATEGORY_COLORS[p.category.toLowerCase()] || "") : "";
       const catChip  = catClass && getCategoryTabsEnabled()
         ? `<span class="entry-category ${catClass}">${escapeHTML(p.category)}</span>`
         : "";
+      const isRead = readSet.has(p.id);
       return `
-      <div class="entry" data-post-href="post.html?id=${p.id}">
+      <div class="entry${isRead ? " entry--read" : ""}" data-post-id="${p.id}" data-post-href="post.html?id=${p.id}">
         <div class="entry-body">
           ${catChip}
           <span class="entry-date">${Progress.formatDateShort(p.date)}</span>
@@ -135,7 +151,7 @@
           <p class="entry-excerpt">${renderEmoticonsText(p.excerpt, "inline-emoticon")}</p>
           <div class="entry-meta">
             <span>${ICONS.heart.replace('viewBox="0 0 24 24"','viewBox="0 0 24 24" width="13" height="13"')} ${p.likes}</span>
-            <span class="entry-author">${avatarHTML(author, 22)}<a class="username-link" href="user.html?id=${author ? author.id : ""}" onclick="event.stopPropagation()">@${p.author}</a></span>
+            <span class="entry-author">${avatarHTML(author, 22)}${renderDisplayBadge(author)}<a class="username-link" href="user.html?id=${author ? author.id : ""}" onclick="event.stopPropagation()">@${p.author}</a></span>
           </div>
         </div>
         ${p.cover ? `<div class="entry-thumb"><img src="${p.cover}" alt="" loading="lazy"></div>` : ""}
@@ -146,7 +162,11 @@
       entry.addEventListener("click", event => {
         if (event.target.closest("a.username-link")) return;
         const href = entry.dataset.postHref;
-        if (href) location.href = href;
+        if (href) {
+          markRead(entry.dataset.postId);
+          entry.classList.add("entry--read");
+          location.href = href;
+        }
       });
     });
   }
