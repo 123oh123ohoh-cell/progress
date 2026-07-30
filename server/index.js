@@ -464,31 +464,26 @@ function emailWrap({ emoticon = null, headlineHtml = "", bodyHtml = "", ctaText 
 
   const emoticonBlock = emoticon
     ? `<tr>
-        <td align="center" style="padding:40px 0 8px;">
-          <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center">
-            <tr>
-              <td width="108" height="108" bgcolor="#F1E7DB" align="center" valign="middle" style="border-radius:54px;font-size:0;line-height:0;overflow:hidden;">
-                <img src="${emoticon}" alt="" width="76" height="76" border="0" style="display:block;margin:16px auto;outline:none;-ms-interpolation-mode:bicubic;">
-              </td>
-            </tr>
-          </table>
+        <td align="center" style="padding:46px 0 0;">
+          <img src="${emoticon}" alt="" width="100" height="100" border="0" style="display:block;margin:0 auto;outline:none;-ms-interpolation-mode:bicubic;">
+          <p style="margin:16px 0 0;font-family:Georgia,'Times New Roman',serif;font-size:14px;color:#CDB99A;letter-spacing:0.36em;">✦ &nbsp; ✦ &nbsp; ✦</p>
         </td>
       </tr>`
-    : `<tr><td height="40" style="font-size:0;line-height:0;">&nbsp;</td></tr>`;
+    : `<tr><td height="46" style="font-size:0;line-height:0;">&nbsp;</td></tr>`;
 
   const ctaBlock = ctaText && ctaUrl
     ? `<tr>
-        <td align="center" style="padding:28px 0 44px;">
+        <td align="center" style="padding:30px 0 52px;">
           <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center">
             <tr>
-              <td bgcolor="#1C1917" style="border-radius:100px;">
-                <a href="${ctaUrl}" style="display:inline-block;padding:13px 38px;font-family:Georgia,'Times New Roman',serif;font-size:14px;font-weight:bold;color:#FAF5EE;text-decoration:none;letter-spacing:0.04em;white-space:nowrap;">${ctaText}</a>
+              <td bgcolor="#8C6E58" style="border-radius:100px;">
+                <a href="${ctaUrl}" style="display:inline-block;padding:14px 44px;font-family:Georgia,'Times New Roman',serif;font-size:13px;font-weight:bold;color:#FAF5EE;text-decoration:none;letter-spacing:0.1em;white-space:nowrap;">${ctaText}</a>
               </td>
             </tr>
           </table>
         </td>
       </tr>`
-    : `<tr><td height="44" style="font-size:0;line-height:0;">&nbsp;</td></tr>`;
+    : `<tr><td height="52" style="font-size:0;line-height:0;">&nbsp;</td></tr>`;
 
   return `<!DOCTYPE html>
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml">
@@ -498,65 +493,71 @@ function emailWrap({ emoticon = null, headlineHtml = "", bodyHtml = "", ctaText 
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Progress</title>
 </head>
-<body style="margin:0;padding:0;background-color:#F1E7DB;-webkit-font-smoothing:antialiased;">
+<body style="margin:0;padding:0;background-color:#DEC9AE;-webkit-font-smoothing:antialiased;">
 ${previewSnippet}
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#F1E7DB">
-  <tr><td align="center" style="padding:36px 20px 60px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#DEC9AE">
+  <tr><td align="center" style="padding:48px 20px 68px;">
 
-    <!-- wordmark above card -->
-    <table role="presentation" width="460" cellpadding="0" cellspacing="0" border="0" style="max-width:460px;width:100%;">
+    <!-- brand stamp -->
+    <table role="presentation" width="480" cellpadding="0" cellspacing="0" border="0" style="max-width:480px;width:100%;">
       <tr>
-        <td align="center" style="padding-bottom:14px;">
-          <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:10px;letter-spacing:0.42em;color:#A9866D;text-transform:uppercase;">Progress</p>
+        <td align="center" style="padding-bottom:24px;">
+          <p style="margin:0 0 7px;font-family:Georgia,'Times New Roman',serif;font-size:26px;font-style:italic;color:#3B2518;letter-spacing:0.01em;">progress.</p>
+          <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:10px;color:#B89A78;letter-spacing:0.32em;text-transform:uppercase;">a writing community &nbsp;✿</p>
         </td>
       </tr>
     </table>
 
-    <!-- card -->
-    <table role="presentation" width="460" cellpadding="0" cellspacing="0" border="0" bgcolor="#FAF5EE" style="max-width:460px;width:100%;border-radius:18px;border:1px solid #E4D5C4;">
+    <!-- card — no border, soft paper feel -->
+    <table role="presentation" width="480" cellpadding="0" cellspacing="0" border="0" bgcolor="#FAF5EE" style="max-width:480px;width:100%;border-radius:26px;">
 
-      <!-- emoticon -->
+      <!-- emoticon / opener -->
       ${emoticonBlock}
 
       <!-- headline -->
       <tr>
-        <td align="center" style="padding:8px 36px 22px;">
+        <td align="center" style="padding:20px 44px 10px;">
           ${headlineHtml}
         </td>
       </tr>
 
-      <!-- rule -->
+      <!-- botanical divider -->
       <tr>
-        <td style="padding:0 36px;">
-          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-            <tr><td height="1" bgcolor="#E4D5C4" style="font-size:0;line-height:0;">&nbsp;</td></tr>
-          </table>
+        <td align="center" style="padding:4px 44px 22px;">
+          <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:14px;color:#D4BBA0;letter-spacing:0.36em;">✿ &nbsp; &nbsp; ✿ &nbsp; &nbsp; ✿</p>
         </td>
       </tr>
 
-      <!-- body -->
+      <!-- body content -->
       <tr>
-        <td style="padding:22px 36px 0;">
+        <td style="padding:0 44px;">
           ${bodyHtml}
         </td>
       </tr>
 
-      <!-- CTA -->
+      <!-- closing botanical -->
+      <tr>
+        <td align="center" style="padding:26px 44px 0;">
+          <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:14px;color:#D4BBA0;letter-spacing:0.36em;">⊹ &nbsp; &nbsp; ⊹ &nbsp; &nbsp; ⊹</p>
+        </td>
+      </tr>
+
+      <!-- CTA button -->
       ${ctaBlock}
 
     </table>
 
     <!-- footer -->
-    <table role="presentation" width="460" cellpadding="0" cellspacing="0" border="0" style="max-width:460px;width:100%;margin-top:22px;">
+    <table role="presentation" width="480" cellpadding="0" cellspacing="0" border="0" style="max-width:480px;width:100%;margin-top:28px;">
       <tr>
         <td align="center" style="padding:0 20px;">
-          <p style="margin:0 0 4px;font-family:Georgia,'Times New Roman',serif;font-size:11px;color:#A9866D;line-height:1.9;">
-            sent with warmth from <a href="${site}" style="color:#8C6E58;text-decoration:none;">progress</a>
+          <p style="margin:0 0 6px;font-family:Georgia,'Times New Roman',serif;font-size:12px;font-style:italic;color:#B89A78;line-height:2.1;">
+            until next time — <a href="${site}" style="color:#8C6E58;text-decoration:none;">progress</a> &nbsp;✿
           </p>
-          <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:11px;color:#C4AFA0;line-height:1.9;">
-            <a href="${site}/profile.html" style="color:#A9866D;text-decoration:underline;">manage preferences</a>
+          <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:11px;color:#C9AE92;line-height:2.1;">
+            <a href="${site}/profile.html" style="color:#B89A78;text-decoration:underline;">email preferences</a>
             &nbsp;&middot;&nbsp;
-            <a href="${site}" style="color:#A9866D;text-decoration:none;">visit the site</a>
+            <a href="${site}" style="color:#B89A78;text-decoration:none;">progressing.online</a>
           </p>
         </td>
       </tr>
@@ -608,7 +609,7 @@ async function sendWelcomeEmail(user) {
       a quiet corner of the internet for writing,<br>reading, and showing up every day.
     </p>
 
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:28px;background-color:#F1E7DB;border-radius:12px;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:28px;background-color:#EDD9C4;border-radius:12px;">
       <tr><td style="padding:22px 24px 20px;">
         <p style="margin:0 0 10px;font-family:Georgia,'Times New Roman',serif;font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:#A9866D;">what is progress?</p>
         <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:14px;color:#4A3728;line-height:1.9;">
@@ -618,7 +619,7 @@ async function sendWelcomeEmail(user) {
     </table>
 
     <p style="margin:0 0 14px;font-family:Georgia,'Times New Roman',serif;font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:#A9866D;">your first three steps</p>
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:28px;background-color:#F1E7DB;border-radius:12px;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:28px;background-color:#EDD9C4;border-radius:12px;">
       <tr><td style="padding:20px 22px 8px;">
         ${step(1, "write something small", "open a blank page. a sentence, a thought, a question — whatever's in your head right now. there are no rules and no audience yet.")}
         ${step(2, "find some writers", "browse recent posts. follow the people whose words make you feel something. a small curated feed beats an infinite scroll, every time.")}
@@ -627,7 +628,7 @@ async function sendWelcomeEmail(user) {
     </table>
 
     <p style="margin:0 0 14px;font-family:Georgia,'Times New Roman',serif;font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:#A9866D;">what you can do here</p>
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:28px;background-color:#F1E7DB;border-radius:12px;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:28px;background-color:#EDD9C4;border-radius:12px;">
       <tr><td style="padding:20px 22px 10px;">
         ${feat("✦", "write freely", "publish posts in any format — essays, diary entries, lists, fragments, half-finished thoughts. all of it belongs.")}
         ${feat("♡", "follow writers", "curate your reading list with voices that move you. quality over quantity, always.")}
@@ -648,7 +649,7 @@ async function sendWelcomeEmail(user) {
 
   const html = emailWrap({
     emoticon: `${site}/images/emoticons/hi.png`,
-    headlineHtml: `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:26px;font-weight:bold;color:#1C1917;line-height:1.25;letter-spacing:-0.01em;">welcome, ${displayName}.</h1>`,
+    headlineHtml: `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:26px;font-weight:bold;font-style:italic;color:#3B2518;line-height:1.25;letter-spacing:-0.01em;">welcome, ${displayName}.</h1>`,
     bodyHtml,
     ctaText: "start writing",
     ctaUrl: `${site}/write.html`,
@@ -677,14 +678,14 @@ async function sendNotificationEmail(user, notification) {
   const img = name => `${site}/images/emoticons/${name}`;
 
   const quote = (text) => `
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#F1E7DB;border-radius:8px;border-left:3px solid #A9866D;margin-top:16px;margin-bottom:16px;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#EDD9C4;border-radius:8px;border-left:3px solid #B08060;margin-top:16px;margin-bottom:16px;">
       <tr><td style="padding:14px 18px;">
         <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:14px;color:#4A3728;line-height:1.7;font-style:italic;">${text}</p>
       </td></tr>
     </table>`;
 
   const warmCard = (label, text) => `
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:20px;margin-bottom:8px;background-color:#F1E7DB;border-radius:12px;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:20px;margin-bottom:8px;background-color:#EDD9C4;border-radius:12px;">
       <tr><td style="padding:20px 22px;">
         <p style="margin:0 0 10px;font-family:Georgia,'Times New Roman',serif;font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:#A9866D;">${label}</p>
         <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:14px;color:#4A3728;line-height:1.85;">${text}</p>
@@ -697,7 +698,7 @@ async function sendNotificationEmail(user, notification) {
     subject      = `@${notification.actor} liked your post`;
     preview      = "someone appreciated what you wrote.";
     emoticon     = img("romantic.png");
-    headlineHtml = `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:24px;font-weight:bold;color:#1C1917;line-height:1.3;">someone loved your writing</h1>`;
+    headlineHtml = `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:24px;font-weight:bold;font-style:italic;color:#3B2518;line-height:1.3;">someone loved your writing</h1>`;
     bodyHtml = `
       <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#4A3728;line-height:1.85;text-align:center;">
         <strong style="color:#1C1917;">@${esc(notification.actor)}</strong> liked your post.
@@ -714,7 +715,7 @@ async function sendNotificationEmail(user, notification) {
     subject      = `@${notification.actor} replied to your post`;
     preview      = "someone joined your conversation.";
     emoticon     = img("two.png");
-    headlineHtml = `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:24px;font-weight:bold;color:#1C1917;line-height:1.3;">a reply came in</h1>`;
+    headlineHtml = `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:24px;font-weight:bold;font-style:italic;color:#3B2518;line-height:1.3;">a reply came in</h1>`;
     const snippet = notification.body
       ? esc(String(notification.body).replace(/<[^>]+>/g,"").slice(0, 240)) + (notification.body.length > 240 ? "&hellip;" : "")
       : "";
@@ -735,14 +736,14 @@ async function sendNotificationEmail(user, notification) {
     subject      = `@${notification.actor} is now following you`;
     preview      = "your writing is finding its people.";
     emoticon     = img("wonder.png");
-    headlineHtml = `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:24px;font-weight:bold;color:#1C1917;line-height:1.3;">you have a new follower</h1>`;
+    headlineHtml = `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:24px;font-weight:bold;font-style:italic;color:#3B2518;line-height:1.3;">you have a new follower</h1>`;
     bodyHtml = `
       <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#4A3728;line-height:1.85;text-align:center;">
         <strong style="color:#1C1917;">@${esc(notification.actor)}</strong> just started following you.<br>
         <span style="color:#9C8B7C;font-size:13px;">they'll see everything you write from here on.</span>
       </p>
       ${warmCard("your writing community", "every follower on progress is a real reader — someone who sought out your profile and chose to stay. your circle grows one person at a time, through the writing itself. that's a beautiful thing.")}
-      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:16px;margin-bottom:6px;background-color:#F1E7DB;border-radius:12px;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:16px;margin-bottom:6px;background-color:#EDD9C4;border-radius:12px;">
         <tr><td style="padding:18px 22px;">
           <p style="margin:0 0 8px;font-family:Georgia,'Times New Roman',serif;font-size:13px;font-weight:bold;color:#1C1917;">what to do next</p>
           <p style="margin:0 0 5px;font-family:Georgia,'Times New Roman',serif;font-size:13px;color:#4A3728;line-height:1.7;">✦ &nbsp;check out <a href="${site}/user.html?id=${esc(notification.actor)}" style="color:#8C6E58;text-decoration:underline;">@${esc(notification.actor)}'s profile</a> — you might find a new favorite writer</p>
@@ -757,7 +758,7 @@ async function sendNotificationEmail(user, notification) {
     subject      = `@${notification.actor} mentioned you`;
     preview      = "you came up in conversation.";
     emoticon     = img("kiss.png");
-    headlineHtml = `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:24px;font-weight:bold;color:#1C1917;line-height:1.3;">you were mentioned</h1>`;
+    headlineHtml = `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:24px;font-weight:bold;font-style:italic;color:#3B2518;line-height:1.3;">you were mentioned</h1>`;
     bodyHtml = `
       <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#4A3728;line-height:1.85;text-align:center;">
         <strong style="color:#1C1917;">@${esc(notification.actor)}</strong> brought you into the conversation<br>
@@ -783,14 +784,14 @@ async function sendNotificationEmail(user, notification) {
     subject      = `${n}-day streak — keep it going`;
     preview      = "you're on a roll. don't stop now.";
     emoticon     = img("pancake.png");
-    headlineHtml = `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:24px;font-weight:bold;color:#1C1917;line-height:1.3;">${n} days in a row</h1>`;
+    headlineHtml = `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:24px;font-weight:bold;font-style:italic;color:#3B2518;line-height:1.3;">${n} days in a row</h1>`;
     bodyHtml = `
       <p style="margin:0 0 22px;font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#4A3728;line-height:1.85;text-align:center;">
         you've written ${n} days in a row.<br>
         <span style="color:#9C8B7C;font-size:13px;">${milestoneMsg}</span>
       </p>
 
-      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:24px;background-color:#1C1917;border-radius:14px;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:24px;background-color:#3B2518;border-radius:14px;">
         <tr>
           <td align="center" style="padding:28px 20px 24px;">
             <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:68px;font-weight:bold;color:#FAF5EE;line-height:1;">${n}</p>
@@ -801,7 +802,7 @@ async function sendNotificationEmail(user, notification) {
 
       ${warmCard("keeping the streak alive", "the secret isn't discipline — it's lowering the bar. on the hard days, write one sentence. write a grocery list in the notes field. write 'today was hard.' that counts. showing up in any form is the whole game.")}
 
-      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:16px;margin-bottom:6px;background-color:#F1E7DB;border-radius:12px;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:16px;margin-bottom:6px;background-color:#EDD9C4;border-radius:12px;">
         <tr><td style="padding:18px 22px;">
           <p style="margin:0 0 10px;font-family:Georgia,'Times New Roman',serif;font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:#A9866D;">tips for the long run</p>
           <p style="margin:0 0 6px;font-family:Georgia,'Times New Roman',serif;font-size:13px;color:#4A3728;line-height:1.7;">✦ &nbsp;write at the same time each day — morning coffee works well</p>
@@ -861,11 +862,11 @@ async function sendWeeklyDigest() {
       const excerpt = p.excerpt ? esc(String(p.excerpt).replace(/<[^>]+>/g,"").slice(0, 140)) : "";
       const isFirst = i === 0;
       return `
-      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:10px;background-color:${isFirst ? "#1C1917" : "#F1E7DB"};border-radius:10px;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:10px;background-color:${isFirst ? "#3B2518" : "#EDD9C4"};border-radius:10px;">
         <tr>
           <td style="padding:18px 20px;">
             ${isFirst ? `<p style="margin:0 0 6px;font-family:Georgia,'Times New Roman',serif;font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:#A9866D;">top pick this week</p>` : ""}
-            <a href="${site}/post.html?id=${p._id}" style="font-family:Georgia,'Times New Roman',serif;font-size:${isFirst ? "16" : "15"}px;font-weight:bold;color:${isFirst ? "#FAF5EE" : "#1C1917"};text-decoration:none;line-height:1.4;display:block;margin-bottom:6px;">${esc(p.title || "Untitled")}</a>
+            <a href="${site}/post.html?id=${p._id}" style="font-family:Georgia,'Times New Roman',serif;font-size:${isFirst ? "16" : "15"}px;font-weight:bold;color:${isFirst ? "#FAF5EE" : "#3B2518"};text-decoration:none;line-height:1.4;display:block;margin-bottom:6px;">${esc(p.title || "Untitled")}</a>
             <p style="margin:0 0 ${excerpt ? "8px" : "0"};font-family:Georgia,'Times New Roman',serif;font-size:11px;color:${isFirst ? "#8C6E58" : "#A9866D"};letter-spacing:0.05em;">by @${esc(p.author)} &nbsp;&#9825; ${p.likes || 0}</p>
             ${excerpt ? `<p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:13px;color:${isFirst ? "#A9866D" : "#4A3728"};line-height:1.7;font-style:italic;">${excerpt}&hellip;</p>` : ""}
           </td>
@@ -888,7 +889,7 @@ async function sendWeeklyDigest() {
       <p style="margin:0 0 12px;font-family:Georgia,'Times New Roman',serif;font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:#A9866D;">from your following list</p>
       ${postCards}
 
-      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:24px;margin-bottom:10px;background-color:#F1E7DB;border-radius:12px;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:24px;margin-bottom:10px;background-color:#EDD9C4;border-radius:12px;">
         <tr><td style="padding:20px 22px;">
           <p style="margin:0 0 10px;font-family:Georgia,'Times New Roman',serif;font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:#A9866D;">writing tip of the week</p>
           <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:14px;color:#4A3728;line-height:1.9;font-style:italic;">&ldquo;${weekTip}&rdquo;</p>
@@ -909,7 +910,7 @@ async function sendWeeklyDigest() {
 
     const html = emailWrap({
       emoticon: `${site}/images/emoticons/starbucks.png`,
-      headlineHtml: `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:24px;font-weight:bold;color:#1C1917;line-height:1.3;">your week in writing</h1>`,
+      headlineHtml: `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:24px;font-weight:bold;font-style:italic;color:#3B2518;line-height:1.3;">your week in writing</h1>`,
       bodyHtml,
       ctaText: "read more on progress",
       ctaUrl: site,
@@ -2508,7 +2509,7 @@ app.post("/api/admin/send-email", requireAuth, requireRole("admin"), asyncHandle
   const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
   const makeHtml = (text) => emailWrap({
     emoticon: `${site}/images/emoticons/penguin.png`,
-    headlineHtml: `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:22px;font-weight:bold;color:#1C1917;line-height:1.35;">${esc(subject)}</h1>`,
+    headlineHtml: `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:22px;font-weight:bold;font-style:italic;color:#3B2518;line-height:1.35;">${esc(subject)}</h1>`,
     bodyHtml: `<p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#4A3728;line-height:1.85;white-space:pre-wrap;">${esc(text)}</p>`,
     ctaText: "visit progress",
     ctaUrl: site,
