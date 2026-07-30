@@ -1550,8 +1550,12 @@ app.get("/api/posts", asyncHandler(async (req, res) => {
   // balloon a post's size (embedded base64 images from the editor), and the
   // feed/profile list views never render it, only title/excerpt/cover. This
   // is what was causing the earlier "posts stuck loading for 2 minutes" bug.
-  const docs = await db.collection("posts").find(filter, { projection: { content: 0 } }).toArray();
-  const posts = docs.map(normalizePost).sort((a, b) => new Date(b.createdAt || b.date).getTime() - new Date(a.createdAt || a.date).getTime());
+  const docs = await db.collection("posts").find(filter, { projection: { content: 0, likedBy: 0 } }).toArray();
+  const posts = docs.map(doc => {
+    const p = normalizePost(doc);
+    if (p.cover && p.cover.startsWith("data:")) p.cover = null;
+    return p;
+  }).sort((a, b) => new Date(b.createdAt || b.date).getTime() - new Date(a.createdAt || a.date).getTime());
   res.json(posts);
 }));
 
@@ -2064,6 +2068,13 @@ app.get("/api/online-users", (req, res) => {
 app.get("/api/current-user", (req, res) => {
   res.status(200).json({});
 });
+
+app.get("/api/me", requireAuth, asyncHandler(async (req, res) => {
+  const user = await db.collection("users").findOne({ username: req.user.username }, { projection: { password: 0 } });
+  if (!user) return res.status(404).json({ error: "User not found" });
+  const pub = publicUser(normalizeUser(user));
+  res.json({ ...pub, email: user.email || null, emailNotifications: typeof user.emailNotifications !== "undefined" ? user.emailNotifications : true });
+}));
 
 app.use((req, res) => {
   res.status(404).json({ error: "Not found" });

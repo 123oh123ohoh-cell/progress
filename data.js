@@ -174,7 +174,7 @@ async function apiFetch(path, options = {}, _retry = false) {
       url = API_BASE + "/api/" + path.replace(/^\/+/, "");
     }
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 3500);
+    const timeout = setTimeout(() => controller.abort(), 25000);
     const token = getAuthToken();
     const headers = { ...(options.headers || {}) };
     if (token) headers.Authorization = `Bearer ${token}`;
