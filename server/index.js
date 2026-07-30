@@ -579,27 +579,70 @@ async function sendWelcomeEmail(user) {
   const step = (num, title, desc) => `
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:14px;">
       <tr>
-        <td width="32" valign="top" style="padding-top:1px;">
-          <p style="margin:0;width:24px;height:24px;line-height:24px;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:12px;font-weight:bold;color:#FAF5EE;background-color:#1C1917;border-radius:50%;display:inline-block;">${num}</p>
+        <td width="34" valign="top" style="padding-top:2px;">
+          <table cellpadding="0" cellspacing="0" border="0"><tr><td align="center" valign="middle" width="26" height="26" style="background-color:#1C1917;border-radius:50%;font-family:Georgia,'Times New Roman',serif;font-size:11px;font-weight:bold;color:#FAF5EE;line-height:26px;text-align:center;">${num}</td></tr></table>
         </td>
-        <td style="padding-left:10px;">
-          <p style="margin:0 0 2px;font-family:Georgia,'Times New Roman',serif;font-size:14px;font-weight:bold;color:#1C1917;line-height:1.35;">${title}</p>
+        <td style="padding-left:12px;">
+          <p style="margin:0 0 3px;font-family:Georgia,'Times New Roman',serif;font-size:14px;font-weight:bold;color:#1C1917;line-height:1.3;">${title}</p>
           <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:13px;color:#8C6E58;line-height:1.65;">${desc}</p>
         </td>
       </tr>
     </table>`;
 
+  const feat = (mark, title, desc) => `
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:12px;">
+      <tr>
+        <td width="22" valign="top" style="font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#8C6E58;padding-top:1px;">${mark}</td>
+        <td style="padding-left:10px;">
+          <p style="margin:0 0 2px;font-family:Georgia,'Times New Roman',serif;font-size:13px;font-weight:bold;color:#1C1917;">${title}</p>
+          <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:12px;color:#9C8B7C;line-height:1.6;">${desc}</p>
+        </td>
+      </tr>
+    </table>`;
+
   const bodyHtml = `
-    <p style="margin:0 0 24px;font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#4A3728;line-height:1.85;text-align:center;">
-      you're officially in the circle.<br>
-      <span style="color:#9C8B7C;font-size:13px;">a quiet corner of the internet for writing,<br>reading, and showing up every day.</span>
+    <p style="margin:0 0 8px;font-family:Georgia,'Times New Roman',serif;font-size:16px;color:#4A3728;line-height:1.85;text-align:center;">
+      you're officially in the circle, ${displayName}.
     </p>
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#F1E7DB;border-radius:10px;">
-      <tr><td style="padding:20px 22px;">
-        <p style="margin:0 0 14px;font-family:Georgia,'Times New Roman',serif;font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:#A9866D;">where to begin</p>
-        ${step(1, "Write something", "Open a blank page. No audience, no pressure — just you.")}
-        ${step(2, "Follow some writers", "Find people whose words you love and follow along.")}
-        ${step(3, "Build a streak", "Show up daily. Small habits grow into beautiful things.")}
+    <p style="margin:0 0 30px;font-family:Georgia,'Times New Roman',serif;font-size:13px;color:#9C8B7C;line-height:1.9;text-align:center;">
+      a quiet corner of the internet for writing,<br>reading, and showing up every day.
+    </p>
+
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:28px;background-color:#F1E7DB;border-radius:12px;">
+      <tr><td style="padding:22px 24px 20px;">
+        <p style="margin:0 0 10px;font-family:Georgia,'Times New Roman',serif;font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:#A9866D;">what is progress?</p>
+        <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:14px;color:#4A3728;line-height:1.9;">
+          progress is a place to write, share, and build a daily habit. it's not about performance or follower counts — it's about the quiet act of putting words down, day after day. we built it for the writers who show up even when no one's watching.
+        </p>
+      </td></tr>
+    </table>
+
+    <p style="margin:0 0 14px;font-family:Georgia,'Times New Roman',serif;font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:#A9866D;">your first three steps</p>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:28px;background-color:#F1E7DB;border-radius:12px;">
+      <tr><td style="padding:20px 22px 8px;">
+        ${step(1, "write something small", "open a blank page. a sentence, a thought, a question — whatever's in your head right now. there are no rules and no audience yet.")}
+        ${step(2, "find some writers", "browse recent posts. follow the people whose words make you feel something. a small curated feed beats an infinite scroll, every time.")}
+        ${step(3, "build your streak", "come back tomorrow. then the day after. daily writing changes you slowly, then suddenly. trust the ritual.")}
+      </td></tr>
+    </table>
+
+    <p style="margin:0 0 14px;font-family:Georgia,'Times New Roman',serif;font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:#A9866D;">what you can do here</p>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:28px;background-color:#F1E7DB;border-radius:12px;">
+      <tr><td style="padding:20px 22px 10px;">
+        ${feat("✦", "write freely", "publish posts in any format — essays, diary entries, lists, fragments, half-finished thoughts. all of it belongs.")}
+        ${feat("♡", "follow writers", "curate your reading list with voices that move you. quality over quantity, always.")}
+        ${feat("◎", "keep a streak", "every day you write counts. missing a day resets your streak — which is exactly the point.")}
+        ${feat("✉", "stay connected", "gentle email nudges when someone likes your work, replies, or follows you.")}
+      </td></tr>
+    </table>
+
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:6px;border-top:1px solid #E4D5C4;">
+      <tr><td style="padding:24px 0 10px;">
+        <p style="margin:0 0 12px;font-family:Georgia,'Times New Roman',serif;font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:#A9866D;">a note from us</p>
+        <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:14px;color:#4A3728;line-height:1.9;font-style:italic;">
+          &ldquo;we made progress because we wanted a place where writing felt like making coffee in the morning — ordinary, ritual, entirely yours. not everything you write needs to be good. it just needs to exist. so welcome. pull up a chair.&rdquo;
+        </p>
+        <p style="margin:14px 0 0;font-family:Georgia,'Times New Roman',serif;font-size:12px;color:#9C8B7C;">— the progress team</p>
       </td></tr>
     </table>`;
 
@@ -632,11 +675,19 @@ async function sendNotificationEmail(user, notification) {
   const site = process.env.RENDER_EXTERNAL_URL || "https://progressing.online";
   const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
   const img = name => `${site}/images/emoticons/${name}`;
-  // Quoted card helper
+
   const quote = (text) => `
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#F1E7DB;border-radius:8px;border-left:3px solid #A9866D;margin-top:16px;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#F1E7DB;border-radius:8px;border-left:3px solid #A9866D;margin-top:16px;margin-bottom:16px;">
       <tr><td style="padding:14px 18px;">
         <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:14px;color:#4A3728;line-height:1.7;font-style:italic;">${text}</p>
+      </td></tr>
+    </table>`;
+
+  const warmCard = (label, text) => `
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:20px;margin-bottom:8px;background-color:#F1E7DB;border-radius:12px;">
+      <tr><td style="padding:20px 22px;">
+        <p style="margin:0 0 10px;font-family:Georgia,'Times New Roman',serif;font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:#A9866D;">${label}</p>
+        <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:14px;color:#4A3728;line-height:1.85;">${text}</p>
       </td></tr>
     </table>`;
 
@@ -648,10 +699,14 @@ async function sendNotificationEmail(user, notification) {
     emoticon     = img("romantic.png");
     headlineHtml = `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:24px;font-weight:bold;color:#1C1917;line-height:1.3;">someone loved your writing</h1>`;
     bodyHtml = `
-      <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#4A3728;line-height:1.8;text-align:center;">
-        <strong>@${esc(notification.actor)}</strong> liked your post.
+      <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#4A3728;line-height:1.85;text-align:center;">
+        <strong style="color:#1C1917;">@${esc(notification.actor)}</strong> liked your post.
       </p>
-      ${quote(`&ldquo;${esc(notification.postTitle || "your post")}&rdquo;`)}`;
+      ${quote(`&ldquo;${esc(notification.postTitle || "your post")}&rdquo;`)}
+      ${warmCard("what this means", "a like on progress isn't a vanity metric — it's a signal from a real person that your words reached them. someone stopped, read what you wrote, and felt something. that's not nothing. that's the whole point.")}
+      <p style="margin:20px 0 6px;font-family:Georgia,'Times New Roman',serif;font-size:13px;color:#9C8B7C;line-height:1.8;text-align:center;">
+        keep writing. readers are finding you.
+      </p>`;
     ctaText = "read it again";
     ctaUrl  = `${site}/post.html?id=${notification.postId}`;
 
@@ -661,13 +716,18 @@ async function sendNotificationEmail(user, notification) {
     emoticon     = img("two.png");
     headlineHtml = `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:24px;font-weight:bold;color:#1C1917;line-height:1.3;">a reply came in</h1>`;
     const snippet = notification.body
-      ? esc(String(notification.body).slice(0, 200)) + (notification.body.length > 200 ? "&hellip;" : "")
+      ? esc(String(notification.body).replace(/<[^>]+>/g,"").slice(0, 240)) + (notification.body.length > 240 ? "&hellip;" : "")
       : "";
     bodyHtml = `
-      <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#4A3728;line-height:1.8;text-align:center;">
-        <strong>@${esc(notification.actor)}</strong> replied to <em>${esc(notification.postTitle || "your post")}</em>.
+      <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#4A3728;line-height:1.85;text-align:center;">
+        <strong style="color:#1C1917;">@${esc(notification.actor)}</strong> replied to your post<br>
+        <em style="color:#8C6E58;">${esc(notification.postTitle || "your post")}</em>.
       </p>
-      ${snippet ? quote(`&ldquo;${snippet}&rdquo;`) : ""}`;
+      ${snippet ? quote(`&ldquo;${snippet}&rdquo;`) : ""}
+      ${warmCard("the conversation", "the best writing on progress isn't monologue — it's dialogue. someone read your words carefully enough to respond. that's rare. write back when you're ready, or just let it sit. either way, your post started something.")}
+      <p style="margin:20px 0 6px;font-family:Georgia,'Times New Roman',serif;font-size:13px;color:#9C8B7C;line-height:1.8;text-align:center;">
+        conversations on progress can go anywhere. join yours.
+      </p>`;
     ctaText = "join the conversation";
     ctaUrl  = `${site}/post.html?id=${notification.postId}`;
 
@@ -677,12 +737,21 @@ async function sendNotificationEmail(user, notification) {
     emoticon     = img("wonder.png");
     headlineHtml = `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:24px;font-weight:bold;color:#1C1917;line-height:1.3;">you have a new follower</h1>`;
     bodyHtml = `
-      <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#4A3728;line-height:1.8;text-align:center;">
-        <strong>@${esc(notification.actor)}</strong> just started following you.<br>
-        <span style="color:#9C8B7C;">your writing is finding its people.</span>
-      </p>`;
+      <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#4A3728;line-height:1.85;text-align:center;">
+        <strong style="color:#1C1917;">@${esc(notification.actor)}</strong> just started following you.<br>
+        <span style="color:#9C8B7C;font-size:13px;">they'll see everything you write from here on.</span>
+      </p>
+      ${warmCard("your writing community", "every follower on progress is a real reader — someone who sought out your profile and chose to stay. your circle grows one person at a time, through the writing itself. that's a beautiful thing.")}
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:16px;margin-bottom:6px;background-color:#F1E7DB;border-radius:12px;">
+        <tr><td style="padding:18px 22px;">
+          <p style="margin:0 0 8px;font-family:Georgia,'Times New Roman',serif;font-size:13px;font-weight:bold;color:#1C1917;">what to do next</p>
+          <p style="margin:0 0 5px;font-family:Georgia,'Times New Roman',serif;font-size:13px;color:#4A3728;line-height:1.7;">✦ &nbsp;check out <a href="${site}/user.html?id=${esc(notification.actor)}" style="color:#8C6E58;text-decoration:underline;">@${esc(notification.actor)}'s profile</a> — you might find a new favorite writer</p>
+          <p style="margin:0 0 5px;font-family:Georgia,'Times New Roman',serif;font-size:13px;color:#4A3728;line-height:1.7;">✦ &nbsp;write something today — they'll see it in their feed</p>
+          <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:13px;color:#4A3728;line-height:1.7;">✦ &nbsp;follow back if their writing resonates with you</p>
+        </td></tr>
+      </table>`;
     ctaText = "view their profile";
-    ctaUrl  = `${site}/user.html?id=${notification.actor}`;
+    ctaUrl  = `${site}/user.html?id=${esc(notification.actor)}`;
 
   } else if (notification.type === "mention") {
     subject      = `@${notification.actor} mentioned you`;
@@ -690,33 +759,58 @@ async function sendNotificationEmail(user, notification) {
     emoticon     = img("kiss.png");
     headlineHtml = `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:24px;font-weight:bold;color:#1C1917;line-height:1.3;">you were mentioned</h1>`;
     bodyHtml = `
-      <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#4A3728;line-height:1.8;text-align:center;">
-        <strong>@${esc(notification.actor)}</strong> mentioned you in<br>
-        <em>${esc(notification.postTitle || "a post")}</em>.
+      <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#4A3728;line-height:1.85;text-align:center;">
+        <strong style="color:#1C1917;">@${esc(notification.actor)}</strong> brought you into the conversation<br>
+        in <em style="color:#8C6E58;">${esc(notification.postTitle || "a post")}</em>.
+      </p>
+      ${warmCard("you're part of it", "being mentioned means someone thought of your voice while they were writing. they wanted to bring you in. it's one of the nicest things that can happen on a writing platform. go see what they said.")}
+      <p style="margin:20px 0 6px;font-family:Georgia,'Times New Roman',serif;font-size:13px;color:#9C8B7C;line-height:1.8;text-align:center;">
+        your words and presence matter here.
       </p>`;
     ctaText = "see the post";
     ctaUrl  = `${site}/post.html?id=${notification.postId}`;
 
   } else if (notification.type === "streak") {
-    subject      = `${notification.streak}-day streak — keep it going`;
+    const n = notification.streak || 0;
+    let milestoneMsg = "every single day counts. this is how it starts.";
+    if (n >= 365) milestoneMsg = "one full year of daily writing. that's not a habit — that's an identity. you are a writer.";
+    else if (n >= 100) milestoneMsg = "a hundred days. you've crossed the line where this becomes who you are.";
+    else if (n >= 60) milestoneMsg = "two months of showing up every day. you've built something real here.";
+    else if (n >= 30) milestoneMsg = "thirty days. a full month. the research says habits solidify around here.";
+    else if (n >= 14) milestoneMsg = "two weeks straight. you're past the hardest part — the beginning.";
+    else if (n >= 7) milestoneMsg = "one full week. you've proven to yourself that you can do this.";
+
+    subject      = `${n}-day streak — keep it going`;
     preview      = "you're on a roll. don't stop now.";
     emoticon     = img("pancake.png");
-    headlineHtml = `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:24px;font-weight:bold;color:#1C1917;line-height:1.3;">${notification.streak} days in a row</h1>`;
+    headlineHtml = `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:24px;font-weight:bold;color:#1C1917;line-height:1.3;">${n} days in a row</h1>`;
     bodyHtml = `
-      <p style="margin:0 0 20px;font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#4A3728;line-height:1.8;text-align:center;">
-        you've shown up ${notification.streak} days in a row.<br>
-        <span style="color:#9C8B7C;">that's not nothing. keep going.</span>
+      <p style="margin:0 0 22px;font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#4A3728;line-height:1.85;text-align:center;">
+        you've written ${n} days in a row.<br>
+        <span style="color:#9C8B7C;font-size:13px;">${milestoneMsg}</span>
       </p>
-      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#F1E7DB;border-radius:10px;">
+
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:24px;background-color:#1C1917;border-radius:14px;">
         <tr>
-          <td align="center" style="padding:20px;">
-            <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:48px;font-weight:bold;color:#1C1917;line-height:1;">${notification.streak}</p>
-            <p style="margin:4px 0 0;font-family:Georgia,'Times New Roman',serif;font-size:10px;color:#A9866D;text-transform:uppercase;letter-spacing:0.18em;">day streak</p>
+          <td align="center" style="padding:28px 20px 24px;">
+            <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:68px;font-weight:bold;color:#FAF5EE;line-height:1;">${n}</p>
+            <p style="margin:6px 0 0;font-family:Georgia,'Times New Roman',serif;font-size:10px;color:#A9866D;text-transform:uppercase;letter-spacing:0.22em;">day streak</p>
           </td>
         </tr>
+      </table>
+
+      ${warmCard("keeping the streak alive", "the secret isn't discipline — it's lowering the bar. on the hard days, write one sentence. write a grocery list in the notes field. write 'today was hard.' that counts. showing up in any form is the whole game.")}
+
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:16px;margin-bottom:6px;background-color:#F1E7DB;border-radius:12px;">
+        <tr><td style="padding:18px 22px;">
+          <p style="margin:0 0 10px;font-family:Georgia,'Times New Roman',serif;font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:#A9866D;">tips for the long run</p>
+          <p style="margin:0 0 6px;font-family:Georgia,'Times New Roman',serif;font-size:13px;color:#4A3728;line-height:1.7;">✦ &nbsp;write at the same time each day — morning coffee works well</p>
+          <p style="margin:0 0 6px;font-family:Georgia,'Times New Roman',serif;font-size:13px;color:#4A3728;line-height:1.7;">✦ &nbsp;keep a running draft — even unfinished posts count toward your streak</p>
+          <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:13px;color:#4A3728;line-height:1.7;">✦ &nbsp;when you miss a day, start again quietly — no drama, no guilt</p>
+        </td></tr>
       </table>`;
     ctaText = "keep writing";
-    ctaUrl  = site;
+    ctaUrl  = `${site}/write.html`;
 
   } else {
     return;
@@ -738,6 +832,18 @@ async function sendWeeklyDigest() {
   const site = process.env.RENDER_EXTERNAL_URL || "https://progressing.online";
   const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
   const since = new Date(Date.now() - 7 * 24 * 3600 * 1000);
+
+  const writingTips = [
+    "write the first draft like no one will ever read it. edit it like everyone will.",
+    "the blank page isn't your enemy. your standards are. lower them first.",
+    "the best writing comes from asking 'what do I actually think?' and then answering honestly.",
+    "read your drafts out loud. your ear catches what your eye misses every time.",
+    "constraints are creative tools. try writing about one thing for a whole week.",
+    "start in the middle. beginnings are the hardest part — you can add them later.",
+    "every writer you admire once wrote something terrible. they kept going anyway.",
+  ];
+  const weekTip = writingTips[new Date().getDay() % writingTips.length];
+
   const users = await db.collection("users").find({ email: { $exists: true, $ne: "" } }).toArray();
   let sent = 0;
   for (const user of users) {
@@ -751,32 +857,61 @@ async function sendWeeklyDigest() {
       .toArray();
     if (!posts.length) continue;
 
-    const postCards = posts.map(p => {
-      const excerpt = p.excerpt ? esc(String(p.excerpt).replace(/<[^>]+>/g,"").slice(0, 120)) : "";
+    const postCards = posts.map((p, i) => {
+      const excerpt = p.excerpt ? esc(String(p.excerpt).replace(/<[^>]+>/g,"").slice(0, 140)) : "";
+      const isFirst = i === 0;
       return `
-      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:10px;background-color:#F1E7DB;border-radius:8px;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:10px;background-color:${isFirst ? "#1C1917" : "#F1E7DB"};border-radius:10px;">
         <tr>
-          <td style="padding:14px 18px;">
-            <a href="${site}/post.html?id=${p._id}" style="font-family:Georgia,'Times New Roman',serif;font-size:15px;font-weight:bold;color:#1C1917;text-decoration:none;line-height:1.4;display:block;margin-bottom:5px;">${esc(p.title || "Untitled")}</a>
-            <p style="margin:0 0 ${excerpt ? "8px" : "0"};font-family:Georgia,'Times New Roman',serif;font-size:11px;color:#A9866D;letter-spacing:0.05em;">by @${esc(p.author)} &nbsp;&#9825; ${p.likes || 0}</p>
-            ${excerpt ? `<p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:13px;color:#4A3728;line-height:1.65;font-style:italic;">${excerpt}&hellip;</p>` : ""}
+          <td style="padding:18px 20px;">
+            ${isFirst ? `<p style="margin:0 0 6px;font-family:Georgia,'Times New Roman',serif;font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:#A9866D;">top pick this week</p>` : ""}
+            <a href="${site}/post.html?id=${p._id}" style="font-family:Georgia,'Times New Roman',serif;font-size:${isFirst ? "16" : "15"}px;font-weight:bold;color:${isFirst ? "#FAF5EE" : "#1C1917"};text-decoration:none;line-height:1.4;display:block;margin-bottom:6px;">${esc(p.title || "Untitled")}</a>
+            <p style="margin:0 0 ${excerpt ? "8px" : "0"};font-family:Georgia,'Times New Roman',serif;font-size:11px;color:${isFirst ? "#8C6E58" : "#A9866D"};letter-spacing:0.05em;">by @${esc(p.author)} &nbsp;&#9825; ${p.likes || 0}</p>
+            ${excerpt ? `<p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:13px;color:${isFirst ? "#A9866D" : "#4A3728"};line-height:1.7;font-style:italic;">${excerpt}&hellip;</p>` : ""}
           </td>
         </tr>
       </table>`;
     }).join("");
 
+    const displayName = esc(user.name || user.username || "friend");
+    const weekLabel = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric" });
+
     const bodyHtml = `
-      <p style="margin:0 0 22px;font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#4A3728;line-height:1.85;text-align:center;">
-        here's what the people you follow<br>published this week.<br>
-        <span style="color:#9C8B7C;font-size:13px;">make yourself something warm and settle in.</span>
+      <p style="margin:0 0 6px;font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#4A3728;line-height:1.85;text-align:center;">
+        hi ${displayName} — here's what came out this week<br>from the writers you follow.
       </p>
-      ${postCards}`;
+      <p style="margin:0 0 28px;font-family:Georgia,'Times New Roman',serif;font-size:12px;color:#9C8B7C;line-height:1.9;text-align:center;">
+        make yourself something warm and settle in.<br>
+        <span style="font-style:italic;">week of ${weekLabel}</span>
+      </p>
+
+      <p style="margin:0 0 12px;font-family:Georgia,'Times New Roman',serif;font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:#A9866D;">from your following list</p>
+      ${postCards}
+
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:24px;margin-bottom:10px;background-color:#F1E7DB;border-radius:12px;">
+        <tr><td style="padding:20px 22px;">
+          <p style="margin:0 0 10px;font-family:Georgia,'Times New Roman',serif;font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:#A9866D;">writing tip of the week</p>
+          <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:14px;color:#4A3728;line-height:1.9;font-style:italic;">&ldquo;${weekTip}&rdquo;</p>
+        </td></tr>
+      </table>
+
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:10px;margin-bottom:6px;border-top:1px solid #E4D5C4;">
+        <tr><td style="padding:22px 0 10px;">
+          <p style="margin:0 0 10px;font-family:Georgia,'Times New Roman',serif;font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:#A9866D;">your writing life</p>
+          <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:14px;color:#4A3728;line-height:1.9;">
+            the writers above are the ones you chose to follow — which means something about what you're drawn to. that pull is worth paying attention to. what would you write about if you weren't trying to be good at it?
+          </p>
+          <p style="margin:14px 0 0;font-family:Georgia,'Times New Roman',serif;font-size:13px;color:#8C6E58;font-style:italic;">
+            open a blank page this week. see what comes.
+          </p>
+        </td></tr>
+      </table>`;
 
     const html = emailWrap({
       emoticon: `${site}/images/emoticons/starbucks.png`,
       headlineHtml: `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:24px;font-weight:bold;color:#1C1917;line-height:1.3;">your week in writing</h1>`,
       bodyHtml,
-      ctaText: "read more",
+      ctaText: "read more on progress",
       ctaUrl: site,
       preview: `${posts.length} new post${posts.length !== 1 ? "s" : ""} from people you follow this week.`,
       site
