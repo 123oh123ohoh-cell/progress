@@ -454,21 +454,21 @@ function broadcastGlobalPresenceUpdate() {
  */
 function emailWrap({ accentEmoji = "✦", headlineHtml = "", bodyHtml = "", ctaText = "", ctaUrl = "", preview = "", site = "https://progressing.online" }) {
   const previewSnippet = preview
-    ? `<div style="display:none;font-size:1px;color:#faf5ee;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">${preview}&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;</div>`
+    ? `<span style="display:none;font-size:0;max-height:0;max-width:0;opacity:0;overflow:hidden;">${preview}&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;</span>`
     : "";
   const ctaRow = ctaText && ctaUrl
     ? `<tr>
-        <td bgcolor="#FAF5EE" align="center" style="padding:20px 40px 44px;">
-          <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+        <td bgcolor="#FAF5EE" align="center" style="padding:28px 40px 48px;">
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center">
             <tr>
-              <td bgcolor="#1C1917" style="border-radius:10px;mso-padding-alt:0 0 0 0;">
-                <a href="${ctaUrl}" style="display:inline-block;padding:14px 40px;font-family:Georgia,'Times New Roman',serif;font-size:15px;font-weight:bold;color:#FAF5EE;text-decoration:none;letter-spacing:0.07em;">${ctaText}</a>
+              <td bgcolor="#1C1917" style="border-radius:30px;">
+                <a href="${ctaUrl}" style="display:inline-block;padding:15px 44px;font-family:Georgia,'Times New Roman',serif;font-size:15px;font-weight:bold;color:#FAF5EE;text-decoration:none;letter-spacing:0.06em;white-space:nowrap;">${ctaText} →</a>
               </td>
             </tr>
           </table>
         </td>
       </tr>`
-    : `<tr><td bgcolor="#FAF5EE" height="40" style="font-size:0;line-height:0;">&nbsp;</td></tr>`;
+    : `<tr><td bgcolor="#FAF5EE" height="44" style="font-size:0;line-height:0;">&nbsp;</td></tr>`;
 
   return `<!DOCTYPE html>
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml">
@@ -478,81 +478,90 @@ function emailWrap({ accentEmoji = "✦", headlineHtml = "", bodyHtml = "", ctaT
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Progress</title>
 </head>
-<body style="margin:0;padding:0;background-color:#EDE6DE;-webkit-font-smoothing:antialiased;">
+<body style="margin:0;padding:0;background-color:#E8E0D6;-webkit-font-smoothing:antialiased;font-family:Georgia,'Times New Roman',serif;">
 ${previewSnippet}
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#EDE6DE">
-  <tr><td align="center" style="padding:36px 16px 56px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#E8E0D6">
+  <tr><td align="center" style="padding:40px 20px 60px;">
 
-    <!-- Outer card -->
-    <table role="presentation" width="540" cellpadding="0" cellspacing="0" border="0" style="max-width:540px;width:100%;border-radius:20px;overflow:hidden;">
+    <!-- card -->
+    <table role="presentation" width="520" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;width:100%;">
+
+      <!-- ── TOP CORNER MARKS ──────────────────────────────────── -->
+      <tr>
+        <td height="20" style="font-size:13px;color:#9C8B7C;padding:0 4px 4px;letter-spacing:0.1em;line-height:1;">&#10022; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &#10022;</td>
+      </tr>
 
       <!-- ── HEADER ──────────────────────────────────────────────── -->
       <tr>
-        <td bgcolor="#1C1917" align="center" style="padding:32px 40px 28px;">
-          <p style="margin:0 0 6px;font-family:Georgia,'Times New Roman',serif;font-size:10px;letter-spacing:0.45em;color:#9C8B7C;text-transform:uppercase;">a letter from</p>
-          <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:28px;font-weight:bold;letter-spacing:0.24em;color:#FAF5EE;text-transform:uppercase;line-height:1;">Progress</p>
-          <!-- ornament dots -->
-          <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin-top:16px;">
+        <td bgcolor="#1C1917" align="center" style="padding:36px 48px 30px;border-radius:4px 4px 0 0;">
+          <p style="margin:0 0 10px;font-family:Georgia,'Times New Roman',serif;font-size:9px;letter-spacing:0.55em;color:#6B5744;text-transform:uppercase;">— a letter from —</p>
+          <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:30px;font-weight:bold;letter-spacing:0.28em;color:#FAF5EE;text-transform:uppercase;line-height:1;">Progress</p>
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin-top:18px;">
             <tr>
-              <td width="28" height="1" bgcolor="#4A3728" style="font-size:0;line-height:0;">&nbsp;</td>
-              <td width="6" style="padding:0 5px;font-size:0;line-height:0;">
-                <div style="width:6px;height:6px;border-radius:50%;background-color:#D4A96A;">&nbsp;</div>
-              </td>
-              <td width="28" height="1" bgcolor="#4A3728" style="font-size:0;line-height:0;">&nbsp;</td>
+              <td width="36" height="1" bgcolor="#3D2E23" style="font-size:0;line-height:0;">&nbsp;</td>
+              <td width="8" height="8" bgcolor="#C9944A" style="font-size:0;line-height:0;border-radius:50%;margin:0 8px;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td>
+              <td width="36" height="1" bgcolor="#3D2E23" style="font-size:0;line-height:0;">&nbsp;</td>
             </tr>
           </table>
         </td>
       </tr>
 
-      <!-- ── GOLD ACCENT LINE ────────────────────────────────────── -->
+      <!-- ── AMBER STRIPE ────────────────────────────────────────── -->
       <tr>
-        <td bgcolor="#D4A96A" height="4" style="font-size:0;line-height:0;">&nbsp;</td>
+        <td bgcolor="#C9944A" height="3" style="font-size:0;line-height:0;">&nbsp;</td>
       </tr>
 
-      <!-- ── EMOJI HERO ──────────────────────────────────────────── -->
+      <!-- ── CREAM BODY CARD ────────────────────────────────────── -->
       <tr>
-        <td bgcolor="#FAF5EE" align="center" style="padding:44px 40px 12px;font-size:54px;line-height:1;font-family:Apple Color Emoji,Segoe UI Emoji,sans-serif;">
-          ${accentEmoji}
+        <td bgcolor="#FAF7F2" style="padding:48px 48px 0;border-left:1px solid #DDD5C8;border-right:1px solid #DDD5C8;">
+          <!-- Emoji -->
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+            <tr>
+              <td align="center" style="padding-bottom:22px;font-size:52px;line-height:1;font-family:Apple Color Emoji,Segoe UI Emoji,sans-serif;">
+                ${accentEmoji}
+              </td>
+            </tr>
+            <!-- Headline -->
+            <tr>
+              <td align="center" style="padding-bottom:20px;">
+                ${headlineHtml}
+              </td>
+            </tr>
+            <!-- thin rule -->
+            <tr>
+              <td height="1" bgcolor="#E8DDD4" style="font-size:0;line-height:0;">&nbsp;</td>
+            </tr>
+          </table>
         </td>
       </tr>
 
-      <!-- ── HEADLINE ────────────────────────────────────────────── -->
+      <!-- ── BODY TEXT ───────────────────────────────────────────── -->
       <tr>
-        <td bgcolor="#FAF5EE" align="center" style="padding:16px 40px 0;">
-          ${headlineHtml}
-        </td>
-      </tr>
-
-      <!-- ── BODY ───────────────────────────────────────────────── -->
-      <tr>
-        <td bgcolor="#FAF5EE" style="padding:20px 40px 0;">
+        <td bgcolor="#FAF7F2" style="padding:28px 48px 0;border-left:1px solid #DDD5C8;border-right:1px solid #DDD5C8;">
           ${bodyHtml}
         </td>
       </tr>
 
-      <!-- ── CTA / BOTTOM PADDING ───────────────────────────────── -->
-      ${ctaRow}
-
-      <!-- ── FOOTER RULE ────────────────────────────────────────── -->
-      <tr>
-        <td bgcolor="#F5EEE8" style="padding:0 36px;font-size:0;line-height:0;">
-          <div style="height:1px;background-color:#E8DDD4;">&nbsp;</div>
-        </td>
-      </tr>
+      <!-- ── CTA ─────────────────────────────────────────────────── -->
+      ${ctaRow.replace('bgcolor="#FAF5EE"', 'bgcolor="#FAF7F2" border-left="1" border-right="1" style="padding:28px 48px 52px;border-left:1px solid #DDD5C8;border-right:1px solid #DDD5C8;"').replace('style="padding:28px 40px 48px;"', '')}
 
       <!-- ── FOOTER ─────────────────────────────────────────────── -->
       <tr>
-        <td bgcolor="#F5EEE8" align="center" style="padding:24px 40px 28px;border-radius:0 0 20px 20px;">
-          <p style="margin:0 0 4px;font-family:Georgia,'Times New Roman',serif;font-size:11px;color:#9C8B7C;line-height:1.7;">
-            You're receiving this because you have an account on
-            <a href="${site}" style="color:#6B4F3A;text-decoration:none;">Progress</a>.
+        <td bgcolor="#EDE7DF" align="center" style="padding:20px 48px 24px;border:1px solid #DDD5C8;border-top:2px solid #C9944A;border-radius:0 0 4px 4px;">
+          <p style="margin:0 0 5px;font-family:Georgia,'Times New Roman',serif;font-size:11px;color:#8C7B6E;line-height:1.8;">
+            Sent with warmth from <a href="${site}" style="color:#6B4F3A;text-decoration:none;font-weight:bold;">Progress</a>
           </p>
-          <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:11px;color:#9C8B7C;line-height:1.7;">
-            <a href="${site}/settings.html" style="color:#6B4F3A;text-decoration:underline;">Manage preferences</a>
+          <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:11px;color:#A89880;line-height:1.8;">
+            <a href="${site}/profile.html" style="color:#8C7B6E;text-decoration:underline;">Manage preferences</a>
             &nbsp;&#183;&nbsp;
-            <a href="${site}" style="color:#6B4F3A;text-decoration:none;">Visit Progress</a>
+            <a href="${site}" style="color:#8C7B6E;text-decoration:none;">Visit Progress</a>
           </p>
         </td>
+      </tr>
+
+      <!-- ── BOTTOM CORNER MARKS ────────────────────────────────── -->
+      <tr>
+        <td height="20" style="font-size:13px;color:#9C8B7C;padding:4px 4px 0;letter-spacing:0.1em;line-height:1;text-align:right;">&#10022; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &#10022;</td>
       </tr>
 
     </table>
@@ -560,6 +569,68 @@ ${previewSnippet}
 </table>
 </body>
 </html>`;
+}
+
+/** Send a welcome email when a user adds their email address for the first time. */
+async function sendWelcomeEmail(user) {
+  const key = process.env.RESEND_API_KEY;
+  if (!key || !user || !user.email) return;
+  const site = process.env.RENDER_EXTERNAL_URL || "https://progressing.online";
+  const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const displayName = esc(user.name || user.username || "friend");
+
+  const step = (num, title, desc) => `
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:16px;">
+      <tr>
+        <td width="36" valign="top" style="padding-top:2px;">
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+            <tr>
+              <td width="28" height="28" bgcolor="#1C1917" align="center" style="font-family:Georgia,'Times New Roman',serif;font-size:13px;font-weight:bold;color:#FAF5EE;border-radius:50%;line-height:28px;">${num}</td>
+            </tr>
+          </table>
+        </td>
+        <td style="padding-left:14px;">
+          <p style="margin:0 0 3px;font-family:Georgia,'Times New Roman',serif;font-size:15px;font-weight:bold;color:#1C1917;line-height:1.3;">${title}</p>
+          <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:13px;color:#6B5744;line-height:1.65;">${desc}</p>
+        </td>
+      </tr>
+    </table>`;
+
+  const bodyHtml = `
+    <p style="margin:0 0 28px;font-family:Georgia,'Times New Roman',serif;font-size:16px;color:#4A3728;line-height:1.85;text-align:center;">
+      You're officially part of the circle.<br>
+      <span style="color:#8C7B6E;font-size:14px;">Progress is a quiet corner of the internet for writing, reading, and showing up every day.</span>
+    </p>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#F5EEE6;border-radius:8px;border-left:3px solid #C9944A;margin-bottom:8px;">
+      <tr><td style="padding:22px 24px;">
+        <p style="margin:0 0 18px;font-family:Georgia,'Times New Roman',serif;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#9C8B7C;">Getting started</p>
+        ${step(1, "Write something", "Open a blank page. No audience, no pressure — just you and your thoughts.")}
+        ${step(2, "Follow some writers", "Find people whose words resonate with you and follow their journey.")}
+        ${step(3, "Build a streak", "Show up daily. Small consistent habits grow into something beautiful.")}
+      </td></tr>
+    </table>`;
+
+  const html = emailWrap({
+    accentEmoji: "✦",
+    headlineHtml: `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:28px;font-weight:bold;color:#1C1917;line-height:1.2;letter-spacing:-0.01em;">Welcome, ${displayName}.</h1>`,
+    bodyHtml,
+    ctaText: "Start writing",
+    ctaUrl: `${site}/write.html`,
+    preview: `You're officially in the circle, ${user.name || user.username}. Welcome to Progress.`,
+    site
+  });
+
+  await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      from: "Progress <noreply@progressing.online>",
+      to: user.email,
+      subject: `Welcome to Progress, ${user.name || user.username} ✦`,
+      html
+    })
+  }).then(r => { if (!r.ok) r.text().then(t => console.error("[welcome] Resend error:", t)); })
+    .catch(e => console.error("[welcome] fetch error:", e));
 }
 
 async function sendNotificationEmail(user, notification) {
@@ -1255,12 +1326,24 @@ app.patch("/api/users/:id", requireAuth, asyncHandler(async (req, res) => {
   const doc = await users.findOne({ _id: req.params.id });
   if (!doc) return res.status(404).json({ error: "User not found" });
   if (req.user.id !== doc._id) return res.status(403).json({ error: "You can only edit your own profile." });
-  const { name, timezone, avatar, bio, displayBadge, spotify } = req.body;
+  const { name, timezone, avatar, bio, displayBadge, spotify, email, emailNotifications } = req.body;
   const update = {};
   if (typeof name === "string") update.name = name;
   if (typeof timezone === "string") update.timezone = timezone;
   if (typeof avatar !== "undefined") update.avatar = avatar;
   if (typeof bio === "string") update.bio = bio;
+  if (typeof email !== "undefined") {
+    if (email === null || email === "") {
+      update.email = null;
+    } else {
+      const trimmedEmail = String(email).trim().toLowerCase();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(trimmedEmail)) {
+        return res.status(400).json({ error: "That doesn't look like a valid email address." });
+      }
+      update.email = trimmedEmail;
+    }
+  }
+  if (typeof emailNotifications === "boolean") update.emailNotifications = emailNotifications;
   if (typeof spotify === "string") {
     const trimmedSpotify = spotify.trim();
     if (trimmedSpotify && (trimmedSpotify.length > 300 || !SPOTIFY_LINK_RE.test(trimmedSpotify))) {
@@ -1294,6 +1377,10 @@ app.patch("/api/users/:id", requireAuth, asyncHandler(async (req, res) => {
     cacheInvalidate("users:all", `users:${doc.username}`);
   }
   const updated = await users.findOne({ _id: req.params.id });
+  // Fire a welcome email the first time a user adds their email address
+  if (update.email && !doc.email) {
+    sendWelcomeEmail(updated).catch(e => console.error("[welcome email trigger]", e));
+  }
   res.json(publicUser(normalizeUser(updated)));
 }));
 

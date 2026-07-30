@@ -22,7 +22,7 @@
   .role-card-name { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; font-weight: 700; margin-bottom: 6px; }
   .role-card-desc { font-size: 13px; color: var(--muted); line-height: 1.5; }
   .role-owner  { border-left: 3px solid #1c1917; }
-  .role-admin  { border-left: 3px solid var(--accent); }
+  .role-admin  { border-left: 3px solid #dc2626; }
   .role-moderator { border-left: 3px solid #2563eb; }
   .role-analyst   { border-left: 3px solid var(--mocha-light); }
 
@@ -50,7 +50,7 @@
     font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
   }
   .rp-owner    { background: #1c1917; color: #f5f0eb; }
-  .rp-admin    { background: var(--accent); color: #fff; }
+  .rp-admin    { background: #dc2626; color: #fff; }
   .rp-moderator{ background: #dbeafe; color: #1d4ed8; }
   .rp-analyst  { background: var(--mocha-wash); color: var(--muted); }
 
@@ -119,7 +119,7 @@
           <div class="role-card-desc">Full platform access. Assign/revoke any role. Cannot be granted via this panel — set in server config.</div>
         </div>
         <div class="role-card role-admin">
-          <div class="role-card-name" style="color:var(--accent);">Admin</div>
+          <div class="role-card-name" style="color:#dc2626;">Admin</div>
           <div class="role-card-desc">Moderation + user management. Ban, lock, delete posts, assign badges, send announcements.</div>
         </div>
         <div class="role-card role-moderator">
@@ -348,12 +348,26 @@
 
     const pages = Math.ceil(result.total / AUDIT_PAGE_SIZE);
     const pagerEl = document.getElementById("auditLogPager");
-    pagerEl.innerHTML = pages > 1 ? Array.from({ length: pages }, (_, i) => `
-      <button class="btn ${i === auditPage ? "primary" : ""}" data-page="${i}" style="padding:6px 14px; font-size:13px;">${i+1}</button>
-    `).join("") : "";
-    pagerEl.querySelectorAll("button").forEach(btn => {
-      btn.addEventListener("click", () => loadAuditLog(Number(btn.dataset.page)));
-    });
+    if (pages <= 1) { pagerEl.innerHTML = ""; }
+    else {
+      // Smart windowed pagination — show first, last, current±2, with … gaps
+      const visible = new Set([0, pages - 1]);
+      for (let i = Math.max(0, auditPage - 2); i <= Math.min(pages - 1, auditPage + 2); i++) visible.add(i);
+      const sorted = [...visible].sort((a, b) => a - b);
+      let html = "";
+      let prev = -1;
+      for (const p of sorted) {
+        if (prev !== -1 && p > prev + 1) {
+          html += `<span style="display:inline-flex;align-items:center;padding:0 4px;color:var(--muted);font-size:16px;">…</span>`;
+        }
+        html += `<button class="btn${p === auditPage ? " primary" : ""}" data-page="${p}" style="padding:6px 12px;font-size:13px;min-width:34px;">${p + 1}</button>`;
+        prev = p;
+      }
+      pagerEl.innerHTML = html;
+      pagerEl.querySelectorAll("button[data-page]").forEach(btn => {
+        btn.addEventListener("click", () => loadAuditLog(Number(btn.dataset.page)));
+      });
+    }
   }
 
   function actionChip(action) {
