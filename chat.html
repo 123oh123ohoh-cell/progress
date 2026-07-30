@@ -46,9 +46,7 @@
   }
 
   function wsUrl(room) {
-    const httpBase = API_BASE.replace(/\/$/, "");
-    const wsBase = httpBase.replace(/^https:/, "wss:").replace(/^http:/, "ws:");
-    return `${wsBase}/ws/chat?room=${encodeURIComponent(room)}&token=${encodeURIComponent(getAuthToken())}`;
+    return `${WS_BASE}/ws/chat?room=${encodeURIComponent(room)}&token=${encodeURIComponent(getAuthToken())}`;
   }
 
   function setStatus(text, cls) {

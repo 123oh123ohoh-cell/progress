@@ -605,8 +605,14 @@ function renderNotifDropdown() {
   if (!el) return;
   const notifs = Progress.getNotifications();
 
-  const rows = notifs.length
-    ? notifs.map(n => {
+  // Filter out WebRTC call signaling messages (never meaningful as notifications)
+  const visibleNotifs = notifs.filter(n => {
+    if (n.type === "message" && n.body && n.body.startsWith("📞::")) return false;
+    return true;
+  });
+
+  const rows = visibleNotifs.length
+    ? visibleNotifs.map(n => {
         const actorUser = Progress.getUser(n.actor);
         const actorHref = actorUser ? `user.html?id=${actorUser.id}` : `user.html?username=${encodeURIComponent(n.actor)}`;
         const actorText = `<strong><span class="username-link" data-href="${actorHref}">@${escapeHTML(n.actor)}</span></strong>`;
@@ -653,6 +659,7 @@ function renderNotifDropdown() {
           </div>`;
       }).join("")
     : `<div class="notif-empty">Nothing yet. Publish something and come back.</div>`;
+
 
   el.innerHTML = `<div class="dropdown-header">Notifications</div>${rows}`;
 
@@ -1157,8 +1164,7 @@ function openPresenceSocket(activePage) {
     // location.host - the current page's own origin (Vercel) doesn't run
     // a WebSocket server at all, which is exactly why this was failing
     // with NS_ERROR_WEBSOCKET... every request.
-    const wsBase = API_BASE.replace(/^http/, "ws");
-    presenceSocket = new WebSocket(`${wsBase}/ws/chat?token=${encodeURIComponent(token)}&room=presence`);
+    presenceSocket = new WebSocket(`${WS_BASE}/ws/chat?token=${encodeURIComponent(token)}&room=presence`);
 
     // Tells the server whether THIS specific tab is currently focused, so
     // someone can show as "Idle" rather than fully "Online" while every

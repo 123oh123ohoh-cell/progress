@@ -23,13 +23,26 @@ const SIGNUP_BADGE_AWARDS = {
   ohhmytesting: ["dexterity", "817x2", "dark", "tester"]
 };
 const API_ENABLED = true;
+// HTTP API base — uses relative URLs on production so requests go through
+// Vercel's global edge CDN (vercel.json rewrites /api/* → Render).
+// WebSocket connections (WS_BASE) must still hit Render directly since
+// Vercel cannot proxy WebSocket connections.
 const API_BASE = (() => {
   if (typeof window === "undefined") return BACKEND_RENDER_URL;
   if (window.PROGRESS_API_BASE) return window.PROGRESS_API_BASE;
   if (window.location.protocol === "file:" || window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
     return BACKEND_LOCAL_URL;
   }
-  return BACKEND_RENDER_URL;
+  // On production (Vercel), use relative URLs so the CDN proxy kicks in
+  return "";
+})();
+// WebSocket always connects directly to Render (Vercel can't proxy WS)
+const WS_BASE = (() => {
+  if (typeof window === "undefined") return BACKEND_RENDER_URL.replace(/^http/, "ws");
+  if (window.location.protocol === "file:" || window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+    return BACKEND_LOCAL_URL.replace(/^http/, "ws");
+  }
+  return BACKEND_RENDER_URL.replace(/^http/, "ws");
 })();
 
 const AUTH_TOKEN_KEY = "progress:authToken";
@@ -930,7 +943,11 @@ const Progress = {
   unseenCount() {
     const user = this.getCurrentUser();
     if (!user) return 0;
-    return this.db.notifications.filter(n => (!n.recipient || n.recipient === user.username) && !n.seen).length;
+    return this.db.notifications.filter(n =>
+      (!n.recipient || n.recipient === user.username) &&
+      !n.seen &&
+      !(n.type === "message" && n.body && n.body.startsWith("📞::"))
+    ).length;
   },
 
   async markAllSeen() {

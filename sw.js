@@ -1,4 +1,4 @@
-const CACHE = 'progress-v2';
+const CACHE = 'progress-v3';
 
 const PRECACHE = [
   '/',
