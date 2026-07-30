@@ -427,11 +427,30 @@ const Progress = {
 
   async _doLoad() {
     const savedCurrent = this.getCurrentUser();
-    const [users, posts, notifications] = await Promise.all([
+
+    // ── Phase 1: load posts first so the feed renders ASAP ──────────────────
+    // Posts are the only thing the feed needs to render. Users and notifications
+    // can arrive later without blocking the initial paint.
+    const posts = await apiFetch("/api/posts");
+    this.apiOnline = posts !== null;
+    if (posts && posts.length) {
+      const apiIds = new Set(posts.map(p => p.id));
+      const localOnly = (this.db.posts || []).filter(p => !apiIds.has(p.id));
+      this.db.posts = [...localOnly, ...posts].sort((a, b) => new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date));
+    } else if (posts && !posts.length) {
+      this.db.posts = [];
+    }
+    // Fire a DOM event so pages can re-render as soon as posts arrive
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("progress:posts-loaded"));
+    }
+
+    // ── Phase 2: load users and notifications in parallel ───────────────────
+    const [users, notifications] = await Promise.all([
       apiFetch("/api/users"),
-      apiFetch("/api/posts"),
       savedCurrent ? apiFetch(`/api/notifications?recipient=${encodeURIComponent(savedCurrent.username)}`) : Promise.resolve(null)
     ]);
+
     if (users && users.length) {
       this.db.users = users.map(u => {
         const existing = this.db.users.find(x => x.username === u.username);
@@ -450,7 +469,6 @@ const Progress = {
             normalized.badges = Array.from(new Set([...(normalized.badges || []), ...existing.badges]));
           }
           if (existing.displayBadge && !normalized.displayBadge) normalized.displayBadge = existing.displayBadge;
-          // Preserve private fields not returned by GET /api/users
           if (existing.email) normalized.email = existing.email;
           if (typeof existing.emailNotifications !== "undefined") normalized.emailNotifications = existing.emailNotifications;
           if (existing.password) normalized.password = existing.password;
@@ -461,34 +479,14 @@ const Progress = {
         this.db.users.push(savedCurrent);
       }
     } else if (savedCurrent && savedCurrent.password) {
-      // The server has no users at all (or the request failed) but we have a
-      // locally logged-in account. Try to sync it to the server so it stops
-      // being local-only.
       this.syncLocalUserToApi(savedCurrent);
     }
     if (users && users.length && savedCurrent && !users.some(u => u.username === savedCurrent.username) && savedCurrent.password) {
-      // Our current user exists locally but the server doesn't know about it
-      // (e.g. signup previously failed silently). Try to sync it now.
       this.syncLocalUserToApi(savedCurrent);
-    }
-    // `posts` is `null` only when the request itself failed (e.g. the free-tier
-    // backend is asleep/booting and never responded). An empty array `[]` means
-    // the server is awake and genuinely has nothing to show.
-    this.apiOnline = posts !== null;
-    if (posts && posts.length) {
-      // Merge instead of overwrite so a post created locally (e.g. because the
-      // API call briefly failed) isn't lost if the server hasn't caught up yet.
-      const apiIds = new Set(posts.map(p => p.id));
-      const localOnly = (this.db.posts || []).filter(p => !apiIds.has(p.id));
-      this.db.posts = [...localOnly, ...posts].sort((a, b) => new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date));
-    } else if (posts && !posts.length) {
-      // Server responded and really has zero posts right now.
-      this.db.posts = [];
     }
     if (notifications && notifications.length) this.db.notifications = notifications;
 
-    // Fetch private fields (email, emailNotifications) for the current user.
-    // GET /api/users never returns these, so we need a dedicated call.
+    // Fetch private fields for current user
     if (savedCurrent) {
       try {
         const me = await apiFetch("/api/me");

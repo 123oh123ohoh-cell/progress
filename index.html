@@ -189,6 +189,11 @@
     initCategoryTabs();
     renderFeed();
     renderStreakBanner();
+    // Re-render as soon as posts arrive (before users finish loading)
+    window.addEventListener("progress:posts-loaded", () => {
+      renderFeed();
+      _lastPostCount = Progress.getPosts().length;
+    }, { once: true });
     ready.then(() => {
       initCategoryTabs();
       renderFeed();

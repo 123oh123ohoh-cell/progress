@@ -925,7 +925,7 @@ app.get("/api/users", asyncHandler(async (req, res) => {
   if (req.query.username) {
     filter.username = { $regex: `^${escapeRegex(req.query.username)}$`, $options: "i" };
   }
-  res.setHeader("Cache-Control", "public, s-maxage=30, stale-while-revalidate=60");
+  res.setHeader("Cache-Control", "public, s-maxage=300, stale-while-revalidate=600");
   const docs = await db.collection("users").find(filter, { projection: { password: 0 } }).toArray();
   res.json(docs.map(normalizeUser).map(publicUser));
 }));
@@ -2060,7 +2060,7 @@ app.get("/api/bookmarks/:postId/status", requireAuth, asyncHandler(async (req, r
 }));
 
 app.get("/api/explore", asyncHandler(async (req, res) => {
-  res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=120");
+  res.setHeader("Cache-Control", "public, s-maxage=300, stale-while-revalidate=600");
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
   const viewerUsername = req.query.viewer || null;
 
