@@ -28,6 +28,10 @@ const BADGES = {
   creator: { label: "Creator", description: "Awarded for creator contributions.", image: "images/creator.png" },
   dark: { label: "Dark", description: "Awarded for being a early supporter, one and only!", image: "images/emoticons/dark.png" },
   tester: { label: "Early Tester", description: "Helped test and shape Progress before it launched.", icon: "🧪" },
+  verified: { label: "Verified", description: "Verified account.", icon: "✅" },
+  mod: { label: "Moderator", description: "Keeps the community safe and on-track.", icon: "🛡️" },
+  og: { label: "OG", description: "One of the very first people on Progress.", icon: "⭐" },
+  writer: { label: "Writer", description: "Recognized for exceptional writing on Progress.", icon: "🖋️" },
 };
 
 const BROWSE_ALLOWED_USERNAMES = new Set(["mara", "own", "progresstesting1"]);

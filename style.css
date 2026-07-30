@@ -1156,8 +1156,8 @@ body.account-banned .mobile-fab {
 }
 /* Creator badge — larger so it's actually visible */
 .display-badge-image.creator-badge {
-  width: 40px;
-  height: 40px;
+  width: 56px;
+  height: 56px;
 }
 .display-badge-text {
   font-size: 14px;

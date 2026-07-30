@@ -229,6 +229,7 @@ setInterval(refreshOnlineStatus, 20000); // Fallback poll, now that push handles
       effectiveUser.joined = fetchedUser?.joined || localUser.joined;
       effectiveUser.timezone = fetchedUser?.timezone || localUser.timezone;
       effectiveUser.badges = fetchedUser?.badges || localUser.badges || [];
+      effectiveUser.displayBadge = fetchedUser?.displayBadge ?? localUser.displayBadge ?? null;
       effectiveUser.spotifyAccount = fetchedUser?.spotifyAccount || localUser.spotifyAccount;
     }
 

@@ -275,9 +275,8 @@ function publicUser(user) {
   let displayBadge = user.displayBadge || null;
   if (ALLOWED_CREATOR_USERNAMES.has(user.username)) {
     if (!badges.includes("creator")) badges.push("creator");
-  } else if (displayBadge === "creator") {
-    displayBadge = null;
   }
+  // displayBadge is kept as-is — admins can assign any badge including creator
   const spotifyAccount = user.spotifyAccount && user.spotifyAccount.connected
     ? { connected: true, displayName: user.spotifyAccount.spotifyName || null, profileUrl: user.spotifyAccount.spotifyProfileUrl || null }
     : { connected: false, displayName: null, profileUrl: null };
@@ -1828,9 +1827,7 @@ app.post("/api/posts/:id/like", requireAuth, asyncHandler(async (req, res) => {
 app.get("/api/notifications", asyncHandler(async (req, res) => {
   const recipient = req.query.recipient;
   if (!recipient) return res.status(400).json({ error: "recipient is required" });
-  const docs = await db.collection("notifications").find({
-    $or: [{ recipient }, { recipient: { $exists: false } }, { recipient: null }, { recipient: "" }]
-  }).toArray();
+  const docs = await db.collection("notifications").find({ recipient }).toArray();
   const notifications = docs.map(toClient).sort((a, b) => new Date(b.time) - new Date(a.time));
   res.json(notifications);
 }));
@@ -1838,10 +1835,7 @@ app.get("/api/notifications", asyncHandler(async (req, res) => {
 app.post("/api/notifications/mark-seen", asyncHandler(async (req, res) => {
   const recipient = req.body.recipient;
   if (!recipient) return res.status(400).json({ error: "recipient is required" });
-  await db.collection("notifications").updateMany(
-    { $or: [{ recipient }, { recipient: { $exists: false } }, { recipient: null }, { recipient: "" }] },
-    { $set: { seen: true } }
-  );
+  await db.collection("notifications").updateMany({ recipient }, { $set: { seen: true } });
   res.json({ ok: true });
 }));
 
@@ -2400,7 +2394,7 @@ app.post("/api/admin/announcement", requireAuth, requireRole("admin"), asyncHand
     // Send to one specific user
     const target = await db.collection("users").findOne({ username: targetUsername.toLowerCase() });
     if (!target) return res.status(404).json({ error: "User not found." });
-    await db.collection("notifications").insertOne({ _id: generateId("n"), ...notification, username: target.username });
+    await db.collection("notifications").insertOne({ _id: generateId("n"), ...notification, recipient: target.username });
     auditLog(req.user.username, "announcement_single", target.username, { title });
     return res.json({ sent: 1 });
   }
@@ -2409,7 +2403,7 @@ app.post("/api/admin/announcement", requireAuth, requireRole("admin"), asyncHand
   const users = await db.collection("users").find({ banned: { $ne: true } }, { projection: { username: 1 } }).toArray();
   if (users.length === 0) return res.json({ sent: 0 });
 
-  const docs = users.map(u => ({ _id: generateId("n"), ...notification, username: u.username }));
+  const docs = users.map(u => ({ _id: generateId("n"), ...notification, recipient: u.username }));
   // Insert in batches of 500
   for (let i = 0; i < docs.length; i += 500) {
     await db.collection("notifications").insertMany(docs.slice(i, i + 500));
@@ -2430,6 +2424,14 @@ app.post("/api/admin/maintenance", requireAuth, requireRole("owner"), asyncHandl
   _maintenanceMode = !!maintenance;
   auditLog(req.user.username, _maintenanceMode ? "maintenance_on" : "maintenance_off", "platform");
   res.json({ maintenance: _maintenanceMode });
+}));
+
+// ── Admin: delete orphan notifications (no valid recipient) ──────────────────
+app.post("/api/admin/cleanup-orphan-notifications", requireAuth, requireRole("owner"), asyncHandler(async (req, res) => {
+  const result = await db.collection("notifications").deleteMany({
+    $or: [{ recipient: { $exists: false } }, { recipient: null }, { recipient: "" }]
+  });
+  res.json({ deleted: result.deletedCount });
 }));
 
 // ── Admin: my role ────────────────────────────────────────────────────────────
