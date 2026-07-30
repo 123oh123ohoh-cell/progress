@@ -573,7 +573,7 @@ ${previewSnippet}
 async function sendWelcomeEmail(user) {
   const key = process.env.RESEND_API_KEY;
   if (!key || !user || !user.email) return;
-  const site = process.env.RENDER_EXTERNAL_URL || "https://progressing.online";
+  const site = "https://progressing.online";
   const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
   const displayName = esc(user.name || user.username || "friend");
 
@@ -673,7 +673,7 @@ async function sendWelcomeEmail(user) {
 async function sendNotificationEmail(user, notification) {
   const key = process.env.RESEND_API_KEY;
   if (!key || !user || !user.email) return;
-  const site = process.env.RENDER_EXTERNAL_URL || "https://progressing.online";
+  const site = "https://progressing.online";
   const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
   const img = name => `${site}/images/emoticons/${name}`;
 
@@ -830,7 +830,7 @@ async function sendNotificationEmail(user, notification) {
 async function sendWeeklyDigest() {
   const key = process.env.RESEND_API_KEY;
   if (!key) return { sent: 0, skipped: "no RESEND_API_KEY" };
-  const site = process.env.RENDER_EXTERNAL_URL || "https://progressing.online";
+  const site = "https://progressing.online";
   const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
   const since = new Date(Date.now() - 7 * 24 * 3600 * 1000);
 
@@ -945,7 +945,7 @@ async function createNotification(notification) {
     }
   }
   if (notification.recipient && ["like","reply","follow","mention","streak"].includes(notification.type)) {
-    const site = process.env.RENDER_EXTERNAL_URL || "https://progressing.online";
+    const site = "https://progressing.online";
     // Email notification
     db.collection("users").findOne({ username: notification.recipient })
       .then(doc => sendNotificationEmail(doc, notification)).catch(() => {});
@@ -1353,7 +1353,7 @@ app.get("/api/posts/:id/og.svg", asyncHandler(async (req, res) => {
 app.get("/og/:id", asyncHandler(async (req, res) => {
   const post = await db.collection("posts").findOne({ _id: req.params.id }, { projection: { title: 1, author: 1, excerpt: 1, date: 1, cover: 1 } });
   if (!post) return res.redirect("/404.html");
-  const SITE = process.env.RENDER_EXTERNAL_URL || "https://progressing.online";
+  const SITE = "https://progressing.online";
   const title = (post.title || "Progress").replace(/"/g, "&quot;");
   const description = (post.excerpt || "").replace(/<[^>]+>/g, "").replace(/"/g, "&quot;").slice(0, 200);
   const ogImage = post.cover || `${SITE}/api/posts/${post._id}/og.svg`;
@@ -1414,6 +1414,66 @@ app.get("/api/users/:id", asyncHandler(async (req, res) => {
   const doc = await db.collection("users").findOne({ _id: req.params.id });
   if (!doc) return res.status(404).json({ error: "User not found" });
   res.json(publicUser(normalizeUser(doc)));
+}));
+
+app.get("/api/users/:id/stats", asyncHandler(async (req, res) => {
+  // Accept either a MongoDB _id or a username
+  const users = db.collection("users");
+  const posts = db.collection("posts");
+  let userDoc = await users.findOne({ _id: req.params.id });
+  if (!userDoc) userDoc = await users.findOne({ username: req.params.id });
+  if (!userDoc) return res.status(404).json({ error: "User not found" });
+
+  const username = userDoc.username;
+  const userPosts = await posts
+    .find({ author: username })
+    .project({ _id: 1, title: 1, date: 1, likes: 1, content: 1 })
+    .toArray();
+
+  // Total words (strip HTML tags, count tokens)
+  const totalWords = userPosts.reduce((sum, p) => {
+    const text = (p.content || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    return sum + (text ? text.split(" ").filter(w => w.length > 0).length : 0);
+  }, 0);
+
+  // Total likes received
+  const totalLikes = userPosts.reduce((sum, p) => sum + (p.likes || 0), 0);
+
+  // Posts per month — last 6 months
+  const now = new Date();
+  const months = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+    return { label: d.toLocaleString("en-US", { month: "short" }), year: d.getFullYear(), month: d.getMonth(), count: 0 };
+  });
+  for (const p of userPosts) {
+    if (!p.date) continue;
+    const d = new Date(p.date);
+    const m = months.find(m => m.year === d.getFullYear() && m.month === d.getMonth());
+    if (m) m.count++;
+  }
+
+  // Longest streak (computed from unique post dates)
+  const dateSorted = [...new Set(userPosts.map(p => p.date ? p.date.slice(0, 10) : null).filter(Boolean))].sort();
+  let longestStreak = dateSorted.length > 0 ? 1 : 0, currentRun = 1;
+  for (let i = 1; i < dateSorted.length; i++) {
+    const diff = (new Date(dateSorted[i]) - new Date(dateSorted[i - 1])) / 86400000;
+    currentRun = diff === 1 ? currentRun + 1 : 1;
+    if (currentRun > longestStreak) longestStreak = currentRun;
+  }
+
+  // Top post
+  const top = [...userPosts].sort((a, b) => (b.likes || 0) - (a.likes || 0))[0] || null;
+
+  res.json({
+    totalPosts: userPosts.length,
+    totalWords,
+    totalLikes,
+    followers: (userDoc.followers || []).length,
+    following: (userDoc.following || []).length,
+    longestStreak,
+    postsPerMonth: months.map(({ label, count }) => ({ label, count })),
+    topPost: top ? { id: top._id, title: top.title, likes: top.likes || 0 } : null
+  });
 }));
 
 app.post("/api/users", signupRateLimit, asyncHandler(async (req, res) => {
@@ -2505,7 +2565,7 @@ app.post("/api/admin/send-email", requireAuth, requireRole("admin"), asyncHandle
   if (!subject || !body) return res.status(400).json({ error: "Subject and body are required." });
   const key = process.env.RESEND_API_KEY;
   if (!key) return res.status(503).json({ error: "Email not configured — RESEND_API_KEY missing." });
-  const site = process.env.RENDER_EXTERNAL_URL || "https://progressing.online";
+  const site = "https://progressing.online";
   const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
   const makeHtml = (text) => emailWrap({
     emoticon: `${site}/images/emoticons/penguin.png`,

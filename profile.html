@@ -27,7 +27,7 @@
   const params = new URLSearchParams(location.search);
   // If Spotify just redirected back here (spotify=connected / spotify=error),
   // force the settings tab open so the user lands on the section that matters.
-  let activeTab = (params.get("tab") === "settings" || params.get("spotify")) ? "settings" : "profile";
+  let activeTab = (params.get("tab") === "settings" || params.get("spotify")) ? "settings" : params.get("tab") === "stats" ? "stats" : "profile";
   let user;
   const timezoneOptions = [
     { value: "America/Los_Angeles", label: "Pacific Time - US & Canada" },
@@ -122,6 +122,7 @@
 
       <div class="tab-row">
         <button class="tab-btn ${activeTab === "profile" ? "active" : ""}" data-tab="profile">Profile</button>
+        <button class="tab-btn ${activeTab === "stats" ? "active" : ""}" data-tab="stats">Stats</button>
         <button class="tab-btn ${activeTab === "settings" ? "active" : ""}" data-tab="settings">Settings</button>
       </div>
 
@@ -198,6 +199,67 @@ refreshNowPlaying();
           <span style="font-size:12px; color:var(--muted); margin-left:8px;">by @${p.author}</span>
         </a>`).join("");
     }).catch(() => {});
+
+    } else if (activeTab === "stats") {
+      content.innerHTML = `<div style="padding-top:12px;"><p style="color:var(--muted);font-size:14px;">loading your stats…</p></div>`;
+      apiFetch(`/api/users/${user.username}/stats`).then(s => {
+        if (!s) { content.innerHTML = `<div style="padding-top:12px;"><p style="color:var(--muted);font-size:14px;">couldn't load stats.</p></div>`; return; }
+        const maxCount = Math.max(...s.postsPerMonth.map(m => m.count), 1);
+        const fmt = n => n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, "") + "k" : String(n);
+        const statCard = (num, label) => `
+          <div style="background:var(--mocha-wash);border-radius:var(--radius);padding:20px 16px;text-align:center;">
+            <span style="display:block;font-size:30px;font-weight:700;color:var(--ink);font-family:var(--font-display);line-height:1;margin-bottom:7px;">${fmt(num)}</span>
+            <span style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.12em;">${label}</span>
+          </div>`;
+        content.innerHTML = `
+          <div style="padding-top:12px;">
+
+            <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px;">
+              ${statCard(s.totalPosts, "posts published")}
+              ${statCard(s.totalWords, "words written")}
+              ${statCard(s.totalLikes, "likes received")}
+              ${statCard(s.followers, "followers")}
+            </div>
+
+            <div style="background:var(--mocha-wash);border-radius:var(--radius);padding:18px 20px;margin-bottom:16px;display:flex;align-items:stretch;gap:0;">
+              <div style="flex:1;text-align:center;">
+                <span style="display:block;font-size:26px;font-weight:700;color:var(--ink);font-family:var(--font-display);line-height:1;margin-bottom:6px;">${user.streak || 0}</span>
+                <span style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;">current streak</span>
+              </div>
+              <div style="width:1px;background:var(--border-color);margin:0 20px;"></div>
+              <div style="flex:1;text-align:center;">
+                <span style="display:block;font-size:26px;font-weight:700;color:var(--ink);font-family:var(--font-display);line-height:1;margin-bottom:6px;">${s.longestStreak}</span>
+                <span style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;">longest streak</span>
+              </div>
+            </div>
+
+            <div class="settings-section">
+              <h3>Activity — last 6 months</h3>
+              <div style="display:flex;align-items:flex-end;gap:6px;height:80px;margin-bottom:6px;">
+                ${s.postsPerMonth.map(m => {
+                  const h = maxCount > 0 ? Math.max(Math.round((m.count / maxCount) * 76), m.count > 0 ? 4 : 0) : 0;
+                  return `<div style="flex:1;background:var(--mocha-soft);border-radius:3px 3px 0 0;height:${h}px;" title="${m.count} post${m.count !== 1 ? 's' : ''}"></div>`;
+                }).join("")}
+              </div>
+              <div style="display:flex;gap:6px;">
+                ${s.postsPerMonth.map(m => `<div style="flex:1;text-align:center;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;">${m.label}</div>`).join("")}
+              </div>
+            </div>
+
+            ${s.topPost ? `
+            <div class="settings-section">
+              <h3>Best post</h3>
+              <a href="post.html?id=${s.topPost.id}" style="display:block;padding:14px 16px;background:var(--mocha-wash);border-radius:var(--radius);text-decoration:none;color:inherit;">
+                <p style="margin:0 0 5px;font-size:15px;font-weight:600;color:var(--ink);line-height:1.3;">${s.topPost.title || "Untitled"}</p>
+                <p style="margin:0;font-size:12px;color:var(--muted);">♡ ${s.topPost.likes} like${s.topPost.likes !== 1 ? "s" : ""}</p>
+              </a>
+            </div>` : ""}
+
+          </div>`;
+      }).catch(() => {
+        content.innerHTML = `<div style="padding-top:12px;"><p style="color:var(--muted);font-size:14px;">couldn't load stats.</p></div>`;
+      });
+
     } else {
       content.innerHTML = `
         <div class="settings-section">
