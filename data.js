@@ -778,7 +778,16 @@ const Progress = {
         this.persist();
         return user;
       }
-      await this.loadFromApi();
+      // Apply the server's authoritative response directly — don't call
+      // loadFromApi() here. GET /api/users has a 30-second in-memory cache;
+      // calling it right after a PATCH would return stale data and silently
+      // undo whatever the user just changed (badge, name, bio, etc.).
+      const localUser = this.db.users.find(u => u.username === (payload.username || user.username));
+      if (localUser) {
+        const preserved = { password: localUser.password, email: localUser.email };
+        Object.assign(localUser, payload, preserved);
+      }
+      this.persist();
       return this.getCurrentUser();
     }
     this.persist();
@@ -936,6 +945,12 @@ const Progress = {
     if (!notification || !notification.id) return;
     if (this.db.notifications.some(n => n.id === notification.id)) return;
     this.db.notifications.unshift(notification);
+  },
+
+  removeNotification(id) {
+    this.db.notifications = this.db.notifications.filter(n => n.id !== id);
+    this.persist();
+    apiFetch(`/api/notifications/${encodeURIComponent(id)}`, { method: "DELETE" }).catch(() => {});
   },
 
   unseenCount() {

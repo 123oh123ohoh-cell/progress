@@ -649,17 +649,20 @@ function renderNotifDropdown() {
             : n.via === "post"
               ? `${actorText} mentioned you in a post: "${renderEmoticonsText(n.postTitle || "", "notif-emoticon")}"`
               : `${actorText} mentioned you in chat: "${renderEmoticonsText(n.body, "notif-emoticon")}"`;
+        } else if (n.type === "announcement") {
+          text = `📢 <strong>${escapeHTML(n.title || "Announcement")}</strong>${n.body ? `<br><span style="font-weight:400;">${escapeHTML(n.body)}</span>` : ""}`;
         } else {
           text = `${actorText} did something`;
         }
 
         return `
-          <div class="notif-item" data-post-href="${targetHref}">
+          <div class="notif-item" data-notif-id="${n.id}" data-post-href="${targetHref}">
             <span class="dot-unread ${n.seen ? "seen" : ""}"></span>
-            <div>
+            <div style="flex:1; min-width:0;">
               <p>${text}</p>
               <time>${Progress.timeAgo(n.time)}</time>
             </div>
+            <button class="notif-dismiss" data-notif-id="${n.id}" title="Dismiss" aria-label="Dismiss notification">×</button>
           </div>`;
       }).join("")
     : `<div class="notif-empty">Nothing yet. Publish something and come back.</div>`;
@@ -673,6 +676,19 @@ function renderNotifDropdown() {
       event.stopPropagation();
       const href = link.dataset.href;
       if (href) location.href = href;
+    });
+  });
+
+  el.querySelectorAll('.notif-dismiss').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const id = btn.dataset.notifId;
+      Progress.removeNotification(id);
+      renderNotifDropdown();
+      const unseen = Progress.unseenCount();
+      const badge = document.getElementById("bellBadge");
+      if (badge) badge.classList.toggle("hidden", unseen === 0);
+      updateTitleBadge(unseen);
     });
   });
 
@@ -1196,6 +1212,23 @@ function openPresenceSocket(activePage) {
         document.dispatchEvent(new CustomEvent("presence-update", { detail: data.statuses || {} }));
       } else if (data.type === "notification") {
         handleIncomingNotification(data.notification);
+      } else if (data.type === "maintenance") {
+        if (data.on) {
+          // Show a persistent banner; non-admins will get 503s on next API calls
+          let banner = document.getElementById("maintenance-banner");
+          if (!banner) {
+            banner = document.createElement("div");
+            banner.id = "maintenance-banner";
+            banner.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:9999;background:#1c1917;color:#faf5ee;text-align:center;padding:12px 16px;font-size:14px;font-family:var(--font-mono);letter-spacing:.03em;";
+            banner.innerHTML = "🚧 Progress is going into maintenance mode. The site will be unavailable briefly.";
+            document.body.prepend(banner);
+          }
+        } else {
+          const banner = document.getElementById("maintenance-banner");
+          if (banner) banner.remove();
+          // Reload so users get the live site again
+          setTimeout(() => location.reload(), 800);
+        }
       }
     });
     window.addEventListener("beforeunload", () => {

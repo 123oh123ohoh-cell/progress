@@ -82,6 +82,7 @@
 
   // ── Main editor ───────────────────────────────────────────────────────────
   async function start() {
+    document.body.classList.add("page-write");
     initShell("write");
     const wrap = document.getElementById("editorWrap");
     Progress.loadFromApi().catch(() => {});

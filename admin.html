@@ -396,12 +396,24 @@
           <input id="badgeUsername" type="text" placeholder="@username" style="padding:8px 12px; border:1px solid var(--mocha-light); border-radius:8px; font-size:13px; background:var(--paper); color:var(--ink); width:160px;">
           <select id="badgeSelect" style="padding:8px 10px; border:1px solid var(--mocha-light); border-radius:8px; font-size:13px; background:var(--paper); color:var(--ink);">
             <option value="">Remove badge</option>
-            <option value="creator">✏️ Creator</option>
-            <option value="verified">✅ Verified</option>
-            <option value="mod">🛡️ Mod</option>
-            <option value="og">⭐ OG</option>
-            <option value="supporter">💙 Supporter</option>
-            <option value="writer">🖋️ Writer</option>
+            <optgroup label="Special">
+              <option value="creator">✏️ Creator</option>
+              <option value="verified">✅ Verified</option>
+              <option value="mod">🛡️ Mod</option>
+              <option value="og">⭐ OG</option>
+            </optgroup>
+            <optgroup label="Earned">
+              <option value="early_supporter">🛋️ Early Supporter</option>
+              <option value="dexterity">🃏 Dexterity</option>
+              <option value="dark">🌑 Dark</option>
+              <option value="tester">🧪 Early Tester</option>
+              <option value="817x2">🎮 817x2</option>
+            </optgroup>
+            <optgroup label="Community">
+              <option value="writer">🖋️ Writer</option>
+              <option value="reader">📚 Avid Reader</option>
+              <option value="supporter">🤝 Community Supporter</option>
+            </optgroup>
           </select>
           <button id="assignBadgeBtn" class="btn" style="font-size:13px; padding:8px 14px;">Apply</button>
           <span id="badgeStatus" style="font-size:13px; color:var(--muted);"></span>
@@ -735,6 +747,7 @@
           <option value="development" ${p.category === "development" ? "selected" : ""}>Development</option>
           <option value="creative"    ${p.category === "creative"    ? "selected" : ""}>Creative</option>
           <option value="random"      ${p.category === "random"      ? "selected" : ""}>Random</option>
+          <option value="spam"        ${p.category === "spam"        ? "selected" : ""}>🚫 Spam</option>
         </select>
         <button class="admin-delete-btn" data-post-id="${p.id}" title="Delete post">Delete</button>
       </div>`).join("");

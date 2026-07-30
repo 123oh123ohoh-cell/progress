@@ -981,6 +981,21 @@ app.get("/og/:id", asyncHandler(async (req, res) => {
 app.use(express.static(publicPath));
 app.use("/api", generalApiRateLimit);
 
+// ── Maintenance-mode gate ─────────────────────────────────────────────────────
+// When _maintenanceMode is on, block all API traffic except:
+//   • authentication (login/signup/forgot)
+//   • admin routes (so the admin can turn it back off)
+//   • the maintenance status check itself
+app.use("/api", (req, res, next) => {
+  if (!_maintenanceMode) return next();
+  const exempt = ["/login", "/signup", "/forgot", "/reset-password"];
+  const isExempt = exempt.includes(req.path) ||
+                   req.path.startsWith("/admin/") ||
+                   req.path === "/admin/maintenance";
+  if (isExempt) return next();
+  res.status(503).json({ error: "maintenance", message: "Progress is under maintenance. We'll be back shortly." });
+});
+
 app.get("/api/users", asyncHandler(async (req, res) => {
   res.setHeader("Cache-Control", "public, s-maxage=300, stale-while-revalidate=600");
   const filter = {};
@@ -1069,6 +1084,8 @@ app.patch("/api/users/:id", requireAuth, asyncHandler(async (req, res) => {
   }
   if (Object.keys(update).length) {
     await users.updateOne({ _id: req.params.id }, { $set: update });
+    // Bust the GET /api/users cache so the next load sees the fresh values.
+    cacheInvalidate("users:all", `users:${doc.username}`);
   }
   const updated = await users.findOne({ _id: req.params.id });
   res.json(publicUser(normalizeUser(updated)));
@@ -1839,6 +1856,11 @@ app.post("/api/notifications/mark-seen", asyncHandler(async (req, res) => {
   res.json({ ok: true });
 }));
 
+app.delete("/api/notifications/:id", requireAuth, asyncHandler(async (req, res) => {
+  await db.collection("notifications").deleteOne({ _id: req.params.id, recipient: req.user.username });
+  res.json({ ok: true });
+}));
+
 async function createChatMessage({ room, author, body, image }) {
   const targetRoom = (room || DEFAULT_CHAT_ROOM).toString().slice(0, 200);
   const trimmed = (body || "").toString().trim();
@@ -2060,6 +2082,52 @@ app.post("/api/admin/send-digest", requireAuth, asyncHandler(async (req, res) =>
   }
   const result = await sendWeeklyDigest();
   res.json(result);
+}));
+
+// ── Admin: custom email blast ─────────────────────────────────────────────────
+app.post("/api/admin/send-email", requireAuth, requireRole("admin"), asyncHandler(async (req, res) => {
+  const { subject, body, targetUsername } = req.body || {};
+  if (!subject || !body) return res.status(400).json({ error: "Subject and body are required." });
+  const key = process.env.RESEND_API_KEY;
+  if (!key) return res.status(503).json({ error: "Email not configured — RESEND_API_KEY missing." });
+  const site = process.env.RENDER_EXTERNAL_URL || "https://progressing.online";
+  const makeHtml = (text) => `<!DOCTYPE html><html><body style="font-family:sans-serif; color:#1C1917; max-width:560px; margin:0 auto; padding:24px;">
+    <h2 style="font-family:Georgia,serif; margin:0 0 16px;">A message from Progress</h2>
+    <div style="font-size:15px; line-height:1.7; white-space:pre-wrap;">${text.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</div>
+    <hr style="border:none; border-top:1px solid #e5e0db; margin:24px 0;">
+    <p style="font-size:12px; color:#9C8B7C;">You received this from <a href="${site}">Progress</a>. <a href="${site}/profile.html?tab=settings">Manage email preferences</a>.</p>
+  </body></html>`;
+
+  if (targetUsername) {
+    const userDoc = await db.collection("users").findOne({ username: targetUsername.toLowerCase() });
+    if (!userDoc || !userDoc.email) return res.status(404).json({ error: "User not found or has no email address." });
+    const r = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ from: "Progress <noreply@progressing.online>", to: userDoc.email, subject, html: makeHtml(body) })
+    });
+    if (!r.ok) { const t = await r.text(); return res.status(502).json({ error: "Resend error", detail: t }); }
+    auditLog(req.user.username, "email_sent", targetUsername, { subject });
+    return res.json({ sent: 1, to: userDoc.email });
+  } else {
+    // Send to all users with email + notifications enabled
+    const users = await db.collection("users").find({
+      email: { $exists: true, $ne: "" },
+      emailNotifications: { $ne: false }
+    }).toArray();
+    let sent = 0, failed = 0;
+    for (const u of users) {
+      if (!u.email) continue;
+      const r = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ from: "Progress <noreply@progressing.online>", to: u.email, subject, html: makeHtml(body) })
+      }).catch(() => null);
+      if (r && r.ok) sent++; else failed++;
+    }
+    auditLog(req.user.username, "email_blast", "all", { subject, sent, failed });
+    return res.json({ sent, failed });
+  }
 }));
 
 app.get("/api/admin/stats", requireAuth, asyncHandler(async (req, res) => {
@@ -2381,32 +2449,51 @@ app.post("/api/admin/announcement", requireAuth, requireRole("admin"), asyncHand
   const { title, body, targetUsername } = req.body || {};
   if (!title || !body) return res.status(400).json({ error: "title and body are required." });
 
-  const notification = {
-    type: "announcement",
-    actor: req.user.username,
-    title: title.slice(0, 200),
-    body: body.slice(0, 1000),
-    timestamp: new Date().toISOString(),
-    read: false
-  };
+  const now = new Date().toISOString();
 
   if (targetUsername) {
-    // Send to one specific user
     const target = await db.collection("users").findOne({ username: targetUsername.toLowerCase() });
     if (!target) return res.status(404).json({ error: "User not found." });
-    await db.collection("notifications").insertOne({ _id: generateId("n"), ...notification, recipient: target.username });
+    await createNotification({
+      _id: generateId("n"),
+      type: "announcement",
+      actor: req.user.username,
+      recipient: target.username,
+      title: title.slice(0, 200),
+      body: body.slice(0, 1000),
+      time: now,
+      seen: false
+    });
     auditLog(req.user.username, "announcement_single", target.username, { title });
     return res.json({ sent: 1 });
   }
 
-  // Send to all users
+  // Send to all users — bulk insert + push to any connected ones
   const users = await db.collection("users").find({ banned: { $ne: true } }, { projection: { username: 1 } }).toArray();
   if (users.length === 0) return res.json({ sent: 0 });
 
-  const docs = users.map(u => ({ _id: generateId("n"), ...notification, recipient: u.username }));
-  // Insert in batches of 500
+  const docs = users.map(u => ({
+    _id: generateId("n"),
+    type: "announcement",
+    actor: req.user.username,
+    recipient: u.username,
+    title: title.slice(0, 200),
+    body: body.slice(0, 1000),
+    time: now,
+    seen: false
+  }));
   for (let i = 0; i < docs.length; i += 500) {
     await db.collection("notifications").insertMany(docs.slice(i, i + 500));
+  }
+  // Real-time push to any currently connected users
+  for (const doc of docs) {
+    const conns = usernameConnections.get(doc.recipient);
+    if (conns) {
+      const payload = JSON.stringify({ type: "notification", notification: toClient(doc) });
+      for (const conn of conns) {
+        if (conn.readyState === conn.OPEN) conn.send(payload);
+      }
+    }
   }
   auditLog(req.user.username, "announcement_all", "all", { title, count: docs.length });
   res.json({ sent: docs.length });
@@ -2423,6 +2510,8 @@ app.post("/api/admin/maintenance", requireAuth, requireRole("owner"), asyncHandl
   const { maintenance } = req.body || {};
   _maintenanceMode = !!maintenance;
   auditLog(req.user.username, _maintenanceMode ? "maintenance_on" : "maintenance_off", "platform");
+  // Push state change to every open WebSocket so clients react in real-time
+  broadcastToRoom("presence", { type: "maintenance", on: _maintenanceMode });
   res.json({ maintenance: _maintenanceMode });
 }));
 

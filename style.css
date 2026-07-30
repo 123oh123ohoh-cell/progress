@@ -399,6 +399,15 @@ body.account-banned .mobile-fab {
   padding: 28px 16px; text-align: center;
   color: var(--muted); font-size: 13px;
 }
+.notif-dismiss {
+  background: none; border: none; cursor: pointer;
+  color: var(--muted); font-size: 18px; line-height: 1;
+  padding: 0 0 0 8px; flex-shrink: 0;
+  opacity: 0; transition: opacity .15s;
+  align-self: flex-start; margin-top: 1px;
+}
+.notif-item:hover .notif-dismiss { opacity: 1; }
+.notif-dismiss:hover { color: var(--danger); }
 
 /* ============================================================
    FEED — timeline of entries
@@ -2056,6 +2065,12 @@ label:has(#themeToggleSwitch[data-on="1"]) .theme-flank-icon.moon { opacity: 1; 
   height: calc(100dvh - var(--nav-h));
   overflow: hidden;
 }
+/* On mobile the top nav is fixed — push chat below it and shrink height
+   to also account for the bottom nav so nothing is hidden under either bar */
+body.mobile .chat-page-main {
+  margin-top: var(--nav-offset);
+  height: calc(100dvh - var(--nav-offset) - var(--mbn-h, 68px));
+}
 
 .chat-page-main .chat-wrap {
   flex: 1;
@@ -2790,11 +2805,12 @@ body.mobile .editor-category-row {
 }
 body.mobile .editor-category-row::-webkit-scrollbar { display: none; }
 
-/* ── Canvas: fills remaining height, generous bottom padding for toolbar ── */
+/* ── Canvas: fills remaining height, generous bottom padding for toolbar + bottom nav ── */
 body.mobile .editor-canvas {
   flex: 1;
   min-height: 280px;
-  padding: 18px 16px 140px; /* 140px = toolbar height + keyboard safe gap */
+  /* toolbar (~52px) + bottom nav (var(--mbn-h) ≈ 68px) + keyboard gap */
+  padding: 18px 16px calc(52px + var(--mbn-h, 68px) + 40px);
   font-size: 17px;
   line-height: 1.75;
 }
@@ -2802,22 +2818,22 @@ body.mobile .editor-canvas {
 /* ── Desktop fixed Publish/Cancel: hidden on mobile (moved to mobile-bar) ── */
 body.mobile .editor-actions { display: none !important; }
 
-/* ── Toolbar: sticks to the BOTTOM on mobile, rises with the keyboard ── */
+/* ── Toolbar: sticks to the BOTTOM on mobile, sits above the bottom nav ── */
 body.mobile .toolbar {
   position: fixed;
-  bottom: 0;
+  /* Sit directly on top of the bottom nav (var(--mbn-h) clears it) */
+  bottom: var(--mbn-h, 68px);
   left: 0;
   right: 0;
   top: auto !important;       /* override sticky top */
-  z-index: 200;
+  z-index: 201;               /* one above the bottom nav z-index:200 */
   border-radius: 0;
   border-left: none;
   border-right: none;
   border-bottom: none;
   border-top: 1px solid var(--mocha-light);
   margin: 0;
-  padding: 8px 10px;
-  padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+  padding: 8px 10px;          /* no extra bottom padding — bottom nav sits below us */
   display: flex !important;
   flex-wrap: nowrap;
   overflow-x: auto;
@@ -3453,6 +3469,9 @@ body.mobile {
   /* Fold in the device safe area (notch / Dynamic Island) so every element
      using --nav-offset automatically sits below the hardware chrome. */
   --nav-offset: calc(var(--nav-h) + env(safe-area-inset-top, 0px));
+  /* Height of the bottom nav bar (items + home-indicator padding).
+     Use this anywhere you need to clear the bottom nav. */
+  --mbn-h: calc(56px + 12px + env(safe-area-inset-bottom, 0px));
 }
 
 body.mobile .nav {

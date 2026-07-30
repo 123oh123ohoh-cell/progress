@@ -282,28 +282,26 @@
       btn.disabled = true; btn.textContent = "Sending…";
       statusEl.textContent = "";
 
-      // Use the announcement endpoint for custom emails (notification delivery)
-      // for now — a full custom email endpoint could be added later
-      const r = await apiFetch("/api/admin/announcement", {
+      const r = await apiFetch("/api/admin/send-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: subject,
-          body: body,
-          targetUsername: targetUsername || undefined
-        })
+        body: JSON.stringify({ subject, body, targetUsername: targetUsername || undefined })
       });
 
       btn.disabled = false; btn.textContent = "Send email";
       if (r && typeof r.sent === "number") {
-        statusEl.textContent = `✓ Notification sent to ${r.sent} user${r.sent !== 1 ? "s" : ""}`;
-        showToast(`Sent to ${r.sent} users.`);
+        const failNote = r.failed ? ` (${r.failed} failed)` : "";
+        statusEl.textContent = `✓ Sent to ${r.sent} user${r.sent !== 1 ? "s" : ""}${failNote}`;
+        showToast(`Email sent to ${r.sent} user${r.sent !== 1 ? "s" : ""}.`);
         document.getElementById("emailSubject").value = "";
         document.getElementById("emailBody").value = "";
         document.getElementById("emailPreview").className = "compose-preview";
+      } else if (r && r.error) {
+        statusEl.textContent = `Error: ${r.error}`;
+        showToast(r.error);
       } else {
-        statusEl.textContent = "Failed.";
-        showToast("Couldn't send.");
+        statusEl.textContent = "Failed — check server logs.";
+        showToast("Couldn't send email.");
       }
     });
   }
