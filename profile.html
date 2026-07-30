@@ -107,8 +107,7 @@
       <div class="settings-avatar-row">
         ${user.avatar ? `<img src="${user.avatar}" alt="">` : `<div class="initials-lg">${initials(user.name)}</div>`}
         <div>
-          <div style="font-family:var(--font-display); font-size:19px; margin-bottom:4px;">${user.name}</div>
-          ${user.displayBadge ? `<div class="profile-display-badge-wrap">${renderDisplayBadge(user)}</div>` : ""}
+          <div style="font-family:var(--font-display); font-size:19px; margin-bottom:4px;">${user.name}${renderDisplayBadge(user)}</div>
           <div style="color:var(--muted); font-size:13.5px; margin-bottom:8px;">@${user.username}</div>
           <div style="display:flex; gap:16px; font-size:13px; color:var(--muted); margin-bottom:10px;">
             <span>${user.followers?.length || 0} followers</span>
