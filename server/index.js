@@ -567,6 +567,24 @@ async function createNotification(notification) {
   }
 }
 
+// ── In-memory response cache ──────────────────────────────────────────────────
+// Avoids hitting MongoDB on every request for data that rarely changes.
+// Keyed by string, value is { data, expires }. Single-server so no staleness
+// across replicas, and the TTLs are short enough that stale data is fine.
+const _memCache = new Map();
+function cacheGet(key) {
+  const e = _memCache.get(key);
+  if (!e) return null;
+  if (Date.now() > e.expires) { _memCache.delete(key); return null; }
+  return e.data;
+}
+function cacheSet(key, data, ttlMs = 30000) {
+  _memCache.set(key, { data, expires: Date.now() + ttlMs });
+}
+function cacheInvalidate(...keys) {
+  keys.forEach(k => _memCache.delete(k));
+}
+
 let db;
 
 async function connect() {
@@ -921,13 +939,18 @@ app.use(express.static(publicPath));
 app.use("/api", generalApiRateLimit);
 
 app.get("/api/users", asyncHandler(async (req, res) => {
+  res.setHeader("Cache-Control", "public, s-maxage=300, stale-while-revalidate=600");
   const filter = {};
   if (req.query.username) {
     filter.username = { $regex: `^${escapeRegex(req.query.username)}$`, $options: "i" };
   }
-  res.setHeader("Cache-Control", "public, s-maxage=300, stale-while-revalidate=600");
+  const cacheKey = req.query.username ? `users:${req.query.username}` : "users:all";
+  const cached = cacheGet(cacheKey);
+  if (cached) return res.json(cached);
   const docs = await db.collection("users").find(filter, { projection: { password: 0 } }).toArray();
-  res.json(docs.map(normalizeUser).map(publicUser));
+  const result = docs.map(normalizeUser).map(publicUser);
+  cacheSet(cacheKey, result, 30000); // 30 seconds
+  res.json(result);
 }));
 
 app.get("/api/users/:id", asyncHandler(async (req, res) => {
@@ -1568,16 +1591,16 @@ app.get("/api/posts", asyncHandler(async (req, res) => {
   if (req.query.author) {
     filter.author = { $regex: `^${escapeRegex(req.query.author)}$`, $options: "i" };
   }
-  // Excludes `content` at the query level - it's the one field that can
-  // balloon a post's size (embedded base64 images from the editor), and the
-  // feed/profile list views never render it, only title/excerpt/cover. This
-  // is what was causing the earlier "posts stuck loading for 2 minutes" bug.
+  const cacheKey = req.query.author ? `posts:author:${req.query.author}` : "posts:all";
+  const cached = cacheGet(cacheKey);
+  if (cached) return res.json(cached);
   const docs = await db.collection("posts").find(filter, { projection: { content: 0, likedBy: 0 } }).toArray();
   const posts = docs.map(doc => {
     const p = normalizePost(doc);
     if (p.cover && p.cover.startsWith("data:")) p.cover = null;
     return p;
   }).sort((a, b) => new Date(b.createdAt || b.date).getTime() - new Date(a.createdAt || a.date).getTime());
+  cacheSet(cacheKey, posts, 20000); // 20 seconds
   res.json(posts);
 }));
 
@@ -1615,6 +1638,7 @@ app.post("/api/posts", requireAuth, asyncHandler(async (req, res) => {
     likedBy: []
   };
   await db.collection("posts").insertOne(post);
+  cacheInvalidate("posts:all", `posts:author:${author}`, "explore:anon", `explore:${author}`);
   await notifyMentionedUsers({
     text: content.replace(/<[^>]+>/g, " "),
     author,
@@ -1644,6 +1668,7 @@ app.patch("/api/posts/:id", requireAuth, asyncHandler(async (req, res) => {
     update.content = await uploadBase64InHtml(update.content);
   }
   await db.collection("posts").updateOne({ _id: req.params.id }, { $set: update });
+  cacheInvalidate("posts:all", `posts:author:${post.author}`, "explore:anon");
   const updated = await db.collection("posts").findOne({ _id: req.params.id });
   res.json(normalizePost(updated));
 }));
@@ -1656,6 +1681,7 @@ app.delete("/api/posts/:id", requireAuth, asyncHandler(async (req, res) => {
   await db.collection("posts").deleteOne({ _id: req.params.id });
   await db.collection("comments").deleteMany({ postId: req.params.id });
   await db.collection("notifications").deleteMany({ postId: req.params.id });
+  cacheInvalidate("posts:all", `posts:author:${post.author}`, "explore:anon");
   res.status(204).end();
 }));
 
@@ -2061,8 +2087,11 @@ app.get("/api/bookmarks/:postId/status", requireAuth, asyncHandler(async (req, r
 
 app.get("/api/explore", asyncHandler(async (req, res) => {
   res.setHeader("Cache-Control", "public, s-maxage=300, stale-while-revalidate=600");
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
   const viewerUsername = req.query.viewer || null;
+  const cacheKey = `explore:${viewerUsername || "anon"}`;
+  const cached = cacheGet(cacheKey);
+  if (cached) return res.json(cached);
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
   // Trending: most liked posts in the last 30 days
   const trendingDocs = await db.collection("posts")
@@ -2088,10 +2117,12 @@ app.get("/api/explore", asyncHandler(async (req, res) => {
   // Sort suggested by follower count
   suggestedDocs.sort((a, b) => (b.followers?.length || 0) - (a.followers?.length || 0));
 
-  res.json({
+  const result = {
     trending: trendingDocs.map(normalizePost),
     suggested: suggestedDocs.map(d => publicUser(normalizeUser(d)))
-  });
+  };
+  cacheSet(cacheKey, result, 60000); // 60 seconds
+  res.json(result);
 }));
 
 app.get("/api/online-users", (req, res) => {
