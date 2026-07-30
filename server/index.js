@@ -447,38 +447,228 @@ function broadcastGlobalPresenceUpdate() {
 // ── Transactional email via Resend ───────────────────────────────────────────
 // Requires RESEND_API_KEY in .env.  Silently skips if the key is absent so the
 // rest of the app works without email configured.
+
+/**
+ * Wraps email content in the Progress branded template.
+ * All content params accept pre-escaped HTML strings.
+ */
+function emailWrap({ accentEmoji = "✦", headlineHtml = "", bodyHtml = "", ctaText = "", ctaUrl = "", preview = "", site = "https://progressing.online" }) {
+  const previewSnippet = preview
+    ? `<div style="display:none;font-size:1px;color:#faf5ee;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">${preview}&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;</div>`
+    : "";
+  const ctaRow = ctaText && ctaUrl
+    ? `<tr>
+        <td bgcolor="#FAF5EE" align="center" style="padding:20px 40px 44px;">
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+            <tr>
+              <td bgcolor="#1C1917" style="border-radius:10px;mso-padding-alt:0 0 0 0;">
+                <a href="${ctaUrl}" style="display:inline-block;padding:14px 40px;font-family:Georgia,'Times New Roman',serif;font-size:15px;font-weight:bold;color:#FAF5EE;text-decoration:none;letter-spacing:0.07em;">${ctaText}</a>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>`
+    : `<tr><td bgcolor="#FAF5EE" height="40" style="font-size:0;line-height:0;">&nbsp;</td></tr>`;
+
+  return `<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Progress</title>
+</head>
+<body style="margin:0;padding:0;background-color:#EDE6DE;-webkit-font-smoothing:antialiased;">
+${previewSnippet}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#EDE6DE">
+  <tr><td align="center" style="padding:36px 16px 56px;">
+
+    <!-- Outer card -->
+    <table role="presentation" width="540" cellpadding="0" cellspacing="0" border="0" style="max-width:540px;width:100%;border-radius:20px;overflow:hidden;">
+
+      <!-- ── HEADER ──────────────────────────────────────────────── -->
+      <tr>
+        <td bgcolor="#1C1917" align="center" style="padding:32px 40px 28px;">
+          <p style="margin:0 0 6px;font-family:Georgia,'Times New Roman',serif;font-size:10px;letter-spacing:0.45em;color:#9C8B7C;text-transform:uppercase;">a letter from</p>
+          <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:28px;font-weight:bold;letter-spacing:0.24em;color:#FAF5EE;text-transform:uppercase;line-height:1;">Progress</p>
+          <!-- ornament dots -->
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin-top:16px;">
+            <tr>
+              <td width="28" height="1" bgcolor="#4A3728" style="font-size:0;line-height:0;">&nbsp;</td>
+              <td width="6" style="padding:0 5px;font-size:0;line-height:0;">
+                <div style="width:6px;height:6px;border-radius:50%;background-color:#D4A96A;">&nbsp;</div>
+              </td>
+              <td width="28" height="1" bgcolor="#4A3728" style="font-size:0;line-height:0;">&nbsp;</td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+
+      <!-- ── GOLD ACCENT LINE ────────────────────────────────────── -->
+      <tr>
+        <td bgcolor="#D4A96A" height="4" style="font-size:0;line-height:0;">&nbsp;</td>
+      </tr>
+
+      <!-- ── EMOJI HERO ──────────────────────────────────────────── -->
+      <tr>
+        <td bgcolor="#FAF5EE" align="center" style="padding:44px 40px 12px;font-size:54px;line-height:1;font-family:Apple Color Emoji,Segoe UI Emoji,sans-serif;">
+          ${accentEmoji}
+        </td>
+      </tr>
+
+      <!-- ── HEADLINE ────────────────────────────────────────────── -->
+      <tr>
+        <td bgcolor="#FAF5EE" align="center" style="padding:16px 40px 0;">
+          ${headlineHtml}
+        </td>
+      </tr>
+
+      <!-- ── BODY ───────────────────────────────────────────────── -->
+      <tr>
+        <td bgcolor="#FAF5EE" style="padding:20px 40px 0;">
+          ${bodyHtml}
+        </td>
+      </tr>
+
+      <!-- ── CTA / BOTTOM PADDING ───────────────────────────────── -->
+      ${ctaRow}
+
+      <!-- ── FOOTER RULE ────────────────────────────────────────── -->
+      <tr>
+        <td bgcolor="#F5EEE8" style="padding:0 36px;font-size:0;line-height:0;">
+          <div style="height:1px;background-color:#E8DDD4;">&nbsp;</div>
+        </td>
+      </tr>
+
+      <!-- ── FOOTER ─────────────────────────────────────────────── -->
+      <tr>
+        <td bgcolor="#F5EEE8" align="center" style="padding:24px 40px 28px;border-radius:0 0 20px 20px;">
+          <p style="margin:0 0 4px;font-family:Georgia,'Times New Roman',serif;font-size:11px;color:#9C8B7C;line-height:1.7;">
+            You're receiving this because you have an account on
+            <a href="${site}" style="color:#6B4F3A;text-decoration:none;">Progress</a>.
+          </p>
+          <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:11px;color:#9C8B7C;line-height:1.7;">
+            <a href="${site}/settings.html" style="color:#6B4F3A;text-decoration:underline;">Manage preferences</a>
+            &nbsp;&#183;&nbsp;
+            <a href="${site}" style="color:#6B4F3A;text-decoration:none;">Visit Progress</a>
+          </p>
+        </td>
+      </tr>
+
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>`;
+}
+
 async function sendNotificationEmail(user, notification) {
   const key = process.env.RESEND_API_KEY;
   if (!key || !user || !user.email) return;
   const site = process.env.RENDER_EXTERNAL_URL || "https://progressing.online";
-  let subject, html;
+  const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+
+  let subject, accentEmoji, headlineHtml, bodyHtml, ctaText, ctaUrl, preview;
+
   if (notification.type === "like") {
-    subject = `@${notification.actor} liked your post`;
-    html = `<p>@${notification.actor} liked <a href="${site}/post.html?id=${notification.postId}">${notification.postTitle || "your post"}</a>.</p>`;
+    subject  = `@${notification.actor} loved your post ♥`;
+    preview  = "Someone appreciated what you wrote.";
+    accentEmoji  = "♥";
+    headlineHtml = `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:26px;font-weight:bold;color:#1C1917;line-height:1.25;">Someone loved<br>your writing</h1>`;
+    bodyHtml = `
+      <p style="margin:0 0 20px;font-family:Georgia,'Times New Roman',serif;font-size:16px;color:#4A3728;line-height:1.75;text-align:center;">
+        <strong>@${esc(notification.actor)}</strong> liked your post.
+      </p>
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#F5EEE8;border-radius:10px;border-left:4px solid #D4A96A;">
+        <tr>
+          <td style="padding:16px 20px;">
+            <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#1C1917;font-style:italic;line-height:1.6;">
+              ${esc(notification.postTitle || "Your post")}
+            </p>
+          </td>
+        </tr>
+      </table>`;
+    ctaText = "Read it again";
+    ctaUrl  = `${site}/post.html?id=${notification.postId}`;
+
   } else if (notification.type === "reply") {
-    subject = `@${notification.actor} replied to your post`;
-    html = `<p>@${notification.actor} replied to <a href="${site}/post.html?id=${notification.postId}">${notification.postTitle || "your post"}</a>:</p><blockquote>${(notification.body || "").slice(0, 200)}</blockquote>`;
+    subject  = `@${notification.actor} replied to your post`;
+    preview  = "Someone joined your conversation.";
+    accentEmoji  = "💬";
+    headlineHtml = `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:26px;font-weight:bold;color:#1C1917;line-height:1.25;">A reply came in</h1>`;
+    const snippet = notification.body ? esc(String(notification.body).slice(0, 200)) + (notification.body.length > 200 ? "&hellip;" : "") : "";
+    bodyHtml = `
+      <p style="margin:0 0 20px;font-family:Georgia,'Times New Roman',serif;font-size:16px;color:#4A3728;line-height:1.75;text-align:center;">
+        <strong>@${esc(notification.actor)}</strong> replied to <em>${esc(notification.postTitle || "your post")}</em>.
+      </p>
+      ${snippet ? `
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#F5EEE8;border-radius:10px;border-left:4px solid #D4A96A;">
+        <tr>
+          <td style="padding:16px 20px;">
+            <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:14px;color:#4A3728;line-height:1.7;font-style:italic;">
+              &ldquo;${snippet}&rdquo;
+            </p>
+          </td>
+        </tr>
+      </table>` : ""}`;
+    ctaText = "Join the conversation";
+    ctaUrl  = `${site}/post.html?id=${notification.postId}`;
+
   } else if (notification.type === "follow") {
-    subject = `@${notification.actor} is now following you`;
-    html = `<p><a href="${site}/user.html?id=${notification.actor}">@${notification.actor}</a> is now following you on Progress.</p>`;
+    subject  = `@${notification.actor} is now following you on Progress`;
+    preview  = "Your writing is finding its people.";
+    accentEmoji  = "✨";
+    headlineHtml = `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:26px;font-weight:bold;color:#1C1917;line-height:1.25;">You have a new follower</h1>`;
+    bodyHtml = `
+      <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:16px;color:#4A3728;line-height:1.75;text-align:center;">
+        <strong>@${esc(notification.actor)}</strong> just started following you.<br>
+        <span style="color:#9C8B7C;">Your writing is finding its people.</span>
+      </p>`;
+    ctaText = "View their profile";
+    ctaUrl  = `${site}/user.html?id=${notification.actor}`;
+
   } else if (notification.type === "mention") {
-    subject = `@${notification.actor} mentioned you`;
-    html = `<p>@${notification.actor} mentioned you in <a href="${site}/post.html?id=${notification.postId}">${notification.postTitle || "a post"}</a>.</p>`;
+    subject  = `@${notification.actor} mentioned you`;
+    preview  = "You came up in conversation.";
+    accentEmoji  = "✦";
+    headlineHtml = `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:26px;font-weight:bold;color:#1C1917;line-height:1.25;">You were mentioned</h1>`;
+    bodyHtml = `
+      <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:16px;color:#4A3728;line-height:1.75;text-align:center;">
+        <strong>@${esc(notification.actor)}</strong> mentioned you in<br>
+        <em>${esc(notification.postTitle || "a post")}</em>.
+      </p>`;
+    ctaText = "See the post";
+    ctaUrl  = `${site}/post.html?id=${notification.postId}`;
+
   } else if (notification.type === "streak") {
-    subject = `🔥 ${notification.streak}-day login streak!`;
-    html = `<p>You've logged in ${notification.streak} days in a row. Keep it going! <a href="${site}">Visit Progress</a></p>`;
+    subject  = `🔥 ${notification.streak}-day streak — keep it going`;
+    preview  = "You're on a roll. Don't stop now.";
+    accentEmoji  = "🔥";
+    headlineHtml = `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:26px;font-weight:bold;color:#1C1917;line-height:1.25;">${notification.streak} days in a row</h1>`;
+    bodyHtml = `
+      <p style="margin:0 0 24px;font-family:Georgia,'Times New Roman',serif;font-size:16px;color:#4A3728;line-height:1.75;text-align:center;">
+        You've logged in ${notification.streak} days in a row —<br>that's something worth celebrating.
+      </p>
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#F5EEE8;border-radius:12px;">
+        <tr>
+          <td align="center" style="padding:24px 20px;">
+            <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:52px;font-weight:bold;color:#1C1917;line-height:1;">${notification.streak}</p>
+            <p style="margin:6px 0 0;font-family:Georgia,'Times New Roman',serif;font-size:11px;color:#9C8B7C;text-transform:uppercase;letter-spacing:0.15em;">day streak</p>
+          </td>
+        </tr>
+      </table>`;
+    ctaText = "Keep writing";
+    ctaUrl  = site;
+
   } else {
     return;
   }
-  const body = `<!DOCTYPE html><html><body style="font-family:sans-serif; color:#1C1917; max-width:540px; margin:0 auto; padding:24px;">
-    ${html}
-    <hr style="border:none; border-top:1px solid #e5e0db; margin:24px 0;">
-    <p style="font-size:12px; color:#9C8B7C;">You're receiving this because you have an account on <a href="${site}">Progress</a>. <a href="${site}/settings.html">Manage email preferences</a>.</p>
-  </body></html>`;
+
+  const html = emailWrap({ accentEmoji, headlineHtml, bodyHtml, ctaText, ctaUrl, preview, site });
   await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from: "Progress <noreply@progressing.online>", to: user.email, subject, html: body })
+    body: JSON.stringify({ from: "Progress <noreply@progressing.online>", to: user.email, subject, html })
   }).then(r => { if (!r.ok) r.text().then(t => console.error("[email] Resend error:", t)); })
     .catch(e => console.error("[email] fetch error:", e));
 }
@@ -488,14 +678,13 @@ async function sendWeeklyDigest() {
   const key = process.env.RESEND_API_KEY;
   if (!key) return { sent: 0, skipped: "no RESEND_API_KEY" };
   const site = process.env.RENDER_EXTERNAL_URL || "https://progressing.online";
+  const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
   const since = new Date(Date.now() - 7 * 24 * 3600 * 1000);
-  // All users with email addresses and at least one person they follow
   const users = await db.collection("users").find({ email: { $exists: true, $ne: "" } }).toArray();
   let sent = 0;
   for (const user of users) {
     const following = user.following || [];
     if (!following.length) continue;
-    // Top 5 posts from people they follow in the last 7 days, sorted by likes
     const posts = await db.collection("posts")
       .find({ author: { $in: following }, date: { $gte: since.toISOString().slice(0,10) } })
       .sort({ likes: -1 })
@@ -503,26 +692,43 @@ async function sendWeeklyDigest() {
       .project({ _id: 1, title: 1, author: 1, excerpt: 1, likes: 1 })
       .toArray();
     if (!posts.length) continue;
-    const rows = posts.map(p => `
-      <tr>
-        <td style="padding:12px 0; border-bottom:1px solid #e5e0db;">
-          <a href="${site}/post.html?id=${p._id}" style="font-weight:600; color:#1C1917; text-decoration:none;">${p.title || "Untitled"}</a><br>
-          <span style="font-size:12px; color:#9C8B7C;">by @${p.author} &middot; ♥ ${p.likes || 0}</span>
-          ${p.excerpt ? `<p style="margin:4px 0 0; font-size:13px; color:#4A3728;">${(p.excerpt).replace(/<[^>]+>/g,"").slice(0,120)}</p>` : ""}
-        </td>
-      </tr>`).join("");
-    const html = `<!DOCTYPE html><html><body style="font-family:sans-serif; color:#1C1917; max-width:540px; margin:0 auto; padding:24px;">
-      <h2 style="font-family:Georgia,serif;">Your weekly digest from Progress</h2>
-      <p style="color:#4A3728;">Here's what people you follow published this week:</p>
-      <table style="width:100%; border-collapse:collapse;">${rows}</table>
-      <p style="margin-top:24px;"><a href="${site}" style="background:#1C1917; color:#FAF5EE; padding:10px 20px; border-radius:6px; text-decoration:none; font-size:14px;">Read more on Progress</a></p>
-      <hr style="border:none; border-top:1px solid #e5e0db; margin:24px 0;">
-      <p style="font-size:12px; color:#9C8B7C;"><a href="${site}/settings.html">Manage email preferences</a></p>
-    </body></html>`;
+
+    const postCards = posts.map((p, i) => {
+      const bg = i % 2 === 0 ? "#FAF5EE" : "#F5EEE8";
+      const excerpt = p.excerpt ? esc(String(p.excerpt).replace(/<[^>]+>/g,"").slice(0, 130)) : "";
+      return `
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:12px;background-color:${bg};border-radius:10px;border-left:4px solid #D4A96A;">
+        <tr>
+          <td style="padding:16px 20px;">
+            <a href="${site}/post.html?id=${p._id}" style="font-family:Georgia,'Times New Roman',serif;font-size:16px;font-weight:bold;color:#1C1917;text-decoration:none;line-height:1.4;display:block;margin-bottom:6px;">${esc(p.title || "Untitled")}</a>
+            <p style="margin:0 0 ${excerpt ? "10px" : "0"};font-family:Georgia,'Times New Roman',serif;font-size:11px;color:#9C8B7C;letter-spacing:0.06em;">by @${esc(p.author)}&nbsp;&nbsp;&nbsp;&#9825;&nbsp;${p.likes || 0}</p>
+            ${excerpt ? `<p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:13px;color:#4A3728;line-height:1.65;font-style:italic;">${excerpt}&hellip;</p>` : ""}
+          </td>
+        </tr>
+      </table>`;
+    }).join("");
+
+    const bodyHtml = `
+      <p style="margin:0 0 28px;font-family:Georgia,'Times New Roman',serif;font-size:16px;color:#4A3728;line-height:1.8;text-align:center;">
+        Here's what the people you follow published this week.<br>
+        <span style="color:#9C8B7C;font-size:14px;">Make yourself something warm and settle in.</span>
+      </p>
+      ${postCards}`;
+
+    const html = emailWrap({
+      accentEmoji: "📖",
+      headlineHtml: `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:26px;font-weight:bold;color:#1C1917;line-height:1.25;">Your week in writing</h1>`,
+      bodyHtml,
+      ctaText: "Read more on Progress",
+      ctaUrl: site,
+      preview: `${posts.length} new post${posts.length !== 1 ? "s" : ""} from people you follow this week.`,
+      site
+    });
+
     await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from: "Progress <noreply@progressing.online>", to: user.email, subject: "Your weekly digest from Progress", html })
+      body: JSON.stringify({ from: "Progress <noreply@progressing.online>", to: user.email, subject: "Your weekly digest from Progress ✦", html })
     }).then(r => { if (r.ok) sent++; else r.text().then(t => console.error("[digest] Resend error:", t)); })
       .catch(e => console.error("[digest] fetch error:", e));
   }
@@ -2091,12 +2297,16 @@ app.post("/api/admin/send-email", requireAuth, requireRole("admin"), asyncHandle
   const key = process.env.RESEND_API_KEY;
   if (!key) return res.status(503).json({ error: "Email not configured — RESEND_API_KEY missing." });
   const site = process.env.RENDER_EXTERNAL_URL || "https://progressing.online";
-  const makeHtml = (text) => `<!DOCTYPE html><html><body style="font-family:sans-serif; color:#1C1917; max-width:560px; margin:0 auto; padding:24px;">
-    <h2 style="font-family:Georgia,serif; margin:0 0 16px;">A message from Progress</h2>
-    <div style="font-size:15px; line-height:1.7; white-space:pre-wrap;">${text.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</div>
-    <hr style="border:none; border-top:1px solid #e5e0db; margin:24px 0;">
-    <p style="font-size:12px; color:#9C8B7C;">You received this from <a href="${site}">Progress</a>. <a href="${site}/profile.html?tab=settings">Manage email preferences</a>.</p>
-  </body></html>`;
+  const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const makeHtml = (text) => emailWrap({
+    accentEmoji: "✉",
+    headlineHtml: `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:24px;font-weight:bold;color:#1C1917;line-height:1.3;">${esc(subject)}</h1>`,
+    bodyHtml: `<div style="font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#4A3728;line-height:1.85;white-space:pre-wrap;">${esc(text)}</div>`,
+    ctaText: "Visit Progress",
+    ctaUrl: site,
+    preview: text.slice(0, 100).replace(/\n/g," "),
+    site
+  });
 
   if (targetUsername) {
     const userDoc = await db.collection("users").findOne({ username: targetUsername.toLowerCase() });
