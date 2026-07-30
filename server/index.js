@@ -587,6 +587,50 @@ function cacheInvalidate(...keys) {
 
 let db;
 
+// ── Audit log helper ──────────────────────────────────────────────────────────
+async function auditLog(actor, action, target, details = {}) {
+  try {
+    await db.collection("auditLog").insertOne({
+      _id: generateId("al"),
+      actor, action, target, details,
+      timestamp: new Date().toISOString()
+    });
+  } catch (e) {
+    console.warn("[audit] write failed:", e.message);
+  }
+}
+
+// ── Admin role helpers ────────────────────────────────────────────────────────
+// Role hierarchy: owner > admin > moderator > analyst
+const ROLE_WEIGHTS = { owner: 4, admin: 3, moderator: 2, analyst: 1 };
+
+async function getAdminRole(username) {
+  if (ALLOWED_CREATOR_USERNAMES.has(username.toLowerCase())) return "owner";
+  const user = await db.collection("users").findOne(
+    { username: username.toLowerCase() },
+    { projection: { adminRole: 1 } }
+  );
+  return user?.adminRole || null;
+}
+
+// Middleware factory — pass the minimum role weight required.
+// e.g. requireRole("admin") allows owner + admin
+// requireRole("analyst") allows all four roles
+function requireRole(minRole) {
+  const minWeight = ROLE_WEIGHTS[minRole] || 99;
+  return async (req, res, next) => {
+    try {
+      const role = await getAdminRole(req.user.username);
+      const weight = ROLE_WEIGHTS[role] || 0;
+      if (weight < minWeight) {
+        return res.status(403).json({ error: "Insufficient permissions." });
+      }
+      req.adminRole = role;
+      next();
+    } catch (e) { next(e); }
+  };
+}
+
 async function connect() {
   const client = new MongoClient(mongoUri);
   await client.connect();
@@ -1145,6 +1189,7 @@ app.post("/api/users/:id/lock", requireAuth, asyncHandler(async (req, res) => {
   }
   await users.updateOne({ _id: req.params.id }, { $set: { locked: !!locked } });
   const updated = await users.findOne({ _id: req.params.id });
+  auditLog(req.user.username, locked ? "lock_user" : "unlock_user", target.username);
   res.json(publicUser(normalizeUser(updated)));
 }));
 
@@ -1160,6 +1205,7 @@ app.post("/api/users/:id/ban", requireAuth, asyncHandler(async (req, res) => {
   }
   await users.updateOne({ _id: req.params.id }, { $set: { banned: true } });
   const updated = await users.findOne({ _id: req.params.id });
+  auditLog(req.user.username, "ban_user", target.username);
   res.json(publicUser(normalizeUser(updated)));
 }));
 
@@ -1172,6 +1218,7 @@ app.post("/api/users/:id/unban", requireAuth, asyncHandler(async (req, res) => {
   if (!target) return res.status(404).json({ error: "User not found" });
   await users.updateOne({ _id: req.params.id }, { $set: { banned: false } });
   const updated = await users.findOne({ _id: req.params.id });
+  auditLog(req.user.username, "unban_user", target.username);
   res.json(publicUser(normalizeUser(updated)));
 }));
 
@@ -1682,6 +1729,9 @@ app.delete("/api/posts/:id", requireAuth, asyncHandler(async (req, res) => {
   await db.collection("comments").deleteMany({ postId: req.params.id });
   await db.collection("notifications").deleteMany({ postId: req.params.id });
   cacheInvalidate("posts:all", `posts:author:${post.author}`, "explore:anon");
+  if (isAdmin && post.author !== req.user.username) {
+    auditLog(req.user.username, "delete_post", post.author, { postId: post._id, title: post.title });
+  }
   res.status(204).end();
 }));
 
@@ -2190,6 +2240,202 @@ app.post("/api/admin/migrate-posts-to-supabase", requireAuth, asyncHandler(async
   }
 
   res.json({ total: posts.length, migrated, skipped, errors });
+}));
+
+// ── Admin: analytics ─────────────────────────────────────────────────────────
+app.get("/api/admin/analytics", requireAuth, requireRole("analyst"), asyncHandler(async (req, res) => {
+  const now = new Date();
+
+  // Active users: login within last 24h / 7d / 30d
+  const day1 = new Date(now - 1  * 24*60*60*1000).toISOString();
+  const day7 = new Date(now - 7  * 24*60*60*1000).toISOString();
+  const day30= new Date(now - 30 * 24*60*60*1000).toISOString();
+
+  const [activeToday, activeWeek, activeMonth, newSignupsWeek, newSignupsMonth] = await Promise.all([
+    db.collection("users").countDocuments({ lastLoginDate: { $gte: day1 } }),
+    db.collection("users").countDocuments({ lastLoginDate: { $gte: day7 } }),
+    db.collection("users").countDocuments({ lastLoginDate: { $gte: day30 } }),
+    db.collection("users").countDocuments({ joined: { $gte: day7 } }),
+    db.collection("users").countDocuments({ joined: { $gte: day30 } }),
+  ]);
+
+  // Daily posts — last 30 days
+  const posts30 = await db.collection("posts")
+    .find({ createdAt: { $gte: day30 } }, { projection: { createdAt: 1 } })
+    .toArray();
+  const postsByDay = {};
+  for (const p of posts30) {
+    const d = (p.createdAt || "").slice(0, 10);
+    if (d) postsByDay[d] = (postsByDay[d] || 0) + 1;
+  }
+
+  // Daily signups — last 30 days
+  const users30 = await db.collection("users")
+    .find({ joined: { $gte: day30 } }, { projection: { joined: 1 } })
+    .toArray();
+  const signupsByDay = {};
+  for (const u of users30) {
+    const d = (u.joined || "").slice(0, 10);
+    if (d) signupsByDay[d] = (signupsByDay[d] || 0) + 1;
+  }
+
+  // Top posts (last 30d)
+  const topPosts = await db.collection("posts")
+    .find({ createdAt: { $gte: day30 } }, { projection: { content: 0, likedBy: 0 } })
+    .sort({ likes: -1 })
+    .limit(10)
+    .toArray();
+
+  // Top authors by post count (all time)
+  const topAuthors = await db.collection("posts").aggregate([
+    { $group: { _id: "$author", posts: { $sum: 1 }, likes: { $sum: "$likes" } } },
+    { $sort: { posts: -1 } },
+    { $limit: 10 }
+  ]).toArray();
+
+  res.json({
+    activeToday, activeWeek, activeMonth,
+    newSignupsWeek, newSignupsMonth,
+    postsByDay, signupsByDay,
+    topPosts: topPosts.map(normalizePost),
+    topAuthors
+  });
+}));
+
+// ── Admin: user list ──────────────────────────────────────────────────────────
+app.get("/api/admin/users-list", requireAuth, requireRole("moderator"), asyncHandler(async (req, res) => {
+  const page  = Math.max(0, parseInt(req.query.page) || 0);
+  const limit = Math.min(50, parseInt(req.query.limit) || 25);
+  const q     = (req.query.q || "").toLowerCase().trim();
+
+  const filter = q
+    ? { $or: [{ username: { $regex: q, $options: "i" } }, { name: { $regex: q, $options: "i" } }] }
+    : {};
+
+  const [total, docs] = await Promise.all([
+    db.collection("users").countDocuments(filter),
+    db.collection("users")
+      .find(filter, { projection: { password: 0 } })
+      .sort({ joined: -1 })
+      .skip(page * limit)
+      .limit(limit)
+      .toArray()
+  ]);
+
+  res.json({ total, page, limit, users: docs.map(u => ({ ...publicUser(normalizeUser(u)), email: u.email || null, adminRole: u.adminRole || null })) });
+}));
+
+// ── Admin: assign role ────────────────────────────────────────────────────────
+app.patch("/api/admin/users/:username/role", requireAuth, requireRole("owner"), asyncHandler(async (req, res) => {
+  const { role } = req.body || {};
+  const validRoles = ["admin", "moderator", "analyst", null];
+  if (!validRoles.includes(role ?? null)) return res.status(400).json({ error: "Invalid role." });
+
+  const target = await db.collection("users").findOne({ username: req.params.username.toLowerCase() });
+  if (!target) return res.status(404).json({ error: "User not found." });
+  if (ALLOWED_CREATOR_USERNAMES.has(target.username)) {
+    return res.status(400).json({ error: "Cannot change role of a platform owner." });
+  }
+
+  await db.collection("users").updateOne(
+    { username: target.username },
+    role ? { $set: { adminRole: role } } : { $unset: { adminRole: "" } }
+  );
+  auditLog(req.user.username, role ? "set_role" : "remove_role", target.username, { role });
+  res.json({ username: target.username, adminRole: role || null });
+}));
+
+// ── Admin: assign badge ───────────────────────────────────────────────────────
+app.patch("/api/admin/users/:username/badge", requireAuth, requireRole("admin"), asyncHandler(async (req, res) => {
+  const { badge } = req.body || {};  // badge = string or null to remove
+  const VALID_BADGES = ["creator", "verified", "mod", "og", "supporter", "writer", null];
+  if (!VALID_BADGES.includes(badge ?? null)) return res.status(400).json({ error: "Invalid badge." });
+
+  const target = await db.collection("users").findOne({ username: req.params.username.toLowerCase() });
+  if (!target) return res.status(404).json({ error: "User not found." });
+
+  await db.collection("users").updateOne(
+    { username: target.username },
+    badge ? { $set: { displayBadge: badge } } : { $unset: { displayBadge: "" } }
+  );
+  cacheInvalidate("users:all", `users:${target.username}`);
+  auditLog(req.user.username, badge ? "set_badge" : "remove_badge", target.username, { badge });
+  res.json({ username: target.username, displayBadge: badge || null });
+}));
+
+// ── Admin: audit log ──────────────────────────────────────────────────────────
+app.get("/api/admin/audit-log", requireAuth, requireRole("admin"), asyncHandler(async (req, res) => {
+  const page  = Math.max(0, parseInt(req.query.page) || 0);
+  const limit = Math.min(100, parseInt(req.query.limit) || 50);
+  const actor = req.query.actor || null;
+  const filter = actor ? { actor } : {};
+
+  const [total, docs] = await Promise.all([
+    db.collection("auditLog").countDocuments(filter),
+    db.collection("auditLog")
+      .find(filter)
+      .sort({ timestamp: -1 })
+      .skip(page * limit)
+      .limit(limit)
+      .toArray()
+  ]);
+  res.json({ total, page, limit, entries: docs });
+}));
+
+// ── Admin: announcement ───────────────────────────────────────────────────────
+app.post("/api/admin/announcement", requireAuth, requireRole("admin"), asyncHandler(async (req, res) => {
+  const { title, body, targetUsername } = req.body || {};
+  if (!title || !body) return res.status(400).json({ error: "title and body are required." });
+
+  const notification = {
+    type: "announcement",
+    actor: req.user.username,
+    title: title.slice(0, 200),
+    body: body.slice(0, 1000),
+    timestamp: new Date().toISOString(),
+    read: false
+  };
+
+  if (targetUsername) {
+    // Send to one specific user
+    const target = await db.collection("users").findOne({ username: targetUsername.toLowerCase() });
+    if (!target) return res.status(404).json({ error: "User not found." });
+    await db.collection("notifications").insertOne({ _id: generateId("n"), ...notification, username: target.username });
+    auditLog(req.user.username, "announcement_single", target.username, { title });
+    return res.json({ sent: 1 });
+  }
+
+  // Send to all users
+  const users = await db.collection("users").find({ banned: { $ne: true } }, { projection: { username: 1 } }).toArray();
+  if (users.length === 0) return res.json({ sent: 0 });
+
+  const docs = users.map(u => ({ _id: generateId("n"), ...notification, username: u.username }));
+  // Insert in batches of 500
+  for (let i = 0; i < docs.length; i += 500) {
+    await db.collection("notifications").insertMany(docs.slice(i, i + 500));
+  }
+  auditLog(req.user.username, "announcement_all", "all", { title, count: docs.length });
+  res.json({ sent: docs.length });
+}));
+
+// ── Admin: maintenance mode ───────────────────────────────────────────────────
+let _maintenanceMode = false;
+
+app.get("/api/admin/maintenance", requireAuth, requireRole("analyst"), (req, res) => {
+  res.json({ maintenance: _maintenanceMode });
+});
+
+app.post("/api/admin/maintenance", requireAuth, requireRole("owner"), asyncHandler(async (req, res) => {
+  const { maintenance } = req.body || {};
+  _maintenanceMode = !!maintenance;
+  auditLog(req.user.username, _maintenanceMode ? "maintenance_on" : "maintenance_off", "platform");
+  res.json({ maintenance: _maintenanceMode });
+}));
+
+// ── Admin: my role ────────────────────────────────────────────────────────────
+app.get("/api/admin/my-role", requireAuth, asyncHandler(async (req, res) => {
+  const role = await getAdminRole(req.user.username);
+  res.json({ role });
 }));
 
 app.use((req, res) => {

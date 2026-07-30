@@ -67,8 +67,9 @@
         </div>
         <div>
           <div style="font-family:var(--font-display); font-size:24px; margin-bottom:6px;">
-            <span>${user.name}${renderDisplayBadge(user)}</span>
+            <span>${user.name}</span>
           </div>
+          ${user.displayBadge ? `<div class="profile-display-badge-wrap">${renderDisplayBadge(user)}</div>` : ""}
           <div style="color:var(--muted); font-size:14px; margin-bottom:12px;">@${user.username}</div>
           <div style="display:flex; gap:18px; color:var(--muted); font-size:14px; margin-bottom:10px;">
             <span id="followerCount">${user.followers.length} followers</span>

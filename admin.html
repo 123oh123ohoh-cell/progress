@@ -3,66 +3,326 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Admin Dashboard — Progress</title>
+<title>Admin — Progress</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;1,500;1,600&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 <script>(function(){try{var t=localStorage.getItem("progressTheme");var dark=(t==="dark")||(t!=="light"&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);if(dark)document.documentElement.setAttribute("data-theme","dark");}catch(e){}})();</script>
+<style>
+  /* ── Admin layout ─────────────────────────────────────────────────── */
+  .admin-wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px 80px; }
+  .admin-header {
+    display: flex; align-items: flex-end; justify-content: space-between;
+    gap: 16px; flex-wrap: wrap;
+    margin: 40px 0 28px;
+  }
+  .admin-header h1 {
+    font-family: var(--font-display); font-size: 30px; margin: 0;
+    line-height: 1;
+  }
+  .admin-role-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 12px; border-radius: 20px;
+    font-family: var(--font-mono); font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.07em;
+  }
+  .role-owner  { background: #1c1917; color: #f5f0eb; }
+  .role-admin  { background: var(--accent); color: #fff; }
+  .role-moderator { background: #2563eb22; color: #2563eb; border: 1px solid #2563eb44; }
+  .role-analyst   { background: var(--mocha-wash); color: var(--muted); border: 1px solid var(--mocha-light); }
+
+  /* ── Tab nav ──────────────────────────────────────────────────────── */
+  .admin-tabs {
+    display: flex; gap: 0; border-bottom: 2px solid var(--mocha-light);
+    margin-bottom: 32px; overflow-x: auto;
+  }
+  .admin-tab {
+    padding: 10px 20px; font-size: 14px; font-weight: 600;
+    color: var(--muted); background: none; border: none; cursor: pointer;
+    border-bottom: 2px solid transparent; margin-bottom: -2px;
+    white-space: nowrap; transition: color .15s, border-color .15s;
+    text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+  }
+  .admin-tab:hover { color: var(--ink); }
+  .admin-tab.active { color: var(--ink); border-bottom-color: var(--ink); }
+  .admin-tab-icon { font-size: 15px; }
+
+  /* ── Stat cards ───────────────────────────────────────────────────── */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 14px; margin-bottom: 36px;
+  }
+  .stat-card {
+    background: var(--paper); border: 1px solid var(--mocha-light);
+    border-radius: 12px; padding: 18px 16px;
+  }
+  .stat-label {
+    font-family: var(--font-mono); font-size: 10px; text-transform: uppercase;
+    letter-spacing: 0.07em; color: var(--muted); margin-bottom: 6px;
+  }
+  .stat-value {
+    font-family: var(--font-display); font-size: 30px; color: var(--ink); line-height: 1;
+  }
+  .stat-sub {
+    font-size: 11px; color: var(--muted); margin-top: 4px;
+  }
+
+  /* ── Section headings ─────────────────────────────────────────────── */
+  .section-head {
+    font-family: var(--font-mono); font-size: 11px; text-transform: uppercase;
+    letter-spacing: 0.07em; color: var(--muted); margin: 0 0 14px;
+  }
+  .section-block {
+    margin-bottom: 40px; padding-top: 32px;
+    border-top: 1px solid var(--mocha-light);
+  }
+  .section-block:first-child { padding-top: 0; border-top: none; }
+  .section-title {
+    font-family: var(--font-display); font-size: 22px; margin: 0 0 18px;
+  }
+
+  /* ── Sparkline chart ──────────────────────────────────────────────── */
+  .sparkline-wrap {
+    display: flex; align-items: flex-end; gap: 3px; height: 60px;
+  }
+  .spark-bar {
+    flex: 1; border-radius: 3px 3px 0 0; background: var(--ink);
+    min-height: 3px; cursor: default; transition: opacity .12s;
+    position: relative;
+  }
+  .spark-bar:hover { opacity: 0.6; }
+  .spark-labels {
+    display: flex; justify-content: space-between; margin-top: 5px;
+  }
+  .spark-label {
+    font-family: var(--font-mono); font-size: 9px; color: var(--muted);
+    text-transform: uppercase;
+  }
+
+  /* ── Post rows ────────────────────────────────────────────────────── */
+  .admin-post-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 0; border-bottom: 1px solid var(--mocha-wash);
+  }
+  .admin-post-row:last-child { border-bottom: none; }
+  .admin-post-info { flex: 1; min-width: 0; }
+  .admin-post-title {
+    font-size: 14px; font-weight: 600; color: var(--ink);
+    text-decoration: none; display: block;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .admin-post-title:hover { text-decoration: underline; }
+  .admin-post-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .admin-cat-select {
+    padding: 5px 8px; border: 1px solid var(--mocha-light);
+    border-radius: 6px; font-size: 12px;
+    background: var(--paper); color: var(--ink); cursor: pointer;
+  }
+  .admin-delete-btn {
+    padding: 5px 12px; background: none; border: 1px solid var(--danger);
+    color: var(--danger); border-radius: 6px; font-size: 12px;
+    font-weight: 600; cursor: pointer; white-space: nowrap;
+  }
+  .admin-delete-btn:hover { background: var(--danger); color: #fff; }
+
+  /* ── User rows ────────────────────────────────────────────────────── */
+  .admin-user-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 0; border-bottom: 1px solid var(--mocha-wash);
+  }
+  .admin-user-row:last-child { border-bottom: none; }
+  .admin-user-info { flex: 1; min-width: 0; }
+  .admin-user-name { font-size: 14px; font-weight: 600; color: var(--ink); }
+  .admin-user-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .admin-user-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .admin-user-actions button {
+    padding: 4px 10px; font-size: 11px; font-weight: 600;
+    border-radius: 5px; cursor: pointer; border: 1px solid var(--mocha-light);
+    background: var(--paper); color: var(--ink);
+  }
+  .admin-user-actions .btn-ban {
+    border-color: var(--danger); color: var(--danger);
+  }
+  .admin-user-actions .btn-ban:hover { background: var(--danger); color: #fff; }
+  .admin-user-actions .btn-unban {
+    border-color: var(--success, #16a34a); color: var(--success, #16a34a);
+  }
+
+  /* ── Platform controls ────────────────────────────────────────────── */
+  .control-card {
+    background: var(--paper); border: 1px solid var(--mocha-light);
+    border-radius: 12px; padding: 20px; margin-bottom: 16px;
+  }
+  .control-card h4 { font-size: 15px; font-weight: 700; margin: 0 0 6px; }
+  .control-card p { font-size: 13px; color: var(--muted); margin: 0 0 14px; line-height: 1.5; }
+
+  /* ── Announcement form ────────────────────────────────────────────── */
+  .announce-form { display: flex; flex-direction: column; gap: 10px; }
+  .announce-form input,
+  .announce-form textarea {
+    padding: 9px 12px; border: 1px solid var(--mocha-light);
+    border-radius: 8px; font-size: 14px;
+    background: var(--paper); color: var(--ink);
+    font-family: var(--font-sans, Inter, sans-serif);
+    resize: vertical;
+  }
+  .announce-form textarea { min-height: 80px; }
+  .announce-form .row { display: flex; gap: 10px; }
+  .announce-form .row input { flex: 1; }
+
+  /* ── Maintenance toggle ───────────────────────────────────────────── */
+  .toggle-switch { position: relative; display: inline-block; width: 48px; height: 26px; }
+  .toggle-switch input { opacity: 0; width: 0; height: 0; }
+  .toggle-track {
+    position: absolute; inset: 0; border-radius: 13px;
+    background: var(--mocha-light); cursor: pointer; transition: .2s;
+  }
+  .toggle-track::before {
+    content: ""; position: absolute; width: 20px; height: 20px;
+    left: 3px; top: 3px; border-radius: 50%;
+    background: #fff; transition: .2s;
+  }
+  .toggle-switch input:checked + .toggle-track { background: var(--danger); }
+  .toggle-switch input:checked + .toggle-track::before { transform: translateX(22px); }
+
+  /* ── Recent list ──────────────────────────────────────────────────── */
+  .recent-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 0; border-bottom: 1px solid var(--mocha-wash);
+    text-decoration: none; color: inherit;
+  }
+  .recent-item:last-child { border-bottom: none; }
+  .recent-item-name { font-size: 14px; font-weight: 600; }
+  .recent-item-meta { font-size: 12px; color: var(--muted); }
+
+  /* ── Auth gate ────────────────────────────────────────────────────── */
+  #authContainer {
+    max-width: 340px; margin: 100px auto 0; text-align: center; padding: 0 20px;
+  }
+</style>
 </head>
 <body>
 
 <div id="nav-root"></div>
 <div id="modal-root"></div>
 
-<main class="container">
-  <div id="authContainer" style="display:none; margin-top:80px; max-width:320px; margin-left:auto; margin-right:auto; text-align:center;">
-    <h1 style="font-family:var(--font-display); font-size:28px; margin-bottom:24px;">Admin Dashboard</h1>
-    <p style="color:var(--muted); margin-bottom:12px;">This page is only available to approved creator accounts.</p>
-    <p style="color:var(--muted); margin-bottom:24px;">Log in as <strong>@mara</strong>, <strong>@own</strong>, or <strong>@progresstesting1</strong>, or enter the access password below.</p>
-    <input type="password" id="adminPassword" placeholder="Password" style="width:100%; padding:10px 12px; border:1px solid var(--mocha-light); border-radius:6px; font-size:14px; margin-bottom:12px; box-sizing:border-box; background:var(--paper); color:var(--ink);">
-    <button id="submitPassword" style="width:100%; padding:10px 12px; background:var(--ink); color:var(--cream); border:none; border-radius:6px; font-size:14px; cursor:pointer; font-weight:600;">Check access</button>
-    <p id="passwordError" style="color:var(--danger); font-size:13px; margin-top:12px; display:none;">You do not have permission to access this page.</p>
-  </div>
+<!-- Auth gate -->
+<div id="authContainer" style="display:none;">
+  <h1 style="font-family:var(--font-display); font-size:28px; margin-bottom:12px;">Admin</h1>
+  <p style="color:var(--muted); font-size:14px; margin-bottom:20px;">Approved accounts and role holders only.</p>
+  <input type="password" id="adminPassword" placeholder="Access password" style="width:100%; padding:10px 12px; border:1px solid var(--mocha-light); border-radius:8px; font-size:14px; margin-bottom:10px; box-sizing:border-box; background:var(--paper); color:var(--ink);">
+  <button id="submitPassword" style="width:100%; padding:10px 12px; background:var(--ink); color:var(--cream); border:none; border-radius:8px; font-size:14px; cursor:pointer; font-weight:600;">Check access</button>
+  <p id="passwordError" style="color:var(--danger); font-size:13px; margin-top:12px; display:none;">Access denied.</p>
+</div>
 
-  <div id="contentContainer" style="display:none;">
-    <div style="margin-top:40px; margin-bottom:32px;">
-      <h1 style="font-family:var(--font-display); font-size:32px; margin-bottom:8px;">Admin Dashboard</h1>
-      <p style="color:var(--muted); font-size:15px;">A quick look at what's happening on Progress.</p>
-    </div>
+<!-- Main content -->
+<div id="contentContainer" style="display:none;">
+  <div class="admin-wrap">
 
-    <div id="statsGrid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); gap:14px; margin-bottom:36px;"></div>
-
-    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:32px;">
+    <div class="admin-header">
       <div>
-        <h3 style="font-family:var(--font-mono); font-size:11.5px; text-transform:uppercase; letter-spacing:0.07em; color:var(--muted); margin-bottom:14px;">Recent signups</h3>
-        <div id="recentUsersList"></div>
+        <h1>Admin Dashboard</h1>
+        <p style="color:var(--muted); font-size:14px; margin:6px 0 0;">A quick look at what's happening on Progress.</p>
       </div>
-      <div>
-        <h3 style="font-family:var(--font-mono); font-size:11.5px; text-transform:uppercase; letter-spacing:0.07em; color:var(--muted); margin-bottom:14px;">Recent entries</h3>
-        <div id="recentPostsList"></div>
+      <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+        <span id="roleDisplay" class="admin-role-badge role-owner" style="display:none;"></span>
+        <a href="admin-roles.html" class="btn" style="font-size:13px; padding:7px 14px;">Roles &amp; Logs →</a>
+        <a href="admin-emails.html" class="btn" style="font-size:13px; padding:7px 14px;">Emails →</a>
       </div>
     </div>
 
-    <div style="margin-top:36px; padding-top:24px; border-top:1px solid var(--mocha-light); display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
-      <a href="users.html" class="btn" style="display:inline-block;">Manage users (lock / ban) &rarr;</a>
+    <!-- Tab nav -->
+    <nav class="admin-tabs" role="tablist">
+      <button class="admin-tab active" data-tab="overview" role="tab">
+        <span class="admin-tab-icon">📊</span> Overview
+      </button>
+      <button class="admin-tab" data-tab="analytics" role="tab">
+        <span class="admin-tab-icon">📈</span> Analytics
+      </button>
+      <button class="admin-tab" data-tab="posts" role="tab">
+        <span class="admin-tab-icon">📝</span> Posts
+      </button>
+      <button class="admin-tab" data-tab="users" role="tab">
+        <span class="admin-tab-icon">👥</span> Users
+      </button>
+      <button class="admin-tab" data-tab="platform" role="tab">
+        <span class="admin-tab-icon">⚙️</span> Platform
+      </button>
+    </nav>
+
+    <!-- ── OVERVIEW tab ─────────────────────────────────────────────── -->
+    <div id="tab-overview" class="admin-tab-content">
+
+      <div class="stats-grid" id="statsGrid">
+        <div style="grid-column:1/-1; color:var(--muted); font-size:14px;">Loading…</div>
+      </div>
+
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:32px; margin-bottom:40px;">
+        <div>
+          <h3 class="section-head">Recent signups</h3>
+          <div id="recentUsersList"></div>
+        </div>
+        <div>
+          <h3 class="section-head">Recent entries</h3>
+          <div id="recentPostsList"></div>
+        </div>
+      </div>
+
+      <!-- Writing stats / month chart -->
+      <div class="section-block">
+        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:18px;">
+          <h2 class="section-title">Writing stats</h2>
+          <button class="upload-btn" id="sendDigestBtn" style="font-size:13px; padding:8px 14px;">📬 Send digest</button>
+        </div>
+        <div id="writingStatsContent"><p style="color:var(--muted); font-size:14px;">Loading…</p></div>
+      </div>
+
+      <div style="margin-top:24px;">
+        <a href="users.html" class="btn">Manage users (lock / ban) →</a>
+      </div>
+
     </div>
 
-    <!-- Writing stats -->
-    <div style="margin-top:40px; padding-top:32px; border-top:1px solid var(--mocha-light);">
+    <!-- ── ANALYTICS tab ────────────────────────────────────────────── -->
+    <div id="tab-analytics" class="admin-tab-content" style="display:none;">
+
+      <div class="stats-grid" id="analyticsGrid">
+        <div style="grid-column:1/-1; color:var(--muted); font-size:14px;">Loading…</div>
+      </div>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:32px; margin-bottom:40px;">
+        <div>
+          <h3 class="section-head" style="margin-bottom:10px;">Posts per day (30 days)</h3>
+          <div id="postsChart" class="sparkline-wrap"></div>
+          <div id="postsChartLabels" class="spark-labels"></div>
+        </div>
+        <div>
+          <h3 class="section-head" style="margin-bottom:10px;">Signups per day (30 days)</h3>
+          <div id="signupsChart" class="sparkline-wrap"></div>
+          <div id="signupsChartLabels" class="spark-labels"></div>
+        </div>
+      </div>
+
+      <div class="section-block">
+        <h2 class="section-title">Top posts (last 30 days)</h2>
+        <div id="topPostsList"></div>
+      </div>
+
+      <div class="section-block">
+        <h2 class="section-title">Top authors (all time)</h2>
+        <table id="topAuthorsTable" style="width:100%; border-collapse:collapse;"></table>
+      </div>
+
+    </div>
+
+    <!-- ── POSTS tab ────────────────────────────────────────────────── -->
+    <div id="tab-posts" class="admin-tab-content" style="display:none;">
       <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:20px;">
-        <h2 style="font-family:var(--font-display); font-size:22px; margin:0;">Writing stats</h2>
-        <button class="upload-btn" id="sendDigestBtn" style="font-size:13px; padding:8px 16px;">📬 Send weekly digest</button>
-      </div>
-      <div id="writingStatsContent"><p style="color:var(--muted); font-size:14px;">Loading…</p></div>
-    </div>
-
-    <!-- Full post management -->
-    <div style="margin-top:40px; padding-top:32px; border-top:1px solid var(--mocha-light);">
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; gap:12px; flex-wrap:wrap;">
-        <h2 style="font-family:var(--font-display); font-size:22px; margin:0;">All Posts</h2>
-        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-          <input id="adminPostSearch" type="search" placeholder="Search posts…" style="padding:7px 12px; border:1px solid var(--mocha-light); border-radius:var(--radius); font-size:13px; background:var(--paper); color:var(--ink); width:180px;">
-          <select id="adminPostCatFilter" style="padding:7px 12px; border:1px solid var(--mocha-light); border-radius:var(--radius); font-size:13px; background:var(--paper); color:var(--ink);">
+        <h2 class="section-title" style="margin:0;">All Posts</h2>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+          <input id="adminPostSearch" type="search" placeholder="Search…" style="padding:7px 12px; border:1px solid var(--mocha-light); border-radius:8px; font-size:13px; background:var(--paper); color:var(--ink); width:180px;">
+          <select id="adminPostCatFilter" style="padding:7px 10px; border:1px solid var(--mocha-light); border-radius:8px; font-size:13px; background:var(--paper); color:var(--ink);">
             <option value="">All categories</option>
             <option value="development">Development</option>
             <option value="creative">Creative</option>
@@ -71,157 +331,266 @@
           </select>
         </div>
       </div>
-      <div id="adminPostsList">
-        <p style="color:var(--muted); font-size:14px;">Loading posts…</p>
-      </div>
+      <div id="adminPostsList"><p style="color:var(--muted); font-size:14px;">Loading posts…</p></div>
       <div id="adminPostsPager" style="display:flex; gap:8px; margin-top:16px; flex-wrap:wrap;"></div>
     </div>
+
+    <!-- ── USERS tab ─────────────────────────────────────────────────── -->
+    <div id="tab-users" class="admin-tab-content" style="display:none;">
+      <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:20px;">
+        <h2 class="section-title" style="margin:0;">Users</h2>
+        <input id="adminUserSearch" type="search" placeholder="Search users…" style="padding:7px 12px; border:1px solid var(--mocha-light); border-radius:8px; font-size:13px; background:var(--paper); color:var(--ink); width:220px;">
+      </div>
+      <div id="adminUsersList"><p style="color:var(--muted); font-size:14px;">Loading users…</p></div>
+      <div id="adminUsersPager" style="display:flex; gap:8px; margin-top:16px; flex-wrap:wrap;"></div>
+    </div>
+
+    <!-- ── PLATFORM tab ─────────────────────────────────────────────── -->
+    <div id="tab-platform" class="admin-tab-content" style="display:none;">
+
+      <!-- Announcement -->
+      <div class="control-card" style="margin-bottom:20px;">
+        <h4>📢 Send Announcement</h4>
+        <p>Send a notification to all users (or a specific one). Shows up in their notification bell.</p>
+        <div class="announce-form">
+          <input id="announceTitle" type="text" placeholder="Title (e.g. New feature alert 🎉)" maxlength="200">
+          <textarea id="announceBody" placeholder="Message body (up to 1000 chars)" maxlength="1000"></textarea>
+          <div class="row">
+            <input id="announceTarget" type="text" placeholder="@username — leave blank for all users">
+          </div>
+          <div style="display:flex; gap:10px;">
+            <button id="sendAnnounceBtn" class="btn" style="background:var(--ink); color:var(--cream); padding:9px 20px; font-size:14px;">Send announcement</button>
+            <span id="announceStatus" style="font-size:13px; color:var(--muted); align-self:center;"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Maintenance mode -->
+      <div class="control-card" id="maintenanceCard">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;">
+          <div>
+            <h4>🚧 Maintenance Mode</h4>
+            <p style="margin:0;">When on, the API returns a maintenance error. Use with care.</p>
+          </div>
+          <label class="toggle-switch" id="maintenanceToggleWrap" title="Toggle maintenance mode">
+            <input type="checkbox" id="maintenanceToggle">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        <p id="maintenanceStatus" style="font-size:12px; color:var(--muted); margin:10px 0 0;"></p>
+      </div>
+
+      <!-- Weekly digest -->
+      <div class="control-card">
+        <h4>📬 Weekly Digest</h4>
+        <p>Manually trigger the weekly digest email to all subscribers.</p>
+        <button class="btn" id="sendDigestBtn2" style="font-size:13px; padding:8px 16px;">Send weekly digest</button>
+        <span id="digestStatus2" style="font-size:13px; color:var(--muted); margin-left:10px;"></span>
+      </div>
+
+      <!-- Badge management -->
+      <div class="control-card">
+        <h4>🏅 Assign Badge</h4>
+        <p>Give or remove a special badge for a user.</p>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+          <input id="badgeUsername" type="text" placeholder="@username" style="padding:8px 12px; border:1px solid var(--mocha-light); border-radius:8px; font-size:13px; background:var(--paper); color:var(--ink); width:160px;">
+          <select id="badgeSelect" style="padding:8px 10px; border:1px solid var(--mocha-light); border-radius:8px; font-size:13px; background:var(--paper); color:var(--ink);">
+            <option value="">Remove badge</option>
+            <option value="creator">✏️ Creator</option>
+            <option value="verified">✅ Verified</option>
+            <option value="mod">🛡️ Mod</option>
+            <option value="og">⭐ OG</option>
+            <option value="supporter">💙 Supporter</option>
+            <option value="writer">🖋️ Writer</option>
+          </select>
+          <button id="assignBadgeBtn" class="btn" style="font-size:13px; padding:8px 14px;">Apply</button>
+          <span id="badgeStatus" style="font-size:13px; color:var(--muted);"></span>
+        </div>
+      </div>
+
+      <!-- Supabase migration -->
+      <div class="control-card">
+        <h4>☁️ Migrate images to Supabase</h4>
+        <p>Uploads any base64-encoded images still stored in MongoDB to Supabase Storage. Safe to re-run (skips already-migrated posts).</p>
+        <button id="migrateBtn" class="btn" style="font-size:13px; padding:8px 14px;">Run migration</button>
+        <span id="migrateStatus" style="font-size:13px; color:var(--muted); margin-left:10px;"></span>
+      </div>
+
+    </div>
+
   </div>
-</main>
+</div>
 
 <script src="data.js"></script>
 <script src="app.js"></script>
 <script>
+  // ── Constants ───────────────────────────────────────────────────────────────
   const ALLOWED_ADMIN_USERNAMES = new Set(["mara", "own", "progresstesting1"]);
   const ADMIN_PASSWORD = "blowblow426J";
-  const authContainer = document.getElementById("authContainer");
-  const contentContainer = document.getElementById("contentContainer");
-  const passwordInput = document.getElementById("adminPassword");
-  const submitBtn = document.getElementById("submitPassword");
-  const passwordError = document.getElementById("passwordError");
+  let myAdminRole = null;
 
+  // ── Auth ────────────────────────────────────────────────────────────────────
   function hasAccountAccess() {
     const user = Progress.getCurrentUser();
     return !!(user && ALLOWED_ADMIN_USERNAMES.has(user.username));
   }
 
   function checkAuth() {
-    if (hasAccountAccess() || sessionStorage.getItem("adminAuth") === "true") {
-      authContainer.style.display = "none";
-      contentContainer.style.display = "block";
-      loadStats();
-    } else {
-      authContainer.style.display = "block";
-      contentContainer.style.display = "none";
-    }
+    const allowed = hasAccountAccess() || sessionStorage.getItem("adminAuth") === "true";
+    document.getElementById("authContainer").style.display = allowed ? "none" : "block";
+    document.getElementById("contentContainer").style.display = allowed ? "block" : "none";
+    if (allowed) initAdmin();
   }
 
-  submitBtn.addEventListener("click", () => {
-    if (hasAccountAccess() || passwordInput.value === ADMIN_PASSWORD) {
+  document.getElementById("submitPassword").addEventListener("click", () => {
+    const val = document.getElementById("adminPassword").value;
+    if (hasAccountAccess() || val === ADMIN_PASSWORD) {
       sessionStorage.setItem("adminAuth", "true");
-      passwordError.style.display = "none";
+      document.getElementById("passwordError").style.display = "none";
       checkAuth();
-      return;
+    } else {
+      document.getElementById("passwordError").style.display = "block";
+      document.getElementById("adminPassword").value = "";
+      document.getElementById("adminPassword").focus();
     }
-    passwordError.style.display = "block";
-    passwordInput.value = "";
-    passwordInput.focus();
   });
-  passwordInput.addEventListener("keydown", (e) => { if (e.key === "Enter") submitBtn.click(); });
+  document.getElementById("adminPassword").addEventListener("keydown", e => {
+    if (e.key === "Enter") document.getElementById("submitPassword").click();
+  });
 
-  function statCard(label, value) {
-    return `
-      <div style="background:var(--paper); border:1px solid var(--mocha-light); border-radius:10px; padding:16px;">
-        <div style="font-family:var(--font-mono); font-size:10.5px; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); margin-bottom:6px;">${label}</div>
-        <div style="font-family:var(--font-display); font-size:28px; color:var(--ink);">${value}</div>
-      </div>`;
+  // ── Tab switching ───────────────────────────────────────────────────────────
+  let analyticsLoaded = false;
+  let usersLoaded = false;
+
+  document.querySelectorAll(".admin-tab").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".admin-tab").forEach(t => t.classList.remove("active"));
+      document.querySelectorAll(".admin-tab-content").forEach(t => t.style.display = "none");
+      btn.classList.add("active");
+      const tab = btn.dataset.tab;
+      document.getElementById(`tab-${tab}`).style.display = "block";
+
+      if (tab === "analytics" && !analyticsLoaded) {
+        analyticsLoaded = true;
+        loadAnalytics();
+      }
+      if (tab === "posts" && !allAdminPosts.length) {
+        loadAllPosts();
+      }
+      if (tab === "users" && !usersLoaded) {
+        usersLoaded = true;
+        loadAdminUsers();
+      }
+      if (tab === "platform") {
+        loadMaintenance();
+      }
+    });
+  });
+
+  // ── Init ────────────────────────────────────────────────────────────────────
+  async function initAdmin() {
+    // Load role badge
+    try {
+      const r = await apiFetch("/api/admin/my-role");
+      if (r && r.role) {
+        myAdminRole = r.role;
+        const badge = document.getElementById("roleDisplay");
+        badge.textContent = r.role.charAt(0).toUpperCase() + r.role.slice(1);
+        badge.className = `admin-role-badge role-${r.role}`;
+        badge.style.display = "inline-flex";
+      }
+    } catch(e) {}
+
+    loadStats();
+    loadWritingStats();
   }
 
+  // ── Overview: stats ─────────────────────────────────────────────────────────
   async function loadStats() {
-    document.getElementById("statsGrid").innerHTML = `<div style="grid-column:1/-1; color:var(--muted);">Loading...</div>`;
+    const grid = document.getElementById("statsGrid");
     const result = await apiFetch("/api/admin/stats");
     if (!result || !result.counts) {
-      document.getElementById("statsGrid").innerHTML = `<div style="grid-column:1/-1; color:var(--danger);">Couldn't load stats. Try refreshing.</div>`;
+      grid.innerHTML = `<div style="grid-column:1/-1; color:var(--danger); font-size:14px;">Couldn't load stats.</div>`;
       return;
     }
     const c = result.counts;
-    document.getElementById("statsGrid").innerHTML = [
+    grid.innerHTML = [
       statCard("Users", c.users),
       statCard("Entries", c.posts),
       statCard("Replies", c.comments),
-      statCard("Chat messages", c.messages),
+      statCard("Messages", c.messages),
       statCard("Banned", c.banned),
       statCard("Locked", c.locked)
     ].join("");
 
     const usersList = document.getElementById("recentUsersList");
     usersList.innerHTML = (result.recentUsers || []).map(u => `
-      <a href="user.html?id=${u.id}" style="display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--mocha-wash); text-decoration:none; color:inherit;">
-        ${u.avatar ? `<img src="${u.avatar}" alt="" style="width:32px; height:32px; border-radius:50%; object-fit:cover;">` : `<div class="initials-lg" style="width:32px; height:32px; font-size:12px;">${initials(u.name)}</div>`}
+      <a href="user.html?id=${u.id}" class="recent-item">
+        ${u.avatar
+          ? `<img src="${u.avatar}" alt="" style="width:32px; height:32px; border-radius:50%; object-fit:cover; flex-shrink:0;">`
+          : `<div class="initials-lg" style="width:32px; height:32px; font-size:12px; flex-shrink:0;">${initials(u.name)}</div>`
+        }
         <div style="min-width:0;">
-          <div style="font-size:14px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${u.name}</div>
-          <div style="font-size:12px; color:var(--muted);">@${u.username} &middot; joined ${Progress.formatDateShort(u.joined)}</div>
+          <div class="recent-item-name" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHTML(u.name)}</div>
+          <div class="recent-item-meta">@${escapeHTML(u.username)} · ${Progress.formatDateShort(u.joined)}</div>
         </div>
       </a>
     `).join("") || `<p style="color:var(--muted); font-size:14px;">No users yet.</p>`;
 
     const postsList = document.getElementById("recentPostsList");
     postsList.innerHTML = (result.recentPosts || []).map(p => `
-      <a href="post.html?id=${p.id}" style="display:block; padding:10px 0; border-bottom:1px solid var(--mocha-wash); text-decoration:none; color:inherit;">
-        <div style="font-size:14px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${p.title}</div>
-        <div style="font-size:12px; color:var(--muted);">@${p.author} &middot; ${Progress.formatDateShort(p.date)}</div>
+      <a href="post.html?id=${p.id}" class="recent-item" style="display:block;">
+        <div class="recent-item-name" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHTML(p.title || "(untitled)")}</div>
+        <div class="recent-item-meta">@${escapeHTML(p.author)} · ${Progress.formatDateShort(p.date)}</div>
       </a>
     `).join("") || `<p style="color:var(--muted); font-size:14px;">No entries yet.</p>`;
-
-    // Load the full post management table
-    loadAllPosts();
-    loadWritingStats();
-
-    // Weekly digest button
-    document.getElementById("sendDigestBtn").addEventListener("click", async () => {
-      const btn = document.getElementById("sendDigestBtn");
-      btn.disabled = true; btn.textContent = "Sending…";
-      const r = await apiFetch("/api/admin/send-digest", { method: "POST" });
-      btn.disabled = false; btn.textContent = "📬 Send weekly digest";
-      if (r && typeof r.sent === "number") {
-        showToast(`Digest sent to ${r.sent} user${r.sent !== 1 ? "s" : ""}.`);
-      } else if (r && r.skipped) {
-        showToast(`Not sent: ${r.skipped}`);
-      } else {
-        showToast("Something went wrong sending the digest.");
-      }
-    });
   }
 
+  function statCard(label, value) {
+    return `
+      <div class="stat-card">
+        <div class="stat-label">${label}</div>
+        <div class="stat-value">${value ?? "—"}</div>
+      </div>`;
+  }
+
+  // ── Overview: writing stats ─────────────────────────────────────────────────
   async function loadWritingStats() {
     const el = document.getElementById("writingStatsContent");
-    if (!el) return;
     const data = await apiFetch("/api/admin/writing-stats");
-    if (!data) { el.innerHTML = `<p style="color:var(--danger); font-size:14px;">Couldn't load writing stats.</p>`; return; }
-
-    // Monthly sparkline
+    if (!data) {
+      el.innerHTML = `<p style="color:var(--danger); font-size:14px;">Couldn't load writing stats.</p>`;
+      return;
+    }
     const now = new Date();
     const months = [];
     for (let i = 11; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-      const label = d.toLocaleDateString(undefined, { month: "short" });
-      months.push({ key, label, count: data.monthly[key] || 0 });
+      const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+      months.push({ key, label: d.toLocaleDateString(undefined, { month: "short" }), count: data.monthly[key] || 0 });
     }
     const maxCount = Math.max(...months.map(m => m.count), 1);
-    const sparkBars = months.map(m => {
+    const bars = months.map(m => {
       const h = Math.max(4, Math.round((m.count / maxCount) * 56));
-      return `<div title="${m.label}: ${m.count} post${m.count !== 1 ? "s" : ""}" style="flex:1; display:flex; flex-direction:column; align-items:center; gap:4px;">
-        <div style="width:100%; height:${h}px; background:var(--ink); border-radius:2px; align-self:flex-end;"></div>
+      return `<div title="${m.label}: ${m.count}" style="flex:1; display:flex; flex-direction:column; align-items:center; gap:4px;">
+        <div style="width:100%; height:${h}px; background:var(--ink); border-radius:2px;"></div>
         <div style="font-family:var(--font-mono); font-size:9px; color:var(--muted); text-transform:uppercase;">${m.label}</div>
       </div>`;
     }).join("");
 
-    // Author table
     const rows = (data.authors || []).map((a, i) => `
       <tr style="border-bottom:1px solid var(--mocha-wash);">
-        <td style="padding:10px 12px 10px 0; font-size:13px; font-weight:600; color:var(--mocha);">#${i + 1}</td>
-        <td style="padding:10px 8px;"><a href="user.html?username=${encodeURIComponent(a.username)}" style="font-size:14px; font-weight:600; color:var(--ink); text-decoration:none;">@${escapeHTML(a.username)}</a></td>
-        <td style="padding:10px 8px; text-align:right; font-family:var(--font-mono); font-size:13px;">${a.posts}</td>
-        <td style="padding:10px 8px; text-align:right; font-family:var(--font-mono); font-size:13px;">${a.likes}</td>
-        <td style="padding:10px 8px; text-align:right; font-family:var(--font-mono); font-size:13px;">${a.comments}</td>
-      </tr>
-    `).join("");
+        <td style="padding:9px 12px 9px 0; font-size:13px; font-weight:600; color:var(--mocha);">#${i+1}</td>
+        <td style="padding:9px 8px;"><a href="user.html?username=${encodeURIComponent(a.username)}" style="font-size:14px; font-weight:600; color:var(--ink); text-decoration:none;">@${escapeHTML(a.username)}</a></td>
+        <td style="padding:9px 8px; text-align:right; font-family:var(--font-mono); font-size:13px;">${a.posts}</td>
+        <td style="padding:9px 8px; text-align:right; font-family:var(--font-mono); font-size:13px;">${a.likes}</td>
+        <td style="padding:9px 8px; text-align:right; font-family:var(--font-mono); font-size:13px;">${a.comments}</td>
+      </tr>`).join("");
 
     el.innerHTML = `
       <div style="margin-bottom:28px;">
-        <div style="font-family:var(--font-mono); font-size:10.5px; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); margin-bottom:12px;">Posts per month (last 12 months)</div>
-        <div style="display:flex; align-items:flex-end; gap:4px; height:80px; padding-bottom:20px;">${sparkBars}</div>
+        <div class="section-head" style="margin-bottom:10px;">Posts per month (last 12 months)</div>
+        <div style="display:flex; align-items:flex-end; gap:4px; height:80px; padding-bottom:20px;">${bars}</div>
       </div>
       <table style="width:100%; border-collapse:collapse;">
         <thead>
@@ -233,22 +602,97 @@
             <th style="text-align:right; padding:0 8px 8px; font-family:var(--font-mono); font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted);">Replies</th>
           </tr>
         </thead>
-        <tbody>${rows || `<tr><td colspan="5" style="padding:16px 0; color:var(--muted); font-size:14px;">No posts yet.</td></tr>`}</tbody>
+        <tbody>${rows || `<tr><td colspan="5" style="padding:14px 0; color:var(--muted); font-size:14px;">No posts yet.</td></tr>`}</tbody>
       </table>`;
   }
 
+  // ── Analytics tab ───────────────────────────────────────────────────────────
+  async function loadAnalytics() {
+    const grid = document.getElementById("analyticsGrid");
+    grid.innerHTML = `<div style="grid-column:1/-1; color:var(--muted); font-size:14px;">Loading…</div>`;
+
+    const data = await apiFetch("/api/admin/analytics");
+    if (!data) {
+      grid.innerHTML = `<div style="grid-column:1/-1; color:var(--danger); font-size:14px;">Couldn't load analytics.</div>`;
+      return;
+    }
+
+    grid.innerHTML = [
+      statCard("Active today", data.activeToday),
+      statCard("Active (7d)", data.activeWeek),
+      statCard("Active (30d)", data.activeMonth),
+      statCard("New (7d)", data.newSignupsWeek),
+      statCard("New (30d)", data.newSignupsMonth),
+    ].join("");
+
+    // Build 30-day date array
+    const days = [];
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 86400000);
+      days.push(d.toISOString().slice(0, 10));
+    }
+
+    renderSparkline("postsChart", "postsChartLabels", days, data.postsByDay || {});
+    renderSparkline("signupsChart", "signupsChartLabels", days, data.signupsByDay || {});
+
+    // Top posts
+    const topPostsEl = document.getElementById("topPostsList");
+    topPostsEl.innerHTML = (data.topPosts || []).map((p, i) => `
+      <div class="admin-post-row">
+        <span style="font-family:var(--font-mono); font-size:12px; color:var(--mocha); min-width:24px;">#${i+1}</span>
+        <div class="admin-post-info">
+          <a class="admin-post-title" href="post.html?id=${p.id}" target="_blank">${escapeHTML(p.title || "(untitled)")}</a>
+          <div class="admin-post-meta">@${escapeHTML(p.author)} · ❤️ ${p.likes} · ${Progress.formatDateShort(p.date)}</div>
+        </div>
+      </div>`).join("") || `<p style="color:var(--muted); font-size:14px;">No posts in this period.</p>`;
+
+    // Top authors
+    const authorsTable = document.getElementById("topAuthorsTable");
+    const authorRows = (data.topAuthors || []).map((a, i) => `
+      <tr style="border-bottom:1px solid var(--mocha-wash);">
+        <td style="padding:9px 12px 9px 0; font-size:13px; font-weight:600; color:var(--mocha);">#${i+1}</td>
+        <td style="padding:9px 8px;"><a href="user.html?username=${encodeURIComponent(a._id)}" style="font-size:14px; font-weight:600; color:var(--ink); text-decoration:none;">@${escapeHTML(a._id)}</a></td>
+        <td style="padding:9px 8px; text-align:right; font-family:var(--font-mono); font-size:13px;">${a.posts} posts</td>
+        <td style="padding:9px 8px; text-align:right; font-family:var(--font-mono); font-size:13px;">❤️ ${a.likes}</td>
+      </tr>`).join("");
+    authorsTable.innerHTML = `
+      <thead>
+        <tr style="border-bottom:2px solid var(--mocha-light);">
+          <th style="text-align:left; padding:0 12px 8px 0; font-family:var(--font-mono); font-size:10px; text-transform:uppercase; color:var(--muted);">#</th>
+          <th style="text-align:left; padding:0 8px 8px; font-family:var(--font-mono); font-size:10px; text-transform:uppercase; color:var(--muted);">Author</th>
+          <th style="text-align:right; padding:0 8px 8px; font-family:var(--font-mono); font-size:10px; text-transform:uppercase; color:var(--muted);">Posts</th>
+          <th style="text-align:right; padding:0 8px 8px; font-family:var(--font-mono); font-size:10px; text-transform:uppercase; color:var(--muted);">Likes</th>
+        </tr>
+      </thead>
+      <tbody>${authorRows || `<tr><td colspan="4" style="padding:14px 0; color:var(--muted); font-size:14px;">No data.</td></tr>`}</tbody>`;
+  }
+
+  function renderSparkline(chartId, labelsId, days, byDay) {
+    const counts = days.map(d => byDay[d] || 0);
+    const max = Math.max(...counts, 1);
+    const chartEl = document.getElementById(chartId);
+    chartEl.innerHTML = counts.map((c, i) => {
+      const h = Math.max(3, Math.round((c / max) * 60));
+      return `<div class="spark-bar" style="height:${h}px;" title="${days[i]}: ${c}"></div>`;
+    }).join("");
+
+    // Show labels at first, middle, last
+    const labelsEl = document.getElementById(labelsId);
+    const label = d => new Date(d + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    labelsEl.innerHTML = `
+      <span class="spark-label">${label(days[0])}</span>
+      <span class="spark-label">${label(days[14])}</span>
+      <span class="spark-label">${label(days[29])}</span>`;
+  }
+
+  // ── Posts tab ───────────────────────────────────────────────────────────────
   let allAdminPosts = [];
   let adminPostPage = 0;
   const ADMIN_PAGE_SIZE = 20;
 
   async function loadAllPosts() {
-    const listEl   = document.getElementById("adminPostsList");
-    const pagerEl  = document.getElementById("adminPostsPager");
-    if (!listEl) return;
+    const listEl = document.getElementById("adminPostsList");
     listEl.innerHTML = `<p style="color:var(--muted); font-size:14px;">Loading…</p>`;
-
-    // Fetch all posts — the admin stats endpoint gives us recentPosts but we
-    // need everything; fall back to the public /api/posts endpoint.
     const result = await apiFetch("/api/posts?limit=500");
     if (!result) {
       listEl.innerHTML = `<p style="color:var(--danger); font-size:14px;">Couldn't load posts.</p>`;
@@ -259,10 +703,9 @@
   }
 
   function renderAdminPosts() {
-    const listEl  = document.getElementById("adminPostsList");
+    const listEl = document.getElementById("adminPostsList");
     const pagerEl = document.getElementById("adminPostsPager");
-    if (!listEl) return;
-    const query     = (document.getElementById("adminPostSearch")?.value || "").toLowerCase();
+    const query = (document.getElementById("adminPostSearch")?.value || "").toLowerCase();
     const catFilter = document.getElementById("adminPostCatFilter")?.value || "";
     let filtered = allAdminPosts.filter(p => {
       if (query && !p.title.toLowerCase().includes(query) && !p.author.toLowerCase().includes(query)) return false;
@@ -270,14 +713,14 @@
       if (catFilter && catFilter !== "none" && (p.category || "").toLowerCase() !== catFilter) return false;
       return true;
     });
-    const total    = filtered.length;
-    const pages    = Math.ceil(total / ADMIN_PAGE_SIZE);
-    adminPostPage  = Math.max(0, Math.min(adminPostPage, pages - 1));
-    const slice    = filtered.slice(adminPostPage * ADMIN_PAGE_SIZE, (adminPostPage + 1) * ADMIN_PAGE_SIZE);
+    const total = filtered.length;
+    const pages = Math.ceil(total / ADMIN_PAGE_SIZE);
+    adminPostPage = Math.max(0, Math.min(adminPostPage, pages - 1));
+    const slice = filtered.slice(adminPostPage * ADMIN_PAGE_SIZE, (adminPostPage + 1) * ADMIN_PAGE_SIZE);
 
     if (!slice.length) {
-      listEl.innerHTML = `<p style="color:var(--muted); font-size:14px;">No posts match this filter.</p>`;
-      pagerEl.innerHTML = "";
+      listEl.innerHTML = `<p style="color:var(--muted); font-size:14px;">No posts match.</p>`;
+      if (pagerEl) pagerEl.innerHTML = "";
       return;
     }
 
@@ -285,9 +728,7 @@
       <div class="admin-post-row" data-post-id="${p.id}">
         <div class="admin-post-info">
           <a class="admin-post-title" href="post.html?id=${p.id}" target="_blank">${escapeHTML(p.title || "(untitled)")}</a>
-          <div class="admin-post-meta">@${escapeHTML(p.author)} &middot; ${Progress.formatDateShort(p.date)}
-            ${p.category ? `&middot; <span style="color:var(--accent);">${escapeHTML(p.category)}</span>` : ""}
-          </div>
+          <div class="admin-post-meta">@${escapeHTML(p.author)} · ${Progress.formatDateShort(p.date)}${p.category ? ` · <span style="color:var(--accent);">${escapeHTML(p.category)}</span>` : ""}</div>
         </div>
         <select class="admin-cat-select" data-post-id="${p.id}" title="Set category">
           <option value="">No category</option>
@@ -296,73 +737,48 @@
           <option value="random"      ${p.category === "random"      ? "selected" : ""}>Random</option>
         </select>
         <button class="admin-delete-btn" data-post-id="${p.id}" title="Delete post">Delete</button>
-      </div>
-    `).join("");
+      </div>`).join("");
 
     // Category change
     listEl.querySelectorAll(".admin-cat-select").forEach(sel => {
       sel.addEventListener("change", async () => {
-        const postId  = sel.dataset.postId;
-        const cat     = sel.value;
-        const user    = Progress.getCurrentUser();
+        const postId = sel.dataset.postId;
+        const user = Progress.getCurrentUser();
         if (!user) return;
         sel.disabled = true;
-        // Try PATCH /api/posts/:id first (standard REST).
-        // The server checks requesterUsername against its admin list.
-        let r = await apiFetch(`/api/posts/${postId}`, {
+        const r = await apiFetch(`/api/posts/${postId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ category: cat || null, requesterUsername: user.username })
+          body: JSON.stringify({ category: sel.value || null, requesterUsername: user.username })
         });
-        // Some servers use PUT for full-resource updates — try that as fallback.
-        if (!r) {
-          r = await apiFetch(`/api/posts/${postId}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ category: cat || null, requesterUsername: user.username })
-          });
-        }
         sel.disabled = false;
         if (r) {
           showToast("Category updated.");
           const post = allAdminPosts.find(p => p.id === postId);
-          if (post) post.category = cat || null;
+          if (post) post.category = sel.value || null;
           renderAdminPosts();
         } else {
-          showToast("Couldn't update category — the server may not support this yet.");
+          showToast("Couldn't update category.");
           sel.value = allAdminPosts.find(p => p.id === postId)?.category || "";
         }
       });
     });
 
-    // Delete — uses the custom confirm dialog defined at the bottom of this page
+    // Delete
     listEl.querySelectorAll(".admin-delete-btn").forEach(btn => {
       btn.addEventListener("click", async () => {
         const postId = btn.dataset.postId;
-        const post   = allAdminPosts.find(p => p.id === postId);
+        const post = allAdminPosts.find(p => p.id === postId);
         const ok = await adminConfirm(
           "Delete this post?",
-          `<strong>${escapeHTML(post?.title || postId)}</strong> by @${escapeHTML(post?.author || "?")}<br><br>This permanently removes the post and all its replies. There's no undo.`,
-          "Delete forever",
-          "danger"
+          `<strong>${escapeHTML(post?.title || postId)}</strong> by @${escapeHTML(post?.author || "?")}<br><br>Permanently removes the post and all replies.`,
+          "Delete forever", "danger"
         );
         if (!ok) return;
         const user = Progress.getCurrentUser();
         if (!user) return;
         btn.disabled = true;
-        // Use DELETE without a body for max server compatibility; pass admin
-        // identity as a query param instead.
-        let r = await apiFetch(`/api/posts/${postId}?requesterUsername=${encodeURIComponent(user.username)}`, {
-          method: "DELETE"
-        });
-        // Some servers expect the body form even on DELETE — try that fallback.
-        if (r === null) {
-          r = await apiFetch(`/api/posts/${postId}`, {
-            method: "DELETE",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ requesterUsername: user.username })
-          });
-        }
+        const r = await apiFetch(`/api/posts/${postId}?requesterUsername=${encodeURIComponent(user.username)}`, { method: "DELETE" });
         if (r !== null) {
           showToast("Post deleted.");
           allAdminPosts = allAdminPosts.filter(p => p.id !== postId);
@@ -376,10 +792,9 @@
 
     // Pagination
     if (pagerEl) {
-      pagerEl.innerHTML = Array.from({ length: pages }, (_, i) => `
-        <button class="btn ${i === adminPostPage ? "primary" : ""}" data-page="${i}"
-          style="padding:6px 14px; font-size:13px;">${i + 1}</button>
-      `).join("");
+      pagerEl.innerHTML = pages > 1 ? Array.from({ length: pages }, (_, i) => `
+        <button class="btn ${i === adminPostPage ? "primary" : ""}" data-page="${i}" style="padding:6px 14px; font-size:13px;">${i+1}</button>
+      `).join("") : "";
       pagerEl.querySelectorAll("button").forEach(btn => {
         btn.addEventListener("click", () => {
           adminPostPage = Number(btn.dataset.page);
@@ -390,78 +805,262 @@
     }
   }
 
-  // Wire search/filter inputs
   ["adminPostSearch","adminPostCatFilter"].forEach(id => {
-    document.addEventListener("input", e => { if (e.target.id === id) { adminPostPage = 0; renderAdminPosts(); } });
+    document.addEventListener("input",  e => { if (e.target.id === id) { adminPostPage = 0; renderAdminPosts(); } });
     document.addEventListener("change", e => { if (e.target.id === id) { adminPostPage = 0; renderAdminPosts(); } });
   });
 
-  // ── Custom confirm dialog ──────────────────────────────────────────────────
-  // Returns a Promise<boolean>. Resolves true if the user clicked the confirm
-  // button, false if they clicked cancel or the backdrop.
+  // ── Users tab ───────────────────────────────────────────────────────────────
+  let adminUserPage = 0;
+  let adminUserTotal = 0;
+  const USER_PAGE_SIZE = 25;
+  let userSearchTimeout = null;
+
+  async function loadAdminUsers(page = 0) {
+    adminUserPage = page;
+    const listEl = document.getElementById("adminUsersList");
+    listEl.innerHTML = `<p style="color:var(--muted); font-size:14px;">Loading…</p>`;
+    const q = document.getElementById("adminUserSearch")?.value || "";
+    const result = await apiFetch(`/api/admin/users-list?page=${page}&limit=${USER_PAGE_SIZE}&q=${encodeURIComponent(q)}`);
+    if (!result) {
+      listEl.innerHTML = `<p style="color:var(--danger); font-size:14px;">Couldn't load users.</p>`;
+      return;
+    }
+    adminUserTotal = result.total;
+    renderAdminUsers(result.users);
+  }
+
+  function renderAdminUsers(users) {
+    const listEl = document.getElementById("adminUsersList");
+    const pagerEl = document.getElementById("adminUsersPager");
+
+    if (!users.length) {
+      listEl.innerHTML = `<p style="color:var(--muted); font-size:14px;">No users found.</p>`;
+      if (pagerEl) pagerEl.innerHTML = "";
+      return;
+    }
+
+    listEl.innerHTML = users.map(u => {
+      const isBanned = !!u.banned;
+      const isLocked = !!u.locked;
+      const role = u.adminRole ? ` · <span style="font-weight:600; color:var(--accent);">${u.adminRole}</span>` : "";
+      const badge = u.displayBadge ? ` · 🏅 ${u.displayBadge}` : "";
+      return `
+      <div class="admin-user-row" data-user-id="${u.id}">
+        ${u.avatar
+          ? `<img src="${u.avatar}" alt="" style="width:36px; height:36px; border-radius:50%; object-fit:cover; flex-shrink:0;">`
+          : `<div class="initials-lg" style="width:36px; height:36px; font-size:13px; flex-shrink:0;">${initials(u.name)}</div>`
+        }
+        <div class="admin-user-info">
+          <a href="user.html?id=${u.id}" class="admin-user-name" style="text-decoration:none; color:var(--ink);">${escapeHTML(u.name)} <span style="font-weight:400; color:var(--muted);">@${escapeHTML(u.username)}</span></a>
+          <div class="admin-user-meta">${Progress.formatDateShort(u.joined)}${role}${badge}${isBanned ? " · <strong style='color:var(--danger);'>BANNED</strong>" : ""}${isLocked ? " · <em style='color:var(--muted);'>locked</em>" : ""}</div>
+        </div>
+        <div class="admin-user-actions">
+          ${isBanned
+            ? `<button class="btn-unban" data-action="unban" data-id="${u.id}" data-username="${escapeHTML(u.username)}">Unban</button>`
+            : `<button class="btn-ban" data-action="ban" data-id="${u.id}" data-username="${escapeHTML(u.username)}">Ban</button>`
+          }
+          ${isLocked
+            ? `<button data-action="unlock" data-id="${u.id}" data-username="${escapeHTML(u.username)}">Unlock</button>`
+            : `<button data-action="lock" data-id="${u.id}" data-username="${escapeHTML(u.username)}">Lock</button>`
+          }
+        </div>
+      </div>`;
+    }).join("");
+
+    listEl.querySelectorAll("[data-action]").forEach(btn => {
+      btn.addEventListener("click", () => handleUserAction(btn.dataset.action, btn.dataset.id, btn.dataset.username));
+    });
+
+    const pages = Math.ceil(adminUserTotal / USER_PAGE_SIZE);
+    if (pagerEl) {
+      pagerEl.innerHTML = pages > 1 ? Array.from({ length: pages }, (_, i) => `
+        <button class="btn ${i === adminUserPage ? "primary" : ""}" data-page="${i}" style="padding:6px 14px; font-size:13px;">${i+1}</button>
+      `).join("") : "";
+      pagerEl.querySelectorAll("button").forEach(b => {
+        b.addEventListener("click", () => loadAdminUsers(Number(b.dataset.page)));
+      });
+    }
+  }
+
+  async function handleUserAction(action, userId, username) {
+    const url = action === "ban"    ? `/api/users/${userId}/ban`
+              : action === "unban"  ? `/api/users/${userId}/unban`
+              : action === "lock"   ? `/api/users/${userId}/lock`
+              : action === "unlock" ? `/api/users/${userId}/lock`
+              : null;
+    if (!url) return;
+    const body = (action === "lock" || action === "unlock")
+      ? JSON.stringify({ locked: action === "lock" })
+      : undefined;
+    const opts = { method: "POST" };
+    if (body) { opts.headers = { "Content-Type": "application/json" }; opts.body = body; }
+    const r = await apiFetch(url, opts);
+    if (r) {
+      showToast(`@${username} ${action}ned.`);
+      loadAdminUsers(adminUserPage);
+    } else {
+      showToast("Action failed.");
+    }
+  }
+
+  document.getElementById("adminUserSearch")?.addEventListener("input", () => {
+    clearTimeout(userSearchTimeout);
+    userSearchTimeout = setTimeout(() => loadAdminUsers(0), 400);
+  });
+
+  // ── Platform: maintenance ───────────────────────────────────────────────────
+  async function loadMaintenance() {
+    const r = await apiFetch("/api/admin/maintenance");
+    if (!r) return;
+    const tog = document.getElementById("maintenanceToggle");
+    const status = document.getElementById("maintenanceStatus");
+    tog.checked = !!r.maintenance;
+    status.textContent = r.maintenance ? "⚠️ Maintenance mode is ON. Users will see an error." : "Maintenance mode is off. Site is live.";
+  }
+
+  document.getElementById("maintenanceToggle").addEventListener("change", async (e) => {
+    const on = e.target.checked;
+    const ok = await adminConfirm(
+      on ? "Enable maintenance mode?" : "Disable maintenance mode?",
+      on ? "Users will see an error page until you turn this off."
+         : "The site will go back to normal immediately.",
+      on ? "Enable" : "Disable"
+    );
+    if (!ok) { e.target.checked = !on; return; }
+    const r = await apiFetch("/api/admin/maintenance", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ maintenance: on })
+    });
+    if (!r) { showToast("Couldn't update maintenance mode."); e.target.checked = !on; return; }
+    document.getElementById("maintenanceStatus").textContent = on
+      ? "⚠️ Maintenance mode is ON."
+      : "Maintenance mode is off. Site is live.";
+    showToast(on ? "Maintenance mode enabled." : "Maintenance mode disabled.");
+  });
+
+  // ── Platform: digest ────────────────────────────────────────────────────────
+  ["sendDigestBtn", "sendDigestBtn2"].forEach(id => {
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    btn.addEventListener("click", async () => {
+      btn.disabled = true; btn.textContent = "Sending…";
+      const r = await apiFetch("/api/admin/send-digest", { method: "POST" });
+      btn.disabled = false; btn.textContent = id === "sendDigestBtn2" ? "Send weekly digest" : "📬 Send digest";
+      if (r && typeof r.sent === "number") showToast(`Digest sent to ${r.sent} user${r.sent !== 1 ? "s" : ""}.`);
+      else if (r?.skipped) showToast(`Not sent: ${r.skipped}`);
+      else showToast("Something went wrong.");
+    });
+  });
+
+  // ── Platform: announcement ──────────────────────────────────────────────────
+  document.getElementById("sendAnnounceBtn").addEventListener("click", async () => {
+    const title  = document.getElementById("announceTitle").value.trim();
+    const body   = document.getElementById("announceBody").value.trim();
+    const target = document.getElementById("announceTarget").value.trim().replace(/^@/, "");
+    const status = document.getElementById("announceStatus");
+
+    if (!title || !body) { showToast("Title and body are required."); return; }
+
+    const btn = document.getElementById("sendAnnounceBtn");
+    btn.disabled = true; btn.textContent = "Sending…";
+    status.textContent = "";
+
+    const r = await apiFetch("/api/admin/announcement", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title, body, targetUsername: target || undefined })
+    });
+    btn.disabled = false; btn.textContent = "Send announcement";
+
+    if (r && typeof r.sent === "number") {
+      showToast(`Sent to ${r.sent} user${r.sent !== 1 ? "s" : ""}.`);
+      status.textContent = `✓ Sent to ${r.sent}`;
+      document.getElementById("announceTitle").value = "";
+      document.getElementById("announceBody").value = "";
+      document.getElementById("announceTarget").value = "";
+    } else {
+      showToast("Couldn't send announcement.");
+      status.textContent = "Failed.";
+    }
+  });
+
+  // ── Platform: badge ─────────────────────────────────────────────────────────
+  document.getElementById("assignBadgeBtn").addEventListener("click", async () => {
+    const username = document.getElementById("badgeUsername").value.trim().replace(/^@/, "");
+    const badge    = document.getElementById("badgeSelect").value || null;
+    const statusEl = document.getElementById("badgeStatus");
+    if (!username) { showToast("Enter a username."); return; }
+
+    const btn = document.getElementById("assignBadgeBtn");
+    btn.disabled = true; statusEl.textContent = "Saving…";
+
+    const r = await apiFetch(`/api/admin/users/${encodeURIComponent(username)}/badge`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ badge })
+    });
+    btn.disabled = false;
+
+    if (r) {
+      statusEl.textContent = badge ? `✓ Badge "${badge}" set` : "✓ Badge removed";
+      showToast(badge ? `Badge set for @${username}` : `Badge removed from @${username}`);
+    } else {
+      statusEl.textContent = "Failed.";
+      showToast("Couldn't update badge.");
+    }
+  });
+
+  // ── Platform: migration ─────────────────────────────────────────────────────
+  document.getElementById("migrateBtn").addEventListener("click", async () => {
+    const btn = document.getElementById("migrateBtn");
+    const status = document.getElementById("migrateStatus");
+    btn.disabled = true; status.textContent = "Running…";
+    const token = localStorage.getItem("progress:authToken");
+    const r = await apiFetch("/api/admin/migrate-posts-to-supabase", { method: "POST" });
+    btn.disabled = false;
+    if (r) {
+      status.textContent = `✓ ${r.migrated} migrated, ${r.skipped} skipped, ${r.errors} errors`;
+      showToast(`Migration done: ${r.migrated} moved.`);
+    } else {
+      status.textContent = "Failed.";
+      showToast("Migration failed.");
+    }
+  });
+
+  // ── Confirm dialog ──────────────────────────────────────────────────────────
   function adminConfirm(title, bodyHtml, confirmLabel = "Confirm", variant = "primary") {
     return new Promise(resolve => {
-      // Remove any leftover dialog
       document.getElementById("adminConfirmDialog")?.remove();
-
       const dlg = document.createElement("div");
       dlg.id = "adminConfirmDialog";
-      dlg.style.cssText = `
-        position:fixed; inset:0; z-index:9000;
-        display:flex; align-items:center; justify-content:center;
-        background:rgba(28,25,23,.45); backdrop-filter:blur(4px);
-        animation:fadeIn .15s ease;
-      `;
+      dlg.style.cssText = `position:fixed; inset:0; z-index:9000; display:flex; align-items:center; justify-content:center; background:rgba(28,25,23,.45); backdrop-filter:blur(4px);`;
       dlg.innerHTML = `
-        <style>
-          @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
-          @keyframes popIn  { from { opacity:0; transform:scale(.94) translateY(8px); } to { opacity:1; transform:none; } }
-        </style>
-        <div style="
-          background:var(--paper);
-          border:1px solid var(--mocha-light);
-          border-radius:14px;
-          box-shadow:0 20px 60px rgba(0,0,0,.22);
-          padding:28px 28px 24px;
-          max-width:380px;
-          width:90%;
-          animation:popIn .18s ease;
-        ">
+        <div style="background:var(--paper); border:1px solid var(--mocha-light); border-radius:14px; box-shadow:0 20px 60px rgba(0,0,0,.22); padding:28px 28px 24px; max-width:380px; width:90%;">
           <h3 style="font-family:var(--font-display); font-size:20px; margin:0 0 10px; color:var(--ink);">${title}</h3>
           <p style="font-size:14px; color:var(--muted); line-height:1.55; margin:0 0 22px;">${bodyHtml}</p>
           <div style="display:flex; gap:10px; justify-content:flex-end;">
-            <button id="adminConfirmCancel" style="
-              padding:10px 20px; border-radius:var(--radius); border:1px solid var(--mocha-light);
-              background:var(--paper); color:var(--ink); font-size:14px; font-weight:600; cursor:pointer;
-            ">Cancel</button>
-            <button id="adminConfirmOk" style="
-              padding:10px 20px; border-radius:var(--radius); border:none;
-              background:${variant === "danger" ? "var(--danger)" : "var(--ink)"};
-              color:#fff; font-size:14px; font-weight:600; cursor:pointer;
-            ">${confirmLabel}</button>
+            <button id="adminConfirmCancel" style="padding:10px 20px; border-radius:var(--radius); border:1px solid var(--mocha-light); background:var(--paper); color:var(--ink); font-size:14px; font-weight:600; cursor:pointer;">Cancel</button>
+            <button id="adminConfirmOk" style="padding:10px 20px; border-radius:var(--radius); border:none; background:${variant==="danger"?"var(--danger)":"var(--ink)"}; color:#fff; font-size:14px; font-weight:600; cursor:pointer;">${confirmLabel}</button>
           </div>
-        </div>
-      `;
-
-      function cleanup(result) {
-        dlg.style.opacity = "0";
-        dlg.style.transition = "opacity .12s ease";
-        setTimeout(() => dlg.remove(), 130);
-        resolve(result);
-      }
-
+        </div>`;
+      const cleanup = result => {
+        dlg.style.opacity = "0"; dlg.style.transition = "opacity .1s";
+        setTimeout(() => dlg.remove(), 120); resolve(result);
+      };
       dlg.addEventListener("click", e => { if (e.target === dlg) cleanup(false); });
       dlg.querySelector("#adminConfirmCancel").addEventListener("click", () => cleanup(false));
       dlg.querySelector("#adminConfirmOk").addEventListener("click",    () => cleanup(true));
       document.addEventListener("keydown", function esc(e) {
         if (e.key === "Escape") { document.removeEventListener("keydown", esc); cleanup(false); }
       });
-
       document.body.appendChild(dlg);
       dlg.querySelector("#adminConfirmOk").focus();
     });
   }
 
+  // ── Bootstrap ───────────────────────────────────────────────────────────────
   async function start() {
     initShell("admin");
     await Progress.loadFromApi().catch(() => {});

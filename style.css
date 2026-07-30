@@ -1154,7 +1154,7 @@ body.account-banned .mobile-fab {
   border: none;
   padding: 0;
 }
-/* Creator badge gets extra size so it's actually visible in the feed */
+/* Creator badge inline (feed/list) — slightly larger */
 .display-badge-image.creator-badge {
   width: 28px;
   height: 28px;
@@ -1162,6 +1162,31 @@ body.account-banned .mobile-fab {
 .display-badge-text {
   font-size: 14px;
   line-height: 1;
+}
+
+/* Profile page — badge gets its own line and is displayed much larger */
+.profile-display-badge-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.profile-display-badge-wrap .display-badge-image {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  border: 2px solid var(--mocha-light);
+  padding: 4px;
+  background: var(--mocha-wash);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+.profile-display-badge-wrap .display-badge-text {
+  font-size: 32px;
+  line-height: 1;
+}
+.profile-display-badge-wrap .display-badge-image.creator-badge {
+  width: 44px;
+  height: 44px;
 }
 .tooltip-badge-image {
   width: 1.2rem;

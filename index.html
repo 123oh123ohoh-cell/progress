@@ -151,7 +151,7 @@
           <p class="entry-excerpt">${renderEmoticonsText(p.excerpt, "inline-emoticon")}</p>
           <div class="entry-meta">
             <span>${ICONS.heart.replace('viewBox="0 0 24 24"','viewBox="0 0 24 24" width="13" height="13"')} ${p.likes}</span>
-            <span class="entry-author">${avatarHTML(author, 22)}${renderDisplayBadge(author)}<a class="username-link" href="user.html?id=${author ? author.id : ""}" onclick="event.stopPropagation()">@${p.author}</a></span>
+            <span class="entry-author">${avatarHTML(author, 22)}<a class="username-link" href="user.html?id=${author ? author.id : ""}" onclick="event.stopPropagation()">@${p.author}</a></span>
           </div>
         </div>
         ${p.cover ? `<div class="entry-thumb"><img src="${p.cover}" alt="" loading="lazy"></div>` : ""}
