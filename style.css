@@ -3270,6 +3270,25 @@ body.mobile .tb-sep {
 .dm-listen-eq span:nth-child(3) { animation: eq-bar-3 1.3s ease-in-out infinite; }
 .dm-listen-banner.is-paused .dm-listen-eq span { animation: none; height: 4px; }
 
+/* Progress bar inside the banner */
+.dm-listen-progress {
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255,255,255,0.12);
+  overflow: hidden;
+  margin-top: 5px;
+}
+.dm-listen-progress-fill {
+  height: 100%;
+  background: #1DB954;
+  border-radius: 2px;
+  transition: width 0.9s linear;
+}
+.dm-listen-banner.is-paused .dm-listen-progress-fill {
+  background: rgba(255,255,255,0.3);
+  transition: none;
+}
+
 /* Track info */
 .dm-listen-info { flex: 1; min-width: 0; }
 .dm-listen-banner-track {

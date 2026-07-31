@@ -209,21 +209,23 @@ function renderNowPlayingWidget(data) {
     </a>`;
 }
 
+function tickProgressEl(el) {
+  const duration = Number(el.dataset.durationMs);
+  const baseProgress = Number(el.dataset.progressMs);
+  const fetchedAt = Number(el.dataset.fetchedAt);
+  const isPlaying = el.dataset.isPlaying === "1";
+  if (!duration) return;
+  const elapsed = isPlaying ? baseProgress + (Date.now() - fetchedAt) : baseProgress;
+  const clamped = Math.max(0, Math.min(duration, elapsed));
+  const pct = Math.min(100, (clamped / duration) * 100);
+  const fill = el.querySelector(".now-playing-progress-fill, .dm-listen-progress-fill");
+  const elapsedLabel = el.querySelector(".now-playing-elapsed");
+  if (fill) fill.style.width = pct.toFixed(2) + "%";
+  if (elapsedLabel) elapsedLabel.textContent = formatNowPlayingClock(clamped);
+}
+
 function tickNowPlayingWidgets() {
-  document.querySelectorAll(".now-playing-widget[data-duration-ms]").forEach(el => {
-    const duration = Number(el.dataset.durationMs);
-    const baseProgress = Number(el.dataset.progressMs);
-    const fetchedAt = Number(el.dataset.fetchedAt);
-    const isPlaying = el.dataset.isPlaying === "1";
-    if (!duration) return;
-    const elapsed = isPlaying ? baseProgress + (Date.now() - fetchedAt) : baseProgress;
-    const clamped = Math.max(0, Math.min(duration, elapsed));
-    const pct = Math.min(100, (clamped / duration) * 100);
-    const fill = el.querySelector(".now-playing-progress-fill");
-    const elapsedLabel = el.querySelector(".now-playing-elapsed");
-    if (fill) fill.style.width = pct.toFixed(2) + "%";
-    if (elapsedLabel) elapsedLabel.textContent = formatNowPlayingClock(clamped);
-  });
+  document.querySelectorAll(".now-playing-widget[data-duration-ms], .dm-listen-banner[data-duration-ms]").forEach(tickProgressEl);
 }
 setInterval(tickNowPlayingWidgets, 1000);
 

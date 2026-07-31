@@ -127,25 +127,25 @@
       const artEl = s.albumArt
         ? `<img class="chat-song-art" src="${escapeHTML(s.albumArt)}" alt="">`
         : `<div class="chat-song-art-fallback">♪</div>`;
-      const previewBtn = s.previewUrl
-        ? `<button type="button" class="chat-song-preview-btn" data-preview="${escapeHTML(s.previewUrl)}" aria-label="Preview">
+      // Wrap the whole card in a Spotify link; add play button only if preview exists
+      const spotifyHref = escapeHTML(s.spotifyUrl || "#");
+      const playBtn = s.previewUrl
+        ? `<button type="button" class="chat-song-preview-btn" data-preview="${escapeHTML(s.previewUrl)}" aria-label="Preview 30s">
              <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
            </button>`
-        : `<a href="${escapeHTML(s.spotifyUrl || "#")}" target="_blank" rel="noopener" class="chat-song-preview-btn" aria-label="Open on Spotify">
-             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-           </a>`;
-      songCardHTML = `<div class="chat-song-card">
+        : "";
+      songCardHTML = `<a class="chat-song-card" href="${spotifyHref}" target="_blank" rel="noopener" aria-label="Open on Spotify">
         ${artEl}
         <div class="chat-song-info">
           <span class="chat-song-name">${escapeHTML(s.name)}</span>
           <span class="chat-song-artist">${escapeHTML(s.artists)}</span>
           <div class="chat-song-spotify-badge">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="#1DB954"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
-            Spotify
+            Open on Spotify
           </div>
         </div>
-        ${previewBtn}
-      </div>`;
+        ${playBtn}
+      </a>`;
     }
 
     // Game card
@@ -638,9 +638,11 @@
       el.querySelectorAll(".chat-song-result").forEach(row => {
         row.addEventListener("click", () => {
           songPending = JSON.parse(row.dataset.song);
-          const input = document.getElementById("chatInput");
-          if (input) { input.value = ""; input.placeholder = `🎵 ${songPending.name} — ${songPending.artists}`; input.focus(); }
           el.classList.remove("open");
+          // Send immediately — no need to tap Send
+          sendMessage("", null);
+          const input = document.getElementById("chatInput");
+          if (input) { input.value = ""; input.placeholder = "Say something…"; }
         });
       });
     }
@@ -1261,25 +1263,33 @@
       chatLog.addEventListener("scroll", updateScrollBtn, { passive: true });
     }
 
-    // Song preview playback (delegated)
+    // Song preview playback (delegated) — stop parent link navigation
     document.getElementById("chatLog").addEventListener("click", (e) => {
       const btn = e.target.closest(".chat-song-preview-btn[data-preview]");
       if (!btn) return;
+      e.preventDefault(); e.stopPropagation();
       const url = btn.dataset.preview;
+      const PLAY_SVG  = `<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
+      const PAUSE_SVG = `<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`;
       if (previewAudio && !previewAudio.paused) {
         previewAudio.pause();
-        document.querySelectorAll(".chat-song-preview-btn.playing").forEach(b => b.classList.remove("playing"));
+        document.querySelectorAll(".chat-song-preview-btn.playing").forEach(b => { b.classList.remove("playing"); b.innerHTML = PLAY_SVG; });
         if (previewAudio._src === url) { previewAudio = null; return; }
       }
       previewAudio = new Audio(url);
       previewAudio._src = url;
       previewAudio.volume = 0.7;
-      previewAudio.play().catch(() => {});
-      btn.classList.add("playing");
-      btn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`;
+      previewAudio.play().then(() => {
+        btn.classList.add("playing");
+        btn.innerHTML = PAUSE_SVG;
+      }).catch(() => {
+        showToast("No preview available — opening on Spotify…");
+        const card = btn.closest(".chat-song-card");
+        if (card && card.href) window.open(card.href, "_blank", "noopener");
+      });
       previewAudio.addEventListener("ended", () => {
         btn.classList.remove("playing");
-        btn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
+        btn.innerHTML = PLAY_SVG;
         previewAudio = null;
       });
     });
@@ -1396,7 +1406,20 @@
     const viewer = Progress.getCurrentUser();
     const joined = viewer && peerSession.participants.includes(viewer.username);
     banner.style.display = "flex";
-    banner.className = `dm-listen-banner${peerSession.isPlaying === false ? " is-paused" : ""}`;
+    const isPlaying = peerSession.isPlaying !== false;
+    banner.className = `dm-listen-banner${isPlaying ? "" : " is-paused"}`;
+
+    // Progress bar data (mirrors now-playing-widget approach so tickNowPlayingWidgets picks it up)
+    const hasProg = typeof peerSession.progressMs === "number" && typeof peerSession.durationMs === "number" && peerSession.durationMs > 0;
+    const pct = hasProg ? Math.min(100, (peerSession.progressMs / peerSession.durationMs) * 100) : 0;
+    if (hasProg) {
+      banner.dataset.durationMs  = peerSession.durationMs;
+      banner.dataset.progressMs  = peerSession.progressMs;
+      banner.dataset.fetchedAt   = Date.now();
+      banner.dataset.isPlaying   = isPlaying ? "1" : "0";
+    } else {
+      delete banner.dataset.durationMs;
+    }
 
     const artEl = peerSession.albumArt
       ? `<img class="dm-listen-art" src="${escapeHTML(peerSession.albumArt)}" alt="">`
@@ -1408,6 +1431,9 @@
       <div class="dm-listen-info">
         <span class="dm-listen-banner-track">${escapeHTML(peerSession.trackName || "Listening to something")}</span>
         <span class="dm-listen-banner-artist">${escapeHTML(peerSession.artistNames || "")}</span>
+        ${hasProg ? `<div class="dm-listen-progress">
+          <div class="dm-listen-progress-fill" style="width:${pct.toFixed(2)}%"></div>
+        </div>` : ""}
       </div>
       <div class="dm-listen-actions">
         ${joined
