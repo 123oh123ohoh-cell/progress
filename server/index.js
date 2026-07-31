@@ -453,7 +453,14 @@ function broadcastGlobalPresenceUpdate() {
   for (const username of usernameConnections.keys()) {
     statuses[username] = getUserPresenceStatus(username);
   }
-  broadcastToRoom("presence", { type: "global-presence", statuses });
+  // Broadcast to ALL connected clients (every room, not just the dedicated
+  // presence room) so the chat page can show live online dots in the DM list.
+  const payload = JSON.stringify({ type: "global-presence", statuses });
+  for (const conns of usernameConnections.values()) {
+    for (const ws of conns) {
+      if (ws.readyState === 1) ws.send(payload);
+    }
+  }
 }
 
 // ── Transactional email via Resend ───────────────────────────────────────────
@@ -2358,19 +2365,25 @@ app.delete("/api/notifications/:id", requireAuth, asyncHandler(async (req, res) 
   res.json({ ok: true });
 }));
 
-async function createChatMessage({ room, author, body, image }) {
+async function createChatMessage({ room, author, body, image, replyTo }) {
   const targetRoom = (room || DEFAULT_CHAT_ROOM).toString().slice(0, 200);
   const trimmed = (body || "").toString().trim();
   const safeImage = (typeof image === "string" && image.startsWith("https://")) ? image : null;
   if (!author || (!trimmed && !safeImage)) return null;
   if (!canAccessRoom(targetRoom, author)) return null;
   if (await isUsernameBanned(author)) return null;
+  const safeReplyTo = replyTo && typeof replyTo === "object" ? {
+    id:     String(replyTo.id     || "").slice(0, 50),
+    author: String(replyTo.author || "").slice(0, 50),
+    body:   String(replyTo.body   || "").slice(0, 300)
+  } : null;
   const message = {
     _id: generateId("m"),
     room: targetRoom,
     author,
     body: trimmed.slice(0, 2000),
     image: safeImage,
+    replyTo: safeReplyTo,
     time: new Date().toISOString()
   };
   await db.collection("messages").insertOne(message);
@@ -3066,7 +3079,7 @@ connect()
           return;
         }
         if (data.type === "send") {
-          createChatMessage({ room: ws.room, author: ws.username, body: data.body, image: data.image }).catch(err => {
+          createChatMessage({ room: ws.room, author: ws.username, body: data.body, image: data.image, replyTo: data.replyTo }).catch(err => {
             console.error("Chat message failed:", err);
           });
         } else if (data.type === "typing") {

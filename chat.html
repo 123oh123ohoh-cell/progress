@@ -41,6 +41,12 @@
   let lastGroupAuthor = null;
   let lastGroupTime   = null;
 
+  // Online presence: username → "online" | "idle" | "offline"
+  const onlineStatuses = new Map();
+
+  // Reply context
+  let replyContext = null;
+
   let currentUser = null;
   let currentRoom = GLOBAL_ROOM;
   let currentPeer = null; // username, or null for the global room
@@ -77,11 +83,19 @@
     const author = Progress.getUser(msg.author);
     const mine = currentUser && msg.author === currentUser.username;
     const imageHTML = msg.image ? `<div class="chat-image"><img src="${msg.image}" alt="Shared image" loading="lazy"></div>` : "";
-    const bodyHTML = msg.body ? `<div class="chat-bubble">${renderMentionsInHTML(renderEmoticonsText(msg.body, "inline-emoticon"))}</div>` : "";
+    const replyHTML = msg.replyTo ? `
+      <div class="chat-reply-quote" data-target-id="${escapeHTML(msg.replyTo.id)}">
+        <span class="chat-reply-quote-author">@${escapeHTML(msg.replyTo.author)}</span>
+        <span class="chat-reply-quote-body">${escapeHTML((msg.replyTo.body || "📷 Image").slice(0, 120))}</span>
+      </div>` : "";
+    const bodyHTML = (msg.body || replyHTML) ? `<div class="chat-bubble">${replyHTML}${msg.body ? renderMentionsInHTML(renderEmoticonsText(msg.body, "inline-emoticon")) : ""}</div>` : "";
     return `
       <div class="chat-msg ${mine ? "mine" : ""} ${grouped ? "grouped" : ""}" data-id="${msg.id}">
         ${!mine ? `<a href="user.html?username=${encodeURIComponent(msg.author)}" class="chat-avatar">${avatarHTML(author, 30)}</a>` : ""}
         <div class="chat-bubble-col">
+          <div class="chat-reply-arrow" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>
+          </div>
           ${!mine && currentRoom === GLOBAL_ROOM && !grouped ? `<span class="chat-author">@${escapeHTML(msg.author)}</span>` : ""}
           ${imageHTML}
           ${bodyHTML}
@@ -173,9 +187,14 @@
 
     log.insertAdjacentHTML("beforeend", messageRow(msg, grouped));
 
-    if (animate) {
-      const el = log.querySelector(`[data-id="${msg.id}"]`);
-      if (el) el.classList.add("chat-msg-new");
+    const msgEl = log.querySelector(`[data-id="${msg.id}"]`);
+    if (msgEl) {
+      if (animate) msgEl.classList.add("chat-msg-new");
+      addSwipeToReply(msgEl, msg);
+      // Clicking a reply quote scrolls to the original message
+      msgEl.querySelectorAll(".chat-reply-quote").forEach(q => {
+        q.addEventListener("click", () => scrollToMessage(q.dataset.targetId));
+      });
     }
 
     scrollToBottom(false, animate); // smooth only for live messages, instant for history
@@ -189,6 +208,86 @@
     const unique = Array.from(new Set(users || []));
     if (!unique.length) { el.textContent = ""; return; }
     el.textContent = unique.length === 1 ? `@${unique[0]} is here` : `${unique.length} people here now`;
+  }
+
+  // ── Online presence ──────────────────────────────────────────────────────────
+
+  function applyGlobalPresence(statuses) {
+    onlineStatuses.clear();
+    for (const [u, s] of Object.entries(statuses || {})) onlineStatuses.set(u, s);
+    updatePresenceDots();
+  }
+
+  function updatePresenceDots() {
+    // Update rail dots
+    document.querySelectorAll(".chat-rail-btn[data-peer]").forEach(btn => {
+      const peer = btn.dataset.peer;
+      const status = onlineStatuses.get(peer) || "offline";
+      let dot = btn.querySelector(".chat-rail-dot");
+      if (status === "offline") { if (dot) dot.remove(); return; }
+      if (!dot) { dot = document.createElement("div"); dot.className = "chat-rail-dot"; btn.appendChild(dot); }
+      dot.className = `chat-rail-dot${status === "idle" ? " idle" : ""}`;
+    });
+    // Update sidebar room-list dots
+    document.querySelectorAll(".chat-room-item[data-peer]").forEach(item => {
+      const peer = item.dataset.peer;
+      const status = onlineStatuses.get(peer) || "offline";
+      let dot = item.querySelector(".chat-room-presence");
+      if (status === "offline") { if (dot) dot.remove(); return; }
+      if (!dot) { dot = document.createElement("div"); dot.className = "chat-room-presence"; item.appendChild(dot); }
+      dot.className = `chat-room-presence${status === "idle" ? " idle" : ""}`;
+    });
+  }
+
+  // ── Discord-style rail ───────────────────────────────────────────────────────
+
+  async function loadRail() {
+    const rooms = document.getElementById("chatRailRooms");
+    if (!rooms) return;
+    const conversations = await apiFetch("/api/chat/conversations") || [];
+    const slots = [];
+
+    // Global room
+    const globalActive = currentRoom === GLOBAL_ROOM;
+    slots.push(`
+      <div class="chat-rail-slot${globalActive ? " active" : ""}" data-room="${GLOBAL_ROOM}" title="Global">
+        <button type="button" class="chat-rail-btn" data-room="${GLOBAL_ROOM}">#</button>
+      </div>`);
+
+    if (conversations.length) {
+      slots.push(`<div class="chat-rail-separator"></div>`);
+      conversations.slice(0, 12).forEach(conv => {
+        const dmRoom = conv.room;
+        const peer = conv.with;
+        const peerUser = Progress.getUser(peer);
+        const active = currentRoom === dmRoom;
+        const status = onlineStatuses.get(peer) || "offline";
+        const dotHTML = status !== "offline"
+          ? `<div class="chat-rail-dot${status === "idle" ? " idle" : ""}"></div>` : "";
+        const unreadHTML = (!active && conv.unreadCount) ? `<div class="chat-rail-unread"></div>` : "";
+        const avatarInner = peerUser && peerUser.avatar
+          ? `<img src="${escapeHTML(peerUser.avatar)}" alt="${escapeHTML(peer)}">`
+          : `<span>${escapeHTML(peer.slice(0, 2).toUpperCase())}</span>`;
+        slots.push(`
+          <div class="chat-rail-slot${active ? " active" : ""}" data-room="${escapeHTML(dmRoom)}" title="@${escapeHTML(peer)}">
+            <button type="button" class="chat-rail-btn" data-room="${escapeHTML(dmRoom)}" data-peer="${escapeHTML(peer)}">
+              ${avatarInner}${dotHTML}${unreadHTML}
+            </button>
+          </div>`);
+      });
+    }
+
+    rooms.innerHTML = slots.join("");
+    rooms.querySelectorAll(".chat-rail-slot").forEach(slot => {
+      slot.addEventListener("click", () => {
+        const room = slot.dataset.room;
+        const btn = slot.querySelector(".chat-rail-btn");
+        const peer = btn?.dataset.peer || null;
+        const label = peer ? `@${peer}` : "Global";
+        if (room !== currentRoom) switchRoom(room, label, peer);
+        else document.querySelectorAll(".chat-rail-slot").forEach(s => s.classList.toggle("active", s.dataset.room === room));
+      });
+    });
   }
 
   function showTypingHint(username) {
@@ -236,7 +335,7 @@
         const msg = data.message;
         appendMessage(msg, true);
         if (currentRoom.startsWith("dm:")) {
-          loadSidebar();
+          loadSidebar(); loadRail();
           if (msg.author !== currentUser.username) {
             _seenByPeer.set(currentRoom, msg.id);
             updateSeenTicks();
@@ -245,6 +344,9 @@
         }
       } else if (data.type === "presence") {
         renderPresence(data.users);
+      } else if (data.type === "global-presence") {
+        applyGlobalPresence(data.statuses);
+        loadRail(); // refresh rail dots + unread badges
       } else if (data.type === "typing") {
         showTypingHint(data.username);
       } else if (data.type === "dm-notify") {
@@ -253,7 +355,7 @@
         // the one currently open, refresh the sidebar right away so the
         // unread badge appears instantly instead of waiting for the next
         // room switch.
-        if (data.room !== currentRoom) loadSidebar();
+        if (data.room !== currentRoom) { loadSidebar(); loadRail(); }
       } else if (data.type === "notification") {
         // chat.html doesn't open the shared presence socket app.js uses on
         // every other page, so it needs its own handling of this too.
@@ -316,17 +418,94 @@
   function sendMessage(text, imageUrl) {
     const trimmed = (text || "").trim();
     if (!trimmed && !imageUrl) return;
+    const reply = replyContext;
+    clearReplyContext();
     if (socket && socket.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify({ type: "send", body: trimmed, image: imageUrl || null }));
+      socket.send(JSON.stringify({ type: "send", body: trimmed, image: imageUrl || null, replyTo: reply }));
     } else {
       apiFetch("/api/chat/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ room: currentRoom, author: currentUser.username, body: trimmed, image: imageUrl || null })
+        body: JSON.stringify({ room: currentRoom, author: currentUser.username, body: trimmed, image: imageUrl || null, replyTo: reply })
       }).then(msg => {
-        if (msg) { appendMessage(msg); if (currentRoom.startsWith("dm:")) loadSidebar(); }
+        if (msg) { appendMessage(msg, true); if (currentRoom.startsWith("dm:")) loadSidebar(); }
       });
     }
+  }
+
+  // ── Reply context ────────────────────────────────────────────────────────────
+
+  function setReplyContext(msg) {
+    replyContext = { id: msg.id, author: msg.author, body: msg.body };
+    const preview = document.getElementById("chatReplyPreview");
+    if (preview) {
+      preview.querySelector(".chat-reply-preview-author").textContent = `@${msg.author}`;
+      preview.querySelector(".chat-reply-preview-body").textContent = msg.body || "📷 Image";
+      preview.classList.add("visible");
+    }
+    document.getElementById("chatInput")?.focus();
+  }
+
+  function clearReplyContext() {
+    replyContext = null;
+    const preview = document.getElementById("chatReplyPreview");
+    if (preview) preview.classList.remove("visible");
+  }
+
+  function scrollToMessage(id) {
+    const el = document.querySelector(`.chat-msg[data-id="${id}"]`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.classList.add("chat-msg-highlight");
+    setTimeout(() => el.classList.remove("chat-msg-highlight"), 1200);
+  }
+
+  // ── Swipe-to-reply ──────────────────────────────────────────────────────────
+
+  function addSwipeToReply(msgEl, msg) {
+    const THRESHOLD = 72;
+    let startX = 0, startY = 0, isDragging = false, triggered = false;
+    const bubbleCol = msgEl.querySelector(".chat-bubble-col");
+    const arrow = msgEl.querySelector(".chat-reply-arrow");
+
+    msgEl.addEventListener("touchstart", e => {
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      isDragging = false;
+      triggered = false;
+    }, { passive: true });
+
+    msgEl.addEventListener("touchmove", e => {
+      const dx = e.touches[0].clientX - startX;
+      const dy = e.touches[0].clientY - startY;
+      // Ignore mostly-vertical movement (user is scrolling)
+      if (!isDragging && Math.abs(dx) < 8) return;
+      if (Math.abs(dy) > Math.abs(dx) * 1.3) return;
+      isDragging = true;
+      if (dx <= 0) return; // only swipe right
+      const capped = Math.min(dx, THRESHOLD + 10);
+      if (bubbleCol) {
+        bubbleCol.style.transition = "none";
+        bubbleCol.style.transform = `translateX(${capped}px)`;
+      }
+      if (arrow) arrow.style.opacity = String(Math.min(1, capped / THRESHOLD));
+      if (capped >= THRESHOLD && !triggered) {
+        triggered = true;
+        if (arrow) arrow.classList.add("show");
+        if (navigator.vibrate) navigator.vibrate(12);
+      }
+    }, { passive: true });
+
+    msgEl.addEventListener("touchend", () => {
+      if (triggered) setReplyContext(msg);
+      // Spring the bubble back
+      if (bubbleCol) {
+        bubbleCol.style.transition = "transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)";
+        bubbleCol.style.transform = "";
+      }
+      if (arrow) { arrow.style.opacity = ""; arrow.classList.remove("show"); }
+      isDragging = false; triggered = false;
+    });
   }
 
   let pendingChatImageUrl = null;
@@ -445,7 +624,7 @@
     closeSocket();
     loadHistory();
     connectSocket();
-    // Autofocus input so you can start typing immediately after switching rooms
+    loadRail(); // keep rail active state in sync
     const chatInput = document.getElementById("chatInput");
     if (chatInput) setTimeout(() => chatInput.focus(), 80);
     const url = new URL(location.href);
@@ -600,15 +779,29 @@
   document.addEventListener("listen-session-updated", () => loadListenRail());
 
   function openChatSidebar() {
-    document.querySelector(".chat-sidebar").classList.add("open");
-    document.getElementById("chatSidebarOverlay").classList.add("open");
-    // Prevent body scroll/rubber-band on iOS while drawer is open
+    document.querySelector(".chat-sidebar")?.classList.add("open");
+    document.getElementById("chatSidebarOverlay")?.classList.add("open");
     document.body.style.overflow = "hidden";
   }
 
   function closeChatSidebar() {
-    document.querySelector(".chat-sidebar") && document.querySelector(".chat-sidebar").classList.remove("open");
-    document.getElementById("chatSidebarOverlay").classList.remove("open");
+    document.querySelector(".chat-sidebar")?.classList.remove("open");
+    document.getElementById("chatSidebarOverlay")?.classList.remove("open");
+    document.body.style.overflow = "";
+  }
+
+  function openNewDmModal() {
+    const modal = document.getElementById("chatNewDmModal");
+    if (!modal) return;
+    modal.classList.add("open");
+    document.body.style.overflow = "hidden";
+    setTimeout(() => document.getElementById("chatNewDmSheetInput")?.focus(), 320);
+  }
+
+  function closeNewDmModal() {
+    const modal = document.getElementById("chatNewDmModal");
+    if (!modal) return;
+    modal.classList.remove("open");
     document.body.style.overflow = "";
   }
 
@@ -616,6 +809,14 @@
     const wrap = document.getElementById("chatWrap");
     wrap.innerHTML = `
       <div class="chat-shell">
+
+        <!-- ── Discord-style icon rail (mobile only, replaces hamburger) ── -->
+        <nav class="chat-rail" id="chatRail" aria-label="Conversations">
+          <div id="chatRailRooms"></div>
+          <button type="button" class="chat-rail-new" id="chatRailNew" title="New message" aria-label="New message">+</button>
+        </nav>
+
+        <!-- ── Full sidebar (desktop / tablet) ── -->
         <aside class="chat-sidebar">
           <button type="button" class="chat-sidebar-close" id="chatSidebarClose" aria-label="Close sidebar">&times;</button>
           <div class="chat-listen-rail" id="chatListenRail"></div>
@@ -624,11 +825,10 @@
           </form>
           <div class="chat-room-list" id="chatRoomList"></div>
         </aside>
+
+        <!-- ── Main chat panel ── -->
         <div class="chat-panel">
           <div class="chat-panel-head">
-            <button type="button" class="chat-sidebar-toggle" id="chatSidebarToggle" aria-label="Open rooms">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
-            </button>
             <span class="chat-room-title" id="chatRoomTitle">Global</span>
             <span class="chat-status" id="chatStatus">Connecting…</span>
             <span class="chat-presence" id="chatPresence"></span>
@@ -636,13 +836,21 @@
               <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1-9.4 0-17-7.6-17-17 0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"/></svg>
             </button>
           </div>
-          <!-- DM listen-together compact banner — shown when the peer has a listen session -->
           <div class="dm-listen-banner" id="dmListenBanner" style="display:none;"></div>
           <div class="chat-log" id="chatLog">
             <div class="chat-empty">Loading…</div>
           </div>
           <div class="chat-typing" id="chatTyping"></div>
           <div class="chat-image-staged" id="chatImageStaged"></div>
+          <!-- Reply preview bar — shown when swiping to reply -->
+          <div class="chat-reply-preview" id="chatReplyPreview">
+            <div class="chat-reply-preview-bar"></div>
+            <div class="chat-reply-preview-text">
+              <span class="chat-reply-preview-author"></span>
+              <span class="chat-reply-preview-body"></span>
+            </div>
+            <button type="button" class="chat-reply-cancel" id="chatReplyCancel" aria-label="Cancel reply">&times;</button>
+          </div>
           <form class="chat-input-row" id="chatForm">
             <div class="emoji-picker chat-emoji-picker" id="chatEmojiPicker"></div>
             <button type="button" class="chat-emoji-btn" id="chatEmojiBtn" aria-label="Insert sticker" title="Stickers">🐱</button>
@@ -653,6 +861,18 @@
               <svg class="chat-send-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
               <span class="chat-send-label">Send</span>
             </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- New-DM bottom sheet (mobile) -->
+      <div class="chat-new-dm-modal" id="chatNewDmModal">
+        <div class="chat-new-dm-sheet">
+          <div class="chat-new-dm-sheet-handle"></div>
+          <h3>New message</h3>
+          <form id="chatNewDmSheetForm">
+            <input type="text" id="chatNewDmSheetInput" placeholder="@username" autocomplete="off">
+            <button type="submit" class="btn primary">Start conversation</button>
           </form>
         </div>
       </div>
@@ -696,38 +916,54 @@
       container: document.getElementById("chatForm")
     });
 
-    // Sidebar toggle (hamburger) — only visible on mobile via CSS
-    const sidebarToggle = document.getElementById("chatSidebarToggle");
-    if (sidebarToggle) sidebarToggle.addEventListener("click", openChatSidebar);
+    // Desktop sidebar close button (still used on tablet/desktop)
     const sidebarClose = document.getElementById("chatSidebarClose");
     if (sidebarClose) sidebarClose.addEventListener("click", closeChatSidebar);
-    const overlay = document.getElementById("chatSidebarOverlay");
-    if (overlay) overlay.addEventListener("click", closeChatSidebar);
 
-    // Swipe right from left edge to open sidebar; swipe left to close
-    let touchStartX = 0;
-    let touchStartY = 0;
-    const shell = wrap.querySelector(".chat-shell");
-    if (shell) {
-      shell.addEventListener("touchstart", (e) => {
-        touchStartX = e.touches[0].clientX;
-        touchStartY = e.touches[0].clientY;
-      }, { passive: true });
-      shell.addEventListener("touchend", (e) => {
-        const dx = e.changedTouches[0].clientX - touchStartX;
-        const dy = e.changedTouches[0].clientY - touchStartY;
-        if (Math.abs(dx) < Math.abs(dy) * 1.5) return; // mostly vertical — ignore
-        if (dx > 48 && touchStartX < 40) openChatSidebar(); // swipe right from edge
-        if (dx < -48) closeChatSidebar(); // swipe left anywhere
-      }, { passive: true });
+    // Reply cancel
+    const replyCancel = document.getElementById("chatReplyCancel");
+    if (replyCancel) replyCancel.addEventListener("click", clearReplyContext);
+
+    // Rail: new DM button opens the bottom sheet
+    const railNew = document.getElementById("chatRailNew");
+    if (railNew) railNew.addEventListener("click", openNewDmModal);
+
+    // New DM bottom sheet
+    const newDmModal = document.getElementById("chatNewDmModal");
+    if (newDmModal) {
+      newDmModal.addEventListener("click", e => { if (e.target === newDmModal) closeNewDmModal(); });
+    }
+    const newDmSheetForm = document.getElementById("chatNewDmSheetForm");
+    if (newDmSheetForm) {
+      newDmSheetForm.addEventListener("submit", e => {
+        e.preventDefault();
+        const input = document.getElementById("chatNewDmSheetInput");
+        const username = (input?.value || "").trim().replace(/^@/, "");
+        if (!username) return;
+        if (username.toLowerCase() === currentUser.username.toLowerCase()) {
+          showToast("You can't message yourself."); return;
+        }
+        const target = Progress.getUser(username);
+        if (!target) { showToast("Couldn't find that user."); return; }
+        input.value = "";
+        closeNewDmModal();
+        switchRoom(dmRoomId(currentUser.username, target.username), `@${target.username}`, target.username);
+        loadSidebar(); loadRail();
+      });
     }
 
     loadSidebar();
+    loadRail();
     loadHistory();
     connectSocket();
     loadListenRail();
     if (listenRailTimer) clearInterval(listenRailTimer);
     listenRailTimer = setInterval(loadListenRail, 1000);
+
+    // Fetch initial presence state for the rail dots
+    apiFetch("/api/online-users").then(data => {
+      if (data && data.statuses) applyGlobalPresence(data.statuses);
+    }).catch(() => {});
 
     // Show/hide call button when in a DM
     updateCallButtonVisibility();
