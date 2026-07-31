@@ -1783,8 +1783,9 @@ label:has(#themeToggleSwitch[data-on="1"]) .theme-flank-icon.moon { opacity: 1; 
   color: var(--ink);
 }
 .chat-room-item.has-unread .chat-room-sub {
+  font-weight: 600;
   color: var(--ink);
-  opacity: 0.75;
+  opacity: 1;
 }
 
 /* Avatar wrapper — positions the presence + unread dots */
@@ -1828,11 +1829,12 @@ label:has(#themeToggleSwitch[data-on="1"]) .theme-flank-icon.moon { opacity: 1; 
 /* Border matches the sidebar background; dark-mode handled via variable */
 [data-theme="dark"] .chat-room-presence { border-color: var(--mocha-wash); }
 
-/* Unread dot — top-right of avatar (replaces the old .chat-unread-badge) */
+/* Unread dot — middle-right of avatar (3 o'clock position) */
 .chat-room-unread-dot {
   position: absolute;
-  top: -2px;
-  right: -2px;
+  top: 50%;
+  right: -4px;
+  transform: translateY(-50%);
   width: 11px;
   height: 11px;
   border-radius: 50%;
@@ -2146,27 +2148,70 @@ label:has(#themeToggleSwitch[data-on="1"]) .theme-flank-icon.moon { opacity: 1; 
 
 .chat-input-row {
   display: flex;
-  gap: 12px;
-  padding: 16px 20px;
+  gap: 8px;
+  padding: 12px 16px;
   border-top: 1px solid var(--mocha-light);
   position: relative;
+  align-items: center;
 }
 
-.chat-emoji-btn {
-  flex-shrink: 0;
-  width: 46px;
-  border: 1px solid var(--mocha-light);
-  border-radius: var(--radius);
-  background: var(--paper);
-  font-size: 20px;
+/* Wrapper keeps the pill + its inner action buttons together */
+.chat-input-wrap {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.chat-input {
+  flex: 1;
+  width: 100%;
+  border: 1.5px solid var(--mocha-light);
+  border-radius: 22px;
+  /* Extra right padding so text doesn't hide behind the action icons */
+  padding: 11px 76px 11px 18px;
+  font-family: var(--font-body);
+  font-size: 15.5px;
+  background: var(--cream);
+  color: var(--ink);
+  transition: border-color 0.15s ease;
+  min-width: 0;
+}
+.chat-input:focus        { outline: none; border-color: var(--mocha-soft); }
+.chat-input:focus-visible { outline: none; border-color: var(--mocha-soft); }
+
+/* Action icon buttons inside the pill (image + sticker) */
+.chat-input-actions {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  pointer-events: auto;
+}
+.chat-action-btn {
+  width: 30px;
+  height: 30px;
+  border: none;
+  background: transparent;
+  padding: 3px;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--mocha-dark);
-  transition: border-color .15s ease;
+  border-radius: 50%;
+  color: var(--mocha-soft);
+  transition: color 0.15s ease;
+  flex-shrink: 0;
 }
-.chat-emoji-btn:hover { border-color: var(--ink); }
+.chat-action-btn:active { color: var(--mocha-dark); }
+.chat-action-btn svg   { width: 19px; height: 19px; }
+.chat-action-btn img   { width: 22px; height: 22px; object-fit: contain; border-radius: 4px; }
 
+/* Sticker picker — anchors to the form row */
 .chat-emoji-picker {
   display: none;
   position: absolute;
@@ -2178,7 +2223,7 @@ label:has(#themeToggleSwitch[data-on="1"]) .theme-flank-icon.moon { opacity: 1; 
   overflow-y: auto;
   background: var(--paper);
   border: 1px solid var(--mocha-light);
-  border-radius: calc(var(--radius) * 1.5);
+  border-radius: 16px;
   padding: 14px;
   box-shadow: var(--shadow-soft);
   gap: 8px;
@@ -2186,19 +2231,6 @@ label:has(#themeToggleSwitch[data-on="1"]) .theme-flank-icon.moon { opacity: 1; 
 }
 .chat-emoji-picker.open { display: flex; flex-wrap: wrap; }
 
-.chat-input {
-  flex: 1;
-  border: 1.5px solid var(--mocha-light);
-  border-radius: 22px;
-  padding: 11px 18px;
-  font-family: var(--font-body);
-  font-size: 15.5px;
-  background: var(--cream);
-  color: var(--ink);
-  transition: border-color 0.15s ease;
-}
-.chat-input:focus { outline: none; border-color: var(--mocha-soft); }
-.chat-input:focus-visible { outline: none; border-color: var(--mocha-soft); }
 .chat-input-row .btn.primary { padding: 14px 24px; font-size: 15px; }
 
 /* ============================================================
@@ -3101,7 +3133,7 @@ body.mobile .tb-sep {
 /* Hide label text on mobile — icon only */
 @media (max-width: 600px) {
   .chat-input-row { padding: 10px 12px; gap: 6px; }
-  .chat-emoji-btn { width: 38px; font-size: 18px; }
+  .chat-action-btn { width: 28px; height: 28px; }
   .chat-send-label { display: none; }
   .chat-send-btn { width: 42px; padding: 0; justify-content: center; border-radius: 50%; }
 }
@@ -3815,7 +3847,7 @@ body.candy-mode .badge-icon { filter: hue-rotate(280deg) saturate(2); }
   transition: background 0.15s ease;
   min-width: 0;
 }
-.chat-header-peer-link:hover { background: var(--mocha-wash); }
+.chat-header-peer-link:hover { background: transparent; }
 
 .chat-header-peer-avatar {
   position: relative;
