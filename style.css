@@ -1773,31 +1773,73 @@ label:has(#themeToggleSwitch[data-on="1"]) .theme-flank-icon.moon { opacity: 1; 
 }
 .chat-room-item:hover { background: var(--mocha-light); }
 
-.chat-unread-badge {
-  flex-shrink: 0;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--ink);
-  margin-left: auto;
-}
 .chat-room-item.active { background: var(--ink); }
 .chat-room-item.active .chat-room-label,
 .chat-room-item.active .chat-room-sub { color: var(--cream); }
 
+/* Unread state: bold label, darker preview */
+.chat-room-item.has-unread .chat-room-label {
+  font-weight: 700;
+  color: var(--ink);
+}
+.chat-room-item.has-unread .chat-room-sub {
+  color: var(--ink);
+  opacity: 0.75;
+}
+
+/* Avatar wrapper — positions the presence + unread dots */
+.chat-room-av-wrap {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+}
+
 .chat-room-avatar {
-  width: 34px; height: 34px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   overflow: hidden;
-  flex-shrink: 0;
-  display: flex; align-items: center; justify-content: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: var(--mocha-light);
   font-family: var(--font-mono);
   font-size: 14px;
   color: var(--mocha-dark);
 }
-.chat-room-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.chat-room-avatar img,
+.chat-room-avatar .avatar,
+.chat-room-avatar .initials-avatar { width: 100% !important; height: 100% !important; object-fit: cover; border-radius: 50% !important; }
 .chat-room-avatar-global { background: var(--ink); color: var(--cream); }
+
+/* Presence dot — bottom-right of avatar */
+.chat-room-presence {
+  position: absolute;
+  bottom: -1px;
+  right: -1px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: #3a8a5a;
+  border: 2.5px solid var(--mocha-wash);
+}
+.chat-room-presence.idle { background: #d9a441; }
+/* Border matches the sidebar background; dark-mode handled via variable */
+[data-theme="dark"] .chat-room-presence { border-color: var(--mocha-wash); }
+
+/* Unread dot — top-right of avatar (replaces the old .chat-unread-badge) */
+.chat-room-unread-dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--ink);
+  border: 2.5px solid var(--mocha-wash);
+}
+[data-theme="dark"] .chat-room-unread-dot { border-color: var(--mocha-wash); }
 
 .chat-room-text { min-width: 0; display: flex; flex-direction: column; }
 .chat-room-label { font-size: 14.5px; color: var(--ink); font-weight: 600; }
@@ -3525,16 +3567,7 @@ body.candy-mode .badge-icon { filter: hue-rotate(280deg) saturate(2); }
   pointer-events: none;
 }
 
-/* Presence dot on room list (desktop sidebar) */
-.chat-room-presence {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: #3a8a5a;
-  flex-shrink: 0;
-  margin-left: auto;
-}
-.chat-room-presence.idle    { background: #d9a441; }
+/* (chat-room-presence defined above with avatar-wrapper positioning) */
 
 /* New-DM modal (pops up when tapping + in the rail) */
 .chat-new-dm-modal {
@@ -3770,20 +3803,41 @@ body.candy-mode .badge-icon { filter: hue-rotate(280deg) saturate(2); }
 .chat-header-peer.visible { display: flex; }
 .chat-header-peer + .chat-room-title { display: none; }
 
+.chat-header-peer-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: inherit;
+  border-radius: 10px;
+  padding: 4px 8px;
+  margin: -4px -8px;
+  transition: background 0.15s ease;
+  min-width: 0;
+}
+.chat-header-peer-link:hover { background: var(--mocha-wash); }
+
 .chat-header-peer-avatar {
   position: relative;
   width: 34px;
   height: 34px;
-  border-radius: 50%;
-  overflow: visible;
   flex-shrink: 0;
+  border-radius: 50%;
+  overflow: visible; /* so the dot peeks outside */
 }
+/* Force the avatar helper output to fit the container */
+.chat-header-peer-avatar > *:first-child,
 .chat-header-peer-avatar .avatar,
 .chat-header-peer-avatar .initials-avatar,
 .chat-header-peer-avatar img {
   width: 34px !important;
   height: 34px !important;
+  min-width: 34px !important;
+  max-width: 34px !important;
   border-radius: 50% !important;
+  object-fit: cover;
+  display: block !important;
+  flex-shrink: 0 !important;
 }
 .chat-header-presence-dot {
   position: absolute;

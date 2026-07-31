@@ -227,24 +227,25 @@
   }
 
   function updatePresenceDots() {
-    // Update sidebar room-list dots
     document.querySelectorAll(".chat-room-item[data-peer]").forEach(item => {
       const peer = item.dataset.peer;
+      if (!peer) return;
       const status = onlineStatuses.get(peer) || "offline";
-      let dot = item.querySelector(".chat-room-presence");
+      const wrap = item.querySelector(".chat-room-av-wrap");
+      if (!wrap) return;
+      let dot = wrap.querySelector(".chat-room-presence");
       if (status === "offline") { if (dot) dot.remove(); return; }
       if (!dot) {
         dot = document.createElement("div");
-        dot.className = "chat-room-presence";
-        item.appendChild(dot);
+        wrap.appendChild(dot);
       }
       dot.className = `chat-room-presence${status === "idle" ? " idle" : ""}`;
     });
   }
 
   function updateChatHeader() {
-    const peerEl   = document.getElementById("chatHeaderPeer");
-    const titleEl  = document.getElementById("chatRoomTitle");
+    const peerEl     = document.getElementById("chatHeaderPeer");
+    const titleEl    = document.getElementById("chatRoomTitle");
     const presenceEl = document.getElementById("chatPresence");
     if (!peerEl) return;
 
@@ -252,27 +253,27 @@
       const peerUser = Progress.getUser(currentPeer);
       const status   = onlineStatuses.get(currentPeer) || "offline";
       const statusLabels = { online: "online", idle: "away", offline: "offline" };
+      const profileUrl = `user.html?username=${encodeURIComponent(currentPeer)}`;
 
-      // Avatar with presence dot
-      const avatarEl = document.getElementById("chatHeaderPeerAvatar");
-      if (avatarEl) {
-        avatarEl.innerHTML = `
-          ${avatarHTML(peerUser, 34)}
-          <div class="chat-header-presence-dot ${status}"></div>`;
-      }
-      const nameEl = document.getElementById("chatHeaderPeerName");
-      if (nameEl) nameEl.textContent = `@${currentPeer}`;
-      const statusEl = document.getElementById("chatHeaderPeerStatus");
-      if (statusEl) {
-        statusEl.textContent = statusLabels[status] || "offline";
-        statusEl.className = `chat-header-peer-status ${status}`;
-      }
+      // Rebuild the peer area as a single clickable link
+      peerEl.innerHTML = `
+        <a href="${profileUrl}" class="chat-header-peer-link" title="View @${escapeHTML(currentPeer)}'s profile">
+          <div class="chat-header-peer-avatar">
+            ${avatarHTML(peerUser, 34)}
+            <div class="chat-header-presence-dot ${escapeHTML(status)}"></div>
+          </div>
+          <div class="chat-header-peer-info">
+            <span class="chat-header-peer-name">@${escapeHTML(currentPeer)}</span>
+            <span class="chat-header-peer-status ${escapeHTML(status)}">${escapeHTML(statusLabels[status] || "offline")}</span>
+          </div>
+        </a>`;
 
       peerEl.classList.add("visible");
       if (titleEl) titleEl.style.display = "none";
       if (presenceEl) presenceEl.style.display = "none";
     } else {
       peerEl.classList.remove("visible");
+      peerEl.innerHTML = "";
       if (titleEl) titleEl.style.display = "";
       if (presenceEl) presenceEl.style.display = "";
     }
@@ -585,18 +586,28 @@
   function roomListItemHTML(opts) {
     const { room, label, sub, active, avatarUser, unreadCount } = opts;
     const peer = opts.peer || "";
+    const hasUnread = !active && unreadCount > 0;
     const status = peer ? (onlineStatuses.get(peer) || "offline") : null;
     const presenceDot = (status && status !== "offline")
       ? `<div class="chat-room-presence${status === "idle" ? " idle" : ""}"></div>` : "";
+    const unreadDot = hasUnread ? `<div class="chat-room-unread-dot"></div>` : "";
+
+    const avatarInner = avatarUser !== undefined
+      ? `<span class="chat-room-avatar">${avatarHTML(avatarUser, 36)}</span>`
+      : `<span class="chat-room-avatar chat-room-avatar-global">#</span>`;
+
     return `
-      <button type="button" class="chat-room-item ${active ? "active" : ""}" data-room="${escapeHTML(room)}" data-label="${escapeHTML(label)}" data-peer="${escapeHTML(peer)}">
-        ${avatarUser !== undefined ? `<span class="chat-room-avatar">${avatarHTML(avatarUser, 28)}</span>` : `<span class="chat-room-avatar chat-room-avatar-global">#</span>`}
+      <button type="button" class="chat-room-item ${active ? "active" : ""} ${hasUnread ? "has-unread" : ""}"
+        data-room="${escapeHTML(room)}" data-label="${escapeHTML(label)}" data-peer="${escapeHTML(peer)}">
+        <span class="chat-room-av-wrap">
+          ${avatarInner}
+          ${presenceDot}
+          ${unreadDot}
+        </span>
         <span class="chat-room-text">
           <span class="chat-room-label">${escapeHTML(label)}</span>
           ${sub ? `<span class="chat-room-sub">${sub}</span>` : ""}
         </span>
-        ${unreadCount ? `<span class="chat-unread-badge"></span>` : ""}
-        ${presenceDot}
       </button>`;
   }
 
