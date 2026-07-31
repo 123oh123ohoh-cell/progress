@@ -293,7 +293,16 @@
         }
       }
     }
-    scrollToBottom(animate, animate); // live messages: force + smooth scroll; history: instant at load
+    if (animate) {
+      // Defer one frame so the browser finishes layout before we measure
+      // scrollHeight — otherwise smooth scroll can land short of the real bottom.
+      requestAnimationFrame(() => {
+        const l = document.getElementById("chatLog");
+        if (l) { l.scrollTo({ top: l.scrollHeight, behavior: "smooth" }); scrollUnreadCount = 0; updateScrollBtn(); }
+      });
+    } else {
+      scrollToBottom(false, false); // history load: instant snap
+    }
     attachLinkPreview(msg);
   }
 

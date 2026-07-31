@@ -4005,8 +4005,9 @@ body.candy-mode .badge-icon { filter: hue-rotate(280deg) saturate(2); }
   background: var(--mocha-light);
   font-family: var(--font-mono); font-size: 13px; color: var(--mocha-dark);
 }
-/* Force the avatar helper output to fit the container */
-.chat-header-peer-avatar > *:first-child,
+/* Force the avatar helper output to fit the container.
+   Exclude .initials so the flex container centers the text naturally. */
+.chat-header-peer-avatar > *:first-child:not(.initials),
 .chat-header-peer-avatar .avatar,
 .chat-header-peer-avatar .initials-avatar,
 .chat-header-peer-avatar img {
