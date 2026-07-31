@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>typing test — Progress</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;1,500;1,600&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script>(function(){try{var t=localStorage.getItem("progressTheme");var dark=(t==="dark")||(t!=="light"&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);if(dark)document.documentElement.setAttribute("data-theme","dark");}catch(e){}})();</script>
+<style>
+/* ── Typing test page ── */
+.typing-hero {
+  text-align: center;
+  padding: 48px 0 36px;
+}
+.typing-hero h1 {
+  font-family: var(--font-display);
+  font-size: clamp(36px, 6vw, 60px);
+  font-style: italic;
+  margin: 0 0 10px;
+  background: linear-gradient(135deg, #a352e0, #e05252, #e0a352);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.typing-hero p {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin: 0;
+}
+
+/* ── Mode / time selector ── */
+.typing-modes {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+}
+.mode-sep {
+  width: 1px; height: 20px;
+  background: var(--mocha-light);
+  margin: 0 6px;
+}
+.mode-btn {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 7px 14px;
+  border-radius: 20px;
+  border: 1.5px solid transparent;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.mode-btn:hover { color: var(--ink); background: var(--mocha-wash); }
+.mode-btn.active {
+  background: var(--ink);
+  color: var(--cream);
+  border-color: var(--ink);
+}
+
+/* ── Stats bar ── */
+.typing-stats {
+  display: flex;
+  justify-content: center;
+  gap: 40px;
+  margin-bottom: 28px;
+}
+.typing-stat {
+  text-align: center;
+}
+.typing-stat-val {
+  font-family: var(--font-display);
+  font-size: 40px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--ink);
+  min-width: 80px;
+  display: block;
+}
+.typing-stat-val.highlight {
+  background: linear-gradient(135deg, #a352e0, #e05252);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.typing-stat-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin-top: 4px;
+  display: block;
+}
+
+/* ── Passage display ── */
+.typing-stage {
+  max-width: 740px;
+  margin: 0 auto 32px;
+  position: relative;
+}
+.typing-passage {
+  font-family: var(--font-display);
+  font-size: clamp(18px, 2.5vw, 22px);
+  line-height: 1.75;
+  color: var(--mocha-light);
+  letter-spacing: 0.01em;
+  position: relative;
+  user-select: none;
+  padding: 36px 40px;
+  background: var(--mocha-wash);
+  border-radius: 20px;
+  min-height: 160px;
+  cursor: text;
+  transition: opacity 0.2s;
+}
+.typing-passage .char { position: relative; }
+.typing-passage .char.correct { color: var(--ink); }
+.typing-passage .char.wrong {
+  color: #e05252;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.typing-passage .char.cursor::before {
+  content: "";
+  position: absolute;
+  left: -1px;
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  background: #a352e0;
+  border-radius: 1px;
+  animation: blink 0.9s steps(1) infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+.typing-input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  top: 0; left: 0;
+  width: 1px; height: 1px;
+}
+
+.typing-overlay {
+  position: absolute; inset: 0;
+  background: rgba(var(--paper-rgb,250,247,243), 0.9);
+  border-radius: 20px;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 12px;
+  backdrop-filter: blur(2px);
+  z-index: 2;
+  cursor: pointer;
+}
+[data-theme="dark"] .typing-overlay { background: rgba(23,19,15,0.88); }
+.typing-overlay-icon { font-size: 36px; }
+.typing-overlay-label {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+/* ── Bottom bar ── */
+.typing-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 80px;
+}
+.typing-btn {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 10px 20px;
+  border-radius: var(--radius);
+  border: 1.5px solid var(--mocha-light);
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+  transition: background 0.1s;
+  display: flex; align-items: center; gap: 8px;
+}
+.typing-btn:hover { background: var(--mocha-light); }
+.typing-btn.primary { background: var(--ink); color: var(--cream); border-color: var(--ink); }
+.typing-btn.primary:hover { opacity: 0.85; }
+
+/* ── Results screen ── */
+.typing-results {
+  max-width: 700px;
+  margin: 0 auto 80px;
+  text-align: center;
+  animation: fadeUp 0.4s ease;
+}
+@keyframes fadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:none; } }
+.results-wpm {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: clamp(72px, 12vw, 120px);
+  font-weight: 600;
+  line-height: 1;
+  background: linear-gradient(135deg, #a352e0, #e05252, #e0a352);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 4px;
+}
+.results-wpm-label {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  margin-bottom: 40px;
+}
+.results-grid {
+  display: flex;
+  justify-content: center;
+  gap: 40px;
+  margin-bottom: 40px;
+  flex-wrap: wrap;
+}
+.result-item {
+  text-align: center;
+}
+.result-item-val {
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 600;
+  color: var(--ink);
+  display: block;
+}
+.result-item-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin-top: 4px;
+  display: block;
+}
+.results-quote {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 18px;
+  color: var(--muted);
+  margin: 0 auto 36px;
+  max-width: 480px;
+  line-height: 1.5;
+}
+.results-bar {
+  height: 6px;
+  background: var(--mocha-light);
+  border-radius: 3px;
+  max-width: 400px;
+  margin: 0 auto 40px;
+  overflow: hidden;
+}
+.results-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #a352e0, #e05252);
+  border-radius: 3px;
+  transition: width 0.8s cubic-bezier(0.16,1,0.3,1);
+}
+
+/* ── Passage category tabs ── */
+.typing-cats {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+</style>
+</head>
+<body>
+
+<div id="nav-root"></div>
+<div id="modal-root"></div>
+
+<main class="container">
+
+  <div class="typing-hero">
+    <h1>typing test.</h1>
+    <p>how fast do your thoughts move?</p>
+  </div>
+
+  <!-- Mode selector -->
+  <div class="typing-modes">
+    <button class="mode-btn active" data-mode="time" data-val="15">15s</button>
+    <button class="mode-btn" data-mode="time" data-val="30">30s</button>
+    <button class="mode-btn" data-mode="time" data-val="60">60s</button>
+    <div class="mode-sep"></div>
+    <button class="mode-btn" data-mode="words" data-val="10">10 words</button>
+    <button class="mode-btn" data-mode="words" data-val="25">25 words</button>
+    <button class="mode-btn" data-mode="words" data-val="50">50 words</button>
+  </div>
+
+  <!-- Stats bar -->
+  <div class="typing-stats" id="statsBar">
+    <div class="typing-stat">
+      <span class="typing-stat-val highlight" id="statWpm">0</span>
+      <span class="typing-stat-label">wpm</span>
+    </div>
+    <div class="typing-stat">
+      <span class="typing-stat-val" id="statAcc">—</span>
+      <span class="typing-stat-label">accuracy</span>
+    </div>
+    <div class="typing-stat">
+      <span class="typing-stat-val" id="statTimer">—</span>
+      <span class="typing-stat-label">time</span>
+    </div>
+  </div>
+
+  <!-- Passage -->
+  <div class="typing-stage" id="typingStage">
+    <div class="typing-passage" id="typingPassage"></div>
+    <input class="typing-input" id="typingInput" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+    <div class="typing-overlay" id="typingOverlay">
+      <div class="typing-overlay-icon">⌨️</div>
+      <div class="typing-overlay-label">click to start</div>
+    </div>
+  </div>
+
+  <!-- Buttons -->
+  <div class="typing-bottom" id="typingBottom">
+    <button class="typing-btn" id="btnNewPassage">↺ new passage</button>
+    <button class="typing-btn primary" id="btnRestart">restart</button>
+  </div>
+
+  <!-- Results (hidden until test ends) -->
+  <div class="typing-results" id="typingResults" style="display:none;"></div>
+
+</main>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+<script>
+initShell("fun"); // "fun" keeps nav highlight on Fun
+
+// ── Passages ──────────────────────────────────────────────────────────────
+const PASSAGES = [
+  "The purpose of a writer is to keep civilization from destroying itself.",
+  "A writer only begins a book. A reader finishes it.",
+  "There is no real ending. It's just the place where you stop the story.",
+  "You can always edit a bad page. You can't edit a blank page.",
+  "The first draft is just you telling yourself the story.",
+  "Write what should not be forgotten.",
+  "If there's a book that you want to read but it hasn't been written yet, then you must write it.",
+  "Writing is the painting of the voice.",
+  "Every secret of a writer's soul, every experience of their life, every quality of their mind, is written large in their works.",
+  "You don't start out writing good stuff. You start out writing crap and thinking it's good stuff, and then gradually you get better at it.",
+  "Either write something worth reading or do something worth writing.",
+  "The scariest moment is always just before you start.",
+  "One day I will find the right words, and they will be simple.",
+  "Not all those who wander are lost.",
+  "We accept the love we think we deserve.",
+  "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
+  "It was the best of times, it was the worst of times, it was the age of wisdom, it was the age of foolishness.",
+  "All this happened, more or less.",
+  "The sky above the port was the color of television, tuned to a dead channel.",
+  "It was a bright cold day in April, and the clocks were striking thirteen.",
+  "Happy families are all alike; every unhappy family is unhappy in its own way.",
+  "Call me Ishmael.",
+  "I am an invisible man.",
+  "Whether I shall turn out to be the hero of my own life, or whether that station will be held by anybody else, these pages must show.",
+  "Writing is not necessarily something to be ashamed of, but do it in private and wash your hands afterwards.",
+];
+
+const WORD_POOL = [
+  "the","of","and","a","to","in","is","you","that","it","he","was","for","on","are","with","as","his","they","be",
+  "at","one","have","this","from","or","had","by","not","word","but","what","some","we","can","out","other","were","all","your",
+  "when","up","use","her","there","can","an","each","she","which","do","how","their","if","will","way","about","many","then","them",
+  "write","read","book","story","page","word","words","author","chapter","voice","draft","edit","poet","prose","verse","novel","tale","ink",
+  "thought","idea","mind","heart","soul","dream","hope","light","dark","time","life","love","world","day","night",
+  "morning","evening","quiet","silence","echo","memory","moment","place","path","road","door","window","sky","star",
+];
+
+// ── State ──────────────────────────────────────────────────────────────────
+let mode = "time", modeVal = 15;
+let passage = [];
+let typedIndex = 0;
+let errors = new Set();
+let totalTyped = 0;
+let started = false;
+let finished = false;
+let timerInterval = null;
+let secondsLeft = 0;
+let secondsElapsed = 0;
+
+// ── Build passage ──────────────────────────────────────────────────────────
+function buildPassage() {
+  if (mode === "time") {
+    // For timed mode, use a long quote (or concatenate a few)
+    const base = PASSAGES[Math.floor(Math.random() * PASSAGES.length)];
+    // Make it long enough to fill 60s of typing
+    let text = base;
+    while (text.length < 400) {
+      text += " " + PASSAGES[Math.floor(Math.random() * PASSAGES.length)];
+    }
+    return text.trim();
+  } else {
+    // Word mode: pick random words
+    const words = [];
+    for (let i = 0; i < modeVal; i++) {
+      words.push(WORD_POOL[Math.floor(Math.random() * WORD_POOL.length)]);
+    }
+    return words.join(" ");
+  }
+}
+
+function initPassage() {
+  const text = buildPassage();
+  passage = text.split("");
+  typedIndex = 0;
+  errors.clear();
+  totalTyped = 0;
+  started = false;
+  finished = false;
+  clearInterval(timerInterval);
+  secondsLeft = mode === "time" ? modeVal : 0;
+  secondsElapsed = 0;
+
+  renderPassage();
+  document.getElementById("statWpm").textContent = "0";
+  document.getElementById("statAcc").textContent = "—";
+  document.getElementById("statTimer").textContent = mode === "time" ? `${modeVal}s` : "—";
+
+  document.getElementById("typingResults").style.display = "none";
+  document.getElementById("typingBottom").style.display = "flex";
+  document.getElementById("statsBar").style.display = "flex";
+  document.getElementById("typingStage").style.display = "block";
+  document.getElementById("typingOverlay").style.display = "flex";
+
+  const input = document.getElementById("typingInput");
+  input.value = "";
+}
+
+function renderPassage() {
+  const el = document.getElementById("typingPassage");
+  el.innerHTML = passage.map((ch, i) => {
+    let cls = "char";
+    if (i < typedIndex) cls += errors.has(i) ? " wrong" : " correct";
+    else if (i === typedIndex) cls += " cursor";
+    const display = ch === " " ? "&nbsp;" : escapeChar(ch);
+    return `<span class="${cls}" data-i="${i}">${display}</span>`;
+  }).join("");
+}
+
+function escapeChar(c) {
+  return c.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+// ── WPM / accuracy ────────────────────────────────────────────────────────
+function calcWpm() {
+  const words = typedIndex / 5;
+  const minutes = secondsElapsed / 60;
+  return minutes > 0 ? Math.round(words / minutes) : 0;
+}
+
+function calcAccuracy() {
+  if (totalTyped === 0) return 100;
+  const correct = totalTyped - errors.size;
+  return Math.round((correct / totalTyped) * 100);
+}
+
+function tickTimer() {
+  secondsElapsed++;
+  if (mode === "time") {
+    secondsLeft = modeVal - secondsElapsed;
+    document.getElementById("statTimer").textContent = secondsLeft + "s";
+    if (secondsLeft <= 0) { endTest(); return; }
+  } else {
+    document.getElementById("statTimer").textContent = secondsElapsed + "s";
+  }
+  document.getElementById("statWpm").textContent = calcWpm();
+  document.getElementById("statAcc").textContent = calcAccuracy() + "%";
+}
+
+// ── Start / end ────────────────────────────────────────────────────────────
+function startTest() {
+  started = true;
+  timerInterval = setInterval(tickTimer, 1000);
+}
+
+function endTest() {
+  if (finished) return;
+  finished = true;
+  clearInterval(timerInterval);
+  const wpm = calcWpm();
+  const acc = calcAccuracy();
+  showResults(wpm, acc);
+}
+
+function showResults(wpm, acc) {
+  document.getElementById("typingStage").style.display = "none";
+  document.getElementById("statsBar").style.display = "none";
+  document.getElementById("typingBottom").style.display = "none";
+
+  const label = wpm >= 100 ? "🔥 absurdly fast" : wpm >= 80 ? "⚡ lightning fingers" : wpm >= 60 ? "👏 solid writer" : wpm >= 40 ? "✍️ decent pace" : "🐢 keep practicing";
+  const quote = PASSAGES[Math.floor(Math.random() * PASSAGES.length)];
+  const barPct = Math.min(100, Math.round((wpm / 120) * 100));
+
+  const res = document.getElementById("typingResults");
+  res.style.display = "block";
+  res.innerHTML = `
+    <div class="results-wpm">${wpm}</div>
+    <div class="results-wpm-label">words per minute</div>
+    <div class="results-grid">
+      <div class="result-item">
+        <span class="result-item-val">${acc}%</span>
+        <span class="result-item-label">accuracy</span>
+      </div>
+      <div class="result-item">
+        <span class="result-item-val">${secondsElapsed}s</span>
+        <span class="result-item-label">time</span>
+      </div>
+      <div class="result-item">
+        <span class="result-item-val">${typedIndex}</span>
+        <span class="result-item-label">characters</span>
+      </div>
+    </div>
+    <div class="results-bar"><div class="results-bar-fill" style="width:0%;" id="resBar"></div></div>
+    <p class="results-quote">"${quote}"</p>
+    <div style="display:flex;gap:12px;justify-content:center;">
+      <button class="typing-btn primary" id="resRestart">test again</button>
+      <button class="typing-btn" id="resNew">new passage</button>
+    </div>
+    <p style="font-family:var(--font-mono);font-size:13px;color:var(--muted);margin-top:16px;">${label}</p>
+  `;
+  setTimeout(() => { const b = document.getElementById("resBar"); if (b) b.style.width = barPct + "%"; }, 100);
+  document.getElementById("resRestart").addEventListener("click", initPassage);
+  document.getElementById("resNew").addEventListener("click", initPassage);
+}
+
+// ── Input handling ─────────────────────────────────────────────────────────
+document.getElementById("typingOverlay").addEventListener("click", () => {
+  document.getElementById("typingOverlay").style.display = "none";
+  document.getElementById("typingInput").focus();
+});
+document.getElementById("typingPassage").addEventListener("click", () => {
+  if (!finished) {
+    document.getElementById("typingOverlay").style.display = "none";
+    document.getElementById("typingInput").focus();
+  }
+});
+
+document.getElementById("typingInput").addEventListener("keydown", (e) => {
+  if (finished) return;
+
+  if (e.key === "Tab") { e.preventDefault(); initPassage(); return; }
+
+  if (!started && e.key.length === 1) startTest();
+
+  if (e.key === "Backspace") {
+    if (typedIndex > 0) { typedIndex--; renderPassage(); }
+    return;
+  }
+
+  if (e.key.length !== 1) return;
+  if (typedIndex >= passage.length) return;
+
+  totalTyped++;
+  if (e.key !== passage[typedIndex]) errors.add(typedIndex);
+  typedIndex++;
+
+  // Finish on last character (word mode) or let timer handle it (time mode)
+  if (typedIndex >= passage.length && mode === "words") { endTest(); return; }
+
+  renderPassage();
+  document.getElementById("statWpm").textContent = started ? calcWpm() : 0;
+  if (started) document.getElementById("statAcc").textContent = calcAccuracy() + "%";
+});
+
+// ── Mode buttons ───────────────────────────────────────────────────────────
+document.querySelectorAll(".mode-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".mode-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    mode = btn.dataset.mode;
+    modeVal = parseInt(btn.dataset.val);
+    initPassage();
+  });
+});
+
+document.getElementById("btnRestart").addEventListener("click", initPassage);
+document.getElementById("btnNewPassage").addEventListener("click", () => {
+  initPassage();
+});
+
+// ── Boot ───────────────────────────────────────────────────────────────────
+initPassage();
+</script>
+
+</body>
+</html>

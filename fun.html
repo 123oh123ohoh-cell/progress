@@ -333,6 +333,7 @@
 initShell("fun");
 
 const GAMES = [
+  { id: "typing",    emoji: "⌨️", name: "Typing Test",   desc: "how fast?", href: "typing.html" },
   { id: "snake",     emoji: "🐍", name: "Snake",        desc: "classic" },
   { id: "memory",    emoji: "🃏", name: "Memory Match",  desc: "find the pairs" },
   { id: "g2048",     emoji: "🔢", name: "2048",          desc: "slide & merge" },
@@ -356,7 +357,9 @@ grid.innerHTML = GAMES.map(g => `
 `).join("");
 
 grid.querySelectorAll(".fun-card").forEach(card => {
+  const game = GAMES.find(g => g.id === card.dataset.game);
   card.addEventListener("click", () => {
+    if (game && game.href) { window.location.href = game.href; return; }
     if (cleanupFn) { cleanupFn(); cleanupFn = null; }
     grid.querySelectorAll(".fun-card").forEach(c => c.classList.remove("active"));
     card.classList.add("active");

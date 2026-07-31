@@ -706,7 +706,7 @@
       form.appendChild(el);
     }
     el.innerHTML = `
-      <div class="chat-game-picker-title">Choose a game</div>
+      <div class="chat-game-picker-title">Play Together</div>
       <button type="button" class="chat-game-pick-btn" data-game="wyr">
         <span class="chat-game-pick-icon">🤔</span>
         <span class="chat-game-pick-info">
@@ -727,8 +727,46 @@
           <span class="chat-game-pick-name">Emoji Story</span>
           <span class="chat-game-pick-desc">Build a story one emoji at a time</span>
         </span>
+      </button>
+      <div class="chat-game-picker-title" style="margin-top:8px;">Solo</div>
+      <button type="button" class="chat-game-pick-btn" data-solo="snake">
+        <span class="chat-game-pick-icon">🐍</span>
+        <span class="chat-game-pick-info">
+          <span class="chat-game-pick-name">Snake</span>
+          <span class="chat-game-pick-desc">Classic — arrow keys to move</span>
+        </span>
+      </button>
+      <button type="button" class="chat-game-pick-btn" data-solo="memory">
+        <span class="chat-game-pick-icon">🃏</span>
+        <span class="chat-game-pick-info">
+          <span class="chat-game-pick-name">Memory Match</span>
+          <span class="chat-game-pick-desc">Find all the pairs</span>
+        </span>
+      </button>
+      <button type="button" class="chat-game-pick-btn" data-solo="reaction">
+        <span class="chat-game-pick-icon">⚡</span>
+        <span class="chat-game-pick-info">
+          <span class="chat-game-pick-name">Reaction Time</span>
+          <span class="chat-game-pick-desc">Click when you see green</span>
+        </span>
+      </button>
+      <button type="button" class="chat-game-pick-btn" data-solo="scramble">
+        <span class="chat-game-pick-icon">🔤</span>
+        <span class="chat-game-pick-info">
+          <span class="chat-game-pick-name">Word Scramble</span>
+          <span class="chat-game-pick-desc">Unscramble the word</span>
+        </span>
+      </button>
+      <button type="button" class="chat-game-pick-btn" data-solo="typing">
+        <span class="chat-game-pick-icon">⌨️</span>
+        <span class="chat-game-pick-info">
+          <span class="chat-game-pick-name">Typing Test</span>
+          <span class="chat-game-pick-desc">How fast do you type?</span>
+        </span>
       </button>`;
-    el.querySelectorAll(".chat-game-pick-btn").forEach(btn => {
+
+    // Social games
+    el.querySelectorAll(".chat-game-pick-btn[data-game]").forEach(btn => {
       btn.addEventListener("click", () => {
         const g = btn.dataset.game;
         let gameData;
@@ -748,14 +786,163 @@
         sendGameMessage(gameData);
       });
     });
+
+    // Solo games
+    el.querySelectorAll(".chat-game-pick-btn[data-solo]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        hideGamePicker();
+        openChatGame(btn.dataset.solo);
+      });
+    });
+
     el.classList.add("open");
-    // Close on outside click
     setTimeout(() => {
       const closeOnClick = (e) => {
         if (!el.contains(e.target)) { el.classList.remove("open"); document.removeEventListener("click", closeOnClick); }
       };
       document.addEventListener("click", closeOnClick);
     }, 10);
+  }
+
+  // ── Solo game embed ────────────────────────────────────────────────────────
+  let soloCleanup = null;
+
+  function openChatGame(id) {
+    closeChatGame();
+    const embed = document.createElement("div");
+    embed.className = "chat-solo-embed";
+    embed.id = "chatSoloEmbed";
+
+    const TITLES = { snake:"🐍 Snake", memory:"🃏 Memory Match", reaction:"⚡ Reaction Time", scramble:"🔤 Word Scramble", typing:"⌨️ Typing Test" };
+    embed.innerHTML = `
+      <div class="chat-solo-header">
+        <span class="chat-solo-title">${TITLES[id] || id}</span>
+        <button class="chat-solo-close" id="chatSoloClose">✕</button>
+      </div>
+      <div class="chat-solo-body" id="chatSoloBody"></div>
+    `;
+    document.body.appendChild(embed);
+    requestAnimationFrame(() => embed.classList.add("open"));
+
+    document.getElementById("chatSoloClose").addEventListener("click", closeChatGame);
+
+    const body = document.getElementById("chatSoloBody");
+    if (id === "snake")    soloCleanup = soloSnake(body);
+    else if (id === "memory")   soloCleanup = soloMemory(body);
+    else if (id === "reaction") soloCleanup = soloReaction(body);
+    else if (id === "scramble") soloCleanup = soloScramble(body);
+    else if (id === "typing")   soloCleanup = soloTyping(body);
+  }
+
+  function closeChatGame() {
+    if (soloCleanup) { soloCleanup(); soloCleanup = null; }
+    const embed = document.getElementById("chatSoloEmbed");
+    if (!embed) return;
+    embed.classList.remove("open");
+    setTimeout(() => embed.remove(), 300);
+  }
+
+  // ── Solo: Snake ────────────────────────────────────────────────────────────
+  function soloSnake(container) {
+    const COLS=20,ROWS=20,CELL=16;
+    let snake,food,dir,nextDir,score,loop,running;
+    container.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <span style="font-family:var(--font-mono);font-size:12px;color:var(--muted);">Score <strong id="sSnakeScore" style="color:var(--ink);">0</strong></span>
+        <button class="cg-btn" id="sSnakeStart">▶ Start</button>
+      </div>
+      <canvas id="sSnakeCanvas" width="${COLS*CELL}" height="${ROWS*CELL}" style="display:block;margin:0 auto;border-radius:10px;background:var(--mocha-light);max-width:100%;"></canvas>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:4px;margin-top:10px;">
+        <div><button class="cg-dpad" id="sUp">▲</button></div>
+        <div style="display:flex;gap:4px;"><button class="cg-dpad" id="sLeft">◄</button><button class="cg-dpad" id="sDown">▼</button><button class="cg-dpad" id="sRight">►</button></div>
+      </div>`;
+
+    const canvas=document.getElementById("sSnakeCanvas"),ctx=canvas.getContext("2d");
+    function rnd(){let p;do{p={x:Math.floor(Math.random()*COLS),y:Math.floor(Math.random()*ROWS)}}while(snake.some(s=>s.x===p.x&&s.y===p.y));return p;}
+    function reset(){snake=[{x:10,y:10},{x:9,y:10},{x:8,y:10}];dir={x:1,y:0};nextDir={x:1,y:0};score=0;food=rnd();document.getElementById("sSnakeScore").textContent=0;}
+    function draw(){ctx.clearRect(0,0,canvas.width,canvas.height);ctx.fillStyle="#e05252";ctx.beginPath();ctx.arc(food.x*CELL+CELL/2,food.y*CELL+CELL/2,CELL/2-2,0,Math.PI*2);ctx.fill();snake.forEach((s,i)=>{ctx.fillStyle=i===0?`hsl(140,60%,38%)`:`hsl(${140-i*2},55%,48%)`;ctx.beginPath();if(ctx.roundRect)ctx.roundRect(s.x*CELL+1,s.y*CELL+1,CELL-2,CELL-2,3);else ctx.rect(s.x*CELL+1,s.y*CELL+1,CELL-2,CELL-2);ctx.fill();});}
+    function tick(){dir=nextDir;const h={x:snake[0].x+dir.x,y:snake[0].y+dir.y};if(h.x<0||h.x>=COLS||h.y<0||h.y>=ROWS||snake.some(s=>s.x===h.x&&s.y===h.y)){clearInterval(loop);running=false;showOver();return;}snake.unshift(h);if(h.x===food.x&&h.y===food.y){score++;document.getElementById("sSnakeScore").textContent=score;food=rnd();}else snake.pop();draw();}
+    function showOver(){const d=document.createElement("div");d.style.cssText="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:rgba(var(--paper-rgb,250,247,243),0.9);border-radius:16px;z-index:5;";d.innerHTML=`<div style="font-family:var(--font-display);font-size:22px;font-style:italic;">game over</div><div style="font-family:var(--font-mono);font-size:12px;color:var(--muted);">score: ${score}</div><button class="cg-btn" id="sSnakeRetry">play again</button>`;container.style.position="relative";container.appendChild(d);d.querySelector("#sSnakeRetry").addEventListener("click",()=>{d.remove();start();});}
+    function start(){reset();draw();clearInterval(loop);running=true;loop=setInterval(tick,120);}
+    const kh=e=>{const m={ArrowUp:{x:0,y:-1},ArrowDown:{x:0,y:1},ArrowLeft:{x:-1,y:0},ArrowRight:{x:1,y:0}};const nd=m[e.key];if(!nd)return;if(nd.x!==-dir.x||nd.y!==-dir.y)nextDir=nd;if(e.key.startsWith("Arrow"))e.preventDefault();};
+    window.addEventListener("keydown",kh);
+    document.getElementById("sSnakeStart").addEventListener("click",()=>{if(!running)start();});
+    document.getElementById("sUp").addEventListener("click",()=>{if(dir.y!==1)nextDir={x:0,y:-1};});
+    document.getElementById("sDown").addEventListener("click",()=>{if(dir.y!==-1)nextDir={x:0,y:1};});
+    document.getElementById("sLeft").addEventListener("click",()=>{if(dir.x!==1)nextDir={x:-1,y:0};});
+    document.getElementById("sRight").addEventListener("click",()=>{if(dir.x!==-1)nextDir={x:1,y:0};});
+    reset();draw();
+    return ()=>{clearInterval(loop);window.removeEventListener("keydown",kh);};
+  }
+
+  // ── Solo: Memory ───────────────────────────────────────────────────────────
+  function soloMemory(container) {
+    const EM=["🌙","🔥","🎸","🌊","🦋","🍓","⚡","🌸"];
+    let cards,flipped,matched,moves,ti;
+    function shuffle(a){return[...a].sort(()=>Math.random()-.5);}
+    function reset(){cards=shuffle([...EM,...EM]).map((e,i)=>({id:i,emoji:e,isFlipped:false,isMatched:false}));flipped=[];matched=0;moves=0;clearInterval(ti);render();}
+    function render(){
+      container.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><span style="font-family:var(--font-mono);font-size:12px;color:var(--muted);">Moves <strong style="color:var(--ink);" id="sMoves">0</strong></span><span style="font-family:var(--font-mono);font-size:12px;color:var(--muted);">Pairs <strong style="color:var(--ink);" id="sPairs">${EM.length}</strong></span><button class="cg-btn" id="sMemReset">restart</button></div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;max-width:320px;margin:0 auto;" id="sMemGrid"></div>`;
+      document.getElementById("sMemReset").addEventListener("click",reset);
+      const g=document.getElementById("sMemGrid");
+      cards.forEach(c=>{const el=document.createElement("div");el.className="s-mem-card"+(c.isFlipped?" flipped":"")+(c.isMatched?" matched":"");el.style.cssText="aspect-ratio:1;border-radius:10px;cursor:pointer;position:relative;transform-style:preserve-3d;transition:transform 0.35s;";el.innerHTML=`<div style="position:absolute;inset:0;border-radius:10px;display:flex;align-items:center;justify-content:center;background:var(--mocha-light);border:2px solid var(--mocha-light);backface-visibility:hidden;-webkit-backface-visibility:hidden;"></div><div style="position:absolute;inset:0;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:24px;background:var(--paper);border:2px solid var(--mocha-light);backface-visibility:hidden;-webkit-backface-visibility:hidden;transform:rotateY(180deg);">${c.emoji}</div>`;if(c.isFlipped||c.isMatched)el.style.transform="rotateY(180deg)";if(c.isMatched){el.querySelectorAll("div")[1].style.borderColor="#52c7a0";el.querySelectorAll("div")[1].style.background="rgba(82,199,160,.12)";}el.addEventListener("click",()=>flip(c));g.appendChild(el);});
+    }
+    function flip(c){if(c.isMatched||c.isFlipped||flipped.length===2)return;c.isFlipped=true;flipped.push(c);moves++;document.getElementById("sMoves").textContent=moves;updateCards();if(flipped.length===2){if(flipped[0].emoji===flipped[1].emoji){flipped.forEach(x=>x.isMatched=true);matched++;document.getElementById("sPairs").textContent=EM.length-matched;flipped=[];updateCards();if(matched===EM.length){setTimeout(()=>{container.innerHTML+=`<div style="text-align:center;padding:16px;font-family:var(--font-display);font-style:italic;font-size:18px;">🎉 done in ${moves} moves!</div><div style="text-align:center;"><button class="cg-btn primary" id="sMemAgain">play again</button></div>`;document.getElementById("sMemAgain").addEventListener("click",reset);},400);}}else{setTimeout(()=>{flipped.forEach(x=>x.isFlipped=false);flipped=[];updateCards();},800);}}}
+    function updateCards(){const els=container.querySelectorAll(".s-mem-card");cards.forEach((c,i)=>{els[i].style.transform=(c.isFlipped||c.isMatched)?"rotateY(180deg)":"";});}
+    reset();
+    return ()=>clearInterval(ti);
+  }
+
+  // ── Solo: Reaction ─────────────────────────────────────────────────────────
+  function soloReaction(container) {
+    let state="idle",startTime,results=[],timer;
+    container.innerHTML=`<div style="display:flex;justify-content:space-between;margin-bottom:12px;"><span style="font-family:var(--font-mono);font-size:12px;color:var(--muted);">Round <strong id="sRound" style="color:var(--ink);">0</strong> / 5</span><button class="cg-btn" id="sReactReset">reset</button></div><div style="display:flex;flex-direction:column;align-items:center;gap:16px;"><div id="sReactBox" style="width:180px;height:180px;border-radius:20px;background:var(--mocha-light);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-style:italic;font-size:15px;cursor:pointer;user-select:none;">tap to start</div><div id="sReactResults" style="font-family:var(--font-mono);font-size:12px;color:var(--muted);text-align:center;line-height:1.8;"></div></div>`;
+    const box=document.getElementById("sReactBox"),res=document.getElementById("sReactResults");
+    document.getElementById("sReactReset").addEventListener("click",()=>{clearTimeout(timer);results=[];state="idle";box.style.background="var(--mocha-light)";box.style.color="var(--ink)";box.textContent="tap to start";res.innerHTML="";document.getElementById("sRound").textContent="0";});
+    box.addEventListener("click",()=>{
+      if(state==="idle"){state="wait";box.style.background="#e05252";box.style.color="#fff";box.textContent="wait…";const d=1500+Math.random()*3000;timer=setTimeout(()=>{startTime=Date.now();state="ready";box.style.background="#52c752";box.style.color="#fff";box.textContent="NOW!";},d);}
+      else if(state==="wait"){clearTimeout(timer);state="idle";box.style.background="var(--mocha-light)";box.style.color="var(--ink)";box.textContent="too early! tap again";}
+      else if(state==="ready"){const rt=Date.now()-startTime;results.push(rt);state="idle";const done=results.length>=5;box.style.background="var(--mocha-light)";box.style.color="var(--ink)";box.textContent=done?"done! see results below":`${rt}ms — tap for next`;document.getElementById("sRound").textContent=results.length;const avg=Math.round(results.reduce((a,b)=>a+b,0)/results.length);const best=Math.min(...results);res.innerHTML=results.map((r,i)=>`Round ${i+1}: <strong>${r}ms</strong>`).join(" · ")+(done?`<br><br>Avg: <strong>${avg}ms</strong> · Best: <strong>${best}ms</strong>`:"");}
+    });
+    return ()=>clearTimeout(timer);
+  }
+
+  // ── Solo: Scramble ─────────────────────────────────────────────────────────
+  function soloScramble(container) {
+    const WORDS=[{word:"writing",hint:"what you do here"},{word:"progress",hint:"this site"},{word:"journal",hint:"daily practice"},{word:"chapter",hint:"part of a story"},{word:"curious",hint:"a great quality"},{word:"horizon",hint:"sky meets earth"},{word:"mystery",hint:"a whodunit"},{word:"journey",hint:"a long trip"},{word:"phantom",hint:"ghost-like"},{word:"library",hint:"books live here"}];
+    let cur,scr,ans,usedIdx,streak=0,total=0;
+    function shuffle(s){let a=s.split("");for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}const r=a.join("");return r===s?shuffle(s):r;}
+    function next(){const e=WORDS[Math.floor(Math.random()*WORDS.length)];cur=e.word;scr=shuffle(cur);ans=[];usedIdx=[];render();}
+    function render(){
+      container.innerHTML=`<div style="display:flex;justify-content:space-between;margin-bottom:12px;"><span style="font-family:var(--font-mono);font-size:12px;color:var(--muted);">🔥 streak <strong style="color:var(--ink);" id="sStreak">${streak}</strong></span><span style="font-family:var(--font-mono);font-size:12px;color:var(--muted);">solved <strong style="color:var(--ink);" id="sTotal">${total}</strong></span><button class="cg-btn" id="sScrambleSkip">skip</button></div><div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);text-align:center;margin-bottom:8px;">hint: ${WORDS.find(w=>w.word===cur)?.hint}</div><div style="display:flex;justify-content:center;gap:5px;margin-bottom:16px;" id="sAnsSlots">${cur.split("").map((_,i)=>`<div style="width:36px;height:42px;border-bottom:3px solid var(--ink);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-weight:700;font-size:17px;cursor:pointer;" data-si="${i}"></div>`).join("")}</div><div style="display:flex;justify-content:center;gap:6px;flex-wrap:wrap;" id="sBank">${scr.split("").map((l,i)=>`<div style="width:40px;height:48px;border:2px solid var(--mocha-light);border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:18px;font-weight:600;cursor:pointer;" data-li="${i}">${l}</div>`).join("")}</div><div style="display:flex;justify-content:center;margin-top:14px;"><button class="cg-btn" id="sScrambleClear">clear</button></div>`;
+      document.getElementById("sScrambleSkip").addEventListener("click",()=>{streak=0;next();});
+      document.getElementById("sScrambleClear").addEventListener("click",()=>{ans=[];usedIdx=[];syncScr();});
+      document.getElementById("sBank").addEventListener("click",e=>{const b=e.target.closest("[data-li]");if(!b||usedIdx.includes(parseInt(b.dataset.li)))return;const li=parseInt(b.dataset.li);if(ans.length>=cur.length)return;ans.push(scr[li]);usedIdx.push(li);syncScr();if(ans.length===cur.length){const g=ans.join("");if(g===cur){flashSlots("correct");streak++;total++;setTimeout(next,700);}else{flashSlots("wrong");setTimeout(()=>{ans=[];usedIdx=[];syncScr();streak=0;document.getElementById("sStreak").textContent=0;},600);};}});
+      document.getElementById("sAnsSlots").addEventListener("click",e=>{const sl=e.target.closest("[data-si]");if(!sl)return;const i=parseInt(sl.dataset.si);if(i>=ans.length)return;ans=ans.slice(0,i);usedIdx=usedIdx.slice(0,i);syncScr();});
+    }
+    function syncScr(flash){const slots=container.querySelectorAll("[data-si]");slots.forEach((sl,i)=>{sl.textContent=ans[i]?scr[usedIdx[i]]:"";if(flash==="correct"){sl.style.borderColor="#52c752";sl.style.color="#52c752";}else if(flash==="wrong"){sl.style.borderColor="#e05252";sl.style.color="#e05252";}else{sl.style.borderColor="var(--ink)";sl.style.color="var(--ink)";}});const bank=container.querySelectorAll("[data-li]");bank.forEach(b=>{const used=usedIdx.includes(parseInt(b.dataset.li));b.style.opacity=used?"0.3":"1";b.style.pointerEvents=used?"none":"auto";});}
+    function flashSlots(type){syncScr(type);}
+    next();
+    return null;
+  }
+
+  // ── Solo: Typing ───────────────────────────────────────────────────────────
+  function soloTyping(container) {
+    const QUOTES=["The first draft is just you telling yourself the story.","Write what should not be forgotten.","You can always edit a bad page. You can't edit a blank page.","Either write something worth reading or do something worth writing.","The scariest moment is always just before you start.","One day I will find the right words, and they will be simple.","A writer only begins a book. A reader finishes it.","Writing is the painting of the voice.","You don't start out writing good stuff. You start out writing crap and thinking it's good stuff, and then gradually you get better at it.","Not all those who wander are lost."];
+    let passage,typed,errors,started,finished,elapsed,ti;
+    function init(){const q=QUOTES[Math.floor(Math.random()*QUOTES.length)];passage=q.split("");typed=0;errors=new Set();started=false;finished=false;elapsed=0;clearInterval(ti);render();}
+    function render(){
+      container.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;"><div style="display:flex;gap:20px;"><span style="font-family:var(--font-mono);font-size:12px;color:var(--muted);">WPM <strong id="sTypWpm" style="color:var(--ink);">0</strong></span><span style="font-family:var(--font-mono);font-size:12px;color:var(--muted);">Time <strong id="sTypTime" style="color:var(--ink);">0s</strong></span></div><button class="cg-btn" id="sTypReset">new</button></div><div id="sTypPassage" style="font-family:var(--font-display);font-size:16px;line-height:1.8;color:var(--mocha-light);background:var(--paper);border-radius:12px;padding:20px;cursor:text;min-height:80px;position:relative;"></div><input id="sTypInput" style="position:absolute;opacity:0;pointer-events:none;width:1px;height:1px;" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"><div id="sTypResult" style="text-align:center;padding:12px 0;font-family:var(--font-mono);font-size:12px;color:var(--muted);"></div>`;
+      document.getElementById("sTypReset").addEventListener("click",init);
+      document.getElementById("sTypPassage").addEventListener("click",()=>document.getElementById("sTypInput").focus());
+      drawPassage();
+      const inp=document.getElementById("sTypInput");
+      inp.addEventListener("keydown",e=>{if(finished)return;if(e.key==="Tab"){e.preventDefault();init();return;}if(!started&&e.key.length===1){started=true;ti=setInterval(()=>{elapsed++;document.getElementById("sTypTime").textContent=elapsed+"s";const wpm=Math.round((typed/5)/(elapsed/60));document.getElementById("sTypWpm").textContent=wpm||0;},1000);}if(e.key==="Backspace"){if(typed>0){typed--;drawPassage();}return;}if(e.key.length!==1||typed>=passage.length)return;if(e.key!==passage[typed])errors.add(typed);typed++;if(typed>=passage.length){clearInterval(ti);finished=true;const wpm=Math.round((typed/5)/((elapsed||1)/60));const acc=Math.round(((typed-errors.size)/typed)*100);document.getElementById("sTypResult").innerHTML=`<strong style="font-size:18px;color:var(--ink);">${wpm} wpm</strong> · ${acc}% accuracy · <button class="cg-btn" style="display:inline-flex;" id="sTypAgain">try again</button>`;document.getElementById("sTypAgain").addEventListener("click",init);return;}drawPassage();});
+      inp.focus();
+    }
+    function drawPassage(){const el=document.getElementById("sTypPassage");if(!el)return;el.innerHTML=passage.map((c,i)=>{let s="color:var(--mocha-light)";if(i<typed)s=errors.has(i)?"color:#e05252;text-decoration:underline":"color:var(--ink)";else if(i===typed)s="color:var(--ink);box-shadow:inset -2px 0 0 #a352e0";const d=c===" "?"&nbsp;":c.replace(/&/g,"&amp;").replace(/</g,"&lt;");return`<span style="${s}">${d}</span>`;}).join("");}
+    init();
+    return ()=>clearInterval(ti);
   }
 
   function scrollToMessage(id) {

@@ -4754,3 +4754,82 @@ body.mobile main.container {
 .chat-game-pick-info { min-width: 0; }
 .chat-game-pick-name { font-size: 14px; font-weight: 700; color: var(--ink); display: block; }
 .chat-game-pick-desc { font-size: 12px; color: var(--muted); display: block; margin-top: 1px; }
+
+/* ── Solo game embed (slide-up panel) ── */
+.chat-solo-embed {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  z-index: 400;
+  background: var(--paper);
+  border-top: 1.5px solid var(--mocha-light);
+  border-radius: 20px 20px 0 0;
+  box-shadow: 0 -8px 40px rgba(0,0,0,.18);
+  transform: translateY(100%);
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+.chat-solo-embed.open { transform: translateY(0); }
+.chat-solo-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--mocha-wash);
+  flex-shrink: 0;
+}
+.chat-solo-title {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 18px;
+  font-weight: 600;
+}
+.chat-solo-close {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--radius);
+  line-height: 1;
+  transition: color 0.1s, background 0.1s;
+}
+.chat-solo-close:hover { color: var(--ink); background: var(--mocha-wash); }
+.chat-solo-body {
+  padding: 16px 20px 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* Shared mini game buttons */
+.cg-btn {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 6px 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--mocha-light);
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+  transition: background 0.1s;
+  white-space: nowrap;
+}
+.cg-btn:hover { background: var(--mocha-light); }
+.cg-btn.primary { background: var(--ink); color: var(--cream); border-color: var(--ink); }
+.cg-btn.primary:hover { opacity: 0.85; }
+.cg-dpad {
+  width: 40px; height: 40px;
+  background: var(--paper);
+  border: 1px solid var(--mocha-light);
+  border-radius: 10px;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+.cg-dpad:active { background: var(--mocha-light); }
