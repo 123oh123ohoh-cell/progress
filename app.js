@@ -594,7 +594,10 @@ function renderNav(activePage) {
         <span>Write</span>
       </a>
       <a href='chat.html' class='mbn-item ${activePage === "chat" ? "active" : ""}'>
-        <svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z'/></svg>
+        <span class='mbn-chat-icon'>
+          <svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z'/></svg>
+          <span class='mbn-chat-badge' id='mbnChatBadge'></span>
+        </span>
         <span>Chat</span>
       </a>
       <a href='profile.html' class='mbn-item ${activePage === "profile" || activePage === "settings" ? "active" : ""}'>
@@ -607,6 +610,9 @@ function renderNav(activePage) {
   renderNotifDropdown();
   renderAccountDropdown(user, activePage);
   wireDropdowns();
+  // Chat page clears the badge; every other page just shows whatever's stored
+  if (activePage === "chat") setDmUnread(0);
+  else updateChatNavBadge();
 }
 
 function renderNotifDropdown() {
@@ -1126,6 +1132,18 @@ function notificationHref(n) {
   return null;
 }
 
+// ── Chat nav badge (mobile bottom nav) ──────────────────────────────────────
+const DM_UNREAD_KEY = "progress:dmUnread";
+function getDmUnread() { try { return Math.max(0, parseInt(localStorage.getItem(DM_UNREAD_KEY) || "0", 10) || 0); } catch (e) { return 0; } }
+function setDmUnread(n) { try { localStorage.setItem(DM_UNREAD_KEY, String(Math.max(0, n))); } catch (e) {} updateChatNavBadge(); }
+function updateChatNavBadge() {
+  const badge = document.getElementById("mbnChatBadge");
+  if (!badge) return;
+  const n = getDmUnread();
+  badge.textContent = n > 9 ? "9+" : n > 0 ? String(n) : "";
+  badge.style.display = n > 0 ? "flex" : "none";
+}
+
 // Called whenever a "notification" WS message arrives, regardless of
 // whether it came in on the shared presence socket or chat.html's own
 // dedicated socket - both funnel through here so the behavior is
@@ -1139,6 +1157,10 @@ function handleIncomingNotification(notification) {
     badge.classList.toggle("hidden", !unseen);
   }
   updateTitleBadge(unseen);
+  // Bump the chat nav badge for incoming DMs
+  if (notification.type === "message" || notification.type === "mention") {
+    setDmUnread(getDmUnread() + 1);
+  }
   const notifDD = document.getElementById("notifDropdown");
   if (notifDD && notifDD.classList.contains("open")) {
     renderNotifDropdown();

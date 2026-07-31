@@ -905,6 +905,12 @@
         closeChatSidebar(); // auto-close on mobile after picking a room
       });
     });
+
+    // Keep the chat nav badge in sync: total unread across all DMs
+    // (chat page itself always clears the badge on load, but this keeps
+    // localStorage accurate so the badge is right on other pages too)
+    const totalUnread = (conversations || []).reduce((s, c) => s + (c.unreadCount || 0), 0);
+    try { localStorage.setItem("progress:dmUnread", String(totalUnread)); } catch (e) {}
   }
 
   // Track seen state per DM room
