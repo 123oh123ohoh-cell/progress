@@ -99,11 +99,11 @@
     const banner = document.getElementById("streakBanner");
     if (!banner) return;
     const me = Progress.getCurrentUser();
-    if (!me || !me.streak || me.streak < 1) { banner.style.display = "none"; return; }
+    if (!me || me.streak < 1) { banner.style.display = "none"; return; }
     banner.style.display = "block";
     banner.innerHTML = `<div style="display:flex; align-items:center; gap:8px; padding:10px 14px; margin-bottom:12px; border-radius:10px; background:var(--mocha-wash); font-size:13.5px; color:var(--muted);">
       <span style="font-size:18px;">🔥</span>
-      <span><strong style="color:var(--ink);">${me.streak}-day streak</strong> &mdash; keep logging in daily</span>
+      <span><strong style="color:var(--ink);">${me.streak}-day streak</strong></span>
     </div>`;
   }
 

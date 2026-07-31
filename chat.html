@@ -54,6 +54,14 @@
   // Reply context
   let replyContext = null;
 
+  // Scroll-to-bottom unread counter
+  let scrollUnreadCount = 0;
+
+  // Song pending to send
+  let songPending = null;
+  let songSearchTimer = null;
+  let previewAudio = null;
+
   let currentUser = null;
   let currentRoom = GLOBAL_ROOM;
   let currentPeer = null; // username, or null for the global room
@@ -73,6 +81,21 @@
     el.className = "chat-status" + (cls ? ` ${cls}` : "");
   }
 
+  function updateScrollBtn() {
+    const log = document.getElementById("chatLog");
+    const btn = document.getElementById("chatScrollBtn");
+    const countEl = document.getElementById("chatScrollCount");
+    if (!log || !btn) return;
+    const distFromBottom = log.scrollHeight - log.scrollTop - log.clientHeight;
+    const show = distFromBottom > 160;
+    btn.classList.toggle("visible", show);
+    if (!show) { scrollUnreadCount = 0; }
+    if (countEl) {
+      countEl.textContent = scrollUnreadCount > 0 ? scrollUnreadCount : "";
+      countEl.classList.toggle("has-count", scrollUnreadCount > 0);
+    }
+  }
+
   function scrollToBottom(force, smooth) {
     const log = document.getElementById("chatLog");
     if (!log) return;
@@ -83,6 +106,8 @@
       } else {
         log.scrollTop = log.scrollHeight;
       }
+      scrollUnreadCount = 0;
+      updateScrollBtn();
     }
   }
 
@@ -95,7 +120,60 @@
         <span class="chat-reply-quote-author">@${escapeHTML(msg.replyTo.author)}</span>
         <span class="chat-reply-quote-body">${escapeHTML((msg.replyTo.body || "📷 Image").slice(0, 120))}</span>
       </div>` : "";
-    const bodyHTML = (msg.body || replyHTML) ? `<div class="chat-bubble">${replyHTML}${msg.body ? renderMentionsInHTML(renderEmoticonsText(msg.body, "inline-emoticon")) : ""}</div>` : "";
+    // Song card
+    let songCardHTML = "";
+    if (msg.type === "song" && msg.songData) {
+      const s = msg.songData;
+      const artEl = s.albumArt
+        ? `<img class="chat-song-art" src="${escapeHTML(s.albumArt)}" alt="">`
+        : `<div class="chat-song-art-fallback">♪</div>`;
+      const previewBtn = s.previewUrl
+        ? `<button type="button" class="chat-song-preview-btn" data-preview="${escapeHTML(s.previewUrl)}" aria-label="Preview">
+             <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+           </button>`
+        : `<a href="${escapeHTML(s.spotifyUrl || "#")}" target="_blank" rel="noopener" class="chat-song-preview-btn" aria-label="Open on Spotify">
+             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+           </a>`;
+      songCardHTML = `<div class="chat-song-card">
+        ${artEl}
+        <div class="chat-song-info">
+          <span class="chat-song-name">${escapeHTML(s.name)}</span>
+          <span class="chat-song-artist">${escapeHTML(s.artists)}</span>
+          <div class="chat-song-spotify-badge">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="#1DB954"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+            Spotify
+          </div>
+        </div>
+        ${previewBtn}
+      </div>`;
+    }
+
+    // Game card
+    let gameCardHTML = "";
+    if (msg.type === "game" && msg.gameData) {
+      const g = msg.gameData;
+      let gameInner = "";
+      if (g.gameType === "wyr") {
+        gameInner = `<div class="chat-game-options">
+          <button type="button" class="chat-game-option" data-game-id="${escapeHTML(msg.id)}" data-choice="a">${escapeHTML(g.optionA)}</button>
+          <button type="button" class="chat-game-option" data-game-id="${escapeHTML(msg.id)}" data-choice="b">${escapeHTML(g.optionB)}</button>
+        </div>`;
+      } else if (g.gameType === "word") {
+        gameInner = `<div class="chat-game-options"><button type="button" class="chat-game-option" data-game-id="${escapeHTML(msg.id)}" data-choice="reply">Reply with a word →</button></div>`;
+      } else if (g.gameType === "emoji") {
+        gameInner = `<div class="chat-game-options"><button type="button" class="chat-game-option" data-game-id="${escapeHTML(msg.id)}" data-choice="emoji">Add an emoji →</button></div>`;
+      }
+      const icons = { wyr: "🤔", word: "💬", emoji: "✨" };
+      const labels = { wyr: "Would You Rather", word: "Word Association", emoji: "Emoji Story" };
+      gameCardHTML = `<div class="chat-game-card">
+        <div class="chat-game-tag">${icons[g.gameType] || "🎮"} ${escapeHTML(labels[g.gameType] || "Game")}</div>
+        <div class="chat-game-body">${escapeHTML(g.prompt)}</div>
+        ${gameInner}
+      </div>`;
+    }
+
+    const bodyHTML = songCardHTML || gameCardHTML ||
+      ((msg.body || replyHTML) ? `<div class="chat-bubble">${replyHTML}${msg.body ? renderMentionsInHTML(renderEmoticonsText(msg.body, "inline-emoticon")) : ""}</div>` : "");
     return `
       <div class="chat-msg ${mine ? "mine" : ""} ${grouped ? "grouped" : ""}" data-id="${msg.id}">
         ${!mine ? `<a href="user.html?username=${encodeURIComponent(msg.author)}" class="chat-avatar">${avatarHTML(author, 30)}</a>` : ""}
@@ -204,6 +282,17 @@
       });
     }
 
+    // If user scrolled up and this is an incoming (animated) message, bump count
+    if (animate) {
+      const log2 = document.getElementById("chatLog");
+      if (log2) {
+        const distFromBottom = log2.scrollHeight - log2.scrollTop - log2.clientHeight;
+        if (distFromBottom > 160) {
+          scrollUnreadCount++;
+          updateScrollBtn();
+        }
+      }
+    }
     scrollToBottom(false, animate); // smooth only for live messages, instant for history
     attachLinkPreview(msg);
   }
@@ -456,19 +545,44 @@
 
   function sendMessage(text, imageUrl) {
     const trimmed = (text || "").trim();
-    if (!trimmed && !imageUrl) return;
+    if (!trimmed && !imageUrl && !songPending) return;
     const reply = replyContext;
     clearReplyContext();
+
+    // Build the payload
+    const payload = { type: "send", body: trimmed, image: imageUrl || null, replyTo: reply };
+    if (songPending) {
+      payload.msgType = "song";
+      payload.songData = songPending;
+      payload.body = `🎵 ${songPending.name} — ${songPending.artists}`;
+      songPending = null;
+      hideSongSearch();
+    }
+
     if (socket && socket.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify({ type: "send", body: trimmed, image: imageUrl || null, replyTo: reply }));
+      socket.send(JSON.stringify(payload));
     } else {
       apiFetch("/api/chat/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ room: currentRoom, author: currentUser.username, body: trimmed, image: imageUrl || null, replyTo: reply })
+        body: JSON.stringify({ room: currentRoom, author: currentUser.username, ...payload })
       }).then(msg => {
         if (msg) { appendMessage(msg, true); if (currentRoom.startsWith("dm:")) loadSidebar(); }
       });
+    }
+  }
+
+  function sendGameMessage(gameData) {
+    const payload = {
+      type: "send",
+      body: `🎮 ${gameData.prompt}`,
+      msgType: "game",
+      gameData,
+      image: null,
+      replyTo: null
+    };
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify(payload));
     }
   }
 
@@ -489,6 +603,148 @@
     replyContext = null;
     const preview = document.getElementById("chatReplyPreview");
     if (preview) preview.classList.remove("visible");
+  }
+
+  // ── Song search ─────────────────────────────────────────────────────────────
+
+  function hideSongSearch() {
+    const el = document.getElementById("chatSongSearch");
+    if (el) el.classList.remove("open");
+    songPending = null;
+  }
+
+  function showSongSearch(results) {
+    let el = document.getElementById("chatSongSearch");
+    if (!el) {
+      el = document.createElement("div");
+      el.className = "chat-song-search";
+      el.id = "chatSongSearch";
+      const form = document.getElementById("chatForm");
+      form.style.position = "relative";
+      form.appendChild(el);
+    }
+    if (!results || results.length === 0) {
+      el.innerHTML = `<div class="chat-song-search-header">Songs</div><div class="chat-song-search-loading">No results</div>`;
+    } else {
+      el.innerHTML = `<div class="chat-song-search-header">Songs — pick one to share</div>` +
+        results.map(r => `
+          <div class="chat-song-result" data-song='${JSON.stringify(r).replace(/'/g, "&#39;")}'>
+            ${r.albumArt ? `<img src="${escapeHTML(r.albumArt)}" alt="">` : `<div class="chat-song-art-fallback" style="width:38px;height:38px;font-size:16px">♪</div>`}
+            <div class="chat-song-result-info">
+              <span class="chat-song-result-name">${escapeHTML(r.name)}</span>
+              <span class="chat-song-result-artist">${escapeHTML(r.artists)}</span>
+            </div>
+          </div>`).join("");
+      el.querySelectorAll(".chat-song-result").forEach(row => {
+        row.addEventListener("click", () => {
+          songPending = JSON.parse(row.dataset.song);
+          const input = document.getElementById("chatInput");
+          if (input) { input.value = ""; input.placeholder = `🎵 ${songPending.name} — ${songPending.artists}`; input.focus(); }
+          el.classList.remove("open");
+        });
+      });
+    }
+    el.classList.add("open");
+  }
+
+  async function searchSpotify(q) {
+    if (!q || q.length < 2) { hideSongSearch(); return; }
+    const el = document.getElementById("chatSongSearch");
+    if (el) {
+      el.innerHTML = `<div class="chat-song-search-header">Songs</div><div class="chat-song-search-loading">Searching…</div>`;
+      el.classList.add("open");
+    } else {
+      showSongSearch(null);
+    }
+    try {
+      const data = await apiFetch(`/api/spotify/search?q=${encodeURIComponent(q)}&limit=5`);
+      if (data && data.tracks) showSongSearch(data.tracks);
+      else showSongSearch([]);
+    } catch { showSongSearch([]); }
+  }
+
+  // ── Game picker ──────────────────────────────────────────────────────────────
+
+  const WYR_PROMPTS = [
+    ["Always be 10 minutes late", "Always be 20 minutes early"],
+    ["Give up music forever", "Give up movies forever"],
+    ["Have no phone for a month", "Have no internet for a month"],
+    ["Only eat sweet food forever", "Only eat savory food forever"],
+    ["Be able to fly", "Be able to be invisible"],
+    ["Know how you'll die", "Know when you'll die"],
+    ["Live in the past", "Live in the future"],
+    ["Have unlimited money", "Have unlimited time"],
+  ];
+
+  const WORD_SEEDS = ["sunshine", "ocean", "chaos", "dream", "fire", "ghost", "neon", "storm", "vintage", "cosmic"];
+  const EMOJI_SEEDS = ["🌙", "🔥", "🌊", "✨", "🎭", "🌈", "🦋", "⚡", "🌸", "🎪"];
+
+  function hideGamePicker() {
+    const el = document.getElementById("chatGamePicker");
+    if (el) el.classList.remove("open");
+  }
+
+  function showGamePicker() {
+    let el = document.getElementById("chatGamePicker");
+    if (!el) {
+      el = document.createElement("div");
+      el.className = "chat-game-picker";
+      el.id = "chatGamePicker";
+      const form = document.getElementById("chatForm");
+      form.style.position = "relative";
+      form.appendChild(el);
+    }
+    el.innerHTML = `
+      <div class="chat-game-picker-title">Choose a game</div>
+      <button type="button" class="chat-game-pick-btn" data-game="wyr">
+        <span class="chat-game-pick-icon">🤔</span>
+        <span class="chat-game-pick-info">
+          <span class="chat-game-pick-name">Would You Rather</span>
+          <span class="chat-game-pick-desc">Pick between two options</span>
+        </span>
+      </button>
+      <button type="button" class="chat-game-pick-btn" data-game="word">
+        <span class="chat-game-pick-icon">💬</span>
+        <span class="chat-game-pick-info">
+          <span class="chat-game-pick-name">Word Association</span>
+          <span class="chat-game-pick-desc">Start a word chain</span>
+        </span>
+      </button>
+      <button type="button" class="chat-game-pick-btn" data-game="emoji">
+        <span class="chat-game-pick-icon">✨</span>
+        <span class="chat-game-pick-info">
+          <span class="chat-game-pick-name">Emoji Story</span>
+          <span class="chat-game-pick-desc">Build a story one emoji at a time</span>
+        </span>
+      </button>`;
+    el.querySelectorAll(".chat-game-pick-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const g = btn.dataset.game;
+        let gameData;
+        if (g === "wyr") {
+          const pair = WYR_PROMPTS[Math.floor(Math.random() * WYR_PROMPTS.length)];
+          gameData = { gameType: "wyr", prompt: "Would you rather…", optionA: pair[0], optionB: pair[1] };
+        } else if (g === "word") {
+          const seed = WORD_SEEDS[Math.floor(Math.random() * WORD_SEEDS.length)];
+          gameData = { gameType: "word", prompt: `Word association — start with: "${seed}"` };
+        } else {
+          const seed = EMOJI_SEEDS[Math.floor(Math.random() * EMOJI_SEEDS.length)];
+          gameData = { gameType: "emoji", prompt: `Emoji story — add one emoji each: ${seed}` };
+        }
+        hideGamePicker();
+        const input = document.getElementById("chatInput");
+        if (input) input.value = "";
+        sendGameMessage(gameData);
+      });
+    });
+    el.classList.add("open");
+    // Close on outside click
+    setTimeout(() => {
+      const closeOnClick = (e) => {
+        if (!el.contains(e.target)) { el.classList.remove("open"); document.removeEventListener("click", closeOnClick); }
+      };
+      document.addEventListener("click", closeOnClick);
+    }, 10);
   }
 
   function scrollToMessage(id) {
@@ -602,12 +858,12 @@
         <span class="chat-room-av-wrap">
           ${avatarInner}
           ${presenceDot}
-          ${unreadDot}
         </span>
         <span class="chat-room-text">
           <span class="chat-room-label">${escapeHTML(label)}</span>
           ${sub ? `<span class="chat-room-sub">${sub}</span>` : ""}
         </span>
+        ${unreadDot}
       </button>`;
   }
 
@@ -899,6 +1155,11 @@
           <div class="chat-log" id="chatLog">
             <div class="chat-empty">Loading…</div>
           </div>
+          <button class="chat-scroll-btn" id="chatScrollBtn" aria-label="Scroll to bottom">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+            <span>new</span>
+            <span class="chat-scroll-btn-count" id="chatScrollCount"></span>
+          </button>
           <div class="chat-typing" id="chatTyping"></div>
           <div class="chat-image-staged" id="chatImageStaged"></div>
           <!-- Reply preview bar -->
@@ -938,8 +1199,11 @@
       const input = document.getElementById("chatInput");
       sendMessage(input.value, pendingChatImageUrl);
       input.value = "";
+      input.placeholder = "Say something…";
       clearStagedImage();
       closeChatEmojiPicker();
+      hideSongSearch();
+      hideGamePicker();
     });
 
     document.getElementById("chatImageBtn").addEventListener("click", () => {
@@ -951,11 +1215,88 @@
       e.target.value = "";
     });
 
-    document.getElementById("chatInput").addEventListener("input", () => {
+    document.getElementById("chatInput").addEventListener("input", (e) => {
       const now = Date.now();
       if (socket && socket.readyState === WebSocket.OPEN && now - lastTypingSent > 800) {
         lastTypingSent = now;
         socket.send(JSON.stringify({ type: "typing" }));
+      }
+      // /song command: show search
+      const val = e.target.value;
+      if (val.startsWith("/song ")) {
+        const query = val.slice(6).trim();
+        clearTimeout(songSearchTimer);
+        if (query.length >= 2) {
+          songSearchTimer = setTimeout(() => searchSpotify(query), 380);
+        } else {
+          hideSongSearch();
+        }
+      } else if (!val.startsWith("/song")) {
+        hideSongSearch();
+        if (songPending) {
+          songPending = null;
+          const input = document.getElementById("chatInput");
+          if (input) input.placeholder = "Say something…";
+        }
+      }
+      // /game command: show picker on Enter or space after /game
+      if (val === "/game") {
+        e.target.value = "";
+        showGamePicker();
+      }
+    });
+
+    // Scroll-to-bottom button
+    const scrollBtn = document.getElementById("chatScrollBtn");
+    const chatLog = document.getElementById("chatLog");
+    if (scrollBtn && chatLog) {
+      scrollBtn.addEventListener("click", () => {
+        chatLog.scrollTo({ top: chatLog.scrollHeight, behavior: "smooth" });
+        scrollUnreadCount = 0;
+        updateScrollBtn();
+        const input = document.getElementById("chatInput");
+        if (input) input.placeholder = "Say something…";
+      });
+      chatLog.addEventListener("scroll", updateScrollBtn, { passive: true });
+    }
+
+    // Song preview playback (delegated)
+    document.getElementById("chatLog").addEventListener("click", (e) => {
+      const btn = e.target.closest(".chat-song-preview-btn[data-preview]");
+      if (!btn) return;
+      const url = btn.dataset.preview;
+      if (previewAudio && !previewAudio.paused) {
+        previewAudio.pause();
+        document.querySelectorAll(".chat-song-preview-btn.playing").forEach(b => b.classList.remove("playing"));
+        if (previewAudio._src === url) { previewAudio = null; return; }
+      }
+      previewAudio = new Audio(url);
+      previewAudio._src = url;
+      previewAudio.volume = 0.7;
+      previewAudio.play().catch(() => {});
+      btn.classList.add("playing");
+      btn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`;
+      previewAudio.addEventListener("ended", () => {
+        btn.classList.remove("playing");
+        btn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
+        previewAudio = null;
+      });
+    });
+
+    // Game card button interactions (delegated)
+    document.getElementById("chatLog").addEventListener("click", (e) => {
+      const btn = e.target.closest(".chat-game-option");
+      if (!btn || btn.classList.contains("voted")) return;
+      const gameId = btn.dataset.gameId;
+      const choice = btn.dataset.choice;
+      // Mark as voted
+      btn.classList.add("voted");
+      if (choice === "reply") {
+        const input = document.getElementById("chatInput");
+        if (input) { input.focus(); input.value = ""; }
+      } else if (choice === "emoji") {
+        const input = document.getElementById("chatInput");
+        if (input) { input.focus(); input.value = ""; }
       }
     });
 
@@ -1045,14 +1386,25 @@
     const viewer = Progress.getCurrentUser();
     const joined = viewer && peerSession.participants.includes(viewer.username);
     banner.style.display = "flex";
+    banner.className = `dm-listen-banner${peerSession.isPlaying === false ? " is-paused" : ""}`;
+    const artEl = peerSession.albumArt
+      ? `<img class="dm-listen-art" src="${escapeHTML(peerSession.albumArt)}" alt="">`
+      : `<div class="dm-listen-art-fallback">♪</div>`;
     banner.innerHTML = `
-      <span class="dm-listen-banner-icon">🎵</span>
-      <span class="dm-listen-banner-track">${escapeHTML(peerSession.trackName || "Listening to something")}</span>
-      <span class="dm-listen-banner-artist">${escapeHTML(peerSession.artistNames || "")}</span>
-      ${joined
-        ? `<button type="button" class="dm-listen-action" data-action="sync" data-id="${peerSession.id}">Sync</button>
-           <button type="button" class="dm-listen-action dm-listen-leave" data-action="leave" data-id="${peerSession.id}">Leave</button>`
-        : `<button type="button" class="dm-listen-action" data-action="join" data-id="${peerSession.id}">Join</button>`}
+      ${artEl}
+      <div class="dm-listen-eq">
+        <span></span><span></span><span></span>
+      </div>
+      <div class="dm-listen-info">
+        <span class="dm-listen-banner-track">${escapeHTML(peerSession.trackName || "Listening to something")}</span>
+        <span class="dm-listen-banner-artist">${escapeHTML(peerSession.artistNames || "")}</span>
+      </div>
+      <div class="dm-listen-actions">
+        ${joined
+          ? `<button type="button" class="dm-listen-action" data-action="sync" data-id="${peerSession.id}">Sync</button>
+             <button type="button" class="dm-listen-action dm-listen-leave" data-action="leave" data-id="${peerSession.id}">Leave</button>`
+          : `<button type="button" class="dm-listen-action" data-action="join" data-id="${peerSession.id}">Join</button>`}
+      </div>
     `;
     banner.querySelectorAll(".dm-listen-action").forEach(btn => {
       btn.addEventListener("click", async () => {

@@ -368,6 +368,15 @@ function chatRoomClients(room) {
   return set;
 }
 
+function isUserActiveInRoom(username, room) {
+  const clients = chatRooms.get(room);
+  if (!clients) return false;
+  for (const ws of clients) {
+    if (ws.username === username && ws.readyState === 1) return true;
+  }
+  return false;
+}
+
 function broadcastToRoom(room, payload) {
   const json = JSON.stringify(payload);
   for (const client of chatRoomClients(room)) {
@@ -1746,6 +1755,53 @@ app.get("/api/spotify/status", (req, res) => {
   res.json({ configured: !!(SPOTIFY_CLIENT_ID && SPOTIFY_CLIENT_SECRET) });
 });
 
+// Client-credentials token cache for search (no user auth needed)
+let _spotifyClientToken = null;
+let _spotifyClientTokenExpires = 0;
+async function getSpotifyClientToken() {
+  if (_spotifyClientToken && _spotifyClientTokenExpires > Date.now() + 10000) return _spotifyClientToken;
+  if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET) return null;
+  try {
+    const res = await fetch("https://accounts.spotify.com/api/token", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Authorization": "Basic " + Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString("base64")
+      },
+      body: new URLSearchParams({ grant_type: "client_credentials" })
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    _spotifyClientToken = data.access_token;
+    _spotifyClientTokenExpires = Date.now() + (data.expires_in * 1000);
+    return _spotifyClientToken;
+  } catch { return null; }
+}
+
+app.get("/api/spotify/search", asyncHandler(async (req, res) => {
+  const q = (req.query.q || "").trim().slice(0, 100);
+  const limit = Math.min(parseInt(req.query.limit) || 5, 10);
+  if (!q) return res.json({ tracks: [] });
+  const token = await getSpotifyClientToken();
+  if (!token) return res.status(503).json({ error: "Spotify not configured" });
+  const searchRes = await fetch(
+    `https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=track&limit=${limit}`,
+    { headers: { "Authorization": `Bearer ${token}` } }
+  );
+  if (!searchRes.ok) return res.json({ tracks: [] });
+  const data = await searchRes.json();
+  const tracks = (data.tracks?.items || []).map(t => ({
+    id:         t.id,
+    name:       t.name,
+    artists:    t.artists.map(a => a.name).join(", "),
+    albumArt:   t.album?.images?.[1]?.url || t.album?.images?.[0]?.url || null,
+    previewUrl: t.preview_url || null,
+    spotifyUrl: t.external_urls?.spotify || null,
+    duration:   t.duration_ms || 0
+  }));
+  res.json({ tracks });
+}));
+
 app.get("/api/spotify/login", asyncHandler(async (req, res) => {
   if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET) {
     return res.status(503).send("Spotify integration isn't configured on this server yet.");
@@ -2365,17 +2421,33 @@ app.delete("/api/notifications/:id", requireAuth, asyncHandler(async (req, res) 
   res.json({ ok: true });
 }));
 
-async function createChatMessage({ room, author, body, image, replyTo }) {
+async function createChatMessage({ room, author, body, image, replyTo, msgType, songData, gameData }) {
   const targetRoom = (room || DEFAULT_CHAT_ROOM).toString().slice(0, 200);
   const trimmed = (body || "").toString().trim();
   const safeImage = (typeof image === "string" && image.startsWith("https://")) ? image : null;
-  if (!author || (!trimmed && !safeImage)) return null;
+  const hasSongData = msgType === "song" && songData && typeof songData === "object";
+  const hasGameData = msgType === "game" && gameData && typeof gameData === "object";
+  if (!author || (!trimmed && !safeImage && !hasSongData && !hasGameData)) return null;
   if (!canAccessRoom(targetRoom, author)) return null;
   if (await isUsernameBanned(author)) return null;
   const safeReplyTo = replyTo && typeof replyTo === "object" ? {
     id:     String(replyTo.id     || "").slice(0, 50),
     author: String(replyTo.author || "").slice(0, 50),
     body:   String(replyTo.body   || "").slice(0, 300)
+  } : null;
+  const safeSongData = hasSongData ? {
+    id:         String(songData.id     || "").slice(0, 50),
+    name:       String(songData.name   || "").slice(0, 200),
+    artists:    String(songData.artists|| "").slice(0, 200),
+    albumArt:   typeof songData.albumArt === "string" && songData.albumArt.startsWith("https://") ? songData.albumArt : null,
+    previewUrl: typeof songData.previewUrl === "string" && songData.previewUrl.startsWith("https://") ? songData.previewUrl : null,
+    spotifyUrl: typeof songData.spotifyUrl === "string" && songData.spotifyUrl.startsWith("https://") ? songData.spotifyUrl : null,
+  } : null;
+  const safeGameData = hasGameData ? {
+    gameType: String(gameData.gameType || "").slice(0, 20),
+    prompt:   String(gameData.prompt   || "").slice(0, 300),
+    optionA:  gameData.optionA ? String(gameData.optionA).slice(0, 200) : undefined,
+    optionB:  gameData.optionB ? String(gameData.optionB).slice(0, 200) : undefined,
   } : null;
   const message = {
     _id: generateId("m"),
@@ -2384,6 +2456,9 @@ async function createChatMessage({ room, author, body, image, replyTo }) {
     body: trimmed.slice(0, 2000),
     image: safeImage,
     replyTo: safeReplyTo,
+    type: safeSongData ? "song" : safeGameData ? "game" : undefined,
+    songData: safeSongData,
+    gameData: safeGameData,
     time: new Date().toISOString()
   };
   await db.collection("messages").insertOne(message);
@@ -2395,25 +2470,26 @@ async function createChatMessage({ room, author, body, image, replyTo }) {
     if (participants) {
       const recipient = participants.find(p => p !== author);
       if (recipient) {
-        await createNotification({
-          _id: generateId("n"),
-          type: "message",
-          actor: author,
-          recipient,
-          room: targetRoom,
-          body: message.body,
-          time: new Date().toISOString(),
-          seen: false
-        });
-        // Sent straight to the recipient's own connections (not a
-        // room broadcast) - this is what lets their sidebar bump the
-        // unread badge the instant a DM lands, even while they're
-        // sitting in Global or a completely different conversation.
-        const recipientConnections = usernameConnections.get(recipient);
-        if (recipientConnections) {
-          const payload = JSON.stringify({ type: "dm-notify", room: targetRoom, from: author });
-          for (const conn of recipientConnections) {
-            if (conn.readyState === conn.OPEN) conn.send(payload);
+        // Skip notification + unread badge if recipient is actively viewing this DM
+        const recipientInRoom = isUserActiveInRoom(recipient, targetRoom);
+        if (!recipientInRoom) {
+          await createNotification({
+            _id: generateId("n"),
+            type: "message",
+            actor: author,
+            recipient,
+            room: targetRoom,
+            body: message.body,
+            time: new Date().toISOString(),
+            seen: false
+          });
+          // Push unread badge to recipient's sidebar (other tabs / other rooms)
+          const recipientConnections = usernameConnections.get(recipient);
+          if (recipientConnections) {
+            const payload = JSON.stringify({ type: "dm-notify", room: targetRoom, from: author });
+            for (const conn of recipientConnections) {
+              if (conn.readyState === conn.OPEN) conn.send(payload);
+            }
           }
         }
       }
@@ -2504,9 +2580,11 @@ async function computeAndSaveStreak(user) {
   if (lastDate) {
     const diffMs = new Date(today + "T00:00:00Z") - new Date(lastDate + "T00:00:00Z");
     const diffDays = Math.round(diffMs / 86400000);
-    streak = diffDays === 1 ? streak + 1 : 1;
+    // Consecutive day: increment. Gap: reset to 0 (not 1)
+    streak = diffDays === 1 ? streak + 1 : 0;
   } else {
-    streak = 1;
+    // First login ever: start at 0
+    streak = 0;
   }
 
   await db.collection("users").updateOne(
@@ -3079,7 +3157,7 @@ connect()
           return;
         }
         if (data.type === "send") {
-          createChatMessage({ room: ws.room, author: ws.username, body: data.body, image: data.image, replyTo: data.replyTo }).catch(err => {
+          createChatMessage({ room: ws.room, author: ws.username, body: data.body, image: data.image, replyTo: data.replyTo, msgType: data.msgType, songData: data.songData, gameData: data.gameData }).catch(err => {
             console.error("Chat message failed:", err);
           });
         } else if (data.type === "typing") {
