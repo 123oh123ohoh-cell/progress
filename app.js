@@ -292,9 +292,12 @@ function renderListenSessionCard(session, opts) {
   opts = opts || {};
   const hasProgress = typeof session.progressMs === "number" && typeof session.durationMs === "number" && session.durationMs > 0;
   const pct = hasProgress ? Math.min(100, (session.progressMs / session.durationMs) * 100) : 0;
+  // Always stamp server-updated-at and track-uri so the first in-place-update poll
+  // doesn't see them as absent and wrongly reset the progress-ticker baseline.
+  const baseDataAttrs = `data-server-updated-at="${session.updatedAt || ""}" data-track-uri="${escapeHTML(session.trackUri || "")}"`;
   const dataAttrs = hasProgress
-    ? `data-duration-ms="${session.durationMs}" data-progress-ms="${session.progressMs}" data-fetched-at="${Date.now()}" data-is-playing="${session.isPlaying ? "1" : "0"}"`
-    : "";
+    ? `${baseDataAttrs} data-duration-ms="${session.durationMs}" data-progress-ms="${session.progressMs}" data-fetched-at="${Date.now()}" data-is-playing="${session.isPlaying ? "1" : "0"}"`
+    : baseDataAttrs;
   const viewer = Progress.getCurrentUser();
   const isHost = viewer && viewer.username === session.hostUsername;
   const isJoined = viewer && session.participants.includes(viewer.username);
@@ -302,7 +305,7 @@ function renderListenSessionCard(session, opts) {
     <div class="listen-session-card now-playing-widget ${session.isPlaying ? "is-playing" : "is-paused"}" data-session-id="${session.id}" ${dataAttrs}>
       <div class="now-playing-header">${SPOTIFY_GLYPH}<span>@${escapeHTML(session.hostUsername)}'s listening session</span></div>
       <div class="now-playing-body">
-        ${session.albumArt ? `<img src="${session.albumArt}" alt="">` : `<div class="now-playing-art-fallback">♪</div>`}
+        ${session.albumArt ? `<img src="${session.albumArt}" alt="">` : `<div class="now-playing-art-fallback">${SPOTIFY_GLYPH}</div>`}
         <div class="now-playing-info">
           <span class="now-playing-track">${escapeHTML(session.trackName || "Nothing playing yet")}</span>
           <span class="now-playing-artist">${escapeHTML(session.artistNames || "")}</span>

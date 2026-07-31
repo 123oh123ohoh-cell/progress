@@ -982,6 +982,7 @@
   }
 
   let listenRailTimer = null;
+  let _listenRailLoading = false; // prevent overlapping concurrent fetches
 
   // Renders the sidebar "Listen Together" rail: any active sessions (so you
   // can join and sync your own Spotify to them), plus a start/end control
@@ -1003,21 +1004,27 @@
     // (tickNowPlayingWidgets) keeps advancing the bar uninterrupted instead
     // of being yanked back to the same value every second.
     const serverStamp = String(session.updatedAt || "");
+    const trackUri    = session.trackUri || "";
+    // Also detect song rotation via URI change — new track means we must reset the
+    // ticker baseline even if updatedAt happened to be unchanged.
     const changed = cardEl.dataset.serverUpdatedAt !== serverStamp
-      || cardEl.dataset.isPlaying !== (session.isPlaying ? "1" : "0");
+      || cardEl.dataset.isPlaying !== (session.isPlaying ? "1" : "0")
+      || cardEl.dataset.trackUri  !== trackUri;
 
     if (hasProgress && changed) {
-      cardEl.dataset.durationMs = session.durationMs;
-      cardEl.dataset.progressMs = session.progressMs;
-      cardEl.dataset.fetchedAt = Date.now();
-      cardEl.dataset.isPlaying = session.isPlaying ? "1" : "0";
+      cardEl.dataset.durationMs      = session.durationMs;
+      cardEl.dataset.progressMs      = session.progressMs;
+      cardEl.dataset.fetchedAt       = Date.now();
+      cardEl.dataset.isPlaying       = session.isPlaying ? "1" : "0";
       cardEl.dataset.serverUpdatedAt = serverStamp;
+      cardEl.dataset.trackUri        = trackUri;
     } else if (!hasProgress) {
       delete cardEl.dataset.durationMs;
       delete cardEl.dataset.progressMs;
       delete cardEl.dataset.fetchedAt;
       delete cardEl.dataset.isPlaying;
       delete cardEl.dataset.serverUpdatedAt;
+      cardEl.dataset.trackUri = trackUri; // keep for future rotation detection
     }
     const trackEl = cardEl.querySelector(".now-playing-track");
     const artistEl = cardEl.querySelector(".now-playing-artist");
@@ -1030,9 +1037,25 @@
   }
 
   async function loadListenRail() {
+    if (_listenRailLoading) return; // don't stack concurrent requests
     const rail = document.getElementById("chatListenRail");
     if (!rail) return;
-    const sessions = await fetchListenSessions();
+    _listenRailLoading = true;
+    let sessions;
+    try {
+      // fetchListenSessions() hits the list endpoint (fast, no Spotify call).
+      // Then we fetch each session individually — that endpoint calls Spotify
+      // and updates the DB, giving us the real current track, progress, and
+      // rotation when the host skips to the next song.
+      const stubs = await fetchListenSessions();
+      sessions = await Promise.all(
+        stubs.map(s => fetchListenSession(s.id).catch(() => s))
+      );
+    } catch (e) {
+      sessions = [];
+    } finally {
+      _listenRailLoading = false;
+    }
     const mySession = sessions.find(s => s.hostUsername === currentUser.username);
     const otherSessions = sessions.filter(s => s.hostUsername !== currentUser.username);
     const ordered = [mySession, ...otherSessions].filter(Boolean);
@@ -1363,7 +1386,9 @@
     connectSocket();
     loadListenRail();
     if (listenRailTimer) clearInterval(listenRailTimer);
-    listenRailTimer = setInterval(loadListenRail, 1000);
+    // 30s is enough to catch song changes. tickNowPlayingWidgets() in app.js
+    // already advances the progress bar every 1s locally without any API calls.
+    listenRailTimer = setInterval(loadListenRail, 30000);
 
     // Fetch initial presence state
     apiFetch("/api/online-users").then(data => {
@@ -1395,42 +1420,57 @@
     const banner = document.getElementById("dmListenBanner");
     if (!banner || !currentPeer) { if (banner) banner.style.display = "none"; return; }
 
-    // Find the peer's session from the list first (fast)
+    // Find peer's active session (for join/leave/sync IDs).
+    // The list endpoint already returns hostUserId and participants so we don't
+    // need a second round-trip to the individual session endpoint — that call
+    // was the source of the extra latency before.
     const sessions = await fetchListenSessions();
-    const stub = sessions.find(s => s.hostUsername === currentPeer);
-    if (!stub) { banner.style.display = "none"; return; }
+    const peerSession = sessions.find(s => s.hostUsername === currentPeer);
+    if (!peerSession) { banner.style.display = "none"; return; }
+    const hostUserId = peerSession.hostUserId;
 
-    // Fetch the individual session to get fresh Spotify track data
-    const peerSession = await fetchListenSession(stub.id) || stub;
+    // Real-time now-playing from Spotify (same endpoint the profile widget uses)
+    let np = null;
+    if (hostUserId) {
+      const npData = await apiFetch(`/api/users/${encodeURIComponent(hostUserId)}/spotify/now-playing`).catch(() => null);
+      if (npData && npData.playing) np = npData.playing;
+    }
+
+    // Merge: prefer live Spotify data, fall back to session cache
+    const trackName  = (np && np.trackName)   || peerSession.trackName  || "Listening to something";
+    const artistNames= (np && np.artistNames)  || peerSession.artistNames|| "";
+    const albumArt   = (np && np.albumArt)     || peerSession.albumArt   || null;
+    const isPlaying  = np ? !!np.isPlaying : (peerSession.isPlaying !== false);
+    const progressMs = (np && typeof np.progressMs === "number") ? np.progressMs : (peerSession.progressMs || 0);
+    const durationMs = (np && typeof np.durationMs === "number") ? np.durationMs : (peerSession.durationMs || 0);
 
     const viewer = Progress.getCurrentUser();
     const joined = viewer && peerSession.participants.includes(viewer.username);
+
     banner.style.display = "flex";
-    const isPlaying = peerSession.isPlaying !== false;
     banner.className = `dm-listen-banner${isPlaying ? "" : " is-paused"}`;
 
-    // Progress bar data (mirrors now-playing-widget approach so tickNowPlayingWidgets picks it up)
-    const hasProg = typeof peerSession.progressMs === "number" && typeof peerSession.durationMs === "number" && peerSession.durationMs > 0;
-    const pct = hasProg ? Math.min(100, (peerSession.progressMs / peerSession.durationMs) * 100) : 0;
+    const hasProg = durationMs > 0;
+    const pct = hasProg ? Math.min(100, (progressMs / durationMs) * 100) : 0;
     if (hasProg) {
-      banner.dataset.durationMs  = peerSession.durationMs;
-      banner.dataset.progressMs  = peerSession.progressMs;
-      banner.dataset.fetchedAt   = Date.now();
-      banner.dataset.isPlaying   = isPlaying ? "1" : "0";
+      banner.dataset.durationMs = durationMs;
+      banner.dataset.progressMs = progressMs;
+      banner.dataset.fetchedAt  = Date.now();
+      banner.dataset.isPlaying  = isPlaying ? "1" : "0";
     } else {
       delete banner.dataset.durationMs;
     }
 
-    const artEl = peerSession.albumArt
-      ? `<img class="dm-listen-art" src="${escapeHTML(peerSession.albumArt)}" alt="">`
+    const artEl = albumArt
+      ? `<img class="dm-listen-art" src="${escapeHTML(albumArt)}" alt="">`
       : `<div class="dm-listen-art-fallback">${SPOTIFY_ICON_SVG}</div>`;
 
     banner.innerHTML = `
       ${artEl}
       <div class="dm-listen-eq"><span></span><span></span><span></span></div>
       <div class="dm-listen-info">
-        <span class="dm-listen-banner-track">${escapeHTML(peerSession.trackName || "Listening to something")}</span>
-        <span class="dm-listen-banner-artist">${escapeHTML(peerSession.artistNames || "")}</span>
+        <span class="dm-listen-banner-track">${escapeHTML(trackName)}</span>
+        <span class="dm-listen-banner-artist">${escapeHTML(artistNames)}</span>
         ${hasProg ? `<div class="dm-listen-progress">
           <div class="dm-listen-progress-fill" style="width:${pct.toFixed(2)}%"></div>
         </div>` : ""}
@@ -1460,9 +1500,12 @@
       });
     });
 
-    // Poll every 30s to keep track name/art current
+    // Poll every 8s — fast enough to catch song changes within a few seconds,
+    // same feel as the profile now-playing widget. tickNowPlayingWidgets() in
+    // app.js already advances the progress bar every 1s locally so there's no
+    // visual jitter between polls.
     clearTimeout(_dmListenPollTimer);
-    _dmListenPollTimer = setTimeout(updateDmListenBanner, 30000);
+    _dmListenPollTimer = setTimeout(updateDmListenBanner, 8000);
   }
 
   // Populates the chat emoji popup (reusing the same emoticon set as
