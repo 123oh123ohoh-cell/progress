@@ -1509,6 +1509,9 @@ body.modal-open { overflow: hidden; }
   padding: 50px 0 100px;
   align-items: start;
 }
+.sett-layout--inline {
+  padding: 24px 0 40px;
+}
 
 .sett-nav {
   position: sticky;

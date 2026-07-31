@@ -67,8 +67,8 @@ function formatZonePreview(zone) {
   } catch (e) { return zone; }
 }
 
-// ── Nav ──────────────────────────────────────────────────────────────────────
-function renderNav() {
+// ── Side nav ─────────────────────────────────────────────────────────────────
+function renderSideNav() {
   const nav = document.getElementById("settNav");
   nav.innerHTML = TABS.map(t => `
     <button class="sett-nav-item${activeTab === t.id ? " active" : ""}" data-tab="${t.id}">
@@ -79,7 +79,7 @@ function renderNav() {
     btn.addEventListener("click", () => {
       activeTab = btn.dataset.tab;
       history.replaceState(null, "", "settings.html?tab=" + activeTab);
-      renderNav();
+      renderSideNav();
       renderPanel();
     });
   });
@@ -134,14 +134,6 @@ function renderProfile(panel) {
         <p class="field-note">Username can't be changed.</p>
       </div>
       <div class="sett-field">
-        <label class="sett-label">Bio</label>
-        <div class="field bio-field">
-          <textarea id="bioField" rows="4" placeholder="Tell people about yourself…">${escapeHTML(user.bio || "")}</textarea>
-        </div>
-        <div class="emoji-picker" id="profileEmojiPicker" style="margin-top:8px;"></div>
-        <p class="field-note">Use <code>:computer:</code>, <code>:dead:</code>, <code>:two:</code> for emoticons.</p>
-      </div>
-      <div class="sett-field">
         <label class="sett-label">Timezone</label>
         <div class="field">
           <select id="timezoneField">
@@ -174,27 +166,6 @@ function renderProfile(panel) {
     });
   }
 
-  // Emoji picker
-  const picker = document.getElementById("profileEmojiPicker");
-  if (picker) {
-    picker.innerHTML = getEmoticonNames().map(n => `
-      <button type="button" class="emoji-btn" data-name="${n}">
-        <img src="images/emoticons/${n}.png" alt="${n}">
-      </button>
-    `).join("");
-    picker.querySelectorAll(".emoji-btn").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const ta = document.getElementById("bioField");
-        if (!ta) return;
-        const ph = `:${btn.dataset.name}:`;
-        const s = ta.selectionStart, e = ta.selectionEnd;
-        ta.value = ta.value.slice(0, s) + ph + ta.value.slice(e);
-        ta.focus();
-        ta.selectionStart = ta.selectionEnd = s + ph.length;
-      });
-    });
-  }
-
   // Timezone preview
   const tzField = document.getElementById("timezoneField");
   const tzPreview = document.getElementById("timezonePreview");
@@ -217,14 +188,13 @@ function renderProfile(panel) {
   // Save
   document.getElementById("saveProfileBtn").addEventListener("click", async () => {
     const name = document.getElementById("nameField").value.trim();
-    const bio = document.getElementById("bioField").value.trim();
     const timezone = document.getElementById("timezoneField").value;
     const spotify = document.getElementById("spotifyField").value.trim();
     if (!name) { showToast("Display name can't be empty."); return; }
     if (spotify && !spotifyEmbedUrl(spotify)) { showToast("That doesn't look like a valid Spotify link."); return; }
     const btn = document.getElementById("saveProfileBtn");
     btn.disabled = true; btn.textContent = "Saving…";
-    const updated = await Progress.updateProfile({ name, bio, timezone, spotify });
+    const updated = await Progress.updateProfile({ name, timezone, spotify });
     btn.disabled = false; btn.textContent = "Save changes";
     if (updated) {
       user = Progress.getCurrentUser() || user;
@@ -638,7 +608,7 @@ async function start() {
     history.replaceState(null, "", "settings.html?tab=integrations");
   }
 
-  renderNav();
+  renderSideNav();
   renderPanel();
 
   Progress.loadFromApi().then(() => {
