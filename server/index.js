@@ -2606,6 +2606,19 @@ async function computeAndSaveStreak(user) {
   return { ...user, streak, lastLoginDate: today };
 }
 
+app.post("/api/account/password", requireAuth, asyncHandler(async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || !newPassword) return res.status(400).json({ error: "Both current and new password are required." });
+  if (newPassword.length < 6) return res.status(400).json({ error: "New password must be at least 6 characters." });
+  const users = db.collection("users");
+  const user = await users.findOne({ _id: req.user.id });
+  if (!user) return res.status(404).json({ error: "User not found." });
+  if (!verifyPassword(currentPassword, user.password)) return res.status(401).json({ error: "Current password is incorrect." });
+  const hashed = hashPassword(newPassword);
+  await users.updateOne({ _id: user._id }, { $set: { password: hashed } });
+  res.json({ ok: true });
+}));
+
 app.post("/api/login", loginRateLimit, asyncHandler(async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) return res.status(400).json({ error: "username and password are required" });
