@@ -1139,7 +1139,11 @@ function setDmUnread(n) { try { localStorage.setItem(DM_UNREAD_KEY, String(Math.
 function updateChatNavBadge() {
   const badge = document.getElementById("mbnChatBadge");
   if (!badge) return;
-  const n = getDmUnread();
+  // Also count unseen message/mention notifications from in-memory DB as a
+  // floor — this seeds the badge on first load when localStorage is empty.
+  const fromNotifs = ((Progress.db && Progress.db.notifications) || [])
+    .filter(n => !n.seen && (n.type === "message" || n.type === "mention")).length;
+  const n = Math.max(getDmUnread(), fromNotifs);
   badge.textContent = n > 9 ? "9+" : n > 0 ? String(n) : "";
   badge.style.display = n > 0 ? "flex" : "none";
 }
@@ -1563,6 +1567,9 @@ function initShell(activePage) {
         badge.classList.toggle("hidden", !unseen);
       }
       updateTitleBadge(unseen);
+      // Seed the chat nav badge from unseen message/mention notifications now
+      // that Progress.db is populated.
+      updateChatNavBadge();
       const notifDD = document.getElementById("notifDropdown");
       if (notifDD && notifDD.classList.contains("open")) {
         renderNotifDropdown();

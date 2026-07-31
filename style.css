@@ -1951,7 +1951,7 @@ label:has(#themeToggleSwitch[data-on="1"]) .theme-flank-icon.moon { opacity: 1; 
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 20px;
+  padding: 16px 12px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -1995,8 +1995,8 @@ label:has(#themeToggleSwitch[data-on="1"]) .theme-flank-icon.moon { opacity: 1; 
 
 .chat-msg {
   display: flex;
-  gap: 12px;
-  max-width: 74%;
+  gap: 7px;
+  max-width: 80%;
   align-items: flex-start;
 }
 .chat-msg.chat-msg-new {
