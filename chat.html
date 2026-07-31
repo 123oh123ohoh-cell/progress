@@ -1420,32 +1420,51 @@
     const banner = document.getElementById("dmListenBanner");
     if (!banner || !currentPeer) { if (banner) banner.style.display = "none"; return; }
 
-    // Find peer's active session (for join/leave/sync IDs).
-    // The list endpoint already returns hostUserId and participants so we don't
-    // need a second round-trip to the individual session endpoint — that call
-    // was the source of the extra latency before.
-    const sessions = await fetchListenSessions();
-    const peerSession = sessions.find(s => s.hostUsername === currentPeer);
-    if (!peerSession) { banner.style.display = "none"; return; }
-    const hostUserId = peerSession.hostUserId;
+    // Fetch session list and peer user data in parallel — neither depends on
+    // the other, so there's no reason to wait for one before the other.
+    const [sessions, peerUser] = await Promise.all([
+      fetchListenSessions(),
+      (async () => {
+        let u = Progress.getUser(currentPeer);
+        if (!u || !u.id) {
+          // Not in local cache yet — fetch from API
+          const r = await apiFetch(`/api/users?username=${encodeURIComponent(currentPeer)}`).catch(() => null);
+          u = Array.isArray(r) ? r[0] : r;
+        }
+        return u || null;
+      })()
+    ]);
 
-    // Real-time now-playing from Spotify (same endpoint the profile widget uses)
+    const peerSession = sessions.find(s => s.hostUsername === currentPeer) || null;
+    const peerId = peerUser && peerUser.id;
+
+    // Fetch live now-playing directly from Spotify — works even without a
+    // formal listen-together session, so the banner appears whenever the peer
+    // is playing anything.
     let np = null;
-    if (hostUserId) {
-      const npData = await apiFetch(`/api/users/${encodeURIComponent(hostUserId)}/spotify/now-playing`).catch(() => null);
+    if (peerId) {
+      const npData = await apiFetch(`/api/users/${encodeURIComponent(peerId)}/spotify/now-playing`).catch(() => null);
       if (npData && npData.playing) np = npData.playing;
     }
 
-    // Merge: prefer live Spotify data, fall back to session cache
-    const trackName  = (np && np.trackName)   || peerSession.trackName  || "Listening to something";
-    const artistNames= (np && np.artistNames)  || peerSession.artistNames|| "";
-    const albumArt   = (np && np.albumArt)     || peerSession.albumArt   || null;
-    const isPlaying  = np ? !!np.isPlaying : (peerSession.isPlaying !== false);
-    const progressMs = (np && typeof np.progressMs === "number") ? np.progressMs : (peerSession.progressMs || 0);
-    const durationMs = (np && typeof np.durationMs === "number") ? np.durationMs : (peerSession.durationMs || 0);
+    // Nothing to show: no session and not actively playing → hide
+    if (!peerSession && (!np || !np.isPlaying)) {
+      banner.style.display = "none";
+      clearTimeout(_dmListenPollTimer);
+      _dmListenPollTimer = setTimeout(updateDmListenBanner, 5000);
+      return;
+    }
+
+    // Prefer live Spotify data; fall back to session cache
+    const trackName   = (np && np.trackName)   || (peerSession && peerSession.trackName)   || "Listening to something";
+    const artistNames = (np && np.artistNames)  || (peerSession && peerSession.artistNames) || "";
+    const albumArt    = (np && np.albumArt)     || (peerSession && peerSession.albumArt)    || null;
+    const isPlaying   = np ? !!np.isPlaying     : (peerSession && peerSession.isPlaying !== false);
+    const progressMs  = (np && typeof np.progressMs === "number") ? np.progressMs : (peerSession ? peerSession.progressMs || 0 : 0);
+    const durationMs  = (np && typeof np.durationMs === "number") ? np.durationMs : (peerSession ? peerSession.durationMs || 0 : 0);
 
     const viewer = Progress.getCurrentUser();
-    const joined = viewer && peerSession.participants.includes(viewer.username);
+    const joined = viewer && peerSession && peerSession.participants.includes(viewer.username);
 
     banner.style.display = "flex";
     banner.className = `dm-listen-banner${isPlaying ? "" : " is-paused"}`;
@@ -1465,6 +1484,15 @@
       ? `<img class="dm-listen-art" src="${escapeHTML(albumArt)}" alt="">`
       : `<div class="dm-listen-art-fallback">${SPOTIFY_ICON_SVG}</div>`;
 
+    // Action buttons only appear when a formal listen-together session exists.
+    // When the banner is just showing passive now-playing, no buttons are shown.
+    const actionButtons = peerSession
+      ? (joined
+          ? `<button type="button" class="dm-listen-action" data-action="sync" data-id="${peerSession.id}">Sync</button>
+             <button type="button" class="dm-listen-action dm-listen-leave" data-action="leave" data-id="${peerSession.id}">Leave</button>`
+          : `<button type="button" class="dm-listen-action" data-action="join" data-id="${peerSession.id}">Join</button>`)
+      : "";
+
     banner.innerHTML = `
       ${artEl}
       <div class="dm-listen-eq"><span></span><span></span><span></span></div>
@@ -1475,12 +1503,7 @@
           <div class="dm-listen-progress-fill" style="width:${pct.toFixed(2)}%"></div>
         </div>` : ""}
       </div>
-      <div class="dm-listen-actions">
-        ${joined
-          ? `<button type="button" class="dm-listen-action" data-action="sync" data-id="${peerSession.id}">Sync</button>
-             <button type="button" class="dm-listen-action dm-listen-leave" data-action="leave" data-id="${peerSession.id}">Leave</button>`
-          : `<button type="button" class="dm-listen-action" data-action="join" data-id="${peerSession.id}">Join</button>`}
-      </div>
+      ${actionButtons ? `<div class="dm-listen-actions">${actionButtons}</div>` : ""}
     `;
 
     banner.querySelectorAll(".dm-listen-action").forEach(btn => {
@@ -1500,10 +1523,6 @@
       });
     });
 
-    // Poll every 8s — fast enough to catch song changes within a few seconds,
-    // same feel as the profile now-playing widget. tickNowPlayingWidgets() in
-    // app.js already advances the progress bar every 1s locally so there's no
-    // visual jitter between polls.
     clearTimeout(_dmListenPollTimer);
     _dmListenPollTimer = setTimeout(updateDmListenBanner, 5000);
   }

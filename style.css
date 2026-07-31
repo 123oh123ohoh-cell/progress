@@ -484,8 +484,6 @@ body.account-banned .mobile-fab {
   border-color: var(--mocha-light) !important;
 }
 .entry--read .entry-title { color: var(--muted); }
-.entry--read .entry-date,
-.entry--read .entry-meta { opacity: 0.55; }
 
 .entry-body { flex: 1; min-width: 0; }
 
