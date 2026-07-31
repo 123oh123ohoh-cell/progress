@@ -1505,7 +1505,7 @@
     // app.js already advances the progress bar every 1s locally so there's no
     // visual jitter between polls.
     clearTimeout(_dmListenPollTimer);
-    _dmListenPollTimer = setTimeout(updateDmListenBanner, 8000);
+    _dmListenPollTimer = setTimeout(updateDmListenBanner, 5000);
   }
 
   // Populates the chat emoji popup (reusing the same emoticon set as
