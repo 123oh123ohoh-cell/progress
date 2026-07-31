@@ -3716,13 +3716,108 @@ body.candy-mode .badge-icon { filter: hue-rotate(280deg) saturate(2); }
 /* Chat bubble col needs relative positioning for the arrow */
 .chat-bubble-col { position: relative; }
 
-/* Show rail, hide old hamburger sidebar on mobile */
+/* Rail is hidden everywhere — drawer tab replaces it on mobile */
+.chat-rail { display: none !important; }
+
 @media (max-width: 600px) {
-  .chat-rail { display: flex; }
-  .chat-sidebar { display: none !important; }
+  /* Hide the old hamburger toggle — drawer tab takes over */
   .chat-sidebar-toggle { display: none !important; }
-  .chat-sidebar-overlay { display: none !important; }
 }
+
+/* ── Left-edge drawer tab (replaces hamburger, mobile only) ── */
+.chat-drawer-tab {
+  display: none; /* desktop: hidden */
+  position: fixed;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 52px;
+  background: var(--mocha-light);
+  border-radius: 0 10px 10px 0;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 298;
+  color: var(--mocha-dark);
+  transition: width 0.2s ease, background 0.2s ease, opacity 0.2s ease;
+  box-shadow: 2px 0 8px rgba(28,25,23,0.08);
+}
+.chat-drawer-tab svg { width: 10px; height: 10px; flex-shrink: 0; }
+.chat-drawer-tab:hover {
+  width: 24px;
+  background: var(--mocha);
+  color: #fff;
+}
+.chat-drawer-tab.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+[data-theme="dark"] .chat-drawer-tab { background: var(--mocha-light); }
+
+@media (max-width: 600px) {
+  .chat-drawer-tab { display: flex; }
+}
+
+/* ── DM header: peer avatar + name + presence ── */
+.chat-header-peer {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+.chat-header-peer.visible { display: flex; }
+.chat-header-peer + .chat-room-title { display: none; }
+
+.chat-header-peer-avatar {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  overflow: visible;
+  flex-shrink: 0;
+}
+.chat-header-peer-avatar .avatar,
+.chat-header-peer-avatar .initials-avatar,
+.chat-header-peer-avatar img {
+  width: 34px !important;
+  height: 34px !important;
+  border-radius: 50% !important;
+}
+.chat-header-presence-dot {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 2.5px solid var(--paper);
+  background: var(--mocha-light); /* offline default */
+  transition: background 0.3s ease;
+}
+.chat-header-presence-dot.online { background: #3a8a5a; }
+.chat-header-presence-dot.idle   { background: #d9a441; }
+
+.chat-header-peer-info { min-width: 0; }
+.chat-header-peer-name {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chat-header-peer-status {
+  display: block;
+  font-size: 11.5px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  letter-spacing: 0.02em;
+}
+.chat-header-peer-status.online { color: #3a8a5a; }
+.chat-header-peer-status.idle   { color: #d9a441; }
 
 /* ── @mention links in posts ── */
 .post-mention-link {

@@ -16,6 +16,13 @@
 
 <div id="chatSidebarOverlay" class="chat-sidebar-overlay"></div>
 
+<!-- Left-edge drawer pull tab — tap or swipe to open the room list -->
+<div class="chat-drawer-tab" id="chatDrawerTab" role="button" aria-label="Open conversations" tabindex="0">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="9 18 15 12 9 6"/>
+  </svg>
+</div>
+
 <main class="chat-page-main">
   <div class="chat-wrap" id="chatWrap">
     <!-- filled by JS -->
@@ -216,27 +223,59 @@
     onlineStatuses.clear();
     for (const [u, s] of Object.entries(statuses || {})) onlineStatuses.set(u, s);
     updatePresenceDots();
+    updateChatHeader();
   }
 
   function updatePresenceDots() {
-    // Update rail dots
-    document.querySelectorAll(".chat-rail-btn[data-peer]").forEach(btn => {
-      const peer = btn.dataset.peer;
-      const status = onlineStatuses.get(peer) || "offline";
-      let dot = btn.querySelector(".chat-rail-dot");
-      if (status === "offline") { if (dot) dot.remove(); return; }
-      if (!dot) { dot = document.createElement("div"); dot.className = "chat-rail-dot"; btn.appendChild(dot); }
-      dot.className = `chat-rail-dot${status === "idle" ? " idle" : ""}`;
-    });
     // Update sidebar room-list dots
     document.querySelectorAll(".chat-room-item[data-peer]").forEach(item => {
       const peer = item.dataset.peer;
       const status = onlineStatuses.get(peer) || "offline";
       let dot = item.querySelector(".chat-room-presence");
       if (status === "offline") { if (dot) dot.remove(); return; }
-      if (!dot) { dot = document.createElement("div"); dot.className = "chat-room-presence"; item.appendChild(dot); }
+      if (!dot) {
+        dot = document.createElement("div");
+        dot.className = "chat-room-presence";
+        item.appendChild(dot);
+      }
       dot.className = `chat-room-presence${status === "idle" ? " idle" : ""}`;
     });
+  }
+
+  function updateChatHeader() {
+    const peerEl   = document.getElementById("chatHeaderPeer");
+    const titleEl  = document.getElementById("chatRoomTitle");
+    const presenceEl = document.getElementById("chatPresence");
+    if (!peerEl) return;
+
+    if (currentPeer) {
+      const peerUser = Progress.getUser(currentPeer);
+      const status   = onlineStatuses.get(currentPeer) || "offline";
+      const statusLabels = { online: "online", idle: "away", offline: "offline" };
+
+      // Avatar with presence dot
+      const avatarEl = document.getElementById("chatHeaderPeerAvatar");
+      if (avatarEl) {
+        avatarEl.innerHTML = `
+          ${avatarHTML(peerUser, 34)}
+          <div class="chat-header-presence-dot ${status}"></div>`;
+      }
+      const nameEl = document.getElementById("chatHeaderPeerName");
+      if (nameEl) nameEl.textContent = `@${currentPeer}`;
+      const statusEl = document.getElementById("chatHeaderPeerStatus");
+      if (statusEl) {
+        statusEl.textContent = statusLabels[status] || "offline";
+        statusEl.className = `chat-header-peer-status ${status}`;
+      }
+
+      peerEl.classList.add("visible");
+      if (titleEl) titleEl.style.display = "none";
+      if (presenceEl) presenceEl.style.display = "none";
+    } else {
+      peerEl.classList.remove("visible");
+      if (titleEl) titleEl.style.display = "";
+      if (presenceEl) presenceEl.style.display = "";
+    }
   }
 
   // ── Discord-style rail ───────────────────────────────────────────────────────
@@ -335,7 +374,7 @@
         const msg = data.message;
         appendMessage(msg, true);
         if (currentRoom.startsWith("dm:")) {
-          loadSidebar(); loadRail();
+          loadSidebar();
           if (msg.author !== currentUser.username) {
             _seenByPeer.set(currentRoom, msg.id);
             updateSeenTicks();
@@ -346,7 +385,6 @@
         renderPresence(data.users);
       } else if (data.type === "global-presence") {
         applyGlobalPresence(data.statuses);
-        loadRail(); // refresh rail dots + unread badges
       } else if (data.type === "typing") {
         showTypingHint(data.username);
       } else if (data.type === "dm-notify") {
@@ -355,7 +393,7 @@
         // the one currently open, refresh the sidebar right away so the
         // unread badge appears instantly instead of waiting for the next
         // room switch.
-        if (data.room !== currentRoom) { loadSidebar(); loadRail(); }
+        if (data.room !== currentRoom) loadSidebar();
       } else if (data.type === "notification") {
         // chat.html doesn't open the shared presence socket app.js uses on
         // every other page, so it needs its own handling of this too.
@@ -546,14 +584,19 @@
 
   function roomListItemHTML(opts) {
     const { room, label, sub, active, avatarUser, unreadCount } = opts;
+    const peer = opts.peer || "";
+    const status = peer ? (onlineStatuses.get(peer) || "offline") : null;
+    const presenceDot = (status && status !== "offline")
+      ? `<div class="chat-room-presence${status === "idle" ? " idle" : ""}"></div>` : "";
     return `
-      <button type="button" class="chat-room-item ${active ? "active" : ""}" data-room="${escapeHTML(room)}" data-label="${escapeHTML(label)}" data-peer="${escapeHTML(opts.peer || "")}">
+      <button type="button" class="chat-room-item ${active ? "active" : ""}" data-room="${escapeHTML(room)}" data-label="${escapeHTML(label)}" data-peer="${escapeHTML(peer)}">
         ${avatarUser !== undefined ? `<span class="chat-room-avatar">${avatarHTML(avatarUser, 28)}</span>` : `<span class="chat-room-avatar chat-room-avatar-global">#</span>`}
         <span class="chat-room-text">
           <span class="chat-room-label">${escapeHTML(label)}</span>
           ${sub ? `<span class="chat-room-sub">${sub}</span>` : ""}
         </span>
         ${unreadCount ? `<span class="chat-unread-badge"></span>` : ""}
+        ${presenceDot}
       </button>`;
   }
 
@@ -624,7 +667,7 @@
     closeSocket();
     loadHistory();
     connectSocket();
-    loadRail(); // keep rail active state in sync
+    updateChatHeader();
     const chatInput = document.getElementById("chatInput");
     if (chatInput) setTimeout(() => chatInput.focus(), 80);
     const url = new URL(location.href);
@@ -781,12 +824,14 @@
   function openChatSidebar() {
     document.querySelector(".chat-sidebar")?.classList.add("open");
     document.getElementById("chatSidebarOverlay")?.classList.add("open");
+    document.getElementById("chatDrawerTab")?.classList.add("hidden");
     document.body.style.overflow = "hidden";
   }
 
   function closeChatSidebar() {
     document.querySelector(".chat-sidebar")?.classList.remove("open");
     document.getElementById("chatSidebarOverlay")?.classList.remove("open");
+    document.getElementById("chatDrawerTab")?.classList.remove("hidden");
     document.body.style.overflow = "";
   }
 
@@ -810,13 +855,7 @@
     wrap.innerHTML = `
       <div class="chat-shell">
 
-        <!-- ── Discord-style icon rail (mobile only, replaces hamburger) ── -->
-        <nav class="chat-rail" id="chatRail" aria-label="Conversations">
-          <div id="chatRailRooms"></div>
-          <button type="button" class="chat-rail-new" id="chatRailNew" title="New message" aria-label="New message">+</button>
-        </nav>
-
-        <!-- ── Full sidebar (desktop / tablet) ── -->
+        <!-- ── Sidebar (drawer on mobile, panel on desktop) ── -->
         <aside class="chat-sidebar">
           <button type="button" class="chat-sidebar-close" id="chatSidebarClose" aria-label="Close sidebar">&times;</button>
           <div class="chat-listen-rail" id="chatListenRail"></div>
@@ -829,6 +868,15 @@
         <!-- ── Main chat panel ── -->
         <div class="chat-panel">
           <div class="chat-panel-head">
+            <!-- DM peer info (avatar + name + presence dot) -->
+            <div class="chat-header-peer" id="chatHeaderPeer">
+              <div class="chat-header-peer-avatar" id="chatHeaderPeerAvatar"></div>
+              <div class="chat-header-peer-info">
+                <span class="chat-header-peer-name" id="chatHeaderPeerName"></span>
+                <span class="chat-header-peer-status" id="chatHeaderPeerStatus"></span>
+              </div>
+            </div>
+            <!-- Global room title (shown when not in DM) -->
             <span class="chat-room-title" id="chatRoomTitle">Global</span>
             <span class="chat-status" id="chatStatus">Connecting…</span>
             <span class="chat-presence" id="chatPresence"></span>
@@ -842,7 +890,7 @@
           </div>
           <div class="chat-typing" id="chatTyping"></div>
           <div class="chat-image-staged" id="chatImageStaged"></div>
-          <!-- Reply preview bar — shown when swiping to reply -->
+          <!-- Reply preview bar -->
           <div class="chat-reply-preview" id="chatReplyPreview">
             <div class="chat-reply-preview-bar"></div>
             <div class="chat-reply-preview-text">
@@ -861,18 +909,6 @@
               <svg class="chat-send-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
               <span class="chat-send-label">Send</span>
             </button>
-          </form>
-        </div>
-      </div>
-
-      <!-- New-DM bottom sheet (mobile) -->
-      <div class="chat-new-dm-modal" id="chatNewDmModal">
-        <div class="chat-new-dm-sheet">
-          <div class="chat-new-dm-sheet-handle"></div>
-          <h3>New message</h3>
-          <form id="chatNewDmSheetForm">
-            <input type="text" id="chatNewDmSheetInput" placeholder="@username" autocomplete="off">
-            <button type="submit" class="btn primary">Start conversation</button>
           </form>
         </div>
       </div>
@@ -916,54 +952,54 @@
       container: document.getElementById("chatForm")
     });
 
-    // Desktop sidebar close button (still used on tablet/desktop)
+    // Sidebar close (desktop / tablet)
     const sidebarClose = document.getElementById("chatSidebarClose");
     if (sidebarClose) sidebarClose.addEventListener("click", closeChatSidebar);
+
+    // Sidebar overlay click-to-close
+    const overlay = document.getElementById("chatSidebarOverlay");
+    if (overlay) overlay.addEventListener("click", closeChatSidebar);
+
+    // Drawer tab — tap to open
+    const drawerTab = document.getElementById("chatDrawerTab");
+    if (drawerTab) {
+      drawerTab.addEventListener("click", openChatSidebar);
+      drawerTab.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") openChatSidebar(); });
+    }
+
+    // Swipe right from left edge to open, swipe left anywhere to close
+    const shell = wrap.querySelector(".chat-shell");
+    if (shell) {
+      let _tx = 0, _ty = 0;
+      shell.addEventListener("touchstart", e => {
+        _tx = e.touches[0].clientX; _ty = e.touches[0].clientY;
+      }, { passive: true });
+      shell.addEventListener("touchend", e => {
+        const dx = e.changedTouches[0].clientX - _tx;
+        const dy = e.changedTouches[0].clientY - _ty;
+        if (Math.abs(dx) < Math.abs(dy) * 1.5) return;
+        if (dx > 48 && _tx < 40) openChatSidebar();
+        if (dx < -48) closeChatSidebar();
+      }, { passive: true });
+    }
 
     // Reply cancel
     const replyCancel = document.getElementById("chatReplyCancel");
     if (replyCancel) replyCancel.addEventListener("click", clearReplyContext);
 
-    // Rail: new DM button opens the bottom sheet
-    const railNew = document.getElementById("chatRailNew");
-    if (railNew) railNew.addEventListener("click", openNewDmModal);
-
-    // New DM bottom sheet
-    const newDmModal = document.getElementById("chatNewDmModal");
-    if (newDmModal) {
-      newDmModal.addEventListener("click", e => { if (e.target === newDmModal) closeNewDmModal(); });
-    }
-    const newDmSheetForm = document.getElementById("chatNewDmSheetForm");
-    if (newDmSheetForm) {
-      newDmSheetForm.addEventListener("submit", e => {
-        e.preventDefault();
-        const input = document.getElementById("chatNewDmSheetInput");
-        const username = (input?.value || "").trim().replace(/^@/, "");
-        if (!username) return;
-        if (username.toLowerCase() === currentUser.username.toLowerCase()) {
-          showToast("You can't message yourself."); return;
-        }
-        const target = Progress.getUser(username);
-        if (!target) { showToast("Couldn't find that user."); return; }
-        input.value = "";
-        closeNewDmModal();
-        switchRoom(dmRoomId(currentUser.username, target.username), `@${target.username}`, target.username);
-        loadSidebar(); loadRail();
-      });
-    }
-
     loadSidebar();
-    loadRail();
     loadHistory();
     connectSocket();
     loadListenRail();
     if (listenRailTimer) clearInterval(listenRailTimer);
     listenRailTimer = setInterval(loadListenRail, 1000);
 
-    // Fetch initial presence state for the rail dots
+    // Fetch initial presence state
     apiFetch("/api/online-users").then(data => {
       if (data && data.statuses) applyGlobalPresence(data.statuses);
     }).catch(() => {});
+
+    updateChatHeader();
 
     // Show/hide call button when in a DM
     updateCallButtonVisibility();
