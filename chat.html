@@ -293,7 +293,7 @@
         }
       }
     }
-    scrollToBottom(false, animate); // smooth only for live messages, instant for history
+    scrollToBottom(animate, animate); // live messages: force + smooth scroll; history: instant at load
     attachLinkPreview(msg);
   }
 

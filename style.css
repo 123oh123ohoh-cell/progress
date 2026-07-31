@@ -2014,8 +2014,13 @@ label:has(#themeToggleSwitch[data-on="1"]) .theme-flank-icon.moon { opacity: 1; 
   max-width: 74%;
 }
 
-.chat-avatar { width: 36px; height: 36px; border-radius: 50%; overflow: hidden; flex-shrink: 0; }
-.chat-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.chat-avatar {
+  width: 36px; height: 36px; border-radius: 50%; overflow: hidden; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--mocha-light);
+  font-family: var(--font-mono); font-size: 13px; color: var(--mocha-dark);
+}
+.chat-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
 
 .chat-bubble-col { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .chat-msg.mine .chat-bubble-col { align-items: flex-end; }
@@ -3996,6 +4001,9 @@ body.candy-mode .badge-icon { filter: hue-rotate(280deg) saturate(2); }
   flex-shrink: 0;
   border-radius: 50%;
   overflow: visible; /* so the dot peeks outside */
+  display: flex; align-items: center; justify-content: center;
+  background: var(--mocha-light);
+  font-family: var(--font-mono); font-size: 13px; color: var(--mocha-dark);
 }
 /* Force the avatar helper output to fit the container */
 .chat-header-peer-avatar > *:first-child,
