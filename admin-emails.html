@@ -33,6 +33,36 @@
 
   #authContainer { max-width: 340px; margin: 100px auto 0; text-align: center; padding: 0 20px; }
 
+  /* Project cards */
+  .proj-card {
+    background: var(--paper); border: 1px solid var(--mocha-light); border-radius: 14px;
+    padding: 16px 18px; display: flex; flex-direction: column; gap: 10px;
+    transition: box-shadow .15s, border-color .15s; position: relative;
+  }
+  .proj-card:hover { box-shadow: 0 4px 18px rgba(59,37,24,.1); border-color: var(--mocha); }
+  .proj-card-name { font-family: var(--font-display); font-size: 16px; font-weight: 600; color: var(--ink); margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .proj-card-subject { font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 18px; }
+  .proj-card-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .proj-card-date { font-size: 11px; font-family: var(--font-mono); color: var(--muted); }
+  .proj-presence { display: flex; gap: -6px; }
+  .proj-avatar {
+    width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--paper);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 700; color: #fff; margin-left: -6px;
+    flex-shrink: 0; position: relative;
+  }
+  .proj-avatar:first-child { margin-left: 0; }
+  .proj-avatar .live-dot {
+    position: absolute; bottom: -1px; right: -1px; width: 7px; height: 7px;
+    background: #4CAF50; border-radius: 50%; border: 1.5px solid var(--paper);
+  }
+  .proj-card-actions { display: flex; gap: 8px; }
+  .proj-join-btn { flex: 1; text-align: center; padding: 8px; background: var(--ink); color: var(--cream); border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; text-decoration: none; display: block; transition: opacity .15s; }
+  .proj-join-btn:hover { opacity: .85; }
+  .proj-del-btn { padding: 8px 10px; background: none; border: 1px solid var(--mocha-light); border-radius: 8px; color: var(--muted); cursor: pointer; font-size: 13px; transition: border-color .15s, color .15s; }
+  .proj-del-btn:hover { border-color: var(--danger); color: var(--danger); }
+  .proj-card-blocks { font-size: 11px; font-family: var(--font-mono); color: var(--muted); }
+
   /* ── Email Builder ─────────────────────────────────────────────────────── */
   .email-builder {
     display: flex; border: 1px solid var(--mocha-light); border-radius: 14px;
@@ -252,6 +282,23 @@
     <div class="section-block" style="border-top:none; padding-top:0;">
       <div class="email-stats" id="emailStats">
         <div style="grid-column:1/-1; color:var(--muted); font-size:14px;">Loading…</div>
+      </div>
+    </div>
+
+    <!-- Live Projects -->
+    <div class="section-block" style="border-top:none; padding-top:0; margin-bottom:32px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
+        <div>
+          <h2 class="section-title" style="margin:0;">Email Projects</h2>
+          <p style="font-size:14px; color:var(--muted); margin:4px 0 0;">Collaborative email drafts. See who's editing and jump in.</p>
+        </div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+          <button id="loadProjectsBtn" class="btn" style="font-size:13px; padding:8px 16px;">↻ Load Projects</button>
+          <a href="email-editor.html?new=1" class="btn" style="background:var(--ink); color:var(--cream); font-size:14px; padding:10px 22px; font-weight:600; text-decoration:none; display:inline-flex; align-items:center; gap:6px;">✍ Write Custom Email</a>
+        </div>
+      </div>
+      <div id="projectsList" style="display:none;">
+        <div id="projectsGrid" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:12px;"></div>
       </div>
     </div>
 
@@ -582,6 +629,65 @@
       subSearchTimeout = setTimeout(() => loadSubscribers(0), 400);
     });
   }
+
+  // ── Email Projects ────────────────────────────────────────────────────────────
+  let _projectsLoaded = false;
+
+  document.getElementById("loadProjectsBtn").addEventListener("click", () => loadProjects(true));
+
+  async function loadProjects(show = false) {
+    const list = document.getElementById("projectsList");
+    const grid = document.getElementById("projectsGrid");
+    if (show) { list.style.display = "block"; grid.innerHTML = `<div style="color:var(--muted);font-size:14px;">Loading…</div>`; }
+    const projects = await apiFetch("/api/admin/email-projects");
+    if (!projects) { grid.innerHTML = `<div style="color:var(--danger);font-size:14px;">Couldn't load projects.</div>`; return; }
+    _projectsLoaded = true;
+    if (show) list.style.display = "block";
+    if (!projects.length) {
+      grid.innerHTML = `<div style="color:var(--muted);font-size:14px;grid-column:1/-1;">No projects yet. Click <strong>Write Custom Email</strong> to create one.</div>`;
+      return;
+    }
+    grid.innerHTML = projects.map(p => renderProjectCard(p)).join("");
+    grid.querySelectorAll(".proj-del-btn").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const id = btn.dataset.id;
+        const ok = await adminConfirm("Delete project?", `"${escapeHTML(btn.dataset.name)}" will be permanently deleted.`, "Delete", "danger");
+        if (!ok) return;
+        await apiFetch(`/api/admin/email-projects/${id}`, { method: "DELETE" });
+        loadProjects(true);
+      });
+    });
+  }
+
+  function renderProjectCard(p) {
+    const when = p.updatedAt ? new Date(p.updatedAt).toLocaleDateString() : "";
+    const presence = (p.presence || []);
+    const avatarsHtml = presence.map(u => {
+      const initials = (u.name||u.username||"?").slice(0,2).toUpperCase();
+      return `<div class="proj-avatar" style="background:${u.color||"#8C6E58"};" title="${escapeHTML(u.name||u.username)}">
+        ${initials}<span class="live-dot"></span>
+      </div>`;
+    }).join("");
+    const blockCount = (p.blocks||[]).length;
+    return `<div class="proj-card">
+      <div>
+        <div class="proj-card-name">${escapeHTML(p.name||"Untitled")}</div>
+        <div class="proj-card-subject">${p.subject ? escapeHTML(p.subject) : '<em style="opacity:.5;">No subject yet</em>'}</div>
+      </div>
+      <div class="proj-card-meta">
+        ${presence.length ? `<div class="proj-presence">${avatarsHtml}</div><span style="font-size:11px;color:var(--muted);">${presence.length} online</span>` : ""}
+        <span class="proj-card-blocks">${blockCount} block${blockCount!==1?"s":""}</span>
+        <span class="proj-card-date">${when}</span>
+      </div>
+      <div class="proj-card-actions">
+        <a class="proj-join-btn" href="email-editor.html?id=${p._id}">✍ Open / Join</a>
+        <button class="proj-del-btn" data-id="${p._id}" data-name="${escapeHTML(p.name||"Untitled")}">🗑</button>
+      </div>
+    </div>`;
+  }
+
+  // Refresh presence every 12s if panel is visible
+  setInterval(() => { if (_projectsLoaded) loadProjects(false); }, 12000);
 
   // ── Email Builder ─────────────────────────────────────────────────────────────
   const EMOTICONS = ["hi","penguin","starbucks","bee","turtle_lazy","hamster","cow","shark","sharkcat","lion","banana","bored","windy","romantic","wonder","asleep_couch","mwa","kiss","computer","computersupport","dark","construction","dexterity"];

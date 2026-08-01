@@ -2785,6 +2785,93 @@ app.post("/api/admin/preview-email", requireAuth, requireRole("admin"), asyncHan
   res.json({ html });
 }));
 
+// ── Email Projects (collaborative builder) ────────────────────────────────────
+const EMAIL_PRESENCE_TTL = 45_000;
+const crypto = require("crypto");
+
+function livePresence(project) {
+  const cutoff = Date.now() - EMAIL_PRESENCE_TTL;
+  return (project.presence || []).filter(p => new Date(p.lastSeen).getTime() > cutoff);
+}
+
+app.get("/api/admin/email-projects", requireAuth, requireRole("admin"), asyncHandler(async (req, res) => {
+  const projects = await db.collection("emailProjects").find({}).sort({ updatedAt: -1 }).limit(60).toArray();
+  res.json(projects.map(p => ({ ...p, presence: livePresence(p) })));
+}));
+
+app.post("/api/admin/email-projects", requireAuth, requireRole("admin"), asyncHandler(async (req, res) => {
+  const { name } = req.body || {};
+  const project = {
+    _id: crypto.randomBytes(8).toString("hex"),
+    name: String(name || "Untitled email").slice(0, 100),
+    subject: "",
+    blocks: [],
+    emoticon: "penguin",
+    accentColor: "#8C6E58",
+    footerTagline: "until next time",
+    createdBy: req.user.username,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    updatedBy: req.user.username,
+    version: 1,
+    presence: [],
+  };
+  await db.collection("emailProjects").insertOne(project);
+  res.json(project);
+}));
+
+app.get("/api/admin/email-projects/:id", requireAuth, requireRole("admin"), asyncHandler(async (req, res) => {
+  const p = await db.collection("emailProjects").findOne({ _id: req.params.id });
+  if (!p) return res.status(404).json({ error: "Project not found" });
+  res.json({ ...p, presence: livePresence(p) });
+}));
+
+app.put("/api/admin/email-projects/:id", requireAuth, requireRole("admin"), asyncHandler(async (req, res) => {
+  const p = await db.collection("emailProjects").findOne({ _id: req.params.id });
+  if (!p) return res.status(404).json({ error: "Project not found" });
+  const { name, subject, blocks, emoticon, accentColor, footerTagline, clientVersion } = req.body || {};
+  // Optimistic concurrency — client sends its version; if server is ahead, signal conflict
+  if (clientVersion && p.version > clientVersion) {
+    return res.status(409).json({ conflict: true, serverVersion: p.version, project: { ...p, presence: livePresence(p) } });
+  }
+  const update = {
+    ...(name       !== undefined && { name: String(name).slice(0,100) }),
+    ...(subject    !== undefined && { subject }),
+    ...(blocks     !== undefined && { blocks }),
+    ...(emoticon   !== undefined && { emoticon }),
+    ...(accentColor !== undefined && { accentColor }),
+    ...(footerTagline !== undefined && { footerTagline }),
+    updatedAt: new Date().toISOString(),
+    updatedBy: req.user.username,
+    version: (p.version || 1) + 1,
+  };
+  await db.collection("emailProjects").updateOne({ _id: req.params.id }, { $set: update });
+  res.json({ ok: true, version: update.version });
+}));
+
+app.delete("/api/admin/email-projects/:id", requireAuth, requireRole("admin"), asyncHandler(async (req, res) => {
+  await db.collection("emailProjects").deleteOne({ _id: req.params.id });
+  auditLog(req.user.username, "email_project_deleted", req.params.id, {});
+  res.json({ ok: true });
+}));
+
+// Heartbeat — keeps user's presence alive; also returns latest project data for sync
+app.post("/api/admin/email-projects/:id/presence", requireAuth, requireRole("admin"), asyncHandler(async (req, res) => {
+  const p = await db.collection("emailProjects").findOne({ _id: req.params.id });
+  if (!p) return res.status(404).json({ error: "Project not found" });
+  const { color } = req.body || {};
+  const safeColor = /^#[0-9A-Fa-f]{3,6}$/.test(color||"") ? color : "#8C6E58";
+  const entry = { username: req.user.username, name: req.user.name || req.user.username, color: safeColor, lastSeen: new Date().toISOString() };
+  // Remove stale entry for this user then push fresh one
+  await db.collection("emailProjects").updateOne({ _id: req.params.id }, { $pull: { presence: { username: req.user.username } } });
+  await db.collection("emailProjects").updateOne({ _id: req.params.id }, { $push: { presence: entry } });
+  // Also prune stale presence entries (> 2× TTL)
+  const cutoff = new Date(Date.now() - EMAIL_PRESENCE_TTL * 2).toISOString();
+  await db.collection("emailProjects").updateOne({ _id: req.params.id }, { $pull: { presence: { lastSeen: { $lt: cutoff } } } });
+  const fresh = await db.collection("emailProjects").findOne({ _id: req.params.id });
+  res.json({ ok: true, project: { ...fresh, presence: livePresence(fresh) } });
+}));
+
 app.get("/api/admin/stats", requireAuth, asyncHandler(async (req, res) => {
   if (!ALLOWED_CREATOR_USERNAMES.has(req.user.username.toLowerCase())) {
     return res.status(403).json({ error: "Only admins can view this." });
