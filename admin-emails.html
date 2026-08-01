@@ -24,7 +24,7 @@
   .stat-value { font-family: var(--font-display); font-size: 28px; color: var(--ink); line-height: 1; }
 
   /* Compose */
-  .compose-form { display: flex; flex-direction: column; gap: 12px; }
+  .compose-form { display: flex; flex-direction: column; gap: 14px; }
   .compose-form input,
   .compose-form select,
   .compose-form textarea {
@@ -35,14 +35,46 @@
   .compose-form textarea { min-height: 120px; resize: vertical; }
   .compose-form .row { display: flex; gap: 10px; flex-wrap: wrap; }
   .compose-form .row > * { flex: 1; min-width: 140px; }
-  .compose-preview {
-    background: var(--mocha-wash); border: 1px solid var(--mocha-light);
-    border-radius: 10px; padding: 16px; font-size: 13px; line-height: 1.6;
-    color: var(--ink); white-space: pre-wrap; word-break: break-word;
-    font-family: var(--font-sans, Inter, sans-serif);
-    min-height: 60px; display: none;
+  .compose-section-label {
+    font-family: var(--font-mono); font-size: 10px; text-transform: uppercase;
+    letter-spacing: 0.07em; color: var(--muted); margin-bottom: 6px; display: block;
   }
-  .compose-preview.visible { display: block; }
+  .emoticon-grid {
+    display: flex; flex-wrap: wrap; gap: 8px; padding: 10px;
+    border: 1px solid var(--mocha-light); border-radius: 10px; background: var(--paper);
+  }
+  .emo-btn {
+    width: 52px; height: 52px; border-radius: 10px; border: 2px solid transparent;
+    background: var(--mocha-wash); cursor: pointer; display: flex; align-items: center;
+    justify-content: center; padding: 4px; transition: border-color .15s, background .15s;
+    position: relative;
+  }
+  .emo-btn:hover { background: var(--mocha-light); }
+  .emo-btn.selected { border-color: var(--ink); background: var(--mocha-wash); }
+  .emo-btn img { width: 36px; height: 36px; object-fit: contain; }
+  .emo-none-btn {
+    width: 52px; height: 52px; border-radius: 10px; border: 2px solid transparent;
+    background: var(--mocha-wash); cursor: pointer; display: flex; align-items: center;
+    justify-content: center; font-size: 18px; color: var(--muted); transition: border-color .15s;
+  }
+  .emo-none-btn.selected { border-color: var(--ink); }
+  .color-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .color-chip {
+    width: 30px; height: 30px; border-radius: 50%; cursor: pointer; border: 3px solid transparent;
+    flex-shrink: 0; transition: border-color .15s;
+  }
+  .color-chip.selected { border-color: var(--ink); }
+  .color-chip-custom { position: relative; overflow: hidden; }
+  .color-chip-custom input[type=color] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; padding: 0; border: none; width: 100%; height: 100%;
+  }
+  .compose-preview-frame {
+    border: 1px solid var(--mocha-light); border-radius: 12px;
+    overflow: hidden; width: 100%; height: 520px; display: none;
+  }
+  .compose-preview-frame.visible { display: block; }
+  .cta-toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px; color: var(--ink); }
+  .cta-toggle input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--ink); cursor: pointer; }
 
   /* Email list */
   .email-row { padding: 10px 0; border-bottom: 1px solid var(--mocha-wash); display: flex; align-items: center; gap: 12px; }
@@ -101,40 +133,97 @@
     <!-- Custom email compose -->
     <div class="section-block">
       <h2 class="section-title">Send custom email</h2>
-      <p style="font-size:14px; color:var(--muted); margin:0 0 18px; line-height:1.6;">Send an email to all users or a specific person. Sent via Resend using the same branded template as the digest.</p>
+      <p style="font-size:14px; color:var(--muted); margin:0 0 18px; line-height:1.6;">Send an email to all users or a specific person using the branded Progress template.</p>
 
       <div class="compose-form">
+
+        <!-- Recipient -->
         <div class="row">
           <div>
-            <label class="section-head" style="display:block; margin-bottom:6px;">Recipient</label>
+            <label class="compose-section-label">Recipient</label>
             <select id="recipientType">
               <option value="all">All subscribers</option>
               <option value="specific">Specific user</option>
             </select>
           </div>
           <div id="specificUserWrap" style="display:none;">
-            <label class="section-head" style="display:block; margin-bottom:6px;">Username</label>
+            <label class="compose-section-label">Username</label>
             <input id="recipientUsername" type="text" placeholder="@username">
           </div>
         </div>
 
+        <!-- Subject -->
         <div>
-          <label class="section-head" style="display:block; margin-bottom:6px;">Subject line</label>
+          <label class="compose-section-label">Subject line</label>
           <input id="emailSubject" type="text" placeholder="e.g. Something special from Progress ✨" maxlength="200">
         </div>
 
+        <!-- Body -->
         <div>
-          <label class="section-head" style="display:block; margin-bottom:6px;">Message body (plain text)</label>
-          <textarea id="emailBody" placeholder="Write your message here. Keep it warm and personal — it'll be wrapped in the Progress email template." maxlength="5000"></textarea>
+          <label class="compose-section-label">Message body</label>
+          <textarea id="emailBody" placeholder="Write your message here. Warm, personal — it'll be wrapped in the Progress email template." maxlength="5000"></textarea>
         </div>
 
+        <!-- Sticker -->
         <div>
-          <button id="previewBtn" class="btn" style="font-size:13px; padding:7px 14px; margin-right:8px;">Preview</button>
+          <label class="compose-section-label">Sticker / emoticon</label>
+          <div class="emoticon-grid" id="emoticonGrid"></div>
+        </div>
+
+        <!-- CTA button -->
+        <div>
+          <label class="cta-toggle">
+            <input type="checkbox" id="ctaEnabled"> Add a call-to-action button
+          </label>
+          <div id="ctaFields" style="display:none; margin-top:10px; display:none;">
+            <div class="row">
+              <div>
+                <label class="compose-section-label">Button text</label>
+                <input id="ctaText" type="text" placeholder="e.g. Read now" maxlength="60">
+              </div>
+              <div>
+                <label class="compose-section-label">Button URL</label>
+                <input id="ctaUrl" type="url" placeholder="https://progressing.online/…">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Accent color -->
+        <div>
+          <label class="compose-section-label">Accent color</label>
+          <div class="color-row" id="accentColorRow">
+            <div class="color-chip selected" data-color="#8C6E58" style="background:#8C6E58;" title="Mocha (default)"></div>
+            <div class="color-chip" data-color="#6B7F6E" style="background:#6B7F6E;" title="Sage"></div>
+            <div class="color-chip" data-color="#7B6B9A" style="background:#7B6B9A;" title="Lavender"></div>
+            <div class="color-chip" data-color="#C47C5A" style="background:#C47C5A;" title="Terracotta"></div>
+            <div class="color-chip" data-color="#4A7C9E" style="background:#4A7C9E;" title="Slate blue"></div>
+            <div class="color-chip" data-color="#333333" style="background:#333333;" title="Ink"></div>
+            <div class="color-chip color-chip-custom" id="customColorChip" style="background:#8C6E58;" title="Custom color">
+              <input type="color" id="customColorInput" value="#8C6E58">
+            </div>
+          </div>
+          <input type="hidden" id="accentColor" value="#8C6E58">
+        </div>
+
+        <!-- Footer tagline -->
+        <div>
+          <label class="compose-section-label">Footer sign-off</label>
+          <input id="footerTagline" type="text" placeholder="until next time" maxlength="80" value="until next time">
+        </div>
+
+        <!-- Actions -->
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+          <button id="previewBtn" class="btn" style="font-size:13px; padding:7px 14px;">Preview email</button>
           <button id="sendEmailBtn" class="btn" style="background:var(--ink); color:var(--cream); padding:9px 20px; font-size:14px;">Send email</button>
-          <span id="emailSendStatus" style="font-size:13px; color:var(--muted); margin-left:12px;"></span>
+          <span id="emailSendStatus" style="font-size:13px; color:var(--muted);"></span>
         </div>
 
-        <div id="emailPreview" class="compose-preview"></div>
+        <!-- Live preview iframe -->
+        <div id="emailPreviewWrap" class="compose-preview-frame">
+          <iframe id="emailPreviewFrame" style="width:100%; height:100%; border:none;" title="Email preview"></iframe>
+        </div>
+
       </div>
     </div>
 
@@ -188,8 +277,11 @@
     loadEmailStats();
     loadSubscribers();
     wireDigest();
+    initEmoticonGrid();
+    initColorPicker();
     wireCompose();
     wireRecipientToggle();
+    wireCtaToggle();
     wireSearch();
   }
 
@@ -240,6 +332,71 @@
     });
   }
 
+  // ── Emoticons ─────────────────────────────────────────────────────────────────
+  const EMOTICONS = ["hi","penguin","starbucks","bee","turtle_lazy","hamster","cow","shark","sharkcat","lion","banana","bored","windy","romantic","wonder","asleep_couch","mwa","kiss","computer","computersupport","dark","construction","dexterity"];
+  let _selectedEmoticon = "penguin";
+
+  function initEmoticonGrid() {
+    const grid = document.getElementById("emoticonGrid");
+    // "none" option
+    const noneBtn = document.createElement("button");
+    noneBtn.type = "button";
+    noneBtn.className = "emo-none-btn";
+    noneBtn.title = "No sticker";
+    noneBtn.textContent = "✕";
+    noneBtn.dataset.name = "none";
+    noneBtn.addEventListener("click", () => selectEmoticon("none", noneBtn));
+    grid.appendChild(noneBtn);
+
+    EMOTICONS.forEach(name => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "emo-btn" + (name === _selectedEmoticon ? " selected" : "");
+      btn.title = name.replace(/_/g," ");
+      btn.dataset.name = name;
+      const img = document.createElement("img");
+      img.src = `/images/emoticons/${name}.png`;
+      img.alt = name;
+      img.loading = "lazy";
+      btn.appendChild(img);
+      btn.addEventListener("click", () => selectEmoticon(name, btn));
+      grid.appendChild(btn);
+    });
+  }
+
+  function selectEmoticon(name, el) {
+    _selectedEmoticon = name;
+    document.querySelectorAll(".emo-btn, .emo-none-btn").forEach(b => b.classList.remove("selected"));
+    el.classList.add("selected");
+  }
+
+  // ── Accent color ──────────────────────────────────────────────────────────────
+  function initColorPicker() {
+    document.querySelectorAll(".color-chip:not(.color-chip-custom)").forEach(chip => {
+      chip.addEventListener("click", () => {
+        document.querySelectorAll(".color-chip").forEach(c => c.classList.remove("selected"));
+        chip.classList.add("selected");
+        document.getElementById("accentColor").value = chip.dataset.color;
+        document.getElementById("customColorChip").style.background = chip.dataset.color;
+        document.getElementById("customColorInput").value = chip.dataset.color;
+      });
+    });
+    document.getElementById("customColorInput").addEventListener("input", e => {
+      const v = e.target.value;
+      document.getElementById("customColorChip").style.background = v;
+      document.getElementById("accentColor").value = v;
+      document.querySelectorAll(".color-chip:not(.color-chip-custom)").forEach(c => c.classList.remove("selected"));
+      document.getElementById("customColorChip").classList.add("selected");
+    });
+  }
+
+  // ── CTA toggle ────────────────────────────────────────────────────────────────
+  function wireCtaToggle() {
+    document.getElementById("ctaEnabled").addEventListener("change", e => {
+      document.getElementById("ctaFields").style.display = e.target.checked ? "block" : "none";
+    });
+  }
+
   // ── Custom email compose ─────────────────────────────────────────────────────
   function wireRecipientToggle() {
     document.getElementById("recipientType").addEventListener("change", e => {
@@ -248,19 +405,43 @@
     });
   }
 
+  function getComposePayload() {
+    const ctaOn = document.getElementById("ctaEnabled").checked;
+    return {
+      subject:      document.getElementById("emailSubject").value.trim(),
+      body:         document.getElementById("emailBody").value.trim(),
+      emoticon:     _selectedEmoticon === "none" ? "" : _selectedEmoticon,
+      ctaText:      ctaOn ? (document.getElementById("ctaText").value.trim() || "visit progress") : "",
+      ctaUrl:       ctaOn ? (document.getElementById("ctaUrl").value.trim() || "https://progressing.online") : "",
+      accentColor:  document.getElementById("accentColor").value,
+      buttonColor:  document.getElementById("accentColor").value,
+      footerTagline: document.getElementById("footerTagline").value.trim() || "until next time",
+    };
+  }
+
   function wireCompose() {
-    document.getElementById("previewBtn").addEventListener("click", () => {
-      const subject = document.getElementById("emailSubject").value.trim();
-      const body = document.getElementById("emailBody").value.trim();
-      const preview = document.getElementById("emailPreview");
+    document.getElementById("previewBtn").addEventListener("click", async () => {
+      const { subject, body } = getComposePayload();
       if (!subject && !body) { showToast("Nothing to preview."); return; }
-      preview.className = "compose-preview visible";
-      preview.textContent = `Subject: ${subject}\n\n${body}`;
+      const payload = getComposePayload();
+      // Ask server to render the HTML
+      const r = await apiFetch("/api/admin/preview-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (r && r.html) {
+        const frame = document.getElementById("emailPreviewFrame");
+        frame.srcdoc = r.html;
+        document.getElementById("emailPreviewWrap").className = "compose-preview-frame visible";
+      } else {
+        showToast("Preview failed — check server.");
+      }
     });
 
     document.getElementById("sendEmailBtn").addEventListener("click", async () => {
-      const subject = document.getElementById("emailSubject").value.trim();
-      const body = document.getElementById("emailBody").value.trim();
+      const payload = getComposePayload();
+      const { subject, body } = payload;
       const type = document.getElementById("recipientType").value;
       const targetUsername = type === "specific"
         ? document.getElementById("recipientUsername").value.trim().replace(/^@/, "")
@@ -285,7 +466,7 @@
       const r = await apiFetch("/api/admin/send-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subject, body, targetUsername: targetUsername || undefined })
+        body: JSON.stringify({ ...payload, targetUsername: targetUsername || undefined })
       });
 
       btn.disabled = false; btn.textContent = "Send email";
@@ -293,9 +474,6 @@
         const failNote = r.failed ? ` (${r.failed} failed)` : "";
         statusEl.textContent = `✓ Sent to ${r.sent} user${r.sent !== 1 ? "s" : ""}${failNote}`;
         showToast(`Email sent to ${r.sent} user${r.sent !== 1 ? "s" : ""}.`);
-        document.getElementById("emailSubject").value = "";
-        document.getElementById("emailBody").value = "";
-        document.getElementById("emailPreview").className = "compose-preview";
       } else if (r && r.error) {
         statusEl.textContent = `Error: ${r.error}`;
         showToast(r.error);

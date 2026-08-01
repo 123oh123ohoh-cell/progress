@@ -485,7 +485,7 @@ function broadcastGlobalPresenceUpdate() {
  * Uses the site's cream/mocha palette and emoticon PNGs from /images/emoticons/.
  * emoticon: full URL to a .png from images/emoticons/ (or null)
  */
-function emailWrap({ emoticon = null, headlineHtml = "", bodyHtml = "", ctaText = "", ctaUrl = "", preview = "", site = "https://progressing.online" }) {
+function emailWrap({ emoticon = null, headlineHtml = "", bodyHtml = "", ctaText = "", ctaUrl = "", preview = "", site = "https://progressing.online", accentColor = "#8C6E58", buttonColor = "#8C6E58", footerTagline = "until next time" }) {
   const previewSnippet = preview
     ? `<span style="display:none;font-size:0;max-height:0;max-width:0;opacity:0;overflow:hidden;">${preview}&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;</span>`
     : "";
@@ -504,7 +504,7 @@ function emailWrap({ emoticon = null, headlineHtml = "", bodyHtml = "", ctaText 
         <td align="center" style="padding:30px 0 52px;">
           <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center">
             <tr>
-              <td bgcolor="#8C6E58" style="border-radius:100px;">
+              <td bgcolor="${buttonColor}" style="border-radius:100px;">
                 <a href="${ctaUrl}" style="display:inline-block;padding:14px 44px;font-family:Georgia,'Times New Roman',serif;font-size:13px;font-weight:bold;color:#FAF5EE;text-decoration:none;letter-spacing:0.1em;white-space:nowrap;">${ctaText}</a>
               </td>
             </tr>
@@ -529,9 +529,11 @@ ${previewSnippet}
     <!-- brand stamp -->
     <table role="presentation" width="480" cellpadding="0" cellspacing="0" border="0" style="max-width:480px;width:100%;">
       <tr>
-        <td align="center" style="padding-bottom:24px;">
-          <p style="margin:0 0 7px;font-family:Georgia,'Times New Roman',serif;font-size:26px;font-style:italic;color:#3B2518;letter-spacing:0.01em;">progress.</p>
-          <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:10px;color:#B89A78;letter-spacing:0.32em;text-transform:uppercase;">a writing community &nbsp;✿</p>
+        <td align="center" style="padding-bottom:20px;">
+          <a href="${site}" style="display:inline-block;text-decoration:none;">
+            <img src="${site}/images/email-logo.png" alt="progress." width="160" height="auto" border="0" style="display:block;margin:0 auto;outline:none;-ms-interpolation-mode:bicubic;max-width:160px;">
+          </a>
+          <p style="margin:8px 0 0;font-family:Georgia,'Times New Roman',serif;font-size:10px;color:${accentColor};letter-spacing:0.32em;text-transform:uppercase;opacity:0.7;">a writing community &nbsp;✿</p>
         </td>
       </tr>
     </table>
@@ -580,7 +582,7 @@ ${previewSnippet}
       <tr>
         <td align="center" style="padding:0 20px;">
           <p style="margin:0 0 6px;font-family:Georgia,'Times New Roman',serif;font-size:12px;font-style:italic;color:#B89A78;line-height:2.1;">
-            until next time — <a href="${site}" style="color:#8C6E58;text-decoration:none;">progress</a> &nbsp;✿
+            ${footerTagline} — <a href="${site}" style="color:${accentColor};text-decoration:none;">progress</a> &nbsp;✿
           </p>
           <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:11px;color:#C9AE92;line-height:2.1;">
             <a href="${site}/profile.html" style="color:#B89A78;text-decoration:underline;">email preferences</a>
@@ -2687,20 +2689,34 @@ app.post("/api/admin/send-digest", requireAuth, asyncHandler(async (req, res) =>
 
 // ── Admin: custom email blast ─────────────────────────────────────────────────
 app.post("/api/admin/send-email", requireAuth, requireRole("admin"), asyncHandler(async (req, res) => {
-  const { subject, body, targetUsername } = req.body || {};
+  const { subject, body, targetUsername, emoticon, ctaText, ctaUrl, accentColor, buttonColor, footerTagline } = req.body || {};
   if (!subject || !body) return res.status(400).json({ error: "Subject and body are required." });
   const key = process.env.RESEND_API_KEY;
   if (!key) return res.status(503).json({ error: "Email not configured — RESEND_API_KEY missing." });
   const site = "https://progressing.online";
   const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+
+  // Validate optional hex color params
+  const hexRe = /^#[0-9A-Fa-f]{3,6}$/;
+  const safeAccent = hexRe.test(accentColor||"") ? accentColor : undefined;
+  const safeButton = hexRe.test(buttonColor||"") ? buttonColor : undefined;
+  const safeTagline = typeof footerTagline === "string" ? footerTagline.slice(0, 80) : undefined;
+  // Only allow emoticons from the known set
+  const ALLOWED_EMOTICONS = new Set(["hi","penguin","starbucks","bee","turtle_lazy","hamster","cow","shark","sharkcat","lion","banana","bored","windy","romantic","wonder","asleep_couch","mwa","kiss","computer","computersupport","dark","penguin","construction","dexterity"]);
+  const emoticonName = typeof emoticon === "string" ? emoticon.replace(/[^a-z0-9_]/gi,"").toLowerCase() : "penguin";
+  const emoticonUrl = ALLOWED_EMOTICONS.has(emoticonName) ? `${site}/images/emoticons/${emoticonName}.png` : `${site}/images/emoticons/penguin.png`;
+
   const makeHtml = (text) => emailWrap({
-    emoticon: `${site}/images/emoticons/penguin.png`,
+    emoticon: emoticonUrl,
     headlineHtml: `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:22px;font-weight:bold;font-style:italic;color:#3B2518;line-height:1.35;">${esc(subject)}</h1>`,
     bodyHtml: `<p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#4A3728;line-height:1.85;white-space:pre-wrap;">${esc(text)}</p>`,
-    ctaText: "visit progress",
-    ctaUrl: site,
+    ctaText: ctaText || "visit progress",
+    ctaUrl: ctaUrl || site,
     preview: text.slice(0, 100).replace(/\n/g," "),
-    site
+    site,
+    ...(safeAccent  && { accentColor: safeAccent }),
+    ...(safeButton  && { buttonColor: safeButton }),
+    ...(safeTagline && { footerTagline: safeTagline }),
   });
 
   if (targetUsername) {
@@ -2733,6 +2749,34 @@ app.post("/api/admin/send-email", requireAuth, requireRole("admin"), asyncHandle
     auditLog(req.user.username, "email_blast", "all", { subject, sent, failed });
     return res.json({ sent, failed });
   }
+}));
+
+// ── Admin: preview email HTML (no send) ───────────────────────────────────────
+app.post("/api/admin/preview-email", requireAuth, requireRole("admin"), asyncHandler(async (req, res) => {
+  const { subject, body, emoticon, ctaText, ctaUrl, accentColor, buttonColor, footerTagline } = req.body || {};
+  if (!subject && !body) return res.status(400).json({ error: "Nothing to preview." });
+  const site = "https://progressing.online";
+  const esc = s => String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const hexRe = /^#[0-9A-Fa-f]{3,6}$/;
+  const safeAccent = hexRe.test(accentColor||"") ? accentColor : undefined;
+  const safeButton = hexRe.test(buttonColor||"") ? buttonColor : undefined;
+  const safeTagline = typeof footerTagline === "string" ? footerTagline.slice(0,80) : undefined;
+  const ALLOWED_EMOTICONS = new Set(["hi","penguin","starbucks","bee","turtle_lazy","hamster","cow","shark","sharkcat","lion","banana","bored","windy","romantic","wonder","asleep_couch","mwa","kiss","computer","computersupport","dark","construction","dexterity"]);
+  const emoticonName = typeof emoticon === "string" ? emoticon.replace(/[^a-z0-9_]/gi,"").toLowerCase() : "penguin";
+  const emoticonUrl = emoticon === "" ? null : (ALLOWED_EMOTICONS.has(emoticonName) ? `${site}/images/emoticons/${emoticonName}.png` : `${site}/images/emoticons/penguin.png`);
+  const html = emailWrap({
+    emoticon: emoticonUrl,
+    headlineHtml: `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:22px;font-weight:bold;font-style:italic;color:#3B2518;line-height:1.35;">${esc(subject)}</h1>`,
+    bodyHtml: `<p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#4A3728;line-height:1.85;white-space:pre-wrap;">${esc(body)}</p>`,
+    ctaText: ctaText || "",
+    ctaUrl: ctaUrl || "",
+    preview: "",
+    site,
+    ...(safeAccent  && { accentColor: safeAccent }),
+    ...(safeButton  && { buttonColor: safeButton }),
+    ...(safeTagline && { footerTagline: safeTagline }),
+  });
+  res.json({ html });
 }));
 
 app.get("/api/admin/stats", requireAuth, asyncHandler(async (req, res) => {
@@ -3239,16 +3283,6 @@ app.get("/api/admin/my-role", requireAuth, asyncHandler(async (req, res) => {
   res.json({ role });
 }));
 
-app.use((req, res) => {
-  res.status(404).json({ error: "Not found" });
-});
-
-app.use((err, req, res, next) => {
-  console.error("Unhandled error:", err);
-  if (res.headersSent) return next(err);
-  res.status(500).json({ error: "Internal server error" });
-});
-
 // ── Admin: all-time totals ────────────────────────────────────────────────────
 app.get("/api/admin/alltime", requireAuth, requireRole("analyst"), asyncHandler(async (req, res) => {
   const [
@@ -3285,7 +3319,7 @@ app.get("/api/admin/alltime", requireAuth, requireRole("analyst"), asyncHandler(
 
   // Most popular category
   const catAgg = await db.collection("posts").aggregate([
-    { $match: { category: { $exists: true, $ne: null, $ne: "" } } },
+    { $match: { category: { $exists: true, $nin: [null, ""] } } },
     { $group: { _id: "$category", count: { $sum: 1 } } },
     { $sort: { count: -1 } }, { $limit: 5 }
   ]).toArray();
@@ -3341,16 +3375,18 @@ app.get("/api/admin/analysis", requireAuth, requireRole("analyst"), asyncHandler
     db.collection("users").find({ lastLoginDate: { $gte: d30 } }, { projection: { username: 1, joined: 1 } }).toArray(),
     db.collection("users").find({ joined: { $gte: d60, $lt: d30 } }, { projection: { username: 1 } }).toArray(),
     db.collection("posts").aggregate([
-      { $match: { createdAt: { $gte: d30 }, category: { $exists: true, $ne: null, $ne: "" } } },
+      { $match: { createdAt: { $gte: d30 }, category: { $exists: true, $nin: [null, ""] } } },
       { $group: { _id: "$category", count: { $sum: 1 }, likes: { $sum: "$likes" } } },
       { $sort: { count: -1 } }
     ]).toArray(),
     db.collection("posts").aggregate([
-      { $group: { _id: { $hour: { $dateFromString: { dateString: "$createdAt", onError: new Date() } } }, count: { $sum: 1 } } },
+      { $match: { createdAt: { $exists: true, $ne: null } } },
+      { $group: { _id: { $hour: { $toDate: "$createdAt" } }, count: { $sum: 1 } } },
       { $sort: { _id: 1 } }
     ]).toArray(),
     db.collection("posts").aggregate([
-      { $group: { _id: { $dayOfWeek: { $dateFromString: { dateString: "$createdAt", onError: new Date() } } }, count: { $sum: 1 } } },
+      { $match: { createdAt: { $exists: true, $ne: null } } },
+      { $group: { _id: { $dayOfWeek: { $toDate: "$createdAt" } }, count: { $sum: 1 } } },
       { $sort: { _id: 1 } }
     ]).toArray(),
     db.collection("posts").distinct("author", { createdAt: { $gte: d30 } }),
@@ -3498,6 +3534,16 @@ app.get("/api/admin/data/pageviews", requireAuth, requireRole("analyst"), asyncH
     page: p.page, username: p.username, timestamp: p.timestamp, date: p.date,
   })) });
 }));
+
+app.use((req, res) => {
+  res.status(404).json({ error: "Not found" });
+});
+
+app.use((err, req, res, next) => {
+  console.error("Unhandled error:", err);
+  if (res.headersSent) return next(err);
+  res.status(500).json({ error: "Internal server error" });
+});
 
 connect()
   .then(() => {
