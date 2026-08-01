@@ -9,7 +9,7 @@
 <link rel="stylesheet" href="style.css">
 <script>(function(){try{var t=localStorage.getItem("progressTheme");var dark=(t==="dark")||(t!=="light"&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);if(dark)document.documentElement.setAttribute("data-theme","dark");}catch(e){}})();</script>
 <style>
-  .admin-wrap { max-width: 960px; margin: 0 auto; padding: 0 20px 80px; }
+  .admin-wrap { max-width: 1100px; margin: 0 auto; padding: 0 20px 80px; }
   .admin-header { margin: 40px 0 28px; display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
   .admin-header h1 { font-family: var(--font-display); font-size: 28px; margin: 0; }
   .section-block { margin-bottom: 40px; padding-top: 32px; border-top: 1px solid var(--mocha-light); }
@@ -23,59 +23,6 @@
   .stat-label { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin-bottom: 6px; }
   .stat-value { font-family: var(--font-display); font-size: 28px; color: var(--ink); line-height: 1; }
 
-  /* Compose */
-  .compose-form { display: flex; flex-direction: column; gap: 14px; }
-  .compose-form input,
-  .compose-form select,
-  .compose-form textarea {
-    padding: 10px 12px; border: 1px solid var(--mocha-light); border-radius: 8px;
-    font-size: 14px; background: var(--paper); color: var(--ink);
-    font-family: var(--font-sans, Inter, sans-serif);
-  }
-  .compose-form textarea { min-height: 120px; resize: vertical; }
-  .compose-form .row { display: flex; gap: 10px; flex-wrap: wrap; }
-  .compose-form .row > * { flex: 1; min-width: 140px; }
-  .compose-section-label {
-    font-family: var(--font-mono); font-size: 10px; text-transform: uppercase;
-    letter-spacing: 0.07em; color: var(--muted); margin-bottom: 6px; display: block;
-  }
-  .emoticon-grid {
-    display: flex; flex-wrap: wrap; gap: 8px; padding: 10px;
-    border: 1px solid var(--mocha-light); border-radius: 10px; background: var(--paper);
-  }
-  .emo-btn {
-    width: 52px; height: 52px; border-radius: 10px; border: 2px solid transparent;
-    background: var(--mocha-wash); cursor: pointer; display: flex; align-items: center;
-    justify-content: center; padding: 4px; transition: border-color .15s, background .15s;
-    position: relative;
-  }
-  .emo-btn:hover { background: var(--mocha-light); }
-  .emo-btn.selected { border-color: var(--ink); background: var(--mocha-wash); }
-  .emo-btn img { width: 36px; height: 36px; object-fit: contain; }
-  .emo-none-btn {
-    width: 52px; height: 52px; border-radius: 10px; border: 2px solid transparent;
-    background: var(--mocha-wash); cursor: pointer; display: flex; align-items: center;
-    justify-content: center; font-size: 18px; color: var(--muted); transition: border-color .15s;
-  }
-  .emo-none-btn.selected { border-color: var(--ink); }
-  .color-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-  .color-chip {
-    width: 30px; height: 30px; border-radius: 50%; cursor: pointer; border: 3px solid transparent;
-    flex-shrink: 0; transition: border-color .15s;
-  }
-  .color-chip.selected { border-color: var(--ink); }
-  .color-chip-custom { position: relative; overflow: hidden; }
-  .color-chip-custom input[type=color] {
-    position: absolute; inset: 0; opacity: 0; cursor: pointer; padding: 0; border: none; width: 100%; height: 100%;
-  }
-  .compose-preview-frame {
-    border: 1px solid var(--mocha-light); border-radius: 12px;
-    overflow: hidden; width: 100%; height: 520px; display: none;
-  }
-  .compose-preview-frame.visible { display: block; }
-  .cta-toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px; color: var(--ink); }
-  .cta-toggle input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--ink); cursor: pointer; }
-
   /* Email list */
   .email-row { padding: 10px 0; border-bottom: 1px solid var(--mocha-wash); display: flex; align-items: center; gap: 12px; }
   .email-row:last-child { border-bottom: none; }
@@ -85,6 +32,194 @@
   .email-search { padding: 7px 12px; border: 1px solid var(--mocha-light); border-radius: 8px; font-size: 13px; background: var(--paper); color: var(--ink); width: 240px; margin-bottom: 14px; }
 
   #authContainer { max-width: 340px; margin: 100px auto 0; text-align: center; padding: 0 20px; }
+
+  /* ── Email Builder ─────────────────────────────────────────────────────── */
+  .email-builder {
+    display: flex; border: 1px solid var(--mocha-light); border-radius: 14px;
+    overflow: hidden; min-height: 680px; background: var(--paper);
+  }
+
+  /* Sidebar */
+  .builder-sidebar {
+    width: 252px; flex-shrink: 0; background: #181512; color: #ddd;
+    display: flex; flex-direction: column; border-right: 1px solid #2e2820;
+  }
+  .builder-tabs { display: flex; border-bottom: 1px solid #2e2820; }
+  .b-tab {
+    flex: 1; padding: 13px 8px; font-size: 11px; font-weight: 700;
+    letter-spacing: 0.09em; text-transform: uppercase; background: none;
+    border: none; color: #666; cursor: pointer;
+    border-bottom: 2px solid transparent; transition: color .15s, border-color .15s;
+  }
+  .b-tab.active { color: #f0e8de; border-bottom-color: #A07858; }
+  .builder-panel { flex: 1; overflow-y: auto; padding: 14px; }
+  .builder-panel::-webkit-scrollbar { width: 4px; }
+  .builder-panel::-webkit-scrollbar-thumb { background: #3a3a3a; border-radius: 4px; }
+
+  /* Palette */
+  .palette-section { margin-bottom: 20px; }
+  .palette-section-title {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+    color: #7a6a58; margin: 0 0 10px; display: flex; align-items: center; justify-content: space-between;
+  }
+  .palette-section-title::after { content: "^"; font-size: 9px; opacity: .5; }
+  .palette-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+  .p-item {
+    background: #221e1a; border: 1px solid #2e2820; border-radius: 7px;
+    padding: 9px 4px 7px; text-align: center; cursor: pointer; font-size: 10px;
+    color: #b0a090; transition: background .15s, border-color .15s, color .15s;
+    user-select: none; display: flex; flex-direction: column; align-items: center; gap: 3px;
+  }
+  .p-item:hover { background: #2e2820; border-color: #A07858; color: #f0e8de; }
+  .p-item .pi { font-size: 17px; line-height: 1; }
+
+  .col-options { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+  .col-option {
+    background: #221e1a; border: 1px solid #2e2820; border-radius: 7px;
+    padding: 8px 6px; cursor: pointer; display: flex; gap: 3px; height: 34px;
+    align-items: center; transition: border-color .15s;
+  }
+  .col-option:hover { border-color: #A07858; }
+  .col-cell { background: #3a3228; border-radius: 3px; flex: 1; height: 100%; }
+
+  .template-card {
+    background: #221e1a; border: 1px solid #2e2820; border-radius: 8px;
+    padding: 9px 11px; cursor: pointer; margin-bottom: 5px;
+    transition: border-color .15s, background .15s;
+  }
+  .template-card:hover { border-color: #A07858; background: #2a2420; }
+  .template-card-name { font-size: 12px; font-weight: 600; color: #c8b8a8; margin-bottom: 2px; }
+  .template-card-desc { font-size: 10px; color: #6a5a48; }
+
+  /* Editor panel */
+  .editor-group { margin-bottom: 15px; }
+  .editor-label {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase;
+    color: #7a6a58; margin-bottom: 6px; display: block;
+  }
+  .editor-input, .editor-select, .editor-textarea {
+    width: 100%; padding: 7px 9px; background: #221e1a; border: 1px solid #2e2820;
+    border-radius: 6px; color: #ddd; font-size: 12px; box-sizing: border-box;
+    font-family: inherit;
+  }
+  .editor-textarea { min-height: 70px; resize: vertical; line-height: 1.5; }
+  .editor-input:focus, .editor-select:focus, .editor-textarea:focus { outline: none; border-color: #A07858; }
+  .editor-select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; padding-right: 24px; }
+  .editor-color-row { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; }
+  .editor-chip {
+    width: 22px; height: 22px; border-radius: 50%; cursor: pointer;
+    border: 2px solid transparent; flex-shrink: 0; transition: border-color .12s;
+  }
+  .editor-chip.sel { border-color: #fff; }
+  .editor-hint { font-size: 10px; color: #5a4a38; margin-top: 4px; line-height: 1.4; }
+  .editor-no-sel { padding: 16px 0 8px; text-align: center; color: #5a4a38; font-size: 12px; line-height: 1.6; }
+  .editor-sep { border: none; border-top: 1px solid #2e2820; margin: 14px 0; }
+
+  .emo-dark-grid { display: flex; flex-wrap: wrap; gap: 4px; }
+  .emo-dark-btn {
+    width: 36px; height: 36px; border-radius: 6px; background: #221e1a;
+    border: 2px solid transparent; cursor: pointer; padding: 2px;
+    display: flex; align-items: center; justify-content: center;
+    transition: border-color .12s, background .12s;
+  }
+  .emo-dark-btn:hover { background: #2e2820; }
+  .emo-dark-btn.sel { border-color: #A07858; }
+  .emo-dark-btn img { width: 28px; height: 28px; object-fit: contain; }
+  .emo-none { font-size: 13px; color: #666; }
+
+  /* Sidebar footer */
+  .builder-sb-footer { padding: 12px 14px; border-top: 1px solid #2e2820; display: flex; flex-direction: column; gap: 6px; }
+
+  /* Main canvas */
+  .builder-main { flex: 1; background: var(--mocha-wash,#F5EDE0); display: flex; flex-direction: column; min-width: 0; }
+  .builder-topbar {
+    background: var(--paper); border-bottom: 1px solid var(--mocha-light);
+    padding: 10px 14px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  }
+  .builder-topbar input, .builder-topbar select {
+    padding: 7px 10px; border: 1px solid var(--mocha-light); border-radius: 7px;
+    font-size: 13px; background: var(--paper); color: var(--ink);
+  }
+  .builder-topbar input { flex: 1; min-width: 160px; }
+
+  .builder-canvas-wrap { flex: 1; overflow-y: auto; padding: 24px 16px; display: flex; justify-content: center; }
+  .builder-canvas {
+    width: 480px; max-width: 100%; background: #FAF5EE;
+    border-radius: 18px; box-shadow: 0 4px 28px rgba(59,37,24,.13);
+    min-height: 500px; display: flex; flex-direction: column;
+  }
+
+  /* Canvas brand header */
+  .canvas-header {
+    padding: 26px 24px 16px; border-bottom: 1px solid #EAD9C4;
+    display: flex; align-items: flex-end; justify-content: center; gap: 8px;
+  }
+  .canvas-brand-text { font-family: Georgia,'Times New Roman',serif; font-style: italic; font-size: 24px; color: #3B2518; line-height: 1; }
+  .canvas-brand-sub { font-family: Georgia,serif; font-size: 9px; color: #B89A78; letter-spacing: 0.32em; text-transform: uppercase; margin-top: 5px; }
+  .canvas-header img { height: 44px; width: 44px; object-fit: contain; }
+
+  /* Canvas sticker */
+  .canvas-sticker { text-align: center; padding: 22px 0 4px; display: none; }
+  .canvas-sticker img { width: 68px; height: 68px; object-fit: contain; }
+  .canvas-sticker .dividers { font-family: Georgia,serif; font-size: 12px; color: #CDB99A; letter-spacing: 0.3em; margin-top: 10px; }
+
+  /* Blocks container */
+  .canvas-blocks { flex: 1; padding: 10px 12px; }
+  .canvas-empty {
+    margin: 10px 0; padding: 36px 20px; text-align: center;
+    color: #C4A882; font-family: Georgia,serif; font-size: 14px;
+    border: 2px dashed #DDD0C0; border-radius: 10px;
+  }
+
+  /* Individual blocks */
+  .c-block {
+    position: relative; margin-bottom: 3px; border-radius: 6px;
+    border: 2px solid transparent; cursor: pointer;
+    transition: border-color .12s;
+  }
+  .c-block:hover { border-color: rgba(160,120,88,.35); }
+  .c-block.sel { border-color: #A07858; }
+
+  .b-controls {
+    position: absolute; top: -1px; right: -1px; display: none;
+    background: #A07858; border-radius: 0 4px 0 6px; z-index: 5;
+  }
+  .c-block:hover .b-controls, .c-block.sel .b-controls { display: flex; }
+  .b-ctrl {
+    width: 22px; height: 22px; border: none; background: none; color: #fff;
+    cursor: pointer; font-size: 11px; display: flex; align-items: center; justify-content: center; padding: 0;
+  }
+  .b-ctrl:hover { background: rgba(0,0,0,.2); }
+
+  /* Block type renderings */
+  .bt-text { padding: 8px 16px; font-family: Georgia,serif; color: #4A3728; line-height: 1.8; }
+  .bt-html { padding: 6px 16px; font-size: 13px; color: #4A3728; }
+  .bt-image { padding: 8px 16px; text-align: center; }
+  .bt-image img { max-width: 100%; border-radius: 4px; }
+  .bt-img-placeholder { background: #EDE4D8; border-radius: 8px; height: 100px; display: flex; align-items: center; justify-content: center; color: #B89A78; font-size: 13px; font-family: Georgia,serif; }
+  .bt-button { padding: 8px 16px; }
+  .bt-btn-inner { display: inline-block; padding: 11px 34px; border-radius: 100px; font-family: Georgia,serif; font-size: 13px; font-weight: bold; color: #FAF5EE; letter-spacing: 0.08em; }
+  .bt-divider { padding: 6px 16px; }
+  .bt-divider hr { border: none; margin: 0; }
+  .bt-spacer { display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 9px; color: #C4A882; letter-spacing: .05em; }
+  .bt-2col { padding: 8px 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .bt-3col { padding: 8px 16px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .bt-col-cell { background: #F0E8DC; border-radius: 6px; padding: 8px; font-family: Georgia,serif; font-size: 12px; color: #6A5040; min-height: 48px; line-height: 1.5; }
+
+  /* Canvas footer */
+  .canvas-footer {
+    padding: 16px 24px 24px; border-top: 1px solid #EAD9C4; margin-top: 8px;
+    text-align: center;
+  }
+  .canvas-footer p { font-family: Georgia,serif; font-size: 11px; font-style: italic; color: #B89A78; margin: 0 0 4px; }
+  .canvas-footer small { font-family: Georgia,serif; font-size: 10px; color: #C9AE92; }
+
+  /* Preview pane */
+  .builder-preview-pane { display: none; padding: 0 16px 20px; }
+  .builder-preview-pane.show { display: block; }
+  .preview-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .preview-header span { font-size: 13px; font-weight: 600; color: var(--ink); }
+  #builderPreviewFrame { width: 100%; height: 600px; border: 1px solid var(--mocha-light); border-radius: 10px; }
 </style>
 </head>
 <body>
@@ -123,107 +258,182 @@
     <!-- Weekly digest -->
     <div class="section-block">
       <h2 class="section-title">Weekly Digest</h2>
-      <p style="font-size:14px; color:var(--muted); margin:0 0 16px; line-height:1.6;">The digest is automatically sent each week to all subscribers. You can manually trigger it here — useful for testing or sending it early.</p>
+      <p style="font-size:14px; color:var(--muted); margin:0 0 16px; line-height:1.6;">The digest is automatically sent each week to all subscribers. You can manually trigger it here.</p>
       <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
         <button id="sendDigestBtn" class="btn" style="padding:9px 20px; font-size:14px;">📬 Send weekly digest now</button>
         <span id="digestStatus" style="font-size:13px; color:var(--muted);"></span>
       </div>
     </div>
 
-    <!-- Custom email compose -->
+    <!-- ── Email Builder ─────────────────────────────────────────────────── -->
     <div class="section-block">
       <h2 class="section-title">Send custom email</h2>
-      <p style="font-size:14px; color:var(--muted); margin:0 0 18px; line-height:1.6;">Send an email to all users or a specific person using the branded Progress template.</p>
+      <p style="font-size:14px; color:var(--muted); margin:0 0 18px; line-height:1.6;">Build and send branded emails using the Progress template.</p>
 
-      <div class="compose-form">
+      <div class="email-builder" id="emailBuilder">
 
-        <!-- Recipient -->
-        <div class="row">
-          <div>
-            <label class="compose-section-label">Recipient</label>
-            <select id="recipientType">
+        <!-- ── Sidebar ── -->
+        <div class="builder-sidebar">
+          <div class="builder-tabs">
+            <button class="b-tab active" data-panel="elements">ELEMENTS</button>
+            <button class="b-tab" data-panel="editor">EDITOR</button>
+          </div>
+
+          <!-- Elements panel -->
+          <div class="builder-panel" id="bPanelElements">
+
+            <div class="palette-section">
+              <div class="palette-section-title">General</div>
+              <div class="palette-grid">
+                <div class="p-item" data-add="text"><span class="pi">T</span>Text</div>
+                <div class="p-item" data-add="html"><span class="pi">&lt;/&gt;</span>HTML</div>
+                <div class="p-item" data-add="image"><span class="pi">🖼</span>Image</div>
+                <div class="p-item" data-add="button"><span class="pi">□</span>Button</div>
+                <div class="p-item" data-add="divider"><span class="pi">—</span>Divider</div>
+                <div class="p-item" data-add="spacer"><span class="pi">↕</span>Spacer</div>
+              </div>
+            </div>
+
+            <div class="palette-section">
+              <div class="palette-section-title">Columns</div>
+              <div class="col-options">
+                <div class="col-option" data-add="2col" title="Two columns">
+                  <div class="col-cell"></div><div class="col-cell"></div>
+                </div>
+                <div class="col-option" data-add="3col" title="Three columns">
+                  <div class="col-cell"></div><div class="col-cell"></div><div class="col-cell"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="palette-section">
+              <div class="palette-section-title">Templates</div>
+              <div class="template-card" data-template="announcement">
+                <div class="template-card-name">📢 Announcement</div>
+                <div class="template-card-desc">Text + divider + button</div>
+              </div>
+              <div class="template-card" data-template="update">
+                <div class="template-card-name">📝 Update</div>
+                <div class="template-card-desc">Heading + body paragraphs</div>
+              </div>
+              <div class="template-card" data-template="image-text">
+                <div class="template-card-name">🖼 Image + Text</div>
+                <div class="template-card-desc">Image then body text</div>
+              </div>
+              <div class="template-card" data-template="newsletter">
+                <div class="template-card-name">📰 Newsletter</div>
+                <div class="template-card-desc">Intro + two-column + outro</div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Editor panel -->
+          <div class="builder-panel" id="bPanelEditor" style="display:none;">
+
+            <!-- Block-specific controls -->
+            <div id="blockEditorArea">
+              <div class="editor-no-sel">← Click a block in the canvas to edit it</div>
+            </div>
+
+            <hr class="editor-sep">
+
+            <!-- Global email style (always visible) -->
+            <div class="editor-group">
+              <span class="editor-label">Sticker</span>
+              <div class="emo-dark-grid" id="emoGrid"></div>
+            </div>
+
+            <div class="editor-group">
+              <span class="editor-label">Accent color</span>
+              <div class="editor-color-row" id="accentChips">
+                <div class="editor-chip sel" data-c="#8C6E58" style="background:#8C6E58" title="Mocha"></div>
+                <div class="editor-chip" data-c="#6B7F6E" style="background:#6B7F6E" title="Sage"></div>
+                <div class="editor-chip" data-c="#7B6B9A" style="background:#7B6B9A" title="Lavender"></div>
+                <div class="editor-chip" data-c="#C47C5A" style="background:#C47C5A" title="Terracotta"></div>
+                <div class="editor-chip" data-c="#4A7C9E" style="background:#4A7C9E" title="Slate"></div>
+                <div class="editor-chip" data-c="#333333" style="background:#333333" title="Ink"></div>
+                <input type="color" id="accentCustom" value="#8C6E58" style="width:22px;height:22px;padding:0;border:none;cursor:pointer;border-radius:50%;overflow:hidden;background:none;" title="Custom">
+              </div>
+              <input type="hidden" id="accentColor" value="#8C6E58">
+            </div>
+
+            <div class="editor-group">
+              <span class="editor-label">Footer sign-off</span>
+              <input class="editor-input" id="footerTagline" type="text" value="until next time" maxlength="80" placeholder="until next time">
+            </div>
+
+          </div>
+
+          <!-- Sidebar footer -->
+          <div class="builder-sb-footer">
+            <button id="builderSendBtn" class="btn" style="width:100%; background:var(--ink); color:var(--cream); padding:9px; font-size:14px; justify-content:center; text-align:center;">Send email</button>
+            <span id="builderSendStatus" style="font-size:12px; color:var(--muted); text-align:center; min-height:16px;"></span>
+          </div>
+        </div>
+
+        <!-- ── Main area ── -->
+        <div class="builder-main">
+
+          <!-- Top bar: subject + recipient + preview -->
+          <div class="builder-topbar">
+            <input id="builderSubject" type="text" placeholder="Subject line…" maxlength="200">
+            <select id="builderRecipient">
               <option value="all">All subscribers</option>
               <option value="specific">Specific user</option>
             </select>
+            <div id="specificWrap" style="display:none;">
+              <input id="builderUsername" type="text" placeholder="@username" style="width:140px;">
+            </div>
+            <button id="builderPreviewBtn" class="btn" style="font-size:13px; padding:7px 14px; flex-shrink:0; white-space:nowrap;">Preview ↗</button>
           </div>
-          <div id="specificUserWrap" style="display:none;">
-            <label class="compose-section-label">Username</label>
-            <input id="recipientUsername" type="text" placeholder="@username">
-          </div>
-        </div>
 
-        <!-- Subject -->
-        <div>
-          <label class="compose-section-label">Subject line</label>
-          <input id="emailSubject" type="text" placeholder="e.g. Something special from Progress ✨" maxlength="200">
-        </div>
+          <!-- Canvas -->
+          <div class="builder-canvas-wrap" id="canvasScrollWrap">
+            <div class="builder-canvas" id="builderCanvas">
 
-        <!-- Body -->
-        <div>
-          <label class="compose-section-label">Message body</label>
-          <textarea id="emailBody" placeholder="Write your message here. Warm, personal — it'll be wrapped in the Progress email template." maxlength="5000"></textarea>
-        </div>
-
-        <!-- Sticker -->
-        <div>
-          <label class="compose-section-label">Sticker / emoticon</label>
-          <div class="emoticon-grid" id="emoticonGrid"></div>
-        </div>
-
-        <!-- CTA button -->
-        <div>
-          <label class="cta-toggle">
-            <input type="checkbox" id="ctaEnabled"> Add a call-to-action button
-          </label>
-          <div id="ctaFields" style="display:none; margin-top:10px; display:none;">
-            <div class="row">
-              <div>
-                <label class="compose-section-label">Button text</label>
-                <input id="ctaText" type="text" placeholder="e.g. Read now" maxlength="60">
+              <!-- Brand header (read-only) -->
+              <div class="canvas-header">
+                <div>
+                  <div class="canvas-brand-text">progress.</div>
+                  <div class="canvas-brand-sub">a writing community &nbsp;✿</div>
+                </div>
+                <img src="/images/nearheader.png" alt="">
               </div>
-              <div>
-                <label class="compose-section-label">Button URL</label>
-                <input id="ctaUrl" type="url" placeholder="https://progressing.online/…">
+
+              <!-- Sticker preview -->
+              <div class="canvas-sticker" id="canvasSticker">
+                <img id="canvasStickerImg" src="" alt="">
+                <div class="dividers">✦ &nbsp;&nbsp; ✦ &nbsp;&nbsp; ✦</div>
               </div>
+
+              <!-- Blocks -->
+              <div class="canvas-blocks" id="canvasBlocks">
+                <div class="canvas-empty" id="canvasEmpty">
+                  <p style="margin:0 0 8px; font-size:20px;">✉️</p>
+                  <p style="margin:0;">Click blocks on the left to build your email</p>
+                </div>
+              </div>
+
+              <!-- Footer preview -->
+              <div class="canvas-footer">
+                <p id="canvasFooterText">until next time — progress ✿</p>
+                <small>email preferences · progressing.online</small>
+              </div>
+
             </div>
           </div>
-        </div>
 
-        <!-- Accent color -->
-        <div>
-          <label class="compose-section-label">Accent color</label>
-          <div class="color-row" id="accentColorRow">
-            <div class="color-chip selected" data-color="#8C6E58" style="background:#8C6E58;" title="Mocha (default)"></div>
-            <div class="color-chip" data-color="#6B7F6E" style="background:#6B7F6E;" title="Sage"></div>
-            <div class="color-chip" data-color="#7B6B9A" style="background:#7B6B9A;" title="Lavender"></div>
-            <div class="color-chip" data-color="#C47C5A" style="background:#C47C5A;" title="Terracotta"></div>
-            <div class="color-chip" data-color="#4A7C9E" style="background:#4A7C9E;" title="Slate blue"></div>
-            <div class="color-chip" data-color="#333333" style="background:#333333;" title="Ink"></div>
-            <div class="color-chip color-chip-custom" id="customColorChip" style="background:#8C6E58;" title="Custom color">
-              <input type="color" id="customColorInput" value="#8C6E58">
+          <!-- Preview pane (appears below canvas) -->
+          <div class="builder-preview-pane" id="builderPreviewPane">
+            <div class="preview-header">
+              <span>Email preview</span>
+              <button id="closePreviewBtn" class="btn" style="font-size:12px; padding:5px 12px;">Close ✕</button>
             </div>
+            <iframe id="builderPreviewFrame" title="Email preview"></iframe>
           </div>
-          <input type="hidden" id="accentColor" value="#8C6E58">
-        </div>
 
-        <!-- Footer tagline -->
-        <div>
-          <label class="compose-section-label">Footer sign-off</label>
-          <input id="footerTagline" type="text" placeholder="until next time" maxlength="80" value="until next time">
         </div>
-
-        <!-- Actions -->
-        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-          <button id="previewBtn" class="btn" style="font-size:13px; padding:7px 14px;">Preview email</button>
-          <button id="sendEmailBtn" class="btn" style="background:var(--ink); color:var(--cream); padding:9px 20px; font-size:14px;">Send email</button>
-          <span id="emailSendStatus" style="font-size:13px; color:var(--muted);"></span>
-        </div>
-
-        <!-- Live preview iframe -->
-        <div id="emailPreviewWrap" class="compose-preview-frame">
-          <iframe id="emailPreviewFrame" style="width:100%; height:100%; border:none;" title="Email preview"></iframe>
-        </div>
-
       </div>
     </div>
 
@@ -272,17 +482,13 @@
     if (e.key === "Enter") document.getElementById("submitPassword").click();
   });
 
-  // ── Init ─────────────────────────────────────────────────────────────────────
+  // ── Init ──────────────────────────────────────────────────────────────────────
   function init() {
     loadEmailStats();
     loadSubscribers();
     wireDigest();
-    initEmoticonGrid();
-    initColorPicker();
-    wireCompose();
-    wireRecipientToggle();
-    wireCtaToggle();
     wireSearch();
+    initBuilder();
   }
 
   // ── Stats ─────────────────────────────────────────────────────────────────────
@@ -294,13 +500,10 @@
       return;
     }
     const c = result.counts;
-    // Fetch subscriber count from user list
-    const subResult = await apiFetch("/api/admin/users-list?limit=1");
-    const total = subResult ? subResult.total : "—";
-
     statsEl.innerHTML = [
       statCard("Total users", c?.users ?? "—"),
-      statCard("Subscribers", "~" + total),
+      statCard("Posts", c?.posts ?? "—"),
+      statCard("Comments", c?.comments ?? "—"),
       statCard("Banned", c?.banned ?? "—"),
     ].join("");
   }
@@ -324,162 +527,8 @@
         showToast(`Digest sent to ${r.sent} users.`);
       } else if (r?.skipped) {
         status.textContent = `Skipped: ${r.skipped}`;
-        showToast(`Not sent: ${r.skipped}`);
       } else {
         status.textContent = "Something went wrong.";
-        showToast("Failed to send digest.");
-      }
-    });
-  }
-
-  // ── Emoticons ─────────────────────────────────────────────────────────────────
-  const EMOTICONS = ["hi","penguin","starbucks","bee","turtle_lazy","hamster","cow","shark","sharkcat","lion","banana","bored","windy","romantic","wonder","asleep_couch","mwa","kiss","computer","computersupport","dark","construction","dexterity"];
-  let _selectedEmoticon = "penguin";
-
-  function initEmoticonGrid() {
-    const grid = document.getElementById("emoticonGrid");
-    // "none" option
-    const noneBtn = document.createElement("button");
-    noneBtn.type = "button";
-    noneBtn.className = "emo-none-btn";
-    noneBtn.title = "No sticker";
-    noneBtn.textContent = "✕";
-    noneBtn.dataset.name = "none";
-    noneBtn.addEventListener("click", () => selectEmoticon("none", noneBtn));
-    grid.appendChild(noneBtn);
-
-    EMOTICONS.forEach(name => {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "emo-btn" + (name === _selectedEmoticon ? " selected" : "");
-      btn.title = name.replace(/_/g," ");
-      btn.dataset.name = name;
-      const img = document.createElement("img");
-      img.src = `/images/emoticons/${name}.png`;
-      img.alt = name;
-      img.loading = "lazy";
-      btn.appendChild(img);
-      btn.addEventListener("click", () => selectEmoticon(name, btn));
-      grid.appendChild(btn);
-    });
-  }
-
-  function selectEmoticon(name, el) {
-    _selectedEmoticon = name;
-    document.querySelectorAll(".emo-btn, .emo-none-btn").forEach(b => b.classList.remove("selected"));
-    el.classList.add("selected");
-  }
-
-  // ── Accent color ──────────────────────────────────────────────────────────────
-  function initColorPicker() {
-    document.querySelectorAll(".color-chip:not(.color-chip-custom)").forEach(chip => {
-      chip.addEventListener("click", () => {
-        document.querySelectorAll(".color-chip").forEach(c => c.classList.remove("selected"));
-        chip.classList.add("selected");
-        document.getElementById("accentColor").value = chip.dataset.color;
-        document.getElementById("customColorChip").style.background = chip.dataset.color;
-        document.getElementById("customColorInput").value = chip.dataset.color;
-      });
-    });
-    document.getElementById("customColorInput").addEventListener("input", e => {
-      const v = e.target.value;
-      document.getElementById("customColorChip").style.background = v;
-      document.getElementById("accentColor").value = v;
-      document.querySelectorAll(".color-chip:not(.color-chip-custom)").forEach(c => c.classList.remove("selected"));
-      document.getElementById("customColorChip").classList.add("selected");
-    });
-  }
-
-  // ── CTA toggle ────────────────────────────────────────────────────────────────
-  function wireCtaToggle() {
-    document.getElementById("ctaEnabled").addEventListener("change", e => {
-      document.getElementById("ctaFields").style.display = e.target.checked ? "block" : "none";
-    });
-  }
-
-  // ── Custom email compose ─────────────────────────────────────────────────────
-  function wireRecipientToggle() {
-    document.getElementById("recipientType").addEventListener("change", e => {
-      document.getElementById("specificUserWrap").style.display =
-        e.target.value === "specific" ? "block" : "none";
-    });
-  }
-
-  function getComposePayload() {
-    const ctaOn = document.getElementById("ctaEnabled").checked;
-    return {
-      subject:      document.getElementById("emailSubject").value.trim(),
-      body:         document.getElementById("emailBody").value.trim(),
-      emoticon:     _selectedEmoticon === "none" ? "" : _selectedEmoticon,
-      ctaText:      ctaOn ? (document.getElementById("ctaText").value.trim() || "visit progress") : "",
-      ctaUrl:       ctaOn ? (document.getElementById("ctaUrl").value.trim() || "https://progressing.online") : "",
-      accentColor:  document.getElementById("accentColor").value,
-      buttonColor:  document.getElementById("accentColor").value,
-      footerTagline: document.getElementById("footerTagline").value.trim() || "until next time",
-    };
-  }
-
-  function wireCompose() {
-    document.getElementById("previewBtn").addEventListener("click", async () => {
-      const { subject, body } = getComposePayload();
-      if (!subject && !body) { showToast("Nothing to preview."); return; }
-      const payload = getComposePayload();
-      // Ask server to render the HTML
-      const r = await apiFetch("/api/admin/preview-email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-      if (r && r.html) {
-        const frame = document.getElementById("emailPreviewFrame");
-        frame.srcdoc = r.html;
-        document.getElementById("emailPreviewWrap").className = "compose-preview-frame visible";
-      } else {
-        showToast("Preview failed — check server.");
-      }
-    });
-
-    document.getElementById("sendEmailBtn").addEventListener("click", async () => {
-      const payload = getComposePayload();
-      const { subject, body } = payload;
-      const type = document.getElementById("recipientType").value;
-      const targetUsername = type === "specific"
-        ? document.getElementById("recipientUsername").value.trim().replace(/^@/, "")
-        : null;
-      const statusEl = document.getElementById("emailSendStatus");
-
-      if (!subject || !body) { showToast("Subject and body are required."); return; }
-      if (type === "specific" && !targetUsername) { showToast("Enter a username."); return; }
-
-      const recipientLabel = type === "all" ? "all subscribers" : `@${targetUsername}`;
-      const ok = await adminConfirm(
-        `Send email to ${recipientLabel}?`,
-        `Subject: <strong>${escapeHTML(subject)}</strong><br><br>This cannot be undone.`,
-        "Send"
-      );
-      if (!ok) return;
-
-      const btn = document.getElementById("sendEmailBtn");
-      btn.disabled = true; btn.textContent = "Sending…";
-      statusEl.textContent = "";
-
-      const r = await apiFetch("/api/admin/send-email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...payload, targetUsername: targetUsername || undefined })
-      });
-
-      btn.disabled = false; btn.textContent = "Send email";
-      if (r && typeof r.sent === "number") {
-        const failNote = r.failed ? ` (${r.failed} failed)` : "";
-        statusEl.textContent = `✓ Sent to ${r.sent} user${r.sent !== 1 ? "s" : ""}${failNote}`;
-        showToast(`Email sent to ${r.sent} user${r.sent !== 1 ? "s" : ""}.`);
-      } else if (r && r.error) {
-        statusEl.textContent = `Error: ${r.error}`;
-        showToast(r.error);
-      } else {
-        statusEl.textContent = "Failed — check server logs.";
-        showToast("Couldn't send email.");
       }
     });
   }
@@ -495,19 +544,16 @@
     el.innerHTML = `<p style="color:var(--muted); font-size:14px;">Loading…</p>`;
     const q = document.getElementById("emailSearch")?.value || "";
     const result = await apiFetch(`/api/admin/users-list?page=${page}&limit=${SUB_PAGE_SIZE}&q=${encodeURIComponent(q)}`);
-
     if (!result) {
       el.innerHTML = `<p style="color:var(--danger); font-size:14px;">Couldn't load subscribers.</p>`;
       return;
     }
-
     const users = result.users || [];
     if (!users.length) {
       el.innerHTML = `<p style="color:var(--muted); font-size:14px;">No users found.</p>`;
       document.getElementById("subscriberPager").innerHTML = "";
       return;
     }
-
     el.innerHTML = users.map(u => `
       <div class="email-row">
         <div style="min-width:0; flex:1;">
@@ -520,12 +566,11 @@
         <div class="email-row-date">${Progress.formatDateShort(u.joined)}</div>
         ${u.banned ? `<span style="font-size:11px; font-family:var(--font-mono); color:var(--danger); font-weight:700;">BANNED</span>` : ""}
       </div>`).join("");
-
     const pages = Math.ceil(result.total / SUB_PAGE_SIZE);
     const pagerEl = document.getElementById("subscriberPager");
-    pagerEl.innerHTML = pages > 1 ? Array.from({ length: pages }, (_, i) => `
-      <button class="btn ${i === subPage ? "primary" : ""}" data-page="${i}" style="padding:6px 14px; font-size:13px;">${i+1}</button>
-    `).join("") : "";
+    pagerEl.innerHTML = pages > 1 ? Array.from({ length: pages }, (_, i) =>
+      `<button class="btn ${i === subPage ? "primary" : ""}" data-page="${i}" style="padding:6px 14px; font-size:13px;">${i+1}</button>`
+    ).join("") : "";
     pagerEl.querySelectorAll("button").forEach(btn => {
       btn.addEventListener("click", () => loadSubscribers(Number(btn.dataset.page)));
     });
@@ -536,6 +581,480 @@
       clearTimeout(subSearchTimeout);
       subSearchTimeout = setTimeout(() => loadSubscribers(0), 400);
     });
+  }
+
+  // ── Email Builder ─────────────────────────────────────────────────────────────
+  const EMOTICONS = ["hi","penguin","starbucks","bee","turtle_lazy","hamster","cow","shark","sharkcat","lion","banana","bored","windy","romantic","wonder","asleep_couch","mwa","kiss","computer","computersupport","dark","construction","dexterity"];
+  const ACCENT_COLORS = ["#8C6E58","#6B7F6E","#7B6B9A","#C47C5A","#4A7C9E","#333333"];
+
+  let _blocks = [];
+  let _selId = null;
+  let _nextId = 1;
+  let _emoticon = "penguin"; // "none" or name
+  let _accent = "#8C6E58";
+
+  function initBuilder() {
+    // Tab switching
+    document.querySelectorAll(".b-tab").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".b-tab").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        const panel = btn.dataset.panel;
+        document.getElementById("bPanelElements").style.display = panel === "elements" ? "" : "none";
+        document.getElementById("bPanelEditor").style.display   = panel === "editor"   ? "" : "none";
+      });
+    });
+
+    // Palette adds
+    document.querySelectorAll("[data-add]").forEach(el =>
+      el.addEventListener("click", () => addBlock(el.dataset.add))
+    );
+
+    // Templates
+    document.querySelectorAll("[data-template]").forEach(el =>
+      el.addEventListener("click", () => loadTemplate(el.dataset.template))
+    );
+
+    // Recipient toggle
+    document.getElementById("builderRecipient").addEventListener("change", e => {
+      document.getElementById("specificWrap").style.display = e.target.value === "specific" ? "" : "none";
+    });
+
+    // Preview / send
+    document.getElementById("builderPreviewBtn").addEventListener("click", previewEmail);
+    document.getElementById("closePreviewBtn").addEventListener("click", () => {
+      document.getElementById("builderPreviewPane").classList.remove("show");
+      document.getElementById("canvasScrollWrap").style.display = "";
+    });
+    document.getElementById("builderSendBtn").addEventListener("click", sendEmail);
+
+    // Emoticon grid
+    buildEmoGrid();
+
+    // Accent color chips
+    document.querySelectorAll("#accentChips .editor-chip").forEach(chip => {
+      chip.addEventListener("click", () => {
+        document.querySelectorAll("#accentChips .editor-chip").forEach(c => c.classList.remove("sel"));
+        chip.classList.add("sel");
+        setAccent(chip.dataset.c);
+      });
+    });
+    document.getElementById("accentCustom").addEventListener("input", e => {
+      document.querySelectorAll("#accentChips .editor-chip").forEach(c => c.classList.remove("sel"));
+      setAccent(e.target.value);
+    });
+
+    // Footer tagline live update
+    document.getElementById("footerTagline").addEventListener("input", e => {
+      const t = e.target.value.trim() || "until next time";
+      document.getElementById("canvasFooterText").textContent = `${t} — progress ✿`;
+    });
+  }
+
+  function buildEmoGrid() {
+    const grid = document.getElementById("emoGrid");
+    grid.innerHTML = "";
+    // "None" button
+    const noneBtn = document.createElement("button");
+    noneBtn.type = "button";
+    noneBtn.className = "emo-dark-btn" + (_emoticon === "none" ? " sel" : "");
+    noneBtn.title = "No sticker";
+    noneBtn.innerHTML = `<span class="emo-none">✕</span>`;
+    noneBtn.dataset.name = "none";
+    noneBtn.addEventListener("click", () => setEmoticon("none", noneBtn));
+    grid.appendChild(noneBtn);
+
+    EMOTICONS.forEach(name => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "emo-dark-btn" + (name === _emoticon ? " sel" : "");
+      btn.title = name.replace(/_/g," ");
+      btn.dataset.name = name;
+      btn.innerHTML = `<img src="/images/emoticons/${name}.png" alt="${name}" loading="lazy">`;
+      btn.addEventListener("click", () => setEmoticon(name, btn));
+      grid.appendChild(btn);
+    });
+  }
+
+  function setEmoticon(name, el) {
+    _emoticon = name;
+    grid.querySelectorAll && null; // unused
+    document.querySelectorAll("#emoGrid .emo-dark-btn").forEach(b => b.classList.remove("sel"));
+    el.classList.add("sel");
+    const stickerDiv = document.getElementById("canvasSticker");
+    const stickerImg = document.getElementById("canvasStickerImg");
+    if (name === "none") {
+      stickerDiv.style.display = "none";
+    } else {
+      stickerImg.src = `/images/emoticons/${name}.png`;
+      stickerDiv.style.display = "block";
+    }
+  }
+
+  function setAccent(color) {
+    _accent = color;
+    document.getElementById("accentColor").value = color;
+    // Update canvas footer link color
+    document.getElementById("canvasFooterText").style.color = color;
+    // Rerender blocks to update button colors
+    renderBlocks();
+  }
+
+  // ── Blocks ────────────────────────────────────────────────────────────────────
+  function makeBlock(type) {
+    const id = `b${_nextId++}`;
+    const D = {
+      text:    { id, type, content:"Your text here. Write something warm and personal.", fontSize:15, textColor:"#4A3728", align:"left" },
+      html:    { id, type, content:"<p>Custom HTML</p>" },
+      image:   { id, type, src:"", alt:"", link:"", width:100 },
+      button:  { id, type, text:"Click here", url:"https://progressing.online", align:"center" },
+      divider: { id, type, lineStyle:"solid", lineColor:"#D4BBA0" },
+      spacer:  { id, type, height:24 },
+      "2col":  { id, type, col1:"First column text.", col2:"Second column text." },
+      "3col":  { id, type, col1:"Col 1", col2:"Col 2", col3:"Col 3" },
+    };
+    return D[type] || { id, type };
+  }
+
+  function addBlock(type) {
+    const b = makeBlock(type);
+    _blocks.push(b);
+    renderBlocks();
+    selectBlock(b.id);
+    // Switch to editor
+    document.querySelector("[data-panel=editor]").click();
+  }
+
+  function removeBlock(id) {
+    _blocks = _blocks.filter(b => b.id !== id);
+    if (_selId === id) { _selId = null; resetBlockEditor(); }
+    renderBlocks();
+  }
+
+  function moveBlock(id, dir) {
+    const i = _blocks.findIndex(b => b.id === id);
+    if (i < 0) return;
+    const j = i + dir;
+    if (j < 0 || j >= _blocks.length) return;
+    [_blocks[i], _blocks[j]] = [_blocks[j], _blocks[i]];
+    renderBlocks();
+  }
+
+  function selectBlock(id) {
+    _selId = id;
+    renderBlocks();
+    const b = _blocks.find(x => x.id === id);
+    if (b) renderBlockEditor(b);
+    // Switch to editor tab
+    document.querySelector("[data-panel=editor]").click();
+  }
+
+  function renderBlocks() {
+    const container = document.getElementById("canvasBlocks");
+    document.getElementById("canvasEmpty").style.display = _blocks.length ? "none" : "block";
+    // Clear existing block els
+    container.querySelectorAll(".c-block").forEach(el => el.remove());
+    _blocks.forEach((b, idx) => {
+      const el = document.createElement("div");
+      el.className = "c-block" + (b.id === _selId ? " sel" : "");
+      el.dataset.id = b.id;
+      el.innerHTML = blockPreviewHtml(b) + `
+        <div class="b-controls">
+          ${idx > 0 ? `<button class="b-ctrl" title="Up" onclick="moveBlock('${b.id}',-1)">↑</button>` : ""}
+          ${idx < _blocks.length-1 ? `<button class="b-ctrl" title="Down" onclick="moveBlock('${b.id}',1)">↓</button>` : ""}
+          <button class="b-ctrl" title="Delete" onclick="removeBlock('${b.id}')">✕</button>
+        </div>`;
+      el.addEventListener("click", e => {
+        if (e.target.closest(".b-ctrl")) return;
+        selectBlock(b.id);
+      });
+      container.appendChild(el);
+    });
+  }
+
+  function blockPreviewHtml(b) {
+    const esc = s => String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+    const n2b = s => esc(s).replace(/\n/g,"<br>");
+    switch (b.type) {
+      case "text":
+        return `<div class="bt-text" style="font-size:${b.fontSize||15}px;color:${b.textColor||"#4A3728"};text-align:${b.align||"left"};">${n2b(b.content||"")}</div>`;
+      case "html":
+        return `<div class="bt-html">${b.content||""}</div>`;
+      case "image":
+        return b.src
+          ? `<div class="bt-image"><img src="${b.src}" alt="${esc(b.alt||"")}" style="width:${b.width||100}%;"></div>`
+          : `<div class="bt-image"><div class="bt-img-placeholder">🖼 set image URL in editor</div></div>`;
+      case "button": {
+        const color = b.color || _accent;
+        return `<div class="bt-button" style="text-align:${b.align||"center"};"><span class="bt-btn-inner" style="background:${color};">${esc(b.text||"Button")}</span></div>`;
+      }
+      case "divider":
+        return `<div class="bt-divider"><hr style="border-top:1px ${b.lineStyle||"solid"} ${b.lineColor||"#D4BBA0"};"></div>`;
+      case "spacer":
+        return `<div class="bt-spacer" style="height:${b.height||24}px;">[spacer ${b.height||24}px]</div>`;
+      case "2col":
+        return `<div class="bt-2col"><div class="bt-col-cell">${n2b(b.col1||"")}</div><div class="bt-col-cell">${n2b(b.col2||"")}</div></div>`;
+      case "3col":
+        return `<div class="bt-3col"><div class="bt-col-cell">${n2b(b.col1||"")}</div><div class="bt-col-cell">${n2b(b.col2||"")}</div><div class="bt-col-cell">${n2b(b.col3||"")}</div></div>`;
+      default:
+        return `<div style="padding:8px 16px;color:#aaa;font-size:12px;">[${b.type}]</div>`;
+    }
+  }
+
+  // ── Block Editor ──────────────────────────────────────────────────────────────
+  function resetBlockEditor() {
+    document.getElementById("blockEditorArea").innerHTML = `<div class="editor-no-sel">← Click a block in the canvas to edit it</div>`;
+  }
+
+  function renderBlockEditor(b) {
+    const area = document.getElementById("blockEditorArea");
+    let html = `<div class="editor-group" style="margin-bottom:10px;"><span class="editor-label" style="color:#A07858;">${b.type.toUpperCase()} BLOCK</span></div>`;
+
+    switch (b.type) {
+      case "text":
+        html += `
+          <div class="editor-group"><span class="editor-label">Content</span>
+            <textarea class="editor-textarea" data-key="content" rows="5">${b.content||""}</textarea></div>
+          <div class="editor-group"><span class="editor-label">Font size</span>
+            <select class="editor-select" data-key="fontSize">
+              <option value="13" ${b.fontSize==13?"selected":""}>Small</option>
+              <option value="15" ${(b.fontSize||15)==15?"selected":""}>Normal</option>
+              <option value="18" ${b.fontSize==18?"selected":""}>Large</option>
+              <option value="22" ${b.fontSize==22?"selected":""}>Heading</option>
+            </select></div>
+          <div class="editor-group"><span class="editor-label">Align</span>
+            <select class="editor-select" data-key="align">
+              <option value="left" ${(b.align||"left")==="left"?"selected":""}>Left</option>
+              <option value="center" ${b.align==="center"?"selected":""}>Center</option>
+              <option value="right" ${b.align==="right"?"selected":""}>Right</option>
+            </select></div>
+          <div class="editor-group"><span class="editor-label">Color</span>
+            <input class="editor-input" type="color" data-key="textColor" value="${b.textColor||"#4A3728"}" style="height:32px;padding:2px;cursor:pointer;"></div>`;
+        break;
+      case "html":
+        html += `
+          <div class="editor-group"><span class="editor-label">HTML</span>
+            <textarea class="editor-textarea" data-key="content" rows="8" style="font-family:monospace;font-size:11px;">${b.content||""}</textarea>
+            <div class="editor-hint">Raw HTML — use email-safe inline styles.</div></div>`;
+        break;
+      case "image":
+        html += `
+          <div class="editor-group"><span class="editor-label">Image URL</span>
+            <input class="editor-input" type="url" data-key="src" value="${b.src||""}" placeholder="https://…"></div>
+          <div class="editor-group"><span class="editor-label">Alt text</span>
+            <input class="editor-input" type="text" data-key="alt" value="${b.alt||""}"></div>
+          <div class="editor-group"><span class="editor-label">Link URL (optional)</span>
+            <input class="editor-input" type="url" data-key="link" value="${b.link||""}"></div>
+          <div class="editor-group"><span class="editor-label">Width (%)</span>
+            <input class="editor-input" type="number" data-key="width" min="20" max="100" value="${b.width||100}"></div>`;
+        break;
+      case "button":
+        html += `
+          <div class="editor-group"><span class="editor-label">Button text</span>
+            <input class="editor-input" type="text" data-key="text" value="${b.text||""}"></div>
+          <div class="editor-group"><span class="editor-label">URL</span>
+            <input class="editor-input" type="url" data-key="url" value="${b.url||""}"></div>
+          <div class="editor-group"><span class="editor-label">Color (leave blank for accent)</span>
+            <input class="editor-input" type="color" data-key="color" value="${b.color||_accent}" style="height:32px;padding:2px;cursor:pointer;"></div>
+          <div class="editor-group"><span class="editor-label">Align</span>
+            <select class="editor-select" data-key="align">
+              <option value="left" ${b.align==="left"?"selected":""}>Left</option>
+              <option value="center" ${(b.align||"center")==="center"?"selected":""}>Center</option>
+              <option value="right" ${b.align==="right"?"selected":""}>Right</option>
+            </select></div>`;
+        break;
+      case "divider":
+        html += `
+          <div class="editor-group"><span class="editor-label">Style</span>
+            <select class="editor-select" data-key="lineStyle">
+              <option value="solid" ${(b.lineStyle||"solid")==="solid"?"selected":""}>Solid</option>
+              <option value="dashed" ${b.lineStyle==="dashed"?"selected":""}>Dashed</option>
+              <option value="dotted" ${b.lineStyle==="dotted"?"selected":""}>Dotted</option>
+            </select></div>
+          <div class="editor-group"><span class="editor-label">Color</span>
+            <input class="editor-input" type="color" data-key="lineColor" value="${b.lineColor||"#D4BBA0"}" style="height:32px;padding:2px;cursor:pointer;"></div>`;
+        break;
+      case "spacer":
+        html += `
+          <div class="editor-group"><span class="editor-label">Height (px)</span>
+            <input class="editor-input" type="number" data-key="height" min="4" max="120" value="${b.height||24}"></div>`;
+        break;
+      case "2col":
+        html += `
+          <div class="editor-group"><span class="editor-label">Left column</span>
+            <textarea class="editor-textarea" data-key="col1" rows="4">${b.col1||""}</textarea></div>
+          <div class="editor-group"><span class="editor-label">Right column</span>
+            <textarea class="editor-textarea" data-key="col2" rows="4">${b.col2||""}</textarea></div>`;
+        break;
+      case "3col":
+        html += `
+          <div class="editor-group"><span class="editor-label">Column 1</span>
+            <textarea class="editor-textarea" data-key="col1" rows="3">${b.col1||""}</textarea></div>
+          <div class="editor-group"><span class="editor-label">Column 2</span>
+            <textarea class="editor-textarea" data-key="col2" rows="3">${b.col2||""}</textarea></div>
+          <div class="editor-group"><span class="editor-label">Column 3</span>
+            <textarea class="editor-textarea" data-key="col3" rows="3">${b.col3||""}</textarea></div>`;
+        break;
+    }
+
+    area.innerHTML = html;
+
+    // Wire inputs → update block → re-render
+    area.querySelectorAll("[data-key]").forEach(inp => {
+      const key = inp.dataset.key;
+      const isNum = inp.type === "number";
+      inp.addEventListener("input", () => {
+        b[key] = isNum ? parseInt(inp.value)||0 : inp.value;
+        renderBlocks();
+      });
+    });
+  }
+
+  // ── Templates ─────────────────────────────────────────────────────────────────
+  function loadTemplate(name) {
+    _blocks = []; _selId = null; _nextId = 1;
+    switch (name) {
+      case "announcement":
+        _blocks = [makeBlock("text"), makeBlock("divider"), makeBlock("button")];
+        _blocks[0].content = "Something exciting is happening at Progress. Here's what you need to know:";
+        _blocks[0].fontSize = 16;
+        _blocks[2].text = "See what's new";
+        _blocks[2].url = "https://progressing.online";
+        break;
+      case "update":
+        _blocks = [makeBlock("text"), makeBlock("spacer"), makeBlock("text")];
+        _blocks[0].content = "Hi! We wanted to share a quick update with you.";
+        _blocks[0].fontSize = 18;
+        _blocks[1].height = 16;
+        _blocks[2].content = "Here are the details of what's changed and what it means for you as part of the Progress community.";
+        break;
+      case "image-text":
+        _blocks = [makeBlock("image"), makeBlock("spacer"), makeBlock("text")];
+        _blocks[0].src = "https://progressing.online/images/nearheader.png";
+        _blocks[0].width = 50;
+        _blocks[1].height = 12;
+        _blocks[2].content = "A picture is worth a thousand words. But here are a few more.";
+        _blocks[2].align = "center";
+        break;
+      case "newsletter":
+        _blocks = [makeBlock("text"), makeBlock("2col"), makeBlock("divider"), makeBlock("text")];
+        _blocks[0].content = "Welcome to this week's roundup from Progress. Here's what's been happening:";
+        _blocks[0].fontSize = 18;
+        _blocks[1].col1 = "✦ New feature\nCheck out what we've been building.";
+        _blocks[1].col2 = "✦ Community\nAmazing writing from our community this week.";
+        _blocks[3].content = "Thank you for being part of Progress. Keep writing. ✿";
+        _blocks[3].align = "center";
+        break;
+    }
+    renderBlocks();
+    resetBlockEditor();
+    document.querySelector("[data-panel=elements]").click();
+    showToast(`Loaded "${name}" template`);
+  }
+
+  // ── Compile blocks → email HTML ────────────────────────────────────────────────
+  function compileBlocks() {
+    const esc = s => String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+    const n2b = s => esc(s).replace(/\n/g,"<br>");
+    return _blocks.map(b => {
+      switch (b.type) {
+        case "text":
+          return `<p style="margin:0 0 18px;font-family:Georgia,'Times New Roman',serif;font-size:${b.fontSize||15}px;color:${b.textColor||"#4A3728"};line-height:1.85;text-align:${b.align||"left"};">${n2b(b.content||"")}</p>`;
+        case "html":
+          return b.content || "";
+        case "image": {
+          const px = Math.round((b.width||100) / 100 * 440);
+          const img = `<img src="${esc(b.src||"")}" alt="${esc(b.alt||"")}" width="${px}" border="0" style="display:block;max-width:100%;margin:0 auto;outline:none;-ms-interpolation-mode:bicubic;">`;
+          const inner = b.link ? `<a href="${esc(b.link)}" style="display:block;text-decoration:none;">${img}</a>` : img;
+          return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td align="center" style="padding:0 0 18px;">${inner}</td></tr></table>`;
+        }
+        case "button": {
+          const c = b.color || _accent;
+          return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 auto 20px;"><tr><td bgcolor="${c}" style="border-radius:100px;"><a href="${esc(b.url||"#")}" style="display:inline-block;padding:13px 40px;font-family:Georgia,'Times New Roman',serif;font-size:13px;font-weight:bold;color:#FAF5EE;text-decoration:none;letter-spacing:0.1em;">${esc(b.text||"Button")}</a></td></tr></table>`;
+        }
+        case "divider":
+          return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:4px 0 22px;"><tr><td style="border-top:1px ${b.lineStyle||"solid"} ${b.lineColor||"#D4BBA0"};font-size:0;line-height:0;">&nbsp;</td></tr></table>`;
+        case "spacer":
+          return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td height="${b.height||24}" style="font-size:0;line-height:0;">&nbsp;</td></tr></table>`;
+        case "2col":
+          return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px;"><tr><td width="47%" valign="top" style="font-family:Georgia,'Times New Roman',serif;font-size:14px;color:#4A3728;line-height:1.75;">${n2b(b.col1||"")}</td><td width="6%"></td><td width="47%" valign="top" style="font-family:Georgia,'Times New Roman',serif;font-size:14px;color:#4A3728;line-height:1.75;">${n2b(b.col2||"")}</td></tr></table>`;
+        case "3col":
+          return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px;"><tr><td width="30%" valign="top" style="font-family:Georgia,'Times New Roman',serif;font-size:13px;color:#4A3728;line-height:1.7;">${n2b(b.col1||"")}</td><td width="5%"></td><td width="30%" valign="top" style="font-family:Georgia,'Times New Roman',serif;font-size:13px;color:#4A3728;line-height:1.7;">${n2b(b.col2||"")}</td><td width="5%"></td><td width="30%" valign="top" style="font-family:Georgia,'Times New Roman',serif;font-size:13px;color:#4A3728;line-height:1.7;">${n2b(b.col3||"")}</td></tr></table>`;
+        default: return "";
+      }
+    }).join("\n");
+  }
+
+  function getPayload() {
+    return {
+      subject:      document.getElementById("builderSubject").value.trim() || "(no subject)",
+      bodyHtml:     compileBlocks(),
+      body:         _blocks.map(b => b.content || b.text || b.col1 || "").join(" ").slice(0, 150),
+      emoticon:     _emoticon === "none" ? "" : _emoticon,
+      accentColor:  _accent,
+      buttonColor:  _accent,
+      footerTagline: document.getElementById("footerTagline").value.trim() || "until next time",
+    };
+  }
+
+  // ── Preview ────────────────────────────────────────────────────────────────────
+  async function previewEmail() {
+    if (!_blocks.length) { showToast("Add some content first."); return; }
+    const payload = getPayload();
+    const r = await apiFetch("/api/admin/preview-email", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (r && r.html) {
+      document.getElementById("builderPreviewFrame").srcdoc = r.html;
+      document.getElementById("canvasScrollWrap").style.display = "none";
+      document.getElementById("builderPreviewPane").classList.add("show");
+    } else {
+      showToast("Preview failed — check server.");
+    }
+  }
+
+  // ── Send ───────────────────────────────────────────────────────────────────────
+  async function sendEmail() {
+    const subject = document.getElementById("builderSubject").value.trim();
+    if (!subject) { showToast("Subject line is required."); return; }
+    if (!_blocks.length) { showToast("Add some content blocks first."); return; }
+
+    const type = document.getElementById("builderRecipient").value;
+    const targetUsername = type === "specific"
+      ? document.getElementById("builderUsername").value.trim().replace(/^@/, "")
+      : null;
+    if (type === "specific" && !targetUsername) { showToast("Enter a username."); return; }
+
+    const label = type === "all" ? "all subscribers" : `@${targetUsername}`;
+    const ok = await adminConfirm(
+      `Send to ${label}?`,
+      `Subject: <strong>${escapeHTML(subject)}</strong><br><br>This cannot be undone.`,
+      "Send"
+    );
+    if (!ok) return;
+
+    const btn = document.getElementById("builderSendBtn");
+    const status = document.getElementById("builderSendStatus");
+    btn.disabled = true; btn.textContent = "Sending…"; status.textContent = "";
+
+    const r = await apiFetch("/api/admin/send-email", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...getPayload(), targetUsername: targetUsername || undefined })
+    });
+
+    btn.disabled = false; btn.textContent = "Send email";
+    if (r && typeof r.sent === "number") {
+      const failNote = r.failed ? ` (${r.failed} failed)` : "";
+      status.textContent = `✓ Sent to ${r.sent}${failNote}`;
+      showToast(`Sent to ${r.sent} user${r.sent !== 1 ? "s" : ""}.`);
+    } else if (r?.error) {
+      status.textContent = `Error: ${r.error}`;
+      showToast(r.error);
+    } else {
+      status.textContent = "Failed.";
+      showToast("Couldn't send email.");
+    }
   }
 
   // ── Confirm dialog ────────────────────────────────────────────────────────────

@@ -529,11 +529,18 @@ ${previewSnippet}
     <!-- brand stamp -->
     <table role="presentation" width="480" cellpadding="0" cellspacing="0" border="0" style="max-width:480px;width:100%;">
       <tr>
-        <td align="center" style="padding-bottom:20px;">
-          <a href="${site}" style="display:inline-block;text-decoration:none;">
-            <img src="${site}/images/email-logo.png" alt="progress." width="160" height="auto" border="0" style="display:block;margin:0 auto;outline:none;-ms-interpolation-mode:bicubic;max-width:160px;">
-          </a>
-          <p style="margin:8px 0 0;font-family:Georgia,'Times New Roman',serif;font-size:10px;color:${accentColor};letter-spacing:0.32em;text-transform:uppercase;opacity:0.7;">a writing community &nbsp;✿</p>
+        <td align="center" style="padding-bottom:24px;">
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto;">
+            <tr>
+              <td style="vertical-align:bottom;padding-right:8px;padding-bottom:2px;">
+                <p style="margin:0 0 6px;font-family:Georgia,'Times New Roman',serif;font-size:26px;font-style:italic;color:#3B2518;letter-spacing:0.01em;">progress.</p>
+                <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:10px;color:${accentColor};letter-spacing:0.32em;text-transform:uppercase;opacity:0.75;">a writing community &nbsp;✿</p>
+              </td>
+              <td style="vertical-align:bottom;padding-bottom:2px;">
+                <img src="${site}/images/nearheader.png" alt="" width="62" height="62" border="0" style="display:block;outline:none;-ms-interpolation-mode:bicubic;">
+              </td>
+            </tr>
+          </table>
         </td>
       </tr>
     </table>
@@ -2689,30 +2696,29 @@ app.post("/api/admin/send-digest", requireAuth, asyncHandler(async (req, res) =>
 
 // ── Admin: custom email blast ─────────────────────────────────────────────────
 app.post("/api/admin/send-email", requireAuth, requireRole("admin"), asyncHandler(async (req, res) => {
-  const { subject, body, targetUsername, emoticon, ctaText, ctaUrl, accentColor, buttonColor, footerTagline } = req.body || {};
-  if (!subject || !body) return res.status(400).json({ error: "Subject and body are required." });
+  const { subject, body, bodyHtml: prebuiltBodyHtml, targetUsername, emoticon, ctaText, ctaUrl, accentColor, buttonColor, footerTagline } = req.body || {};
+  if (!subject || (!body && !prebuiltBodyHtml)) return res.status(400).json({ error: "Subject and body are required." });
   const key = process.env.RESEND_API_KEY;
   if (!key) return res.status(503).json({ error: "Email not configured — RESEND_API_KEY missing." });
   const site = "https://progressing.online";
-  const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const esc = s => String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 
-  // Validate optional hex color params
   const hexRe = /^#[0-9A-Fa-f]{3,6}$/;
   const safeAccent = hexRe.test(accentColor||"") ? accentColor : undefined;
   const safeButton = hexRe.test(buttonColor||"") ? buttonColor : undefined;
   const safeTagline = typeof footerTagline === "string" ? footerTagline.slice(0, 80) : undefined;
-  // Only allow emoticons from the known set
-  const ALLOWED_EMOTICONS = new Set(["hi","penguin","starbucks","bee","turtle_lazy","hamster","cow","shark","sharkcat","lion","banana","bored","windy","romantic","wonder","asleep_couch","mwa","kiss","computer","computersupport","dark","penguin","construction","dexterity"]);
+  const ALLOWED_EMOTICONS = new Set(["hi","penguin","starbucks","bee","turtle_lazy","hamster","cow","shark","sharkcat","lion","banana","bored","windy","romantic","wonder","asleep_couch","mwa","kiss","computer","computersupport","dark","construction","dexterity"]);
   const emoticonName = typeof emoticon === "string" ? emoticon.replace(/[^a-z0-9_]/gi,"").toLowerCase() : "penguin";
-  const emoticonUrl = ALLOWED_EMOTICONS.has(emoticonName) ? `${site}/images/emoticons/${emoticonName}.png` : `${site}/images/emoticons/penguin.png`;
+  const emoticonUrl = (emoticon === "" || emoticon === "none") ? null : (ALLOWED_EMOTICONS.has(emoticonName) ? `${site}/images/emoticons/${emoticonName}.png` : `${site}/images/emoticons/penguin.png`);
 
   const makeHtml = (text) => emailWrap({
     emoticon: emoticonUrl,
     headlineHtml: `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:22px;font-weight:bold;font-style:italic;color:#3B2518;line-height:1.35;">${esc(subject)}</h1>`,
-    bodyHtml: `<p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#4A3728;line-height:1.85;white-space:pre-wrap;">${esc(text)}</p>`,
-    ctaText: ctaText || "visit progress",
-    ctaUrl: ctaUrl || site,
-    preview: text.slice(0, 100).replace(/\n/g," "),
+    // If builder sent pre-built HTML, use it directly (buttons are already embedded as blocks)
+    bodyHtml: prebuiltBodyHtml || `<p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#4A3728;line-height:1.85;white-space:pre-wrap;">${esc(text)}</p>`,
+    ctaText: prebuiltBodyHtml ? "" : (ctaText || "visit progress"),
+    ctaUrl: prebuiltBodyHtml ? "" : (ctaUrl || site),
+    preview: (text||"").slice(0, 100).replace(/\n/g," "),
     site,
     ...(safeAccent  && { accentColor: safeAccent }),
     ...(safeButton  && { buttonColor: safeButton }),
@@ -2753,8 +2759,8 @@ app.post("/api/admin/send-email", requireAuth, requireRole("admin"), asyncHandle
 
 // ── Admin: preview email HTML (no send) ───────────────────────────────────────
 app.post("/api/admin/preview-email", requireAuth, requireRole("admin"), asyncHandler(async (req, res) => {
-  const { subject, body, emoticon, ctaText, ctaUrl, accentColor, buttonColor, footerTagline } = req.body || {};
-  if (!subject && !body) return res.status(400).json({ error: "Nothing to preview." });
+  const { subject, body, bodyHtml: prebuiltBodyHtml, emoticon, ctaText, ctaUrl, accentColor, buttonColor, footerTagline } = req.body || {};
+  if (!subject && !body && !prebuiltBodyHtml) return res.status(400).json({ error: "Nothing to preview." });
   const site = "https://progressing.online";
   const esc = s => String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
   const hexRe = /^#[0-9A-Fa-f]{3,6}$/;
@@ -2763,13 +2769,13 @@ app.post("/api/admin/preview-email", requireAuth, requireRole("admin"), asyncHan
   const safeTagline = typeof footerTagline === "string" ? footerTagline.slice(0,80) : undefined;
   const ALLOWED_EMOTICONS = new Set(["hi","penguin","starbucks","bee","turtle_lazy","hamster","cow","shark","sharkcat","lion","banana","bored","windy","romantic","wonder","asleep_couch","mwa","kiss","computer","computersupport","dark","construction","dexterity"]);
   const emoticonName = typeof emoticon === "string" ? emoticon.replace(/[^a-z0-9_]/gi,"").toLowerCase() : "penguin";
-  const emoticonUrl = emoticon === "" ? null : (ALLOWED_EMOTICONS.has(emoticonName) ? `${site}/images/emoticons/${emoticonName}.png` : `${site}/images/emoticons/penguin.png`);
+  const emoticonUrl = (emoticon === "" || emoticon === "none") ? null : (ALLOWED_EMOTICONS.has(emoticonName) ? `${site}/images/emoticons/${emoticonName}.png` : `${site}/images/emoticons/penguin.png`);
   const html = emailWrap({
     emoticon: emoticonUrl,
     headlineHtml: `<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:22px;font-weight:bold;font-style:italic;color:#3B2518;line-height:1.35;">${esc(subject)}</h1>`,
-    bodyHtml: `<p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#4A3728;line-height:1.85;white-space:pre-wrap;">${esc(body)}</p>`,
-    ctaText: ctaText || "",
-    ctaUrl: ctaUrl || "",
+    bodyHtml: prebuiltBodyHtml || `<p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#4A3728;line-height:1.85;white-space:pre-wrap;">${esc(body||"")}</p>`,
+    ctaText: prebuiltBodyHtml ? "" : (ctaText || ""),
+    ctaUrl: prebuiltBodyHtml ? "" : (ctaUrl || ""),
     preview: "",
     site,
     ...(safeAccent  && { accentColor: safeAccent }),
