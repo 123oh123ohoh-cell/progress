@@ -2787,7 +2787,6 @@ app.post("/api/admin/preview-email", requireAuth, requireRole("admin"), asyncHan
 
 // ── Email Projects (collaborative builder) ────────────────────────────────────
 const EMAIL_PRESENCE_TTL = 45_000;
-const crypto = require("crypto");
 
 function livePresence(project) {
   const cutoff = Date.now() - EMAIL_PRESENCE_TTL;
