@@ -351,6 +351,150 @@
   .an-load-btn.loaded { background: none; color: var(--muted); border-color: transparent; cursor: default; font-size: 10px; }
   .an-lazy-body { animation: fadeIn .25s ease; }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+  /* ── All-time grid ───────────────────────────────────────────────── */
+  .alltime-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px;
+  }
+  .alltime-card {
+    background: var(--cream); border: 1px solid var(--mocha-wash);
+    border-radius: 10px; padding: 12px 14px; text-align: center;
+  }
+  .alltime-card-label {
+    font-family: var(--font-mono); font-size: 9px; text-transform: uppercase;
+    letter-spacing: .07em; color: var(--muted); margin-bottom: 5px;
+  }
+  .alltime-card-val {
+    font-family: var(--font-display); font-size: 24px; color: var(--ink); line-height: 1;
+  }
+  .alltime-sub {
+    display: flex; flex-wrap: wrap; gap: 10px;
+  }
+  .alltime-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 12px; background: var(--mocha-wash);
+    border-radius: 100px; font-family: var(--font-mono); font-size: 12px; color: var(--ink);
+  }
+  .alltime-pill span { color: var(--muted); font-size: 10px; }
+
+  /* ── Growth / analysis cards ─────────────────────────────────────── */
+  .growth-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px;
+  }
+  .growth-card {
+    background: var(--cream); border: 1px solid var(--mocha-wash);
+    border-radius: 10px; padding: 14px 16px;
+  }
+  .growth-label {
+    font-family: var(--font-mono); font-size: 9px; text-transform: uppercase;
+    letter-spacing: .07em; color: var(--muted); margin-bottom: 6px;
+  }
+  .growth-val { font-family: var(--font-display); font-size: 26px; line-height: 1; color: var(--ink); }
+  .growth-badge {
+    display: inline-flex; align-items: center; gap: 3px;
+    padding: 3px 8px; border-radius: 20px; font-family: var(--font-mono); font-size: 11px;
+    font-weight: 700; margin-top: 6px;
+  }
+  .badge-up   { background: rgba(82,199,140,.15); color: #27a65a; }
+  .badge-down { background: rgba(224,82,82,.12);  color: #d63535; }
+  .badge-flat { background: var(--mocha-wash); color: var(--muted); }
+
+  /* ── Health score ────────────────────────────────────────────────── */
+  .health-score {
+    font-family: var(--font-mono); font-size: 12px; font-weight: 700;
+    padding: 5px 14px; border-radius: 20px; letter-spacing: .04em;
+  }
+  .health-great  { background: rgba(82,199,140,.15); color: #27a65a; }
+  .health-good   { background: rgba(82,199,224,.15); color: #229ec4; }
+  .health-ok     { background: rgba(224,163,82,.15); color: #c48822; }
+  .health-low    { background: rgba(224,82,82,.12);  color: #d63535; }
+
+  /* ── Engagement grid ─────────────────────────────────────────────── */
+  .eng-grid { display: flex; flex-direction: column; gap: 12px; }
+  .eng-row { display: flex; align-items: center; justify-content: space-between; }
+  .eng-label { font-size: 13px; color: var(--muted); }
+  .eng-val   { font-family: var(--font-display); font-size: 22px; color: var(--ink); }
+
+  /* ── Category breakdown bars ─────────────────────────────────────── */
+  .cat-row { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; }
+  .cat-label { font-family: var(--font-mono); font-size: 12px; color: var(--ink); min-width: 90px; text-transform: capitalize; }
+  .cat-bar-track { flex: 1; height: 8px; background: var(--mocha-wash); border-radius: 4px; overflow: hidden; }
+  .cat-bar-fill  { height: 100%; border-radius: 4px; background: #a352e0; transition: width .5s ease; }
+  .cat-count { font-family: var(--font-mono); font-size: 11px; color: var(--muted); min-width: 32px; text-align: right; }
+
+  /* ── Day-of-week bars ────────────────────────────────────────────── */
+  .dow-chart {
+    display: flex; align-items: flex-end; gap: 6px; height: 80px; padding-top: 8px;
+  }
+  .dow-bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; justify-content: flex-end; }
+  .dow-bar { width: 100%; border-radius: 3px 3px 0 0; background: #a352e0; min-height: 3px; transition: height .4s ease; }
+  .dow-label { font-family: var(--font-mono); font-size: 9px; color: var(--muted); text-transform: uppercase; }
+
+  /* ── Cohort table ────────────────────────────────────────────────── */
+  .cohort-table { border-collapse: collapse; width: 100%; min-width: 600px; }
+  .cohort-table th, .cohort-table td {
+    padding: 7px 10px; font-size: 12px; white-space: nowrap;
+    border-bottom: 1px solid var(--mocha-wash);
+  }
+  .cohort-table th {
+    font-family: var(--font-mono); font-size: 9px; text-transform: uppercase;
+    letter-spacing: .07em; color: var(--muted); text-align: left;
+  }
+  .cohort-table td:last-child { text-align: center; }
+  .retention-pill {
+    display: inline-block; padding: 2px 8px; border-radius: 20px;
+    font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+  }
+
+  /* ── Data browser ────────────────────────────────────────────────── */
+  .data-sub-tabs {
+    display: flex; gap: 0; border-bottom: 2px solid var(--mocha-light);
+    margin-bottom: 16px; overflow-x: auto;
+  }
+  .data-sub-tab {
+    padding: 8px 18px; font-size: 13px; font-weight: 600;
+    color: var(--muted); background: none; border: none;
+    border-bottom: 2px solid transparent; margin-bottom: -2px;
+    cursor: pointer; white-space: nowrap; transition: color .12s, border-color .12s;
+  }
+  .data-sub-tab:hover { color: var(--ink); }
+  .data-sub-tab-active { color: var(--ink); border-bottom-color: var(--ink); }
+  .data-toolbar {
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px;
+  }
+  .data-search {
+    padding: 7px 12px; border: 1px solid var(--mocha-light); border-radius: 8px;
+    font-size: 13px; background: var(--paper); color: var(--ink); flex: 1; min-width: 180px; max-width: 320px;
+  }
+  .data-sort {
+    padding: 7px 10px; border: 1px solid var(--mocha-light); border-radius: 8px;
+    font-size: 13px; background: var(--paper); color: var(--ink); cursor: pointer;
+  }
+  .data-total {
+    font-family: var(--font-mono); font-size: 11px; color: var(--muted);
+    margin-left: auto; white-space: nowrap;
+  }
+  .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .data-table th {
+    text-align: left; padding: 9px 12px; font-family: var(--font-mono);
+    font-size: 9px; text-transform: uppercase; letter-spacing: .07em;
+    color: var(--muted); border-bottom: 2px solid var(--mocha-light); white-space: nowrap;
+    cursor: pointer; user-select: none;
+  }
+  .data-table th:hover { color: var(--ink); }
+  .data-table td {
+    padding: 9px 12px; border-bottom: 1px solid var(--mocha-wash);
+    color: var(--ink); vertical-align: middle; max-width: 260px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .data-table tr:hover td { background: var(--mocha-wash); }
+  .data-table .td-link { color: var(--ink); text-decoration: none; font-weight: 600; }
+  .data-table .td-link:hover { text-decoration: underline; }
+  .data-table .td-mono { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+  .data-badge { display: inline-flex; align-items: center; padding: 2px 7px; border-radius: 20px; font-size: 10px; font-weight: 700; font-family: var(--font-mono); }
+  .data-badge-role  { background: rgba(163,82,224,.12); color: #a352e0; }
+  .data-badge-ban   { background: rgba(224,82,82,.12); color: #d63535; }
+  .data-badge-ok    { background: rgba(82,199,140,.12); color: #27a65a; }
 </style>
 </head>
 <body>
@@ -397,6 +541,12 @@
       <button class="admin-tab" data-tab="users" role="tab">
         <span class="admin-tab-icon">👥</span> Users
       </button>
+      <button class="admin-tab" data-tab="analysis" role="tab">
+        <span class="admin-tab-icon">🔬</span> Analysis
+      </button>
+      <button class="admin-tab" data-tab="data" role="tab">
+        <span class="admin-tab-icon">🗂️</span> Data
+      </button>
       <button class="admin-tab" data-tab="platform" role="tab">
         <span class="admin-tab-icon">⚙️</span> Platform
       </button>
@@ -437,6 +587,24 @@
 
     <!-- ── ANALYTICS tab ────────────────────────────────────────────── -->
     <div id="tab-analytics" class="admin-tab-content" style="display:none;">
+
+      <!-- All-time totals (lazy) -->
+      <div class="an-section-card an-lazy-card" id="lazyAlltime" style="margin-bottom:20px;">
+        <div class="an-section-head">
+          <span class="an-section-title">All Time</span>
+          <button class="an-load-btn" onclick="loadAllTime()">Load stats</button>
+        </div>
+        <div class="an-lazy-body" id="lazyAlltimeBody" style="display:none;">
+          <!-- Big numbers row -->
+          <div class="alltime-grid" id="alltimeGrid" style="margin-top:16px;"></div>
+          <!-- Sub-stats row -->
+          <div class="alltime-sub" id="alltimeSub" style="margin-top:14px;"></div>
+          <!-- Category breakdown -->
+          <div id="alltimeCats" style="margin-top:16px;"></div>
+          <!-- Top day ever -->
+          <div id="alltimeTopDay" style="margin-top:10px;"></div>
+        </div>
+      </div>
 
       <!-- Date navigator -->
       <div class="an-date-strip">
@@ -595,6 +763,109 @@
     <!-- Chart hover tooltip (shared) -->
     <div class="chart-tooltip" id="chartTooltip"></div>
 
+    <!-- ── ANALYSIS tab ──────────────────────────────────────────────── -->
+    <div id="tab-analysis" class="admin-tab-content" style="display:none;">
+
+      <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:24px;">
+        <div>
+          <h2 class="section-title" style="margin:0 0 4px;">Platform Analysis</h2>
+          <p style="font-size:13px; color:var(--muted); margin:0;">30-day window vs prior 30 days. Cohort retention for the last 12 months.</p>
+        </div>
+        <button class="an-load-btn" onclick="loadAnalysis()" style="padding:8px 18px; font-size:13px;">↻ Refresh</button>
+      </div>
+
+      <!-- Health score -->
+      <div id="analysisLoading" style="color:var(--muted); font-size:14px; margin-bottom:24px;">Loading analysis…</div>
+
+      <!-- Growth cards -->
+      <div class="an-section-card" style="margin-bottom:20px; display:none;" id="analysisGrowthCard">
+        <div class="an-section-head" style="margin-bottom:16px;">
+          <span class="an-section-title">Growth (30d vs prior 30d)</span>
+          <div id="healthScore" class="health-score"></div>
+        </div>
+        <div class="growth-grid" id="growthGrid"></div>
+      </div>
+
+      <!-- Engagement metrics -->
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px; margin-bottom:20px;">
+
+        <div class="an-section-card" id="analysisEngCard" style="display:none;">
+          <div class="an-section-title" style="margin-bottom:14px;">Engagement</div>
+          <div class="eng-grid" id="engGrid"></div>
+        </div>
+
+        <div class="an-section-card" id="analysisCatCard" style="display:none;">
+          <div class="an-section-head" style="margin-bottom:14px;">
+            <span class="an-section-title">Content breakdown (30d)</span>
+          </div>
+          <div id="catBreakdown"></div>
+        </div>
+
+      </div>
+
+      <!-- Posting patterns -->
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px; margin-bottom:20px;">
+
+        <div class="an-section-card" id="analysisDowCard" style="display:none;">
+          <div class="an-section-title" style="margin-bottom:14px;">Posts by day of week</div>
+          <div class="dow-chart" id="dowChart"></div>
+        </div>
+
+        <div class="an-section-card" id="analysisHourCard" style="display:none;">
+          <div class="an-section-title" style="margin-bottom:14px;">Posts by hour of day</div>
+          <canvas id="analysisHourCanvas" height="80" style="width:100%; display:block;"></canvas>
+          <div class="hour-labels" style="margin-top:4px;">
+            <span class="hour-label">12am</span><span class="hour-label">6am</span>
+            <span class="hour-label">12pm</span><span class="hour-label">6pm</span><span class="hour-label">11pm</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Cohort retention -->
+      <div class="an-section-card" id="analysisCohortCard" style="display:none; margin-bottom:40px;">
+        <div class="an-section-head" style="margin-bottom:16px;">
+          <span class="an-section-title">Cohort retention <span style="font-size:11px; color:var(--muted);">— users still active in last 30d</span></span>
+        </div>
+        <div id="cohortChart" style="overflow-x:auto;"></div>
+      </div>
+
+    </div>
+
+    <!-- ── DATA tab ────────────────────────────────────────────────────── -->
+    <div id="tab-data" class="admin-tab-content" style="display:none;">
+
+      <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:20px;">
+        <h2 class="section-title" style="margin:0;">Data Browser</h2>
+        <button id="exportCsvBtn" class="an-load-btn" style="padding:8px 18px; font-size:13px;">⬇ Export CSV</button>
+      </div>
+
+      <!-- Sub-tabs -->
+      <div class="data-sub-tabs" id="dataSubTabs">
+        <button class="data-sub-tab data-sub-tab-active" data-dtab="posts">Posts</button>
+        <button class="data-sub-tab" data-dtab="users">Users</button>
+        <button class="data-sub-tab" data-dtab="comments">Comments</button>
+        <button class="data-sub-tab" data-dtab="pageviews">Page Views</button>
+      </div>
+
+      <!-- Search + sort bar -->
+      <div class="data-toolbar" id="dataToolbar">
+        <input type="search" id="dataSearch" class="data-search" placeholder="Search…">
+        <select id="dataSort" class="data-sort">
+          <option value="date">Sort: Date</option>
+          <option value="likes">Sort: Likes</option>
+          <option value="comments">Sort: Comments</option>
+        </select>
+        <span id="dataTotal" class="data-total"></span>
+      </div>
+
+      <div id="dataTable" style="overflow-x:auto; margin-bottom:12px;">
+        <p style="color:var(--muted); font-size:14px;">Select a tab to load data.</p>
+      </div>
+      <div id="dataPager" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:40px;"></div>
+
+    </div>
+
     <!-- ── POSTS tab ────────────────────────────────────────────────── -->
     <div id="tab-posts" class="admin-tab-content" style="display:none;">
       <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:20px;">
@@ -751,6 +1022,8 @@
 
   // ── Tab switching ───────────────────────────────────────────────────────────
   let analyticsLoaded = false;
+  let analysisLoaded  = false;
+  let dataLoaded      = false;
   let usersLoaded = false;
 
   document.querySelectorAll(".admin-tab").forEach(btn => {
@@ -764,6 +1037,14 @@
       if (tab === "analytics" && !analyticsLoaded) {
         analyticsLoaded = true;
         loadAnalytics();
+      }
+      if (tab === "analysis" && !analysisLoaded) {
+        analysisLoaded = true;
+        loadAnalysis();
+      }
+      if (tab === "data" && !dataLoaded) {
+        dataLoaded = true;
+        initDataTab();
       }
       if (tab === "posts" && !allAdminPosts.length) {
         loadAllPosts();
@@ -1258,6 +1539,422 @@
         </tr>
       </thead>
       <tbody>${rows || `<tr><td colspan="5" style="padding:14px 0; color:var(--muted); font-size:13px;">No data.</td></tr>`}</tbody>`;
+  }
+
+  // ── All-time stats ──────────────────────────────────────────────────────────
+  async function loadAllTime() {
+    const btn = document.querySelector("#lazyAlltime .an-load-btn");
+    if (btn) { btn.textContent = "Loading…"; btn.disabled = true; }
+    const d = await apiFetch("/api/admin/alltime");
+    if (!d) { if (btn) { btn.textContent = "Error"; btn.disabled = false; } return; }
+    if (btn) { btn.textContent = "Loaded"; btn.classList.add("loaded"); }
+    document.getElementById("lazyAlltimeBody").style.display = "block";
+
+    const fmt = n => Number.isFinite(+n) ? (+n).toLocaleString() : "—";
+
+    // Big number cards
+    document.getElementById("alltimeGrid").innerHTML = [
+      { label: "Users",      val: fmt(d.totalUsers),    color: "#a352e0" },
+      { label: "Posts",      val: fmt(d.totalPosts),    color: "#52c7e0" },
+      { label: "Replies",    val: fmt(d.totalComments), color: "#e0a352" },
+      { label: "Likes",      val: fmt(d.totalLikes),    color: "#e05252" },
+      { label: "Messages",   val: fmt(d.totalMessages), color: "#52c7a0" },
+      { label: "Page Views", val: fmt(d.totalPageViews),color: "#7a52e0" },
+    ].map(c => `
+      <div class="alltime-card" style="border-top:3px solid ${c.color};">
+        <div class="alltime-card-label">${c.label}</div>
+        <div class="alltime-card-val" style="color:${c.color};">${c.val}</div>
+      </div>`).join("");
+
+    // Sub-stats
+    const ageText = d.platformAgeDays != null ? `${d.platformAgeDays} days old` : null;
+    const pills = [
+      ["❤️ avg / post", d.avgLikesPost],
+      ["💬 avg / post", d.avgCommPost],
+      ["📝 posts / day", d.postsPerDay],
+      ageText ? ["🗓️ age", ageText] : null,
+    ].filter(Boolean);
+    document.getElementById("alltimeSub").innerHTML = pills.map(([label, val]) =>
+      `<div class="alltime-pill"><span>${label}</span> <strong>${val}</strong></div>`
+    ).join("");
+
+    // Category breakdown
+    if (d.categories?.length) {
+      const maxCat = d.categories[0].count;
+      document.getElementById("alltimeCats").innerHTML =
+        `<div class="section-head" style="margin:0 0 10px;">Posts by category</div>` +
+        `<div class="pages-list">` +
+        d.categories.map(c => {
+          const pct = Math.round(c.count / maxCat * 100);
+          return `<div class="page-row">
+            <span class="page-row-label" style="text-transform:capitalize;">${escapeHTML(c._id)}</span>
+            <div class="page-bar-track"><div class="page-bar-fill" style="width:${pct}%; background:#a352e0;"></div></div>
+            <span class="page-count">${c.count}</span>
+          </div>`;
+        }).join("") + `</div>`;
+    }
+
+    // Top day ever
+    if (d.topDay) {
+      const fmtDate = new Date(d.topDay.date + "T00:00:00").toLocaleDateString(undefined, { weekday: "short", year: "numeric", month: "long", day: "numeric" });
+      document.getElementById("alltimeTopDay").innerHTML =
+        `<div class="alltime-pill" style="background:rgba(163,82,224,.1); border:1px solid rgba(163,82,224,.2);">
+          🏆 <span>Most posts ever in a single day:</span> <strong>${d.topDay.count} posts</strong> <span>on</span> <strong>${fmtDate}</strong>
+        </div>`;
+    }
+  }
+
+  // ── Analysis tab ────────────────────────────────────────────────────────────
+  async function loadAnalysis() {
+    // Show loading state, hide all cards
+    document.getElementById("analysisLoading").style.display = "block";
+    document.getElementById("analysisLoading").textContent   = "Loading analysis…";
+    ["analysisGrowthCard","analysisEngCard","analysisCatCard",
+     "analysisDowCard","analysisHourCard","analysisCohortCard"]
+      .forEach(id => { const el = document.getElementById(id); if (el) el.style.display = "none"; });
+
+    const d = await apiFetch("/api/admin/analysis");
+    if (!d) {
+      document.getElementById("analysisLoading").textContent = "Couldn't load analysis.";
+      return;
+    }
+    document.getElementById("analysisLoading").style.display = "none";
+
+    // ── Health score
+    const scores = [d.growth.posts, d.growth.signups, d.growth.active].filter(v => v != null);
+    const avgGrowth = scores.length ? scores.reduce((a,b)=>a+b,0)/scores.length : 0;
+    const healthEl  = document.getElementById("healthScore");
+    const healthScore = Math.min(100, Math.max(0, Math.round(50 + avgGrowth)));
+    let healthClass = "health-low", healthLabel = "Needs attention";
+    if (healthScore >= 75) { healthClass = "health-great"; healthLabel = "Thriving 🚀"; }
+    else if (healthScore >= 55) { healthClass = "health-good"; healthLabel = "Growing ↑"; }
+    else if (healthScore >= 40) { healthClass = "health-ok"; healthLabel = "Stable →"; }
+    healthEl.textContent = `${healthLabel}`;
+    healthEl.className = `health-score ${healthClass}`;
+
+    // ── Growth cards
+    const growthItems = [
+      { label: "Posts (30d)",    val: d.posts30,    pct: d.growth.posts },
+      { label: "Signups (30d)",  val: d.signups30,  pct: d.growth.signups },
+      { label: "Active (30d)",   val: d.active30,   pct: d.growth.active },
+      { label: "Replies (30d)",  val: d.comments30, pct: d.growth.comments },
+      { label: "Posts (7d)",     val: d.posts7,     pct: d.growth.postsWeek },
+      { label: "Signups (7d)",   val: d.signups7,   pct: null },
+    ];
+    document.getElementById("growthGrid").innerHTML = growthItems.map(item => {
+      let badgeHtml = "";
+      if (item.pct != null) {
+        const cls = item.pct > 5 ? "badge-up" : item.pct < -5 ? "badge-down" : "badge-flat";
+        const arrow = item.pct > 5 ? "↑" : item.pct < -5 ? "↓" : "→";
+        badgeHtml = `<div class="growth-badge ${cls}">${arrow} ${Math.abs(item.pct)}%</div>`;
+      }
+      return `<div class="growth-card">
+        <div class="growth-label">${item.label}</div>
+        <div class="growth-val">${(item.val||0).toLocaleString()}</div>
+        ${badgeHtml}
+      </div>`;
+    }).join("");
+    document.getElementById("analysisGrowthCard").style.display = "block";
+
+    // ── Engagement metrics
+    document.getElementById("engGrid").innerHTML = [
+      { label: "Retention rate",            val: d.retentionRate != null ? `${d.retentionRate}%` : "—",
+        sub: d.retentionBase ? `${d.retainedCount}/${d.retentionBase} users (30-60d ago still active)` : "Not enough data" },
+      { label: "Creator rate",              val: `${d.creatorRate}%`, sub: "Active users who posted in 30d" },
+      { label: "Avg posts / active user",   val: d.avgPostsPerActiveUser, sub: "Last 30 days" },
+    ].map(r => `
+      <div class="eng-row" style="flex-direction:column; align-items:flex-start; gap:2px; padding-bottom:12px; border-bottom:1px solid var(--mocha-wash);">
+        <div style="display:flex; align-items:center; justify-content:space-between; width:100%;">
+          <span class="eng-label">${r.label}</span>
+          <span class="eng-val">${r.val}</span>
+        </div>
+        <span style="font-family:var(--font-mono); font-size:10px; color:var(--muted);">${r.sub}</span>
+      </div>`).join("");
+    document.getElementById("analysisEngCard").style.display = "block";
+
+    // ── Category breakdown
+    if (d.catBreakdown30?.length) {
+      const maxCat = d.catBreakdown30[0].count;
+      document.getElementById("catBreakdown").innerHTML = d.catBreakdown30.slice(0, 8).map(c => {
+        const pct = Math.round(c.count / maxCat * 100);
+        return `<div class="cat-row">
+          <span class="cat-label">${escapeHTML(c._id)}</span>
+          <div class="cat-bar-track"><div class="cat-bar-fill" style="width:${pct}%;"></div></div>
+          <span class="cat-count">${c.count}</span>
+        </div>`;
+      }).join("");
+    } else {
+      document.getElementById("catBreakdown").innerHTML = `<p style="color:var(--muted); font-size:13px;">No category data yet.</p>`;
+    }
+    document.getElementById("analysisCatCard").style.display = "block";
+
+    // ── Day-of-week bars
+    const DOW = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+    const maxDow = Math.max(...(d.byDow||Array(7).fill(0)), 1);
+    document.getElementById("dowChart").innerHTML = DOW.map((label, i) => {
+      const count = d.byDow?.[i] || 0;
+      const hPct  = Math.max(4, Math.round(count / maxDow * 100));
+      return `<div class="dow-bar-wrap" title="${label}: ${count} posts">
+        <div class="dow-bar" style="height:${hPct}%;"></div>
+        <div class="dow-label">${label}</div>
+      </div>`;
+    }).join("");
+    document.getElementById("analysisDowCard").style.display = "block";
+
+    // ── Hour-of-day canvas chart
+    if (d.byHour) {
+      const canvas = document.getElementById("analysisHourCanvas");
+      renderCanvasChart.__raw(canvas, d.byHour, "#a352e0");
+    }
+    document.getElementById("analysisHourCard").style.display = "block";
+
+    // ── Cohort table
+    const cohorts = d.cohorts || [];
+    document.getElementById("cohortChart").innerHTML = `
+      <table class="cohort-table">
+        <thead>
+          <tr>
+            <th>Cohort</th>
+            <th>Joined</th>
+            <th>Still active (30d)</th>
+            <th>Retention</th>
+          </tr>
+        </thead>
+        <tbody>${cohorts.map(c => {
+          const r = c.retention;
+          const cls = r >= 50 ? "badge-up" : r >= 20 ? "badge-flat" : "badge-down";
+          return `<tr>
+            <td style="font-weight:600;">${escapeHTML(c.label)}</td>
+            <td class="td-mono">${c.joined.toLocaleString()}</td>
+            <td class="td-mono">${c.active.toLocaleString()}</td>
+            <td><span class="retention-pill growth-badge ${cls}">${r}%</span></td>
+          </tr>`;
+        }).join("")}</tbody>
+      </table>`;
+    document.getElementById("analysisCohortCard").style.display = "block";
+  }
+
+  // Give renderCanvasChart a raw-array mode for the analysis hour chart
+  renderCanvasChart.__raw = function(canvas, arr, color) {
+    if (!canvas) return;
+    const days = arr.map((_, i) => String(i).padStart(2,"0"));
+    const byDay = Object.fromEntries(arr.map((v, i) => [String(i).padStart(2,"0"), v]));
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const W = canvas.offsetWidth || (canvas.parentElement.offsetWidth - 28);
+    const H = canvas.height;
+    canvas.width  = W * dpr;
+    canvas.height = H * dpr;
+    const ctx = canvas.getContext("2d");
+    ctx.scale(dpr, dpr);
+    const dark  = document.documentElement.getAttribute("data-theme") === "dark";
+    const max   = Math.max(...arr, 1);
+    const barW  = W / arr.length - 1;
+    const padB  = 0, chartH = H - padB;
+    arr.forEach((v, i) => {
+      const barH = Math.max(2, (v / max) * chartH);
+      ctx.fillStyle = v > 0 ? color : (dark ? "#2a211a" : "#ede6df");
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(i*(barW+1), chartH - barH, barW, barH, [2,2,0,0]);
+      else ctx.rect(i*(barW+1), chartH - barH, barW, barH);
+      ctx.fill();
+    });
+    const tooltip = document.getElementById("chartTooltip");
+    const newC = canvas.cloneNode(true);
+    canvas.parentNode.replaceChild(newC, canvas);
+    newC.width = W*dpr; newC.height = H*dpr;
+    const ctx2 = newC.getContext("2d"); ctx2.scale(dpr, dpr);
+    arr.forEach((v, i) => {
+      const barH = Math.max(2, (v / max) * chartH);
+      ctx2.fillStyle = v > 0 ? color : (dark ? "#2a211a" : "#ede6df");
+      ctx2.beginPath();
+      if (ctx2.roundRect) ctx2.roundRect(i*(barW+1), chartH - barH, barW, barH, [2,2,0,0]);
+      else ctx2.rect(i*(barW+1), chartH - barH, barW, barH);
+      ctx2.fill();
+    });
+    newC.addEventListener("mousemove", (e) => {
+      const rect = newC.getBoundingClientRect();
+      const i = Math.max(0, Math.min(arr.length-1, Math.floor((e.clientX - rect.left) / (W / arr.length))));
+      const h = i === 0 ? "12am" : i < 12 ? `${i}am` : i === 12 ? "12pm" : `${i-12}pm`;
+      tooltip.style.display = "block";
+      tooltip.style.left = e.clientX + "px";
+      tooltip.style.top  = (e.clientY - 14) + "px";
+      tooltip.innerHTML  = `<strong>${arr[i]}</strong> &nbsp;·&nbsp; ${h}`;
+    });
+    newC.addEventListener("mouseleave", () => { tooltip.style.display = "none"; });
+  };
+
+  // ── Data Browser tab ────────────────────────────────────────────────────────
+  let _dataCurrent = "posts";
+  let _dataPage    = 0;
+  let _dataFetched = null;
+
+  function initDataTab() {
+    document.getElementById("dataSubTabs").addEventListener("click", e => {
+      const btn = e.target.closest("[data-dtab]");
+      if (!btn) return;
+      _dataCurrent = btn.dataset.dtab;
+      _dataPage = 0;
+      document.querySelectorAll(".data-sub-tab").forEach(b => b.classList.remove("data-sub-tab-active"));
+      btn.classList.add("data-sub-tab-active");
+      // Show/hide sort (only relevant for posts)
+      const sortEl = document.getElementById("dataSort");
+      if (_dataCurrent === "posts") {
+        sortEl.style.display = "";
+        sortEl.innerHTML = `<option value="date">Sort: Date</option><option value="likes">Sort: Likes</option><option value="comments">Sort: Comments</option>`;
+      } else if (_dataCurrent === "users") {
+        sortEl.style.display = "";
+        sortEl.innerHTML = `<option value="joined">Sort: Joined</option><option value="active">Sort: Last active</option>`;
+      } else {
+        sortEl.style.display = "none";
+      }
+      fetchDataTab();
+    });
+    document.getElementById("dataSearch").addEventListener("input", debounce(fetchDataTab, 320));
+    document.getElementById("dataSort").addEventListener("change", () => { _dataPage = 0; fetchDataTab(); });
+    document.getElementById("exportCsvBtn").addEventListener("click", exportDataCsv);
+    // Auto-load posts on first visit
+    fetchDataTab();
+  }
+
+  async function fetchDataTab() {
+    const q    = document.getElementById("dataSearch").value.trim();
+    const sort = document.getElementById("dataSort").value;
+    const url  = `/api/admin/data/${_dataCurrent}?page=${_dataPage}&q=${encodeURIComponent(q)}&sort=${sort}&limit=25`;
+    document.getElementById("dataTable").innerHTML = `<p style="color:var(--muted); font-size:13px;">Loading…</p>`;
+    const d = await apiFetch(url);
+    if (!d) { document.getElementById("dataTable").innerHTML = `<p style="color:var(--danger); font-size:13px;">Error loading data.</p>`; return; }
+    _dataFetched = d;
+    document.getElementById("dataTotal").textContent = `${(d.total||0).toLocaleString()} total`;
+    renderDataTable(d);
+    renderDataPager(d.total, d.page, d.limit);
+  }
+
+  function renderDataTable(d) {
+    const el = document.getElementById("dataTable");
+    if (_dataCurrent === "posts")     el.innerHTML = renderPostsTable(d.posts   || []);
+    if (_dataCurrent === "users")     el.innerHTML = renderUsersTable(d.users   || []);
+    if (_dataCurrent === "comments")  el.innerHTML = renderCommentsTable(d.comments || []);
+    if (_dataCurrent === "pageviews") el.innerHTML = renderPageviewsTable(d.pageviews || []);
+  }
+
+  function renderPostsTable(posts) {
+    if (!posts.length) return `<p style="color:var(--muted); font-size:13px; padding:20px 0;">No posts found.</p>`;
+    return `<table class="data-table">
+      <thead><tr>
+        <th>#</th><th>Title</th><th>Author</th>
+        <th>❤️</th><th>💬</th><th>Category</th><th>Date</th>
+      </tr></thead>
+      <tbody>${posts.map((p, i) => `
+        <tr>
+          <td class="td-mono">${(_dataPage * 25) + i + 1}</td>
+          <td><a class="td-link" href="post.html?id=${p.id}" target="_blank" title="${escapeHTML(p.title||'')}">${escapeHTML((p.title||"(untitled)").slice(0,55))}</a></td>
+          <td><a class="td-link" href="user.html?username=${encodeURIComponent(p.author)}" target="_blank">@${escapeHTML(p.author)}</a></td>
+          <td class="td-mono">${p.likes||0}</td>
+          <td class="td-mono">${p.commentCount||0}</td>
+          <td class="td-mono">${escapeHTML(p.category||"—")}</td>
+          <td class="td-mono">${Progress.formatDateShort(p.date)}</td>
+        </tr>`).join("")}
+      </tbody></table>`;
+  }
+
+  function renderUsersTable(users) {
+    if (!users.length) return `<p style="color:var(--muted); font-size:13px; padding:20px 0;">No users found.</p>`;
+    return `<table class="data-table">
+      <thead><tr>
+        <th>#</th><th>Username</th><th>Name</th><th>Email</th>
+        <th>Posts</th><th>Role</th><th>Joined</th><th>Last active</th><th>Status</th>
+      </tr></thead>
+      <tbody>${users.map((u, i) => `
+        <tr>
+          <td class="td-mono">${(_dataPage*25)+i+1}</td>
+          <td><a class="td-link" href="user.html?username=${encodeURIComponent(u.username)}" target="_blank">@${escapeHTML(u.username)}</a></td>
+          <td>${escapeHTML(u.name||"")}</td>
+          <td class="td-mono">${escapeHTML(u.email||"—")}</td>
+          <td class="td-mono">${u.postCount||0}</td>
+          <td>${u.adminRole ? `<span class="data-badge data-badge-role">${u.adminRole}</span>` : `<span class="td-mono">—</span>`}</td>
+          <td class="td-mono">${(u.joined||"").slice(0,10)||"—"}</td>
+          <td class="td-mono">${(u.lastActive||"").slice(0,10)||"—"}</td>
+          <td>${u.isBanned ? `<span class="data-badge data-badge-ban">banned</span>` : `<span class="data-badge data-badge-ok">active</span>`}</td>
+        </tr>`).join("")}
+      </tbody></table>`;
+  }
+
+  function renderCommentsTable(comments) {
+    if (!comments.length) return `<p style="color:var(--muted); font-size:13px; padding:20px 0;">No comments found.</p>`;
+    return `<table class="data-table">
+      <thead><tr><th>#</th><th>Author</th><th>Comment</th><th>Post</th><th>Date</th></tr></thead>
+      <tbody>${comments.map((c, i) => `
+        <tr>
+          <td class="td-mono">${(_dataPage*25)+i+1}</td>
+          <td><a class="td-link" href="user.html?username=${encodeURIComponent(c.author)}" target="_blank">@${escapeHTML(c.author)}</a></td>
+          <td title="${escapeHTML(c.body||'')}">${escapeHTML((c.body||"").slice(0,80))}${c.body?.length>80?"…":""}</td>
+          <td><a class="td-link" href="post.html?id=${encodeURIComponent(c.postId||'')}" target="_blank" style="font-size:11px;">view →</a></td>
+          <td class="td-mono">${(c.createdAt||"").slice(0,10)||"—"}</td>
+        </tr>`).join("")}
+      </tbody></table>`;
+  }
+
+  function renderPageviewsTable(pvs) {
+    if (!pvs.length) return `<p style="color:var(--muted); font-size:13px; padding:20px 0;">No page view data yet — starts tracking on next visit.</p>`;
+    return `<table class="data-table">
+      <thead><tr><th>#</th><th>Page</th><th>User</th><th>Date</th><th>Timestamp</th></tr></thead>
+      <tbody>${pvs.map((p, i) => `
+        <tr>
+          <td class="td-mono">${(_dataPage*25)+i+1}</td>
+          <td><span class="data-badge data-badge-role">${escapeHTML(p.page||"?")}</span></td>
+          <td class="td-mono">${p.username ? `@${escapeHTML(p.username)}` : "—"}</td>
+          <td class="td-mono">${(p.date||"").slice(0,10)||"—"}</td>
+          <td class="td-mono">${(p.timestamp||"").slice(0,19).replace("T"," ")||"—"}</td>
+        </tr>`).join("")}
+      </tbody></table>`;
+  }
+
+  function renderDataPager(total, page, limit) {
+    const el = document.getElementById("dataPager");
+    const pages = Math.ceil(total / limit);
+    if (pages <= 1) { el.innerHTML = ""; return; }
+    const maxShow = 7;
+    let html = "";
+    if (page > 0) html += `<button class="an-load-btn" onclick="goDataPage(${page-1})" style="padding:5px 12px;">‹ Prev</button>`;
+    for (let p = 0; p < pages; p++) {
+      if (pages > maxShow && Math.abs(p - page) > 2 && p !== 0 && p !== pages-1) {
+        if (p === page - 3 || p === page + 3) html += `<span style="color:var(--muted); font-family:var(--font-mono);">…</span>`;
+        continue;
+      }
+      html += `<button class="an-load-btn ${p === page ? "an-date-btn-active" : ""}" onclick="goDataPage(${p})" style="padding:5px 12px;">${p+1}</button>`;
+    }
+    if (page < pages-1) html += `<button class="an-load-btn" onclick="goDataPage(${page+1})" style="padding:5px 12px;">Next ›</button>`;
+    el.innerHTML = html;
+  }
+
+  function goDataPage(p) { _dataPage = p; fetchDataTab(); window.scrollTo(0, 0); }
+
+  function exportDataCsv() {
+    if (!_dataFetched) return;
+    let rows = [], headers = [];
+    if (_dataCurrent === "posts") {
+      headers = ["#","title","author","likes","comments","category","date"];
+      rows = (_dataFetched.posts||[]).map((p,i) => [i+1, p.title||"", p.author, p.likes||0, p.commentCount||0, p.category||"", (p.date||"").slice(0,10)]);
+    } else if (_dataCurrent === "users") {
+      headers = ["#","username","name","email","posts","role","joined","last_active","banned"];
+      rows = (_dataFetched.users||[]).map((u,i) => [i+1, u.username, u.name||"", u.email||"", u.postCount||0, u.adminRole||"", (u.joined||"").slice(0,10), (u.lastActive||"").slice(0,10), u.isBanned?"yes":"no"]);
+    } else if (_dataCurrent === "comments") {
+      headers = ["#","author","body","post_id","date"];
+      rows = (_dataFetched.comments||[]).map((c,i) => [i+1, c.author, (c.body||"").replace(/"/g,'""'), c.postId||"", (c.createdAt||"").slice(0,10)]);
+    } else if (_dataCurrent === "pageviews") {
+      headers = ["#","page","username","date","timestamp"];
+      rows = (_dataFetched.pageviews||[]).map((p,i) => [i+1, p.page, p.username||"", p.date||"", (p.timestamp||"").slice(0,19)]);
+    }
+    const csv = [headers, ...rows].map(r => r.map(v => `"${v}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${_dataCurrent}_export_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+  }
+
+  function debounce(fn, ms) {
+    let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
   }
 
   // ── Posts tab ───────────────────────────────────────────────────────────────

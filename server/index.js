@@ -3249,6 +3249,256 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: "Internal server error" });
 });
 
+// ── Admin: all-time totals ────────────────────────────────────────────────────
+app.get("/api/admin/alltime", requireAuth, requireRole("analyst"), asyncHandler(async (req, res) => {
+  const [
+    totalUsers, totalPosts, totalComments, totalPageViews,
+    firstUser, firstPost,
+    likesAgg, commentsAgg,
+  ] = await Promise.all([
+    db.collection("users").countDocuments({}),
+    db.collection("posts").countDocuments({}),
+    db.collection("comments").countDocuments({}),
+    db.collection("pageviews").countDocuments({}).catch(() => 0),
+    db.collection("users").findOne({}, { sort: { joined: 1 }, projection: { joined: 1 } }),
+    db.collection("posts").findOne({}, { sort: { createdAt: 1 }, projection: { createdAt: 1 } }),
+    db.collection("posts").aggregate([{ $group: { _id: null, total: { $sum: "$likes" } } }]).toArray(),
+    db.collection("posts").aggregate([{ $group: { _id: null, total: { $sum: "$commentCount" } } }]).toArray(),
+  ]);
+
+  const totalLikes    = likesAgg[0]?.total    || 0;
+  const avgLikesPost  = totalPosts ? (totalLikes / totalPosts).toFixed(1) : 0;
+  const avgCommPost   = totalPosts ? (totalComments / totalPosts).toFixed(1) : 0;
+  const platformStartDate = firstUser?.joined || firstPost?.createdAt || null;
+  const platformAgeDays   = platformStartDate
+    ? Math.floor((Date.now() - new Date(platformStartDate)) / 86400000)
+    : null;
+  const postsPerDay = platformAgeDays ? (totalPosts / platformAgeDays).toFixed(1) : 0;
+
+  // Top day ever (most posts)
+  const topDayAgg = await db.collection("posts").aggregate([
+    { $group: { _id: { $substr: ["$createdAt", 0, 10] }, count: { $sum: 1 } } },
+    { $sort: { count: -1 } },
+    { $limit: 1 }
+  ]).toArray();
+  const topDay = topDayAgg[0] ? { date: topDayAgg[0]._id, count: topDayAgg[0].count } : null;
+
+  // Most popular category
+  const catAgg = await db.collection("posts").aggregate([
+    { $match: { category: { $exists: true, $ne: null, $ne: "" } } },
+    { $group: { _id: "$category", count: { $sum: 1 } } },
+    { $sort: { count: -1 } }, { $limit: 5 }
+  ]).toArray();
+
+  // Messages total
+  const totalMessages = await db.collection("messages").countDocuments({}).catch(() => 0);
+
+  res.json({
+    totalUsers, totalPosts, totalComments, totalLikes,
+    totalMessages, totalPageViews,
+    avgLikesPost, avgCommPost, postsPerDay,
+    platformAgeDays, platformStartDate,
+    topDay, categories: catAgg,
+  });
+}));
+
+// ── Admin: analysis insights ──────────────────────────────────────────────────
+app.get("/api/admin/analysis", requireAuth, requireRole("analyst"), asyncHandler(async (req, res) => {
+  const now  = new Date();
+  const d30  = new Date(now - 30 * 86400000).toISOString();
+  const d60  = new Date(now - 60 * 86400000).toISOString();
+  const d7   = new Date(now - 7  * 86400000).toISOString();
+  const d14  = new Date(now - 14 * 86400000).toISOString();
+
+  const [
+    // Current window counts
+    posts30, posts60to30, signups30, signups60to30,
+    active30, active60to30, comments30, comments60to30,
+    posts7, posts14to7,
+    // Retention
+    activeUsers30Docs, newUsers30to60,
+    // Category breakdown (current 30d)
+    catBreakdown30,
+    // Hour of day breakdown (all time)
+    hourBreakdown,
+    // Day of week breakdown (all time)
+    dowBreakdown,
+    // Users who have posted (engagement)
+    usersPosted30,
+    // New users this week
+    signups7,
+  ] = await Promise.all([
+    db.collection("posts").countDocuments({ createdAt: { $gte: d30 } }),
+    db.collection("posts").countDocuments({ createdAt: { $gte: d60, $lt: d30 } }),
+    db.collection("users").countDocuments({ joined: { $gte: d30 } }),
+    db.collection("users").countDocuments({ joined: { $gte: d60, $lt: d30 } }),
+    db.collection("users").countDocuments({ lastLoginDate: { $gte: d30 } }),
+    db.collection("users").countDocuments({ lastLoginDate: { $gte: d60, $lt: d30 } }),
+    db.collection("comments").countDocuments({ createdAt: { $gte: d30 } }),
+    db.collection("comments").countDocuments({ createdAt: { $gte: d60, $lt: d30 } }),
+    db.collection("posts").countDocuments({ createdAt: { $gte: d7 } }),
+    db.collection("posts").countDocuments({ createdAt: { $gte: d14, $lt: d7 } }),
+    db.collection("users").find({ lastLoginDate: { $gte: d30 } }, { projection: { username: 1, joined: 1 } }).toArray(),
+    db.collection("users").find({ joined: { $gte: d60, $lt: d30 } }, { projection: { username: 1 } }).toArray(),
+    db.collection("posts").aggregate([
+      { $match: { createdAt: { $gte: d30 }, category: { $exists: true, $ne: null, $ne: "" } } },
+      { $group: { _id: "$category", count: { $sum: 1 }, likes: { $sum: "$likes" } } },
+      { $sort: { count: -1 } }
+    ]).toArray(),
+    db.collection("posts").aggregate([
+      { $group: { _id: { $hour: { $dateFromString: { dateString: "$createdAt", onError: new Date() } } }, count: { $sum: 1 } } },
+      { $sort: { _id: 1 } }
+    ]).toArray(),
+    db.collection("posts").aggregate([
+      { $group: { _id: { $dayOfWeek: { $dateFromString: { dateString: "$createdAt", onError: new Date() } } }, count: { $sum: 1 } } },
+      { $sort: { _id: 1 } }
+    ]).toArray(),
+    db.collection("posts").distinct("author", { createdAt: { $gte: d30 } }),
+    db.collection("users").countDocuments({ joined: { $gte: d7 } }),
+  ]);
+
+  // Growth rates (% change vs prior period)
+  const growth = {
+    posts:    posts60to30   > 0 ? Math.round((posts30   - posts60to30)   / posts60to30   * 100) : null,
+    signups:  signups60to30 > 0 ? Math.round((signups30 - signups60to30) / signups60to30 * 100) : null,
+    active:   active60to30  > 0 ? Math.round((active30  - active60to30)  / active60to30  * 100) : null,
+    comments: comments60to30> 0 ? Math.round((comments30- comments60to30)/ comments60to30* 100) : null,
+    postsWeek:posts14to7    > 0 ? Math.round((posts7    - posts14to7)    / posts14to7    * 100) : null,
+  };
+
+  // Retention: of users who signed up 30-60d ago, how many are still active?
+  const activeUsernames30 = new Set(activeUsers30Docs.map(u => u.username));
+  const retainedCount     = newUsers30to60.filter(u => activeUsernames30.has(u.username)).length;
+  const retentionRate     = newUsers30to60.length > 0
+    ? Math.round(retainedCount / newUsers30to60.length * 100) : null;
+
+  // Creator rate: % of active-30d users who posted
+  const totalActive30 = active30 || 1;
+  const creatorRate   = Math.round(usersPosted30.length / totalActive30 * 100);
+
+  // Avg posts per active user
+  const avgPostsPerActiveUser = (posts30 / Math.max(active30, 1)).toFixed(2);
+
+  // Hour breakdown array (24 slots)
+  const byHour = Array(24).fill(0);
+  hourBreakdown.forEach(h => { if (h._id >= 0 && h._id < 24) byHour[h._id] = h.count; });
+
+  // Day-of-week array (1=Sun..7=Sat)
+  const DOW_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const byDow = Array(7).fill(0);
+  dowBreakdown.forEach(d => { if (d._id >= 1 && d._id <= 7) byDow[d._id - 1] = d.count; });
+
+  // Cohort: signups per month for last 12m and how many are still active
+  const cohorts = [];
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const monthStart = d.toISOString().slice(0, 7) + "-01T00:00:00.000";
+    const nextD = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
+    const monthEnd = nextD.toISOString().slice(0, 10) + "T00:00:00.000";
+    const label = d.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
+    const [joined, active] = await Promise.all([
+      db.collection("users").countDocuments({ joined: { $gte: monthStart, $lt: monthEnd } }),
+      db.collection("users").countDocuments({ joined: { $gte: monthStart, $lt: monthEnd }, lastLoginDate: { $gte: d30 } }),
+    ]);
+    cohorts.push({ label, joined, active, retention: joined > 0 ? Math.round(active / joined * 100) : 0 });
+  }
+
+  res.json({
+    // Counts
+    posts30, signups30, active30, comments30, posts7, signups7,
+    // Growth
+    growth,
+    // Engagement
+    retentionRate, creatorRate, avgPostsPerActiveUser,
+    retainedCount, retentionBase: newUsers30to60.length,
+    // Breakdown
+    catBreakdown30, byHour, byDow,
+    // Cohorts
+    cohorts,
+  });
+}));
+
+// ── Admin: data browser ───────────────────────────────────────────────────────
+app.get("/api/admin/data/posts", requireAuth, requireRole("analyst"), asyncHandler(async (req, res) => {
+  const page   = Math.max(0, parseInt(req.query.page) || 0);
+  const limit  = Math.min(50, parseInt(req.query.limit) || 25);
+  const q      = (req.query.q || "").trim();
+  const sort   = req.query.sort || "date";
+  const filter = q
+    ? { $or: [{ title: { $regex: q, $options: "i" } }, { author: { $regex: q, $options: "i" } }] }
+    : {};
+  const sortMap = { date: { createdAt: -1 }, likes: { likes: -1 }, comments: { commentCount: -1 } };
+  const [total, docs] = await Promise.all([
+    db.collection("posts").countDocuments(filter),
+    db.collection("posts")
+      .find(filter, { projection: { content: 0, likedBy: 0, body: 0 } })
+      .sort(sortMap[sort] || { createdAt: -1 })
+      .skip(page * limit).limit(limit).toArray()
+  ]);
+  res.json({ total, page, limit, posts: docs.map(normalizePost) });
+}));
+
+app.get("/api/admin/data/users", requireAuth, requireRole("analyst"), asyncHandler(async (req, res) => {
+  const page  = Math.max(0, parseInt(req.query.page) || 0);
+  const limit = Math.min(50, parseInt(req.query.limit) || 25);
+  const q     = (req.query.q || "").trim();
+  const sort  = req.query.sort || "joined";
+  const filter = q
+    ? { $or: [{ username: { $regex: q, $options: "i" } }, { name: { $regex: q, $options: "i" } }, { email: { $regex: q, $options: "i" } }] }
+    : {};
+  const sortMap = { joined: { joined: -1 }, active: { lastLoginDate: -1 }, posts: { postCount: -1 } };
+  const [total, docs] = await Promise.all([
+    db.collection("users").countDocuments(filter),
+    db.collection("users")
+      .find(filter, { projection: { password: 0 } })
+      .sort(sortMap[sort] || { joined: -1 })
+      .skip(page * limit).limit(limit).toArray()
+  ]);
+  res.json({ total, page, limit, users: docs.map(u => ({
+    username: u.username, name: u.name || u.username,
+    email: u.email || null, joined: u.joined || null,
+    lastActive: u.lastLoginDate || null, postCount: u.postCount || 0,
+    bio: u.bio ? u.bio.slice(0, 80) : null,
+    adminRole: u.adminRole || null, isBanned: u.banned || false,
+  })) });
+}));
+
+app.get("/api/admin/data/comments", requireAuth, requireRole("analyst"), asyncHandler(async (req, res) => {
+  const page  = Math.max(0, parseInt(req.query.page) || 0);
+  const limit = Math.min(50, parseInt(req.query.limit) || 25);
+  const q     = (req.query.q || "").trim();
+  const filter = q
+    ? { $or: [{ author: { $regex: q, $options: "i" } }, { body: { $regex: q, $options: "i" } }] }
+    : {};
+  const [total, docs] = await Promise.all([
+    db.collection("comments").countDocuments(filter),
+    db.collection("comments")
+      .find(filter)
+      .sort({ createdAt: -1 })
+      .skip(page * limit).limit(limit).toArray()
+  ]);
+  res.json({ total, page, limit, comments: docs.map(c => ({
+    id: c._id?.toString(), author: c.author, body: (c.body || "").slice(0, 200),
+    postId: c.postId, createdAt: c.createdAt,
+  })) });
+}));
+
+app.get("/api/admin/data/pageviews", requireAuth, requireRole("analyst"), asyncHandler(async (req, res) => {
+  const page  = Math.max(0, parseInt(req.query.page) || 0);
+  const limit = Math.min(50, parseInt(req.query.limit) || 50);
+  const q     = (req.query.q || "").trim();
+  const filter = q ? { page: { $regex: q, $options: "i" } } : {};
+  const [total, docs] = await Promise.all([
+    db.collection("pageviews").countDocuments(filter).catch(() => 0),
+    db.collection("pageviews")
+      .find(filter).sort({ timestamp: -1 })
+      .skip(page * limit).limit(limit).toArray().catch(() => [])
+  ]);
+  res.json({ total, page, limit, pageviews: docs.map(p => ({
+    page: p.page, username: p.username, timestamp: p.timestamp, date: p.date,
+  })) });
+}));
+
 connect()
   .then(() => {
     const server = http.createServer(app);
