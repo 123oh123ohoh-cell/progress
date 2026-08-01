@@ -2851,6 +2851,21 @@ app.get("/api/online-users", (req, res) => {
   res.json({ statuses });
 });
 
+// ── Page view tracking (lightweight, unauthenticated) ─────────────────────────
+app.post("/api/track/pageview", asyncHandler(async (req, res) => {
+  const { page } = req.body || {};
+  if (!page || typeof page !== "string") return res.json({ ok: true });
+  const safePage = page.replace(/[^a-zA-Z0-9\-_.]/g, "").slice(0, 60);
+  const username = req.user?.username || null; // populated by requireAuth if present
+  await db.collection("pageviews").insertOne({
+    page: safePage,
+    username,
+    timestamp: new Date().toISOString(),
+    date: new Date().toISOString().slice(0, 10),
+  });
+  res.json({ ok: true });
+}));
+
 app.get("/api/current-user", (req, res) => {
   res.status(200).json({});
 });
@@ -2960,10 +2975,81 @@ app.get("/api/admin/analytics", requireAuth, requireRole("analyst"), asyncHandle
     { $limit: 10 }
   ]).toArray();
 
+  // Currently online users (from live WS connections)
+  const onlineUsernames = [...usernameConnections.keys()];
+  const onlineUserDocs = onlineUsernames.length > 0
+    ? await db.collection("users")
+        .find({ username: { $in: onlineUsernames } }, { projection: { username: 1, name: 1, avatar: 1 } })
+        .toArray()
+    : [];
+  const onlineUsers = onlineUserDocs.map(u => ({
+    username: u.username,
+    name: u.name || u.username,
+    avatar: u.avatar || null,
+    status: getUserPresenceStatus(u.username),
+  }));
+
+  // Activity today
+  const todayMidnight = new Date(); todayMidnight.setHours(0,0,0,0);
+  const todayStr = todayMidnight.toISOString();
+  const [postsToday, commentsToday, messagesToday] = await Promise.all([
+    db.collection("posts").countDocuments({ createdAt: { $gte: todayStr } }),
+    db.collection("comments").countDocuments({ createdAt: { $gte: todayStr } }),
+    db.collection("messages").countDocuments({ createdAt: { $gte: todayStr } }).catch(() => 0),
+  ]);
+
+  // Activity by hour of day (last 7 days — posts + comments)
+  const last7d = new Date(now - 7*24*60*60*1000).toISOString();
+  const [recentPosts7, recentComments7] = await Promise.all([
+    db.collection("posts").find({ createdAt: { $gte: last7d } }, { projection: { createdAt: 1 } }).toArray(),
+    db.collection("comments").find({ createdAt: { $gte: last7d } }, { projection: { createdAt: 1 } }).toArray(),
+  ]);
+  const activeByHour = Array(24).fill(0);
+  [...recentPosts7, ...recentComments7].forEach(item => {
+    if (item.createdAt) activeByHour[new Date(item.createdAt).getHours()]++;
+  });
+
+  // Active users by day (last 30d) — logins
+  const activeUsers30 = await db.collection("users")
+    .find({ lastLoginDate: { $gte: day30 } }, { projection: { lastLoginDate: 1 } })
+    .toArray();
+  const activeByDay = {};
+  for (const u of activeUsers30) {
+    const d = (u.lastLoginDate || "").slice(0, 10);
+    if (d) activeByDay[d] = (activeByDay[d] || 0) + 1;
+  }
+
+  // Top pages (last 30d from pageviews collection)
+  let topPages = [];
+  try {
+    topPages = await db.collection("pageviews").aggregate([
+      { $match: { timestamp: { $gte: day30 } } },
+      { $group: { _id: "$page", count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 15 }
+    ]).toArray();
+  } catch(e) {}
+
+  // Page views by day (last 30d)
+  let pageviewsByDay = {};
+  try {
+    const pvDocs = await db.collection("pageviews")
+      .find({ timestamp: { $gte: day30 } }, { projection: { date: 1 } })
+      .toArray();
+    for (const p of pvDocs) {
+      if (p.date) pageviewsByDay[p.date] = (pageviewsByDay[p.date] || 0) + 1;
+    }
+  } catch(e) {}
+
   res.json({
     activeToday, activeWeek, activeMonth,
     newSignupsWeek, newSignupsMonth,
-    postsByDay, signupsByDay,
+    postsByDay, signupsByDay, activeByDay, pageviewsByDay,
+    postsToday, commentsToday, messagesToday,
+    onlineNow: onlineUsers.length,
+    onlineUsers,
+    activeByHour,
+    topPages,
     topPosts: topPosts.map(normalizePost),
     topAuthors
   });

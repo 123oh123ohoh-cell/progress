@@ -82,7 +82,62 @@
     font-family: var(--font-display); font-size: 22px; margin: 0 0 18px;
   }
 
-  /* ── Sparkline chart ──────────────────────────────────────────────── */
+  /* ── Canvas chart tooltip ──────────────────────────────────────── */
+  .chart-wrap { position: relative; }
+  .chart-tooltip {
+    position: fixed; pointer-events: none; display: none;
+    background: var(--ink); color: var(--cream);
+    font-family: var(--font-mono); font-size: 11px;
+    padding: 5px 10px; border-radius: 7px;
+    white-space: nowrap; z-index: 200;
+    box-shadow: 0 4px 16px rgba(0,0,0,.25);
+    transform: translate(-50%, -100%);
+    margin-top: -8px;
+  }
+  /* ── Online users ─────────────────────────────────────────────── */
+  .online-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(82,199,160,.12); color: #38a16a;
+    font-family: var(--font-mono); font-size: 11px;
+    text-transform: uppercase; letter-spacing: .06em;
+    padding: 4px 12px; border-radius: 100px;
+  }
+  .online-dot {
+    width: 7px; height: 7px; border-radius: 50%; background: #38a16a;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+  .online-avatars { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+  .online-av-card {
+    display: flex; flex-direction: column; align-items: center; gap: 5px;
+    max-width: 52px; text-align: center; text-decoration: none; color: inherit;
+  }
+  .online-av-card img, .online-av-card .initials-lg {
+    width: 40px; height: 40px; border-radius: 50%; object-fit: cover;
+    border: 2px solid #52c7a0; flex-shrink: 0;
+  }
+  .online-av-name {
+    font-family: var(--font-mono); font-size: 10px; color: var(--muted);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 52px;
+  }
+  /* ── Top pages ────────────────────────────────────────────────── */
+  .pages-list { display: flex; flex-direction: column; gap: 9px; }
+  .page-row { display: flex; align-items: center; gap: 10px; }
+  .page-row-label {
+    font-family: var(--font-mono); font-size: 12px; color: var(--ink);
+    min-width: 90px; max-width: 120px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .page-bar-track { flex: 1; height: 7px; background: var(--mocha-wash); border-radius: 4px; overflow: hidden; }
+  .page-bar-fill { height: 100%; border-radius: 4px; background: var(--ink); }
+  .page-count { font-family: var(--font-mono); font-size: 11px; color: var(--muted); min-width: 38px; text-align: right; }
+  /* ── Hour heatmap ─────────────────────────────────────────────── */
+  .hour-grid { display: grid; grid-template-columns: repeat(24, 1fr); gap: 3px; }
+  .hour-cell { aspect-ratio: 1; border-radius: 3px; cursor: default; }
+  .hour-cell:hover { outline: 1.5px solid var(--ink); }
+  .hour-labels { display: flex; justify-content: space-between; margin-top: 5px; }
+  .hour-label { font-family: var(--font-mono); font-size: 9px; color: var(--muted); }
+  /* ── Sparkline (kept for overview tab) ───────────────────────── */
   .sparkline-wrap {
     display: flex; align-items: flex-end; gap: 3px; height: 60px;
   }
@@ -287,34 +342,111 @@
     <!-- ── ANALYTICS tab ────────────────────────────────────────────── -->
     <div id="tab-analytics" class="admin-tab-content" style="display:none;">
 
+      <!-- Stat cards row -->
       <div class="stats-grid" id="analyticsGrid">
         <div style="grid-column:1/-1; color:var(--muted); font-size:14px;">Loading…</div>
       </div>
 
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:32px; margin-bottom:40px;">
-        <div>
-          <h3 class="section-head" style="margin-bottom:10px;">Posts per day (30 days)</h3>
-          <div id="postsChart" class="sparkline-wrap"></div>
-          <div id="postsChartLabels" class="spark-labels"></div>
+      <!-- Online now + Today's activity -->
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:24px; margin-bottom:36px;">
+
+        <!-- Currently online -->
+        <div style="background:var(--paper); border:1px solid var(--mocha-light); border-radius:14px; padding:20px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+            <h3 class="section-head" style="margin:0;">Online right now</h3>
+            <span class="online-pill"><span class="online-dot"></span><span id="onlineCount">—</span></span>
+          </div>
+          <div class="online-avatars" id="onlineAvatars">
+            <p style="color:var(--muted); font-size:13px;">Loading…</p>
+          </div>
+          <p style="font-family:var(--font-mono); font-size:10px; color:var(--muted); margin:12px 0 0; text-transform:uppercase; letter-spacing:.05em;">
+            Refreshes automatically every 30s
+          </p>
         </div>
-        <div>
-          <h3 class="section-head" style="margin-bottom:10px;">Signups per day (30 days)</h3>
-          <div id="signupsChart" class="sparkline-wrap"></div>
-          <div id="signupsChartLabels" class="spark-labels"></div>
+
+        <!-- Today's activity -->
+        <div style="background:var(--paper); border:1px solid var(--mocha-light); border-radius:14px; padding:20px;">
+          <h3 class="section-head" style="margin:0 0 16px;">Today's activity</h3>
+          <div style="display:flex; flex-direction:column; gap:14px;">
+            <div style="display:flex; align-items:center; justify-content:space-between;">
+              <span style="font-size:13px; color:var(--muted);">Posts published</span>
+              <span id="todayPosts" style="font-family:var(--font-display); font-size:22px; font-weight:600;">—</span>
+            </div>
+            <div style="display:flex; align-items:center; justify-content:space-between;">
+              <span style="font-size:13px; color:var(--muted);">Replies written</span>
+              <span id="todayComments" style="font-family:var(--font-display); font-size:22px; font-weight:600;">—</span>
+            </div>
+            <div style="display:flex; align-items:center; justify-content:space-between;">
+              <span style="font-size:13px; color:var(--muted);">Chat messages</span>
+              <span id="todayMessages" style="font-family:var(--font-display); font-size:22px; font-weight:600;">—</span>
+            </div>
+            <div style="display:flex; align-items:center; justify-content:space-between; padding-top:10px; border-top:1px solid var(--mocha-wash);">
+              <span style="font-size:13px; color:var(--muted);">Active users (today)</span>
+              <span id="todayActive" style="font-family:var(--font-display); font-size:22px; font-weight:600; color:#a352e0;">—</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Canvas charts row -->
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:24px; margin-bottom:36px;">
+        <div class="chart-wrap" style="background:var(--paper); border:1px solid var(--mocha-light); border-radius:14px; padding:20px;">
+          <h3 class="section-head" style="margin:0 0 14px;">Posts per day (30d)</h3>
+          <canvas id="postsCanvas" height="90" style="width:100%;display:block;"></canvas>
+        </div>
+        <div class="chart-wrap" style="background:var(--paper); border:1px solid var(--mocha-light); border-radius:14px; padding:20px;">
+          <h3 class="section-head" style="margin:0 0 14px;">Signups per day (30d)</h3>
+          <canvas id="signupsCanvas" height="90" style="width:100%;display:block;"></canvas>
+        </div>
+        <div class="chart-wrap" style="background:var(--paper); border:1px solid var(--mocha-light); border-radius:14px; padding:20px;">
+          <h3 class="section-head" style="margin:0 0 14px;">Active users per day (30d)</h3>
+          <canvas id="activeCanvas" height="90" style="width:100%;display:block;"></canvas>
+        </div>
+        <div class="chart-wrap" style="background:var(--paper); border:1px solid var(--mocha-light); border-radius:14px; padding:20px;">
+          <h3 class="section-head" style="margin:0 0 14px;">Page views per day (30d)</h3>
+          <canvas id="pageviewCanvas" height="90" style="width:100%;display:block;"></canvas>
         </div>
       </div>
 
-      <div class="section-block">
-        <h2 class="section-title">Top posts (last 30 days)</h2>
-        <div id="topPostsList"></div>
+      <!-- Hourly activity heatmap -->
+      <div style="background:var(--paper); border:1px solid var(--mocha-light); border-radius:14px; padding:20px; margin-bottom:24px;">
+        <h3 class="section-head" style="margin:0 0 14px;">Activity by hour of day (last 7 days)</h3>
+        <div class="hour-grid" id="hourGrid"></div>
+        <div class="hour-labels">
+          <span class="hour-label">12am</span>
+          <span class="hour-label">6am</span>
+          <span class="hour-label">12pm</span>
+          <span class="hour-label">6pm</span>
+          <span class="hour-label">11pm</span>
+        </div>
       </div>
 
-      <div class="section-block">
-        <h2 class="section-title">Top authors (all time)</h2>
+      <!-- Top pages visited -->
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:24px; margin-bottom:36px;">
+        <div style="background:var(--paper); border:1px solid var(--mocha-light); border-radius:14px; padding:20px;">
+          <h3 class="section-head" style="margin:0 0 16px;">Most visited pages (30d)</h3>
+          <div class="pages-list" id="topPagesList">
+            <p style="color:var(--muted); font-size:13px;">No data yet — tracking starts now.</p>
+          </div>
+        </div>
+
+        <!-- Top posts -->
+        <div style="background:var(--paper); border:1px solid var(--mocha-light); border-radius:14px; padding:20px;">
+          <h3 class="section-head" style="margin:0 0 16px;">Top posts (last 30d)</h3>
+          <div id="topPostsList"></div>
+        </div>
+      </div>
+
+      <!-- Top authors -->
+      <div style="background:var(--paper); border:1px solid var(--mocha-light); border-radius:14px; padding:20px; margin-bottom:40px;">
+        <h3 class="section-head" style="margin:0 0 16px;">Top authors (all time)</h3>
         <table id="topAuthorsTable" style="width:100%; border-collapse:collapse;"></table>
       </div>
 
     </div>
+    <!-- Chart hover tooltip (shared) -->
+    <div class="chart-tooltip" id="chartTooltip"></div>
 
     <!-- ── POSTS tab ────────────────────────────────────────────────── -->
     <div id="tab-posts" class="admin-tab-content" style="display:none;">
@@ -558,10 +690,18 @@
     `).join("") || `<p style="color:var(--muted); font-size:14px;">No entries yet.</p>`;
   }
 
-  function statCard(label, value) {
+  function initials(name) {
+    if (!name) return "?";
+    return name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+  }
+
+  function statCard(label, value, badge) {
+    const badgeHtml = badge === "live"
+      ? `<span class="online-pill" style="font-size:9px; padding:2px 6px; margin-left:6px; vertical-align:middle;">● live</span>`
+      : "";
     return `
-      <div class="stat-card">
-        <div class="stat-label">${label}</div>
+      <div class="stat-card" data-label="${label}">
+        <div class="stat-label">${label}${badgeHtml}</div>
         <div class="stat-value">${value ?? "—"}</div>
       </div>`;
   }
@@ -619,6 +759,8 @@
   }
 
   // ── Analytics tab ───────────────────────────────────────────────────────────
+  let analyticsRefreshTimer = null;
+
   async function loadAnalytics() {
     const grid = document.getElementById("analyticsGrid");
     grid.innerHTML = `<div style="grid-column:1/-1; color:var(--muted); font-size:14px;">Loading…</div>`;
@@ -629,23 +771,43 @@
       return;
     }
 
+    // Stat cards
     grid.innerHTML = [
-      statCard("Active today", data.activeToday),
-      statCard("Active (7d)", data.activeWeek),
-      statCard("Active (30d)", data.activeMonth),
-      statCard("New (7d)", data.newSignupsWeek),
-      statCard("New (30d)", data.newSignupsMonth),
+      statCard("Online now",   data.onlineNow    ?? 0, "live"),
+      statCard("Active today", data.activeToday  ?? 0),
+      statCard("Active (7d)",  data.activeWeek   ?? 0),
+      statCard("Active (30d)", data.activeMonth  ?? 0),
+      statCard("New (7d)",     data.newSignupsWeek  ?? 0),
+      statCard("New (30d)",    data.newSignupsMonth ?? 0),
     ].join("");
 
-    // Build 30-day date array
+    // Today's activity
+    document.getElementById("todayPosts").textContent    = data.postsToday    ?? 0;
+    document.getElementById("todayComments").textContent = data.commentsToday ?? 0;
+    document.getElementById("todayMessages").textContent = data.messagesToday ?? 0;
+    document.getElementById("todayActive").textContent   = data.activeToday   ?? 0;
+
+    // Online users section
+    renderOnlineUsers(data.onlineNow ?? 0, data.onlineUsers ?? []);
+
+    // 30-day date array
     const days = [];
     for (let i = 29; i >= 0; i--) {
       const d = new Date(Date.now() - i * 86400000);
       days.push(d.toISOString().slice(0, 10));
     }
 
-    renderSparkline("postsChart", "postsChartLabels", days, data.postsByDay || {});
-    renderSparkline("signupsChart", "signupsChartLabels", days, data.signupsByDay || {});
+    // Canvas charts with hover tooltips
+    renderCanvasChart("postsCanvas",      days, data.postsByDay       || {}, "#a352e0");
+    renderCanvasChart("signupsCanvas",    days, data.signupsByDay     || {}, "#52c7e0");
+    renderCanvasChart("activeCanvas",     days, data.activeByDay      || {}, "#e0a352");
+    renderCanvasChart("pageviewCanvas",   days, data.pageviewsByDay   || {}, "#52c7a0");
+
+    // Hourly heatmap
+    renderHourGrid(data.activeByHour || Array(24).fill(0));
+
+    // Top pages
+    renderTopPages(data.topPages || []);
 
     // Top posts
     const topPostsEl = document.getElementById("topPostsList");
@@ -677,24 +839,133 @@
         </tr>
       </thead>
       <tbody>${authorRows || `<tr><td colspan="4" style="padding:14px 0; color:var(--muted); font-size:14px;">No data.</td></tr>`}</tbody>`;
+
+    // Auto-refresh online users every 30s
+    clearInterval(analyticsRefreshTimer);
+    analyticsRefreshTimer = setInterval(async () => {
+      const fresh = await apiFetch("/api/admin/analytics").catch(() => null);
+      if (!fresh) return;
+      renderOnlineUsers(fresh.onlineNow ?? 0, fresh.onlineUsers ?? []);
+      document.getElementById("onlineCount").textContent = fresh.onlineNow ?? 0;
+      const onlineCard = grid.querySelector('[data-label="Online now"] .stat-value');
+      if (onlineCard) onlineCard.textContent = fresh.onlineNow ?? 0;
+    }, 30000);
   }
 
-  function renderSparkline(chartId, labelsId, days, byDay) {
-    const counts = days.map(d => byDay[d] || 0);
-    const max = Math.max(...counts, 1);
-    const chartEl = document.getElementById(chartId);
-    chartEl.innerHTML = counts.map((c, i) => {
-      const h = Math.max(3, Math.round((c / max) * 60));
-      return `<div class="spark-bar" style="height:${h}px;" title="${days[i]}: ${c}"></div>`;
-    }).join("");
+  // ── Online users section ────────────────────────────────────────────────────
+  function renderOnlineUsers(count, users) {
+    document.getElementById("onlineCount").textContent = count;
+    const wrap = document.getElementById("onlineAvatars");
+    if (!users.length) {
+      wrap.innerHTML = `<p style="color:var(--muted); font-size:13px;">No one online right now.</p>`;
+      return;
+    }
+    wrap.innerHTML = users.map(u => `
+      <a href="user.html?username=${encodeURIComponent(u.username)}" class="online-av-card" title="@${escapeHTML(u.username)}">
+        ${u.avatar
+          ? `<img src="${escapeHTML(u.avatar)}" alt="">`
+          : `<div class="initials-lg" style="width:40px;height:40px;font-size:13px;border:2px solid #52c7a0;">${initials(u.name)}</div>`}
+        <span class="online-av-name">@${escapeHTML(u.username)}</span>
+      </a>`).join("");
+  }
 
-    // Show labels at first, middle, last
-    const labelsEl = document.getElementById(labelsId);
-    const label = d => new Date(d + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
-    labelsEl.innerHTML = `
-      <span class="spark-label">${label(days[0])}</span>
-      <span class="spark-label">${label(days[14])}</span>
-      <span class="spark-label">${label(days[29])}</span>`;
+  // ── Canvas bar chart with hover tooltip ────────────────────────────────────
+  const tooltip = document.getElementById("chartTooltip");
+
+  function renderCanvasChart(canvasId, days, byDay, color) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const W = canvas.offsetWidth || canvas.parentElement.offsetWidth - 40;
+    const H = canvas.height;
+    canvas.width  = W * dpr;
+    canvas.height = H * dpr;
+    const ctx = canvas.getContext("2d");
+    ctx.scale(dpr, dpr);
+
+    const dark = document.documentElement.getAttribute("data-theme") === "dark";
+    const counts = days.map(d => byDay[d] || 0);
+    const maxVal = Math.max(...counts, 1);
+    const gap = 2, barW = (W - gap * (days.length - 1)) / days.length;
+    const padB = 20, chartH = H - padB;
+
+    // Draw bars
+    counts.forEach((c, i) => {
+      const barH = Math.max(2, (c / maxVal) * chartH);
+      const x = i * (barW + gap);
+      const y = chartH - barH;
+      ctx.fillStyle = c > 0 ? color : (dark ? "#2a211a" : "#e8ddd4");
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(x, y, barW, barH, [2,2,0,0]);
+      else ctx.rect(x, y, barW, barH);
+      ctx.fill();
+    });
+
+    // Date labels at start/mid/end
+    ctx.fillStyle = dark ? "#5e4f41" : "#b0a090";
+    ctx.font = `9px 'IBM Plex Mono', monospace`;
+    ctx.textAlign = "left";
+    const labelDate = d => new Date(d + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    ctx.fillText(labelDate(days[0]),  0, H - 4);
+    ctx.textAlign = "center";
+    ctx.fillText(labelDate(days[14]), W / 2, H - 4);
+    ctx.textAlign = "right";
+    ctx.fillText(labelDate(days[29]), W, H - 4);
+
+    // Hover tooltip
+    canvas.addEventListener("mousemove", (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const idx = Math.floor(mx / ((W / days.length)));
+      const safeIdx = Math.max(0, Math.min(days.length - 1, idx));
+      const date = new Date(days[safeIdx] + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
+      const val  = counts[safeIdx];
+      tooltip.style.display = "block";
+      tooltip.style.left  = e.clientX + "px";
+      tooltip.style.top   = (e.clientY - 10) + "px";
+      tooltip.innerHTML   = `<strong>${val}</strong> &nbsp;·&nbsp; ${date}`;
+    });
+    canvas.addEventListener("mouseleave", () => { tooltip.style.display = "none"; });
+  }
+
+  // ── Hour heatmap ────────────────────────────────────────────────────────────
+  function renderHourGrid(byHour) {
+    const el = document.getElementById("hourGrid");
+    if (!el) return;
+    const max = Math.max(...byHour, 1);
+    el.innerHTML = byHour.map((v, h) => {
+      const intensity = v / max;
+      const alpha = Math.round(intensity * 100);
+      const label = h === 0 ? "12am" : h < 12 ? `${h}am` : h === 12 ? "12pm" : `${h-12}pm`;
+      return `<div class="hour-cell"
+        style="background: rgba(163,82,224,${(0.08 + intensity * 0.85).toFixed(2)});"
+        title="${label}: ${v} actions"></div>`;
+    }).join("");
+  }
+
+  // ── Top pages list ──────────────────────────────────────────────────────────
+  function renderTopPages(pages) {
+    const el = document.getElementById("topPagesList");
+    if (!el) return;
+    if (!pages.length) {
+      el.innerHTML = `<p style="color:var(--muted); font-size:13px;">No page view data yet — tracking starts on next visit.</p>`;
+      return;
+    }
+    const max = pages[0]?.count || 1;
+    const PAGE_LABELS = {
+      feed: "Feed", profile: "Profile", post: "Post", chat: "Chat",
+      write: "Write", explore: "Explore", fun: "Fun", typing: "Typing",
+      home: "Home", admin: "Admin", index: "Home",
+    };
+    el.innerHTML = `<div class="pages-list">` + pages.map(p => {
+      const label = PAGE_LABELS[p._id] || p._id;
+      const pct = Math.round((p.count / max) * 100);
+      return `<div class="page-row">
+        <span class="page-row-label">${escapeHTML(label)}</span>
+        <div class="page-bar-track"><div class="page-bar-fill" style="width:${pct}%;"></div></div>
+        <span class="page-count">${p.count}</span>
+      </div>`;
+    }).join("") + `</div>`;
   }
 
   // ── Posts tab ───────────────────────────────────────────────────────────────

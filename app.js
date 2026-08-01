@@ -1551,6 +1551,14 @@ function initShell(activePage) {
   mountModals();
   attachNavScrollWatcher();
   openPresenceSocket(activePage);
+  // Track page view (fire-and-forget, no auth required)
+  if (activePage && typeof API_BASE !== "undefined") {
+    fetch(`${API_BASE}/api/track/pageview`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ page: activePage }),
+    }).catch(() => {});
+  }
   (async () => {
     const banned = await applyBannedOverlayIfNeeded();
     if (!banned) applyLockedOverlayIfNeeded();
