@@ -2928,54 +2928,87 @@ app.post("/api/admin/migrate-posts-to-supabase", requireAuth, asyncHandler(async
 app.get("/api/admin/analytics", requireAuth, requireRole("analyst"), asyncHandler(async (req, res) => {
   const now = new Date();
 
-  // Active users: login within last 24h / 7d / 30d
-  const day1 = new Date(now - 1  * 24*60*60*1000).toISOString();
-  const day7 = new Date(now - 7  * 24*60*60*1000).toISOString();
-  const day30= new Date(now - 30 * 24*60*60*1000).toISOString();
+  // --- Date range params ---
+  const days = Math.min(Math.max(parseInt(req.query.days) || 30, 7), 90);
+  const snapDate = (req.query.date && /^\d{4}-\d{2}-\d{2}$/.test(req.query.date))
+    ? req.query.date
+    : now.toISOString().slice(0, 10);
 
-  const [activeToday, activeWeek, activeMonth, newSignupsWeek, newSignupsMonth] = await Promise.all([
+  const dayN   = new Date(now - days * 24*60*60*1000).toISOString();
+  const day1   = new Date(now - 1  * 24*60*60*1000).toISOString();
+  const day7   = new Date(now - 7  * 24*60*60*1000).toISOString();
+  const day30  = new Date(now - 30 * 24*60*60*1000).toISOString();
+
+  // Snapshot window: the selected date, midnight-to-midnight
+  const snapStart = snapDate + "T00:00:00.000";
+  const snapEnd   = snapDate + "T23:59:59.999";
+
+  // --- Aggregate counters ---
+  const [activeToday, activeWeek, activeMonth, newSignupsWeek, newSignupsMonth,
+         postsToday, commentsToday, messagesToday, signupsToday] = await Promise.all([
     db.collection("users").countDocuments({ lastLoginDate: { $gte: day1 } }),
     db.collection("users").countDocuments({ lastLoginDate: { $gte: day7 } }),
     db.collection("users").countDocuments({ lastLoginDate: { $gte: day30 } }),
     db.collection("users").countDocuments({ joined: { $gte: day7 } }),
     db.collection("users").countDocuments({ joined: { $gte: day30 } }),
+    db.collection("posts").countDocuments({ createdAt: { $gte: snapStart, $lte: snapEnd } }),
+    db.collection("comments").countDocuments({ createdAt: { $gte: snapStart, $lte: snapEnd } }),
+    db.collection("messages").countDocuments({ createdAt: { $gte: snapStart, $lte: snapEnd } }).catch(() => 0),
+    db.collection("users").countDocuments({ joined: { $gte: snapStart, $lte: snapEnd } }),
   ]);
 
-  // Daily posts — last 30 days
-  const posts30 = await db.collection("posts")
-    .find({ createdAt: { $gte: day30 } }, { projection: { createdAt: 1 } })
-    .toArray();
-  const postsByDay = {};
-  for (const p of posts30) {
+  // Active users on snapshot date
+  const activeOnDate = await db.collection("users")
+    .countDocuments({ lastLoginDate: { $gte: snapStart, $lte: snapEnd } });
+
+  // --- Daily charts (for the requested day window) ---
+  const [postsInRange, usersInRange, activeUsersInRange] = await Promise.all([
+    db.collection("posts")
+      .find({ createdAt: { $gte: dayN } }, { projection: { createdAt: 1 } }).toArray(),
+    db.collection("users")
+      .find({ joined: { $gte: dayN } }, { projection: { joined: 1 } }).toArray(),
+    db.collection("users")
+      .find({ lastLoginDate: { $gte: dayN } }, { projection: { lastLoginDate: 1 } }).toArray(),
+  ]);
+
+  const postsByDay = {}, signupsByDay = {}, activeByDay = {};
+  for (const p of postsInRange) {
     const d = (p.createdAt || "").slice(0, 10);
     if (d) postsByDay[d] = (postsByDay[d] || 0) + 1;
   }
-
-  // Daily signups — last 30 days
-  const users30 = await db.collection("users")
-    .find({ joined: { $gte: day30 } }, { projection: { joined: 1 } })
-    .toArray();
-  const signupsByDay = {};
-  for (const u of users30) {
+  for (const u of usersInRange) {
     const d = (u.joined || "").slice(0, 10);
     if (d) signupsByDay[d] = (signupsByDay[d] || 0) + 1;
   }
+  for (const u of activeUsersInRange) {
+    const d = (u.lastLoginDate || "").slice(0, 10);
+    if (d) activeByDay[d] = (activeByDay[d] || 0) + 1;
+  }
 
-  // Top posts (last 30d)
+  // --- Top posts (in date range) ---
   const topPosts = await db.collection("posts")
-    .find({ createdAt: { $gte: day30 } }, { projection: { content: 0, likedBy: 0 } })
+    .find({ createdAt: { $gte: dayN } }, { projection: { content: 0, likedBy: 0 } })
     .sort({ likes: -1 })
     .limit(10)
     .toArray();
 
-  // Top authors by post count (all time)
+  // --- Top authors (all time, with engagement breakdown) ---
   const topAuthors = await db.collection("posts").aggregate([
     { $group: { _id: "$author", posts: { $sum: 1 }, likes: { $sum: "$likes" } } },
     { $sort: { posts: -1 } },
-    { $limit: 10 }
+    { $limit: 15 }
   ]).toArray();
 
-  // Currently online users (from live WS connections)
+  // Enrich top authors with comment counts
+  const authorNames = topAuthors.map(a => a._id);
+  const commentCounts = await db.collection("comments").aggregate([
+    { $match: { author: { $in: authorNames } } },
+    { $group: { _id: "$author", comments: { $sum: 1 } } }
+  ]).toArray();
+  const commentMap = Object.fromEntries(commentCounts.map(c => [c._id, c.comments]));
+  topAuthors.forEach(a => { a.comments = commentMap[a._id] || 0; });
+
+  // --- Currently online ---
   const onlineUsernames = [...usernameConnections.keys()];
   const onlineUserDocs = onlineUsernames.length > 0
     ? await db.collection("users")
@@ -2986,19 +3019,9 @@ app.get("/api/admin/analytics", requireAuth, requireRole("analyst"), asyncHandle
     username: u.username,
     name: u.name || u.username,
     avatar: u.avatar || null,
-    status: getUserPresenceStatus(u.username),
   }));
 
-  // Activity today
-  const todayMidnight = new Date(); todayMidnight.setHours(0,0,0,0);
-  const todayStr = todayMidnight.toISOString();
-  const [postsToday, commentsToday, messagesToday] = await Promise.all([
-    db.collection("posts").countDocuments({ createdAt: { $gte: todayStr } }),
-    db.collection("comments").countDocuments({ createdAt: { $gte: todayStr } }),
-    db.collection("messages").countDocuments({ createdAt: { $gte: todayStr } }).catch(() => 0),
-  ]);
-
-  // Activity by hour of day (last 7 days — posts + comments)
+  // --- Activity by hour (last 7d — posts + comments) ---
   const last7d = new Date(now - 7*24*60*60*1000).toISOString();
   const [recentPosts7, recentComments7] = await Promise.all([
     db.collection("posts").find({ createdAt: { $gte: last7d } }, { projection: { createdAt: 1 } }).toArray(),
@@ -3009,32 +3032,22 @@ app.get("/api/admin/analytics", requireAuth, requireRole("analyst"), asyncHandle
     if (item.createdAt) activeByHour[new Date(item.createdAt).getHours()]++;
   });
 
-  // Active users by day (last 30d) — logins
-  const activeUsers30 = await db.collection("users")
-    .find({ lastLoginDate: { $gte: day30 } }, { projection: { lastLoginDate: 1 } })
-    .toArray();
-  const activeByDay = {};
-  for (const u of activeUsers30) {
-    const d = (u.lastLoginDate || "").slice(0, 10);
-    if (d) activeByDay[d] = (activeByDay[d] || 0) + 1;
-  }
-
-  // Top pages (last 30d from pageviews collection)
+  // --- Top pages ---
   let topPages = [];
   try {
     topPages = await db.collection("pageviews").aggregate([
-      { $match: { timestamp: { $gte: day30 } } },
+      { $match: { timestamp: { $gte: dayN } } },
       { $group: { _id: "$page", count: { $sum: 1 } } },
       { $sort: { count: -1 } },
       { $limit: 15 }
     ]).toArray();
   } catch(e) {}
 
-  // Page views by day (last 30d)
+  // --- Page views by day ---
   let pageviewsByDay = {};
   try {
     const pvDocs = await db.collection("pageviews")
-      .find({ timestamp: { $gte: day30 } }, { projection: { date: 1 } })
+      .find({ timestamp: { $gte: dayN } }, { projection: { date: 1 } })
       .toArray();
     for (const p of pvDocs) {
       if (p.date) pageviewsByDay[p.date] = (pageviewsByDay[p.date] || 0) + 1;
@@ -3042,16 +3055,22 @@ app.get("/api/admin/analytics", requireAuth, requireRole("analyst"), asyncHandle
   } catch(e) {}
 
   res.json({
+    snapDate, days,
     activeToday, activeWeek, activeMonth,
     newSignupsWeek, newSignupsMonth,
+    // Snapshot for selected date
+    postsToday, commentsToday, messagesToday, signupsToday,
+    activeOnDate,
+    // Charts
     postsByDay, signupsByDay, activeByDay, pageviewsByDay,
-    postsToday, commentsToday, messagesToday,
+    // Live
     onlineNow: onlineUsers.length,
     onlineUsers,
+    // Sections (lazy rendered)
     activeByHour,
     topPages,
     topPosts: topPosts.map(normalizePost),
-    topAuthors
+    topAuthors,
   });
 }));
 
