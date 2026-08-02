@@ -1830,16 +1830,18 @@
 
           <!-- Communities panel -->
           <div class="sidebar-panel" id="sidebarPanelCommunities">
-            <div class="community-search-wrap">
-              <input type="search" class="community-search" id="communitySidebarSearch" placeholder="Search communities…" autocomplete="off">
+            <div style="padding:10px 10px 6px;flex-shrink:0;">
+              <button type="button" class="community-explore-btn" id="communitySidebarExploreBtn">
+                <span style="font-size:16px;line-height:1;">🔭</span> Explore communities
+              </button>
+            </div>
+            <div class="community-search-wrap" style="padding-top:4px;">
+              <input type="search" class="community-search" id="communitySidebarSearch" placeholder="Search joined rooms…" autocomplete="off">
             </div>
             <div class="community-list" id="communitySidebarList">
               <div style="padding:20px 10px;color:var(--muted);font-size:13px;">Loading…</div>
             </div>
-            <div style="display:flex;flex-direction:column;gap:6px;padding:0 6px 10px;flex-shrink:0;">
-              <button type="button" class="community-explore-btn" id="communitySidebarExploreBtn">
-                <span style="font-size:16px;line-height:1;">🔭</span> Explore communities
-              </button>
+            <div style="padding:0 10px 10px;flex-shrink:0;">
               <button type="button" class="community-create-btn" id="communitySidebarCreateBtn">
                 <span style="font-size:18px;line-height:1;">+</span> Create community
               </button>
