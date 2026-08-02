@@ -52,13 +52,22 @@
 .community-topic { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
 .community-create-btn {
   display: flex; align-items: center; gap: 8px;
-  padding: 9px 10px; margin: 4px 6px; border-radius: 10px;
+  padding: 9px 10px; border-radius: 10px;
   background: none; border: 1.5px dashed var(--mocha-light); color: var(--muted);
-  font-size: 13px; font-weight: 600; cursor: pointer; width: calc(100% - 12px);
+  font-size: 13px; font-weight: 600; cursor: pointer; width: 100%;
   font-family: var(--font-body); transition: border-color .15s, color .15s, background .12s;
-  text-align: left;
+  text-align: left; box-sizing: border-box;
 }
 .community-create-btn:hover { border-color: var(--ink); color: var(--ink); background: var(--mocha-wash); }
+.community-explore-btn {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 10px; border-radius: 10px;
+  background: var(--ink); color: var(--cream);
+  border: none; font-size: 13px; font-weight: 600; cursor: pointer; width: 100%;
+  font-family: var(--font-body); transition: opacity .15s;
+  text-align: left; box-sizing: border-box;
+}
+.community-explore-btn:hover { opacity: .85; }
 
 /* ── Discovery Overlay (kept for reference, now unused) ─────────── */
 .discovery-overlay {
@@ -204,6 +213,84 @@
 .cc-submit:hover { opacity: .85; }
 .cc-submit:disabled { opacity: .5; cursor: not-allowed; }
 .cc-error { font-size: 12px; color: var(--danger); margin-top: 8px; min-height: 16px; }
+/* ── Explore Panel (in-panel full view) ─────────────────────────── */
+.explore-panel {
+  position: absolute; inset: 0; z-index: 20;
+  background: var(--paper);
+  display: flex; flex-direction: column;
+  opacity: 0; pointer-events: none;
+  transition: opacity .22s;
+}
+.explore-panel.open { opacity: 1; pointer-events: all; }
+.explore-panel-head {
+  padding: 18px 24px 14px;
+  border-bottom: 1px solid var(--mocha-light);
+  flex-shrink: 0; display: flex; align-items: center; gap: 14px;
+}
+.explore-panel-back {
+  background: none; border: none; cursor: pointer; color: var(--muted);
+  font-size: 18px; line-height: 1; padding: 6px 8px; border-radius: 8px;
+  transition: background .12s, color .12s; flex-shrink: 0;
+}
+.explore-panel-back:hover { background: var(--mocha-wash); color: var(--ink); }
+.explore-panel-title {
+  font-family: var(--font-display); font-style: italic; font-size: 20px;
+  color: var(--ink); margin: 0; flex: 1;
+}
+.explore-search-wrap { padding: 14px 24px 10px; flex-shrink: 0; }
+.explore-search {
+  width: 100%; box-sizing: border-box;
+  padding: 10px 16px; border: 1.5px solid var(--mocha-light); border-radius: 22px;
+  font-family: var(--font-body); font-size: 14px;
+  background: var(--paper); color: var(--ink); transition: border-color .15s;
+  outline: none;
+}
+.explore-search:focus { border-color: var(--ink); }
+.explore-grid-wrap { flex: 1; overflow-y: auto; padding: 4px 20px 24px; }
+.explore-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px; padding-top: 8px;
+}
+.explore-card {
+  border-radius: 18px; min-height: 140px; position: relative;
+  cursor: pointer; overflow: hidden;
+  display: flex; flex-direction: column; justify-content: flex-end;
+  padding: 16px; transition: transform .16s, box-shadow .16s;
+}
+.explore-card:hover { transform: translateY(-3px); box-shadow: 0 10px 28px rgba(0,0,0,.18); }
+.explore-card-overlay {
+  position: absolute; inset: 0;
+  background: linear-gradient(to top, rgba(0,0,0,.6) 0%, rgba(0,0,0,.05) 65%);
+}
+.explore-card-name {
+  font-family: var(--font-display); font-size: 15px; font-weight: 600;
+  color: #fff; margin: 0 0 3px; position: relative; z-index: 2; line-height: 1.2;
+}
+.explore-card-topic {
+  font-size: 11px; color: rgba(255,255,255,.78);
+  position: relative; z-index: 2; margin: 0;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+.explore-card-create {
+  background: var(--mocha-wash);
+  border: 2px dashed var(--mocha-light);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 6px;
+  border-radius: 18px; min-height: 140px; cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.explore-card-create:hover { border-color: var(--ink); background: var(--mocha-light); }
+.explore-card-create-icon { font-size: 28px; line-height: 1; }
+.explore-card-create-label {
+  font-size: 13px; font-weight: 600; color: var(--muted);
+  font-family: var(--font-body);
+}
+.explore-empty {
+  grid-column: 1/-1; text-align: center; padding: 40px 0;
+  color: var(--muted); font-size: 14px;
+}
+
 /* ── Discover button in sidebar ─────────────────────────────────── */
 .chat-discover-btn {
   display: flex; align-items: center; gap: 9px; width: 100%;
@@ -1749,9 +1836,14 @@
             <div class="community-list" id="communitySidebarList">
               <div style="padding:20px 10px;color:var(--muted);font-size:13px;">Loading…</div>
             </div>
-            <button type="button" class="community-create-btn" id="communitySidebarCreateBtn">
-              <span style="font-size:18px;line-height:1;">+</span> Create community
-            </button>
+            <div style="display:flex;flex-direction:column;gap:6px;padding:0 6px 10px;flex-shrink:0;">
+              <button type="button" class="community-explore-btn" id="communitySidebarExploreBtn">
+                <span style="font-size:16px;line-height:1;">🔭</span> Explore communities
+              </button>
+              <button type="button" class="community-create-btn" id="communitySidebarCreateBtn">
+                <span style="font-size:18px;line-height:1;">+</span> Create community
+              </button>
+            </div>
           </div>
         </aside>
 
@@ -2001,6 +2093,10 @@
     // Community create button
     const communityCreateBtn = document.getElementById("communitySidebarCreateBtn");
     if (communityCreateBtn) communityCreateBtn.addEventListener("click", openCreateRoomModal);
+
+    // Community explore button
+    const communityExploreBtn = document.getElementById("communitySidebarExploreBtn");
+    if (communityExploreBtn) communityExploreBtn.addEventListener("click", openExplorePanel);
 
     // Sidebar overlay click-to-close
     const overlay = document.getElementById("chatSidebarOverlay");
@@ -2680,6 +2776,113 @@
       card.addEventListener("click", joinRoom);
       card.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") joinRoom(); });
     });
+  }
+
+  // ── Explore Panel ──────────────────────────────────────────────────────────
+
+  function roomCardGradientForExplore(roomId) {
+    // Reuse existing roomCardGradient if defined, otherwise generate
+    if (typeof roomCardGradient === "function") return roomCardGradient(roomId);
+    const hue = roomId.split("").reduce((n, c) => n + c.charCodeAt(0), 0) % 360;
+    return `linear-gradient(135deg, hsl(${hue},45%,38%) 0%, hsl(${(hue+40)%360},50%,28%) 100%)`;
+  }
+
+  function renderExploreGrid(filter) {
+    const grid = document.getElementById("exploreGrid");
+    if (!grid) return;
+    const fl = (filter || "").trim().toLowerCase();
+    const rooms = [...roomMap.values()]
+      .filter(r => !fl ||
+        r.label.toLowerCase().includes(fl) ||
+        (r.topic || "").toLowerCase().includes(fl) ||
+        r.room.toLowerCase().includes(fl));
+
+    const createCard = `
+      <div class="explore-card-create" id="explorePanelCreateCard" role="button" tabindex="0">
+        <div class="explore-card-create-icon">✦</div>
+        <div class="explore-card-create-label">Create community</div>
+      </div>`;
+
+    const roomCards = rooms.map(r => {
+      const bg = roomCardGradientForExplore(r.room);
+      return `
+        <div class="explore-card" data-room="${escapeHTML(r.room)}"
+             style="background:${bg};" role="button" tabindex="0">
+          <div class="explore-card-overlay"></div>
+          <p class="explore-card-name">${escapeHTML(r.label)}</p>
+          <p class="explore-card-topic">${escapeHTML(r.topic || "No topic")}</p>
+        </div>`;
+    }).join("");
+
+    grid.innerHTML = createCard + (rooms.length
+      ? roomCards
+      : `<div class="explore-empty">No communities yet — be the first!</div>`);
+
+    document.getElementById("explorePanelCreateCard")?.addEventListener("click", () => {
+      closeExplorePanel();
+      openCreateRoomModal();
+    });
+
+    grid.querySelectorAll(".explore-card[data-room]").forEach(card => {
+      card.addEventListener("click", () => {
+        const room = card.dataset.room;
+        const info = roomMap.get(room);
+        if (info) {
+          closeExplorePanel();
+          switchRoom(room, `#${info.label}`, null);
+          closeChatSidebar();
+        }
+      });
+      card.addEventListener("keydown", e => {
+        if (e.key === "Enter" || e.key === " ") card.click();
+      });
+    });
+  }
+
+  function openExplorePanel() {
+    if (document.getElementById("explorePanelEl")) return;
+    const chatPanel = document.querySelector(".chat-panel");
+    if (!chatPanel) return;
+    chatPanel.style.position = "relative";
+
+    const panel = document.createElement("div");
+    panel.className = "explore-panel";
+    panel.id = "explorePanelEl";
+    panel.innerHTML = `
+      <div class="explore-panel-head">
+        <button type="button" class="explore-panel-back" id="explorePanelBack" aria-label="Close explore">←</button>
+        <h2 class="explore-panel-title">Discover communities</h2>
+      </div>
+      <div class="explore-search-wrap">
+        <input type="search" class="explore-search" id="explorePanelSearch" placeholder="Search rooms…" autocomplete="off">
+      </div>
+      <div class="explore-grid-wrap">
+        <div class="explore-grid" id="exploreGrid"></div>
+      </div>
+    `;
+    chatPanel.appendChild(panel);
+    requestAnimationFrame(() => panel.classList.add("open"));
+
+    renderExploreGrid();
+
+    document.getElementById("explorePanelBack").addEventListener("click", closeExplorePanel);
+
+    const searchEl = document.getElementById("explorePanelSearch");
+    let _searchTimer;
+    searchEl.addEventListener("input", () => {
+      clearTimeout(_searchTimer);
+      _searchTimer = setTimeout(() => renderExploreGrid(searchEl.value), 200);
+    });
+    searchEl.addEventListener("keydown", e => { if (e.key === "Escape") closeExplorePanel(); });
+
+    setTimeout(() => searchEl?.focus(), 80);
+  }
+
+  function closeExplorePanel() {
+    const panel = document.getElementById("explorePanelEl");
+    if (!panel) return;
+    panel.classList.remove("open");
+    setTimeout(() => panel.remove(), 240);
   }
 
   // Cat emojis + layout for scattered background
