@@ -129,47 +129,81 @@
   border: 2px dashed rgba(255,255,255,.32);
   background: linear-gradient(135deg, #2c6e8a 0%, #1a4a5e 100%);
 }
-/* ── Create Room Modal ──────────────────────────────────────────── */
-.create-room-backdrop {
-  position: fixed; inset: 0; z-index: 300;
-  background: rgba(0,0,0,.5); display: flex;
-  align-items: center; justify-content: center;
-  opacity: 0; pointer-events: none; transition: opacity .2s;
+/* ── Create Community In-Panel View ─────────────────────────────── */
+.create-community-panel {
+  position: absolute; inset: 0; z-index: 20;
+  background: var(--paper);
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+  opacity: 0; pointer-events: none;
+  transition: opacity .22s;
 }
-.create-room-backdrop.open { opacity: 1; pointer-events: all; }
-.create-room-modal {
-  background: var(--paper); border-radius: 22px; padding: 30px 32px;
-  width: calc(100% - 48px); max-width: 420px;
-  box-shadow: 0 24px 64px rgba(0,0,0,.24);
-  transform: translateY(28px) scale(.97); transition: transform .22s;
+.create-community-panel.open { opacity: 1; pointer-events: all; }
+
+/* floating cat decorations */
+.cc-cats { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.cc-cat {
+  position: absolute; user-select: none; line-height: 1;
+  opacity: var(--cc-op, .07); font-size: var(--cc-sz, 26px);
+  transform: rotate(var(--cc-rot, 0deg));
+  animation: cc-float var(--cc-dur, 6s) ease-in-out infinite alternate;
+  animation-delay: var(--cc-delay, 0s);
 }
-.create-room-backdrop.open .create-room-modal { transform: translateY(0) scale(1); }
-.create-room-modal h2 {
-  font-family: var(--font-display); font-style: italic; font-size: 21px;
-  color: var(--ink); margin: 0 0 22px;
+@keyframes cc-float {
+  from { transform: rotate(var(--cc-rot, 0deg)) translateY(0px); }
+  to   { transform: rotate(var(--cc-rot, 0deg)) translateY(-10px); }
 }
-.create-room-modal input {
+
+.create-community-card {
+  position: relative; z-index: 2;
+  background: var(--paper);
+  border: 1.5px solid var(--mocha-light);
+  border-radius: 28px; padding: 36px 36px 30px;
+  width: calc(100% - 56px); max-width: 400px;
+  box-shadow: 0 8px 40px rgba(59,37,24,.1);
+  transform: translateY(20px) scale(.97); transition: transform .28s;
+}
+.create-community-panel.open .create-community-card {
+  transform: translateY(0) scale(1);
+}
+.cc-header { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 22px; }
+.cc-icon { font-size: 42px; line-height: 1; flex-shrink: 0; }
+.cc-title { font-family: var(--font-display); font-style: italic; font-size: 24px; color: var(--ink); margin: 0 0 4px; }
+.cc-sub { font-size: 13px; color: var(--muted); margin: 0; line-height: 1.5; }
+
+.cc-field { margin-bottom: 13px; }
+.cc-label {
+  display: block; font-family: var(--font-mono); font-size: 10px;
+  text-transform: uppercase; letter-spacing: .07em; color: var(--muted);
+  margin-bottom: 5px;
+}
+.cc-input {
   display: block; width: 100%; box-sizing: border-box;
-  padding: 10px 14px; margin-bottom: 12px;
-  border: 1.5px solid var(--mocha-light); border-radius: 11px;
+  padding: 11px 14px;
+  border: 1.5px solid var(--mocha-light); border-radius: 12px;
   font-family: var(--font-body); font-size: 14px;
-  background: var(--paper); color: var(--ink); transition: border-color .15s;
+  background: var(--paper); color: var(--ink);
+  transition: border-color .15s; outline: none;
 }
-.create-room-modal input:focus { outline: none; border-color: var(--ink); }
-.create-room-modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 10px; }
-.create-room-cancel {
-  background: none; border: 1.5px solid var(--mocha-light); border-radius: 11px;
-  padding: 9px 20px; cursor: pointer; font-family: var(--font-body);
-  font-size: 14px; color: var(--muted); transition: background .15s;
+.cc-input:focus { border-color: var(--ink); }
+.cc-input::placeholder { color: var(--muted); opacity: .7; }
+
+.cc-actions { display: flex; gap: 10px; margin-top: 20px; }
+.cc-cancel {
+  flex: 1; padding: 11px; background: none;
+  border: 1.5px solid var(--mocha-light); border-radius: 12px;
+  font-family: var(--font-body); font-size: 14px; color: var(--muted);
+  cursor: pointer; transition: background .15s, border-color .15s;
 }
-.create-room-cancel:hover { background: var(--mocha-light); }
-.create-room-submit {
-  background: var(--ink); color: var(--paper); border: none; border-radius: 11px;
-  padding: 9px 22px; cursor: pointer; font-family: var(--font-body);
-  font-size: 14px; font-weight: 600; transition: opacity .15s;
+.cc-cancel:hover { background: var(--mocha-wash); border-color: var(--mocha); }
+.cc-submit {
+  flex: 2; padding: 11px; background: var(--ink); color: var(--cream);
+  border: none; border-radius: 12px; font-family: var(--font-body);
+  font-size: 14px; font-weight: 700; cursor: pointer; transition: opacity .15s;
 }
-.create-room-submit:hover { opacity: .82; }
-.create-room-submit:disabled { opacity: .5; cursor: not-allowed; }
+.cc-submit:hover { opacity: .85; }
+.cc-submit:disabled { opacity: .5; cursor: not-allowed; }
+.cc-error { font-size: 12px; color: var(--danger); margin-top: 8px; min-height: 16px; }
 /* ── Discover button in sidebar ─────────────────────────────────── */
 .chat-discover-btn {
   display: flex; align-items: center; gap: 9px; width: 100%;
@@ -2648,55 +2682,104 @@
     });
   }
 
-  function openCreateRoomModal() {
-    const existing = document.getElementById("createRoomBackdrop");
-    if (existing) return;
+  // Cat emojis + layout for scattered background
+  const CC_CATS = [
+    { e:"🐱", top:"6%",  left:"6%",  sz:"30px", rot:"-14deg", op:.08, dur:"7s",  delay:"0s"   },
+    { e:"😸", top:"4%",  left:"68%", sz:"38px", rot:"10deg",  op:.07, dur:"8s",  delay:"1s"   },
+    { e:"🐾", top:"16%", right:"5%", sz:"22px", rot:"25deg",  op:.09, dur:"6s",  delay:"2s"   },
+    { e:"😺", top:"38%", left:"2%",  sz:"32px", rot:"-6deg",  op:.07, dur:"9s",  delay:".5s"  },
+    { e:"🐾", top:"55%", right:"4%", sz:"26px", rot:"18deg",  op:.08, dur:"7.5s",delay:"1.5s" },
+    { e:"🐈", top:"72%", left:"7%",  sz:"28px", rot:"-20deg", op:.07, dur:"8.5s",delay:"3s"   },
+    { e:"🙀", top:"82%", left:"52%", sz:"34px", rot:"8deg",   op:.06, dur:"6.5s",delay:"2.5s" },
+    { e:"😹", top:"88%", right:"8%", sz:"24px", rot:"-12deg", op:.09, dur:"7s",  delay:".8s"  },
+    { e:"🐾", top:"11%", left:"38%", sz:"18px", rot:"4deg",   op:.06, dur:"9s",  delay:"2s"   },
+    { e:"🌸", top:"62%", left:"38%", sz:"20px", rot:"-18deg", op:.07, dur:"8s",  delay:"1.2s" },
+    { e:"🐱", top:"46%", left:"68%", sz:"22px", rot:"30deg",  op:.08, dur:"6s",  delay:"3.5s" },
+    { e:"✨", top:"28%", left:"18%", sz:"16px", rot:"-3deg",  op:.07, dur:"7s",  delay:"0.3s" },
+    { e:"🐾", top:"20%", left:"55%", sz:"20px", rot:"15deg",  op:.06, dur:"9.5s",delay:"4s"   },
+  ];
 
-    const backdrop = document.createElement("div");
-    backdrop.className = "create-room-backdrop";
-    backdrop.id = "createRoomBackdrop";
-    backdrop.innerHTML = `
-      <div class="create-room-modal" id="createRoomModal">
-        <h2>Create a community</h2>
-        <input type="text" id="crNameInput" placeholder="Room ID — e.g. study-group" autocomplete="off" spellcheck="false">
-        <input type="text" id="crLabelInput" placeholder="Display name — e.g. Study Group" autocomplete="off">
-        <input type="text" id="crTopicInput" placeholder="Topic (optional)" autocomplete="off">
-        <div class="create-room-modal-actions">
-          <button type="button" class="create-room-cancel" id="crCancelBtn">Cancel</button>
-          <button type="button" class="create-room-submit" id="crSubmitBtn">Create room</button>
+  function openCreateRoomModal() {
+    if (document.getElementById("createCommunityPanel")) return;
+
+    // Inject into .chat-panel so it stays inside the chat area
+    const chatPanel = document.querySelector(".chat-panel");
+    if (!chatPanel) return;
+    chatPanel.style.position = "relative"; // ensure stacking context
+
+    const panel = document.createElement("div");
+    panel.className = "create-community-panel";
+    panel.id = "createCommunityPanel";
+
+    // Scattered cats
+    const catHtml = CC_CATS.map(c => {
+      const posStyle = c.right
+        ? `top:${c.top};right:${c.right};`
+        : `top:${c.top};left:${c.left};`;
+      return `<span class="cc-cat" style="${posStyle}--cc-sz:${c.sz};--cc-rot:${c.rot};--cc-op:${c.op};--cc-dur:${c.dur};--cc-delay:${c.delay};">${c.e}</span>`;
+    }).join("");
+
+    panel.innerHTML = `
+      <div class="cc-cats">${catHtml}</div>
+      <div class="create-community-card">
+        <div class="cc-header">
+          <div class="cc-icon">🐱</div>
+          <div>
+            <div class="cc-title">New community</div>
+            <p class="cc-sub">Create a room for your crew to hang out in.</p>
+          </div>
+        </div>
+        <div class="cc-field">
+          <label class="cc-label" for="crNameInput">Room ID</label>
+          <input class="cc-input" type="text" id="crNameInput" placeholder="e.g. book-club" autocomplete="off" spellcheck="false" maxlength="40">
+        </div>
+        <div class="cc-field">
+          <label class="cc-label" for="crLabelInput">Display name</label>
+          <input class="cc-input" type="text" id="crLabelInput" placeholder="e.g. Book Club" autocomplete="off" maxlength="50">
+        </div>
+        <div class="cc-field">
+          <label class="cc-label" for="crTopicInput">Topic <span style="opacity:.5;font-size:9px;">(optional)</span></label>
+          <input class="cc-input" type="text" id="crTopicInput" placeholder="What's this room about?" autocomplete="off" maxlength="120">
+        </div>
+        <div class="cc-error" id="crErrorMsg"></div>
+        <div class="cc-actions">
+          <button type="button" class="cc-cancel" id="crCancelBtn">Cancel</button>
+          <button type="button" class="cc-submit" id="crSubmitBtn">✦ Create community</button>
         </div>
       </div>
     `;
-    document.body.appendChild(backdrop);
-    requestAnimationFrame(() => backdrop.classList.add("open"));
+
+    chatPanel.appendChild(panel);
+    requestAnimationFrame(() => panel.classList.add("open"));
 
     document.getElementById("crCancelBtn").addEventListener("click", closeCreateRoomModal);
-    backdrop.addEventListener("click", (e) => { if (e.target === backdrop) closeCreateRoomModal(); });
 
     document.getElementById("crSubmitBtn").addEventListener("click", async () => {
       const name  = document.getElementById("crNameInput").value.trim();
       const label = document.getElementById("crLabelInput").value.trim();
       const topic = document.getElementById("crTopicInput").value.trim();
-      if (!name)  { showToast("Room ID is required."); document.getElementById("crNameInput").focus(); return; }
-      if (!label) { showToast("Display name is required."); document.getElementById("crLabelInput").focus(); return; }
+      const errEl = document.getElementById("crErrorMsg");
+      if (!name)  { errEl.textContent = "Room ID is required."; document.getElementById("crNameInput").focus(); return; }
+      if (!label) { errEl.textContent = "Display name is required."; document.getElementById("crLabelInput").focus(); return; }
+      errEl.textContent = "";
       const btn = document.getElementById("crSubmitBtn");
       btn.disabled = true; btn.textContent = "Creating…";
       const room = await createChatRoom(name, label, topic);
       if (room) {
-        showToast(`✓ #${label} created!`);
         closeCreateRoomModal();
-        // Refresh community sidebar and switch to new room
+        showToast(`✓ #${label} created!`);
         renderCommunitySidebar(document.getElementById("communitySidebarSearch")?.value || "");
         switchRoom(room.room, `#${room.label}`, null);
       } else {
-        btn.disabled = false; btn.textContent = "Create room";
+        btn.disabled = false; btn.textContent = "✦ Create community";
+        errEl.textContent = "That room ID might already be taken.";
       }
     });
 
-    // Enter to submit from any input
     ["crNameInput","crLabelInput","crTopicInput"].forEach(id => {
       document.getElementById(id)?.addEventListener("keydown", (e) => {
         if (e.key === "Enter") document.getElementById("crSubmitBtn")?.click();
+        if (e.key === "Escape") closeCreateRoomModal();
       });
     });
 
@@ -2704,10 +2787,10 @@
   }
 
   function closeCreateRoomModal() {
-    const backdrop = document.getElementById("createRoomBackdrop");
-    if (!backdrop) return;
-    backdrop.classList.remove("open");
-    setTimeout(() => backdrop.remove(), 220);
+    const panel = document.getElementById("createCommunityPanel");
+    if (!panel) return;
+    panel.classList.remove("open");
+    setTimeout(() => panel.remove(), 240);
   }
 
   // ── Report modal ────────────────────────────────────────────────────────────
