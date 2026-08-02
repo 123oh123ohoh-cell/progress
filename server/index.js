@@ -296,7 +296,8 @@ function publicUser(user) {
     following: user.following || [],
     locked: !!user.locked,
     banned: !!user.banned,
-    streak: typeof user.streak === "number" ? user.streak : 0
+    streak: typeof user.streak === "number" ? user.streak : 0,
+    adminRole: ALLOWED_CREATOR_USERNAMES.has(user.username) ? "owner" : (user.adminRole || null)
   };
 }
 
@@ -1037,7 +1038,7 @@ async function auditLog(actor, action, target, details = {}) {
 
 // ── Admin role helpers ────────────────────────────────────────────────────────
 // Role hierarchy: owner > admin > moderator > analyst
-const ROLE_WEIGHTS = { owner: 4, admin: 3, moderator: 2, analyst: 1 };
+const ROLE_WEIGHTS = { owner: 5, moderator: 4, analyst: 3, email_writer: 2 };
 
 async function getAdminRole(username) {
   if (ALLOWED_CREATOR_USERNAMES.has(username.toLowerCase())) return "owner";
@@ -1049,8 +1050,8 @@ async function getAdminRole(username) {
 }
 
 // Middleware factory — pass the minimum role weight required.
-// e.g. requireRole("admin") allows owner + admin
-// requireRole("analyst") allows all four roles
+// e.g. requireRole("moderator") allows owner + moderator
+// requireRole("email_writer") allows all four roles
 function requireRole(minRole) {
   const minWeight = ROLE_WEIGHTS[minRole] || 99;
   return async (req, res, next) => {
@@ -2695,7 +2696,7 @@ app.post("/api/admin/send-digest", requireAuth, asyncHandler(async (req, res) =>
 }));
 
 // ── Admin: custom email blast ─────────────────────────────────────────────────
-app.post("/api/admin/send-email", requireAuth, requireRole("admin"), asyncHandler(async (req, res) => {
+app.post("/api/admin/send-email", requireAuth, requireRole("email_writer"), asyncHandler(async (req, res) => {
   const { subject, body, bodyHtml: prebuiltBodyHtml, targetUsername, emoticon, ctaText, ctaUrl, accentColor, buttonColor, footerTagline } = req.body || {};
   if (!subject || (!body && !prebuiltBodyHtml)) return res.status(400).json({ error: "Subject and body are required." });
   const key = process.env.RESEND_API_KEY;
@@ -2758,7 +2759,7 @@ app.post("/api/admin/send-email", requireAuth, requireRole("admin"), asyncHandle
 }));
 
 // ── Admin: preview email HTML (no send) ───────────────────────────────────────
-app.post("/api/admin/preview-email", requireAuth, requireRole("admin"), asyncHandler(async (req, res) => {
+app.post("/api/admin/preview-email", requireAuth, requireRole("email_writer"), asyncHandler(async (req, res) => {
   const { subject, body, bodyHtml: prebuiltBodyHtml, emoticon, ctaText, ctaUrl, accentColor, buttonColor, footerTagline } = req.body || {};
   if (!subject && !body && !prebuiltBodyHtml) return res.status(400).json({ error: "Nothing to preview." });
   const site = "https://progressing.online";
@@ -2793,12 +2794,12 @@ function livePresence(project) {
   return (project.presence || []).filter(p => new Date(p.lastSeen).getTime() > cutoff);
 }
 
-app.get("/api/admin/email-projects", requireAuth, requireRole("admin"), asyncHandler(async (req, res) => {
+app.get("/api/admin/email-projects", requireAuth, requireRole("email_writer"), asyncHandler(async (req, res) => {
   const projects = await db.collection("emailProjects").find({}).sort({ updatedAt: -1 }).limit(60).toArray();
   res.json(projects.map(p => ({ ...p, presence: livePresence(p) })));
 }));
 
-app.post("/api/admin/email-projects", requireAuth, requireRole("admin"), asyncHandler(async (req, res) => {
+app.post("/api/admin/email-projects", requireAuth, requireRole("email_writer"), asyncHandler(async (req, res) => {
   const { name } = req.body || {};
   const project = {
     _id: crypto.randomBytes(8).toString("hex"),
@@ -2819,13 +2820,13 @@ app.post("/api/admin/email-projects", requireAuth, requireRole("admin"), asyncHa
   res.json(project);
 }));
 
-app.get("/api/admin/email-projects/:id", requireAuth, requireRole("admin"), asyncHandler(async (req, res) => {
+app.get("/api/admin/email-projects/:id", requireAuth, requireRole("email_writer"), asyncHandler(async (req, res) => {
   const p = await db.collection("emailProjects").findOne({ _id: req.params.id });
   if (!p) return res.status(404).json({ error: "Project not found" });
   res.json({ ...p, presence: livePresence(p) });
 }));
 
-app.put("/api/admin/email-projects/:id", requireAuth, requireRole("admin"), asyncHandler(async (req, res) => {
+app.put("/api/admin/email-projects/:id", requireAuth, requireRole("email_writer"), asyncHandler(async (req, res) => {
   const p = await db.collection("emailProjects").findOne({ _id: req.params.id });
   if (!p) return res.status(404).json({ error: "Project not found" });
   const { name, subject, blocks, emoticon, accentColor, footerTagline, clientVersion } = req.body || {};
@@ -2848,14 +2849,14 @@ app.put("/api/admin/email-projects/:id", requireAuth, requireRole("admin"), asyn
   res.json({ ok: true, version: update.version });
 }));
 
-app.delete("/api/admin/email-projects/:id", requireAuth, requireRole("admin"), asyncHandler(async (req, res) => {
+app.delete("/api/admin/email-projects/:id", requireAuth, requireRole("email_writer"), asyncHandler(async (req, res) => {
   await db.collection("emailProjects").deleteOne({ _id: req.params.id });
   auditLog(req.user.username, "email_project_deleted", req.params.id, {});
   res.json({ ok: true });
 }));
 
 // Heartbeat — keeps user's presence alive; also returns latest project data for sync
-app.post("/api/admin/email-projects/:id/presence", requireAuth, requireRole("admin"), asyncHandler(async (req, res) => {
+app.post("/api/admin/email-projects/:id/presence", requireAuth, requireRole("email_writer"), asyncHandler(async (req, res) => {
   const p = await db.collection("emailProjects").findOne({ _id: req.params.id });
   if (!p) return res.status(404).json({ error: "Project not found" });
   const { color } = req.body || {};
@@ -3236,7 +3237,7 @@ app.get("/api/admin/users-list", requireAuth, requireRole("moderator"), asyncHan
 // ── Admin: assign role ────────────────────────────────────────────────────────
 app.patch("/api/admin/users/:username/role", requireAuth, requireRole("owner"), asyncHandler(async (req, res) => {
   const { role } = req.body || {};
-  const validRoles = ["admin", "moderator", "analyst", null];
+  const validRoles = ["moderator", "analyst", "email_writer", null];
   if (!validRoles.includes(role ?? null)) return res.status(400).json({ error: "Invalid role." });
 
   const target = await db.collection("users").findOne({ username: req.params.username.toLowerCase() });
@@ -3254,7 +3255,7 @@ app.patch("/api/admin/users/:username/role", requireAuth, requireRole("owner"), 
 }));
 
 // ── Admin: assign badge ───────────────────────────────────────────────────────
-app.patch("/api/admin/users/:username/badge", requireAuth, requireRole("admin"), asyncHandler(async (req, res) => {
+app.patch("/api/admin/users/:username/badge", requireAuth, requireRole("moderator"), asyncHandler(async (req, res) => {
   const { badge } = req.body || {};  // badge = string or null to remove
   const VALID_BADGES = ["creator", "verified", "mod", "og", "supporter", "writer", null];
   if (!VALID_BADGES.includes(badge ?? null)) return res.status(400).json({ error: "Invalid badge." });
@@ -3272,7 +3273,7 @@ app.patch("/api/admin/users/:username/badge", requireAuth, requireRole("admin"),
 }));
 
 // ── Admin: audit log ──────────────────────────────────────────────────────────
-app.get("/api/admin/audit-log", requireAuth, requireRole("admin"), asyncHandler(async (req, res) => {
+app.get("/api/admin/audit-log", requireAuth, requireRole("moderator"), asyncHandler(async (req, res) => {
   const page  = Math.max(0, parseInt(req.query.page) || 0);
   const limit = Math.min(100, parseInt(req.query.limit) || 50);
   const actor = req.query.actor || null;
@@ -3291,7 +3292,7 @@ app.get("/api/admin/audit-log", requireAuth, requireRole("admin"), asyncHandler(
 }));
 
 // ── Admin: announcement ───────────────────────────────────────────────────────
-app.post("/api/admin/announcement", requireAuth, requireRole("admin"), asyncHandler(async (req, res) => {
+app.post("/api/admin/announcement", requireAuth, requireRole("moderator"), asyncHandler(async (req, res) => {
   const { title, body, targetUsername } = req.body || {};
   if (!title || !body) return res.status(400).json({ error: "title and body are required." });
 

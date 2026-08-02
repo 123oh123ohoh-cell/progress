@@ -316,6 +316,56 @@ html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; font-family:
 
 /* Keyboard shortcut hint */
 .kb-hint { font-size: 10px; color: var(--muted,#8a7060); font-family: monospace; background: var(--mocha-wash,#F5EDE0); padding: 1px 5px; border-radius: 4px; }
+
+/* ── Format Toolbar ── */
+#formatBar {
+  background: #FAF5EE; border-bottom: 1px solid #E0D4C4;
+  padding: 4px 12px; display: flex; align-items: center; gap: 2px;
+  flex-shrink: 0; flex-wrap: wrap; min-height: 38px; z-index: 50;
+  transition: opacity .15s;
+}
+#formatBar.inactive { opacity: .35; pointer-events: none; }
+.fmt-sep { width: 1px; height: 20px; background: #D4C4B4; margin: 0 4px; flex-shrink: 0; }
+.fmt-btn {
+  height: 28px; min-width: 28px; padding: 0 6px; border: none;
+  background: none; border-radius: 5px; cursor: pointer;
+  font-size: 13px; font-weight: 600; color: #5A4030;
+  display: flex; align-items: center; justify-content: center;
+  gap: 3px; white-space: nowrap; transition: background .1s, color .1s;
+}
+.fmt-btn:hover { background: #EAD9C4; color: #2A1F14; }
+.fmt-btn.active { background: #A07858; color: #fff; }
+.fmt-select {
+  height: 28px; padding: 0 6px; border: 1px solid #D4C4B4; border-radius: 5px;
+  background: #FAF5EE; color: #5A4030; font-size: 12px; cursor: pointer;
+  font-family: Inter,sans-serif;
+}
+.fmt-select:focus { outline: none; border-color: #A07858; }
+.fmt-color-btn { width: 28px; height: 28px; border-radius: 5px; border: 1.5px solid #D4C4B4; cursor: pointer; padding: 2px; background: none; display: flex; align-items: center; justify-content: center; }
+.fmt-color-btn:hover { border-color: #A07858; }
+.fmt-color-swatch { width: 18px; height: 18px; border-radius: 3px; pointer-events: none; }
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  #leftPanel { width: 180px; }
+  #rightPanel { width: 220px; }
+  .pal-grid { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 700px) {
+  #leftPanel { display: none; }
+  #rightPanel { width: 200px; }
+  #emailCanvas { width: 100%; min-width: 320px; }
+  #canvasWrap { padding: 12px 8px 40px; }
+  #topBar { padding: 0 8px; gap: 6px; }
+  .tb-logo { display: none; }
+  .tb-sep:not(:last-of-type) { display: none; }
+  #zoomControl { display: none; }
+  #projectName { max-width: 120px; }
+}
+@media (max-width: 480px) {
+  #rightPanel { display: none; }
+  .tb-btn span { display: none; }
+}
 </style>
 </head>
 <body>
@@ -355,6 +405,61 @@ html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; font-family:
     <div class="tb-sep"></div>
     <button class="tb-btn tb-btn-ghost" id="previewBtn">👁 Preview</button>
     <button class="tb-btn tb-btn-send" id="sendBtn">Send ✉</button>
+  </div>
+
+  <!-- ── Format Bar ── -->
+  <div id="formatBar" class="inactive">
+    <!-- Font family -->
+    <select class="fmt-select" id="fmtFont" title="Font family">
+      <option value="Georgia,'Times New Roman',serif">Georgia</option>
+      <option value="Inter,sans-serif">Inter</option>
+      <option value="'IBM Plex Mono',monospace">Mono</option>
+    </select>
+    <!-- Font size -->
+    <select class="fmt-select" id="fmtSize" title="Font size" style="width:62px;">
+      <option value="12">12</option>
+      <option value="13">13</option>
+      <option value="15" selected>15</option>
+      <option value="17">17</option>
+      <option value="18">18</option>
+      <option value="20">20</option>
+      <option value="22">22</option>
+      <option value="26">26</option>
+      <option value="32">32</option>
+    </select>
+    <div class="fmt-sep"></div>
+    <!-- Bold / Italic / Underline -->
+    <button class="fmt-btn" id="fmtBold"      title="Bold (Ctrl+B)"><strong>B</strong></button>
+    <button class="fmt-btn" id="fmtItalic"    title="Italic (Ctrl+I)"><em>I</em></button>
+    <button class="fmt-btn" id="fmtUnderline" title="Underline (Ctrl+U)"><u>U</u></button>
+    <div class="fmt-sep"></div>
+    <!-- Alignment -->
+    <button class="fmt-btn" id="fmtLeft"   title="Align left"   data-align="left">⬛◻◻</button>
+    <button class="fmt-btn" id="fmtCenter" title="Align center" data-align="center">◻⬛◻</button>
+    <button class="fmt-btn" id="fmtRight"  title="Align right"  data-align="right">◻◻⬛</button>
+    <div class="fmt-sep"></div>
+    <!-- Text color -->
+    <button class="fmt-color-btn" id="fmtColorBtn" title="Text color">
+      <span class="fmt-color-swatch" id="fmtColorSwatch" style="background:#4A3728;"></span>
+    </button>
+    <input type="color" id="fmtColorPicker" value="#4A3728" style="position:absolute;opacity:0;width:0;height:0;pointer-events:none;">
+    <div class="fmt-sep"></div>
+    <!-- Line height -->
+    <select class="fmt-select" id="fmtLineH" title="Line height" style="width:64px;">
+      <option value="1.4">1.4×</option>
+      <option value="1.6">1.6×</option>
+      <option value="1.85" selected>1.85×</option>
+      <option value="2.1">2.1×</option>
+      <option value="2.4">2.4×</option>
+    </select>
+    <div class="fmt-sep"></div>
+    <!-- Letter spacing -->
+    <select class="fmt-select" id="fmtLetterSpacing" title="Letter spacing" style="width:66px;">
+      <option value="0">Normal</option>
+      <option value="0.03em">Wide</option>
+      <option value="0.08em">Wider</option>
+      <option value="0.15em">Widest</option>
+    </select>
   </div>
 
   <!-- ── Main ── -->
@@ -500,8 +605,8 @@ html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; font-family:
 const SITE = "https://progressing.online";
 const EMOTICONS = ["hi","penguin","starbucks","bee","turtle_lazy","hamster","cow","shark","sharkcat","lion","banana","bored","windy","romantic","wonder","asleep_couch","mwa","kiss","computer","computersupport","dark","construction","dexterity"];
 const ACCENT_PRESETS = ["#8C6E58","#6B7F6E","#7B6B9A","#C47C5A","#4A7C9E","#2E6B4A","#9E5A5A","#333333"];
-const ALLOWED_ADMIN = new Set(["mara","own","progresstesting1"]);
-const ADMIN_PASSWORD = "blowblow426J";
+const EMAIL_ROLES = new Set(["owner","moderator","analyst","email_writer"]);
+const OWNER_USERNAMES = new Set(["mara","own","progresstesting1"]);
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let _projectId = null;
@@ -525,7 +630,9 @@ let _dragSrcId = null;
 // ── Auth ──────────────────────────────────────────────────────────────────────
 function isAuthed() {
   const u = Progress.getCurrentUser?.();
-  return (u && ALLOWED_ADMIN.has(u.username)) || sessionStorage.getItem("adminAuth") === "true";
+  if (!u) return false;
+  if (OWNER_USERNAMES.has(u.username)) return true;
+  return EMAIL_ROLES.has(u.adminRole);
 }
 
 // ── Startup ───────────────────────────────────────────────────────────────────
@@ -534,13 +641,8 @@ async function start() {
   await Progress.loadFromApi().catch(() => {});
 
   if (!isAuthed()) {
-    const pw = prompt("Admin password:");
-    if (pw === ADMIN_PASSWORD) {
-      sessionStorage.setItem("adminAuth", "true");
-    } else {
-      document.getElementById("app").innerHTML = `<div style="text-align:center;padding:80px 20px;font-family:Georgia,serif;"><h2>Access denied.</h2><a href="admin-emails.html">← Back</a></div>`;
-      return;
-    }
+    document.getElementById("app").innerHTML = `<div style="text-align:center;padding:80px 20px;font-family:Georgia,serif;color:#4A3728;"><h2>Access denied</h2><p style="color:#8a7060;font-size:15px;">You need the <strong>email_writer</strong> role to access this page.</p><a href="/" style="color:#A07858;">← Back to Progress</a></div>`;
+    return;
   }
 
   const params = new URLSearchParams(location.search);
@@ -647,9 +749,13 @@ function initUI() {
     _selId = null;
     renderBlocks();
     renderGlobalProps();
+    syncFormatBar();
     document.getElementById("rpClose").style.display = "none";
     document.getElementById("rpTitle").textContent = "Email Settings";
   });
+
+  // ── Format bar ────────────────────────────────────────────────────────────
+  initFormatBar();
 
   // Keyboard shortcuts
   document.addEventListener("keydown", e => {
@@ -657,7 +763,10 @@ function initUI() {
     if (ctrl && e.key === "z" && !e.shiftKey) { e.preventDefault(); undo(); }
     if (ctrl && (e.key === "y" || (e.key === "z" && e.shiftKey))) { e.preventDefault(); redo(); }
     if (ctrl && e.key === "s") { e.preventDefault(); save(true); }
-    if (e.key === "Escape") { _selId = null; renderBlocks(); renderGlobalProps(); }
+    if (ctrl && e.key === "b") { e.preventDefault(); fmtToggle("bold"); }
+    if (ctrl && e.key === "i") { e.preventDefault(); fmtToggle("italic"); }
+    if (ctrl && e.key === "u") { e.preventDefault(); fmtToggle("underline"); }
+    if (e.key === "Escape") { _selId = null; renderBlocks(); renderGlobalProps(); syncFormatBar(); }
     if (e.key === "Delete" && _selId && document.activeElement === document.body) removeBlock(_selId);
   });
 
@@ -667,6 +776,7 @@ function initUI() {
       _selId = null;
       renderBlocks();
       renderGlobalProps();
+      syncFormatBar();
     }
   });
 
@@ -677,8 +787,83 @@ function initUI() {
 // ── Zoom ──────────────────────────────────────────────────────────────────────
 function setZoom(z) {
   _zoom = Math.max(.4, Math.min(1.6, Math.round(z * 10) / 10));
-  document.getElementById("emailCanvas").style.transform = `scale(${_zoom})`;
+  const canvas = document.getElementById("emailCanvas");
+  canvas.style.transform = `scale(${_zoom})`;
+  canvas.style.transformOrigin = "top center";
+  // Adjust wrapper height so scroll area reflects scaled canvas size
+  const scaledH = canvas.scrollHeight * _zoom;
+  canvas.style.marginBottom = `${Math.max(0, scaledH - canvas.scrollHeight)}px`;
   document.getElementById("zoomPct").textContent = Math.round(_zoom * 100) + "%";
+}
+
+// ── Format Bar ───────────────────────────────────────────────────────────────
+function initFormatBar() {
+  const fmtApply = (key, val) => {
+    const b = _blocks.find(x => x.id === _selId);
+    if (!b || b.type !== "text") return;
+    b[key] = val;
+    renderBlocks(); markDirty(); pushHistory(); syncFormatBar();
+  };
+
+  document.getElementById("fmtFont").addEventListener("change", e => fmtApply("fontFamily", e.target.value));
+  document.getElementById("fmtSize").addEventListener("change", e => fmtApply("fontSize", parseInt(e.target.value)));
+  document.getElementById("fmtLineH").addEventListener("change", e => fmtApply("lineHeight", parseFloat(e.target.value)));
+  document.getElementById("fmtLetterSpacing").addEventListener("change", e => fmtApply("letterSpacing", e.target.value));
+
+  document.getElementById("fmtBold").addEventListener("click",      () => fmtToggle("bold"));
+  document.getElementById("fmtItalic").addEventListener("click",    () => fmtToggle("italic"));
+  document.getElementById("fmtUnderline").addEventListener("click", () => fmtToggle("underline"));
+
+  document.querySelectorAll("[data-align]").forEach(btn =>
+    btn.addEventListener("click", () => fmtApply("align", btn.dataset.align))
+  );
+
+  // Text color
+  const colorBtn = document.getElementById("fmtColorBtn");
+  const colorPicker = document.getElementById("fmtColorPicker");
+  colorBtn.addEventListener("click", () => colorPicker.click());
+  colorPicker.addEventListener("input", e => {
+    document.getElementById("fmtColorSwatch").style.background = e.target.value;
+    fmtApply("textColor", e.target.value);
+  });
+}
+
+function fmtToggle(key) {
+  const b = _blocks.find(x => x.id === _selId);
+  if (!b || b.type !== "text") return;
+  b[key] = !b[key];
+  renderBlocks(); markDirty(); pushHistory(); syncFormatBar();
+}
+
+function syncFormatBar() {
+  const bar = document.getElementById("formatBar");
+  const b = _blocks.find(x => x.id === _selId);
+  const active = b && b.type === "text";
+  bar.classList.toggle("inactive", !active);
+  if (!active) return;
+
+  const v = (id, val) => { const el = document.getElementById(id); if(el) el.value = val; };
+  const t = (id, on) => { const el = document.getElementById(id); if(el) el.classList.toggle("active", on); };
+
+  v("fmtFont", b.fontFamily || "Georgia,'Times New Roman',serif");
+  v("fmtSize", String(b.fontSize || 15));
+  v("fmtLineH", String(b.lineHeight || 1.85));
+  v("fmtLetterSpacing", b.letterSpacing || "0");
+  t("fmtBold",      !!b.bold);
+  t("fmtItalic",    !!b.italic);
+  t("fmtUnderline", !!b.underline);
+
+  // Alignment
+  ["left","center","right"].forEach(a => {
+    const el = document.querySelector(`[data-align="${a}"]`);
+    if (el) el.classList.toggle("active", (b.align||"left") === a);
+  });
+
+  // Color swatch
+  const swatch = document.getElementById("fmtColorSwatch");
+  const picker = document.getElementById("fmtColorPicker");
+  if (swatch) swatch.style.background = b.textColor || "#4A3728";
+  if (picker) picker.value = b.textColor || "#4A3728";
 }
 
 // ── History (undo/redo) ───────────────────────────────────────────────────────
@@ -707,7 +892,8 @@ function redo() {
 function applyHistory(snap) {
   const s = JSON.parse(snap);
   _blocks = s.blocks; _emoticon = s.emoticon; _accent = s.accent; _footerTagline = s.footer;
-  applyAccent(); renderBlocks(); renderGlobalProps(); markDirty(); syncUndoRedo();
+  _selId = null;
+  applyAccent(); renderBlocks(); renderGlobalProps(); syncFormatBar(); markDirty(); syncUndoRedo();
 }
 
 function syncUndoRedo() {
@@ -719,7 +905,7 @@ function syncUndoRedo() {
 function makeBlock(type) {
   const id = `b${_nextId++}`;
   const D = {
-    text:    { id, type, content: "Write something beautiful here.", fontSize: 15, textColor: "#4A3728", align: "left" },
+    text:    { id, type, content: "Write something beautiful here.", fontSize: 15, textColor: "#4A3728", align: "left", fontFamily: "Georgia,'Times New Roman',serif", lineHeight: 1.85, letterSpacing: "0", bold: false, italic: false, underline: false },
     html:    { id, type, content: "<p>Custom HTML content here.</p>" },
     image:   { id, type, src: "", alt: "", link: "", width: 100 },
     button:  { id, type, text: "Click here", url: SITE, align: "center" },
@@ -769,6 +955,7 @@ function selectBlock(id) {
     document.getElementById("rpTitle").textContent = b.type.toUpperCase() + " BLOCK";
     document.getElementById("rpClose").style.display = "";
   }
+  syncFormatBar();
 }
 
 // ── Render blocks ─────────────────────────────────────────────────────────────
@@ -856,8 +1043,11 @@ function blockHtml(b) {
   const esc = s => String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
   const n2b = s => esc(s).replace(/\n/g,"<br>");
   switch (b.type) {
-    case "text":
-      return `<div class="b-text" style="font-size:${b.fontSize||15}px;color:${b.textColor||"#4A3728"};text-align:${b.align||"left"};">${n2b(b.content||"")}</div>`;
+    case "text": {
+      const ff = b.fontFamily || "Georgia,'Times New Roman',serif";
+      const fStyle = `font-size:${b.fontSize||15}px;color:${b.textColor||"#4A3728"};text-align:${b.align||"left"};font-family:${ff};line-height:${b.lineHeight||1.85};letter-spacing:${b.letterSpacing||"0"};${b.bold?"font-weight:bold;":""}${b.italic?"font-style:italic;":""}${b.underline?"text-decoration:underline;":""}`;
+      return `<div class="b-text" style="${fStyle}">${n2b(b.content||"")}</div>`;
+    }
     case "html":
       return `<div class="b-html">${b.content||""}</div>`;
     case "image":
@@ -1038,24 +1228,26 @@ function renderBlockProps(b) {
   switch (b.type) {
     case "text":
       html = `
+        <div class="rp-hint" style="margin-bottom:10px;padding:8px 10px;background:#FFF0E0;border-radius:6px;font-size:11px;color:#8a6040;">
+          ✦ Use the <strong>format bar above the canvas</strong> for bold, italic, alignment, font, and color.
+        </div>
         <div class="rp-group"><span class="rp-label">Content</span>
-          <textarea class="rp-ta" data-key="content" rows="6">${esc(b.content||"")}</textarea></div>
-        <div class="rp-group"><span class="rp-label">Font size</span>
-          <select class="rp-select" data-key="fontSize">
-            <option value="13" ${b.fontSize==13?"selected":""}>Small (13px)</option>
-            <option value="15" ${(b.fontSize||15)==15?"selected":""}>Normal (15px)</option>
-            <option value="18" ${b.fontSize==18?"selected":""}>Large (18px)</option>
-            <option value="22" ${b.fontSize==22?"selected":""}>Heading (22px)</option>
-            <option value="26" ${b.fontSize==26?"selected":""}>Display (26px)</option>
-          </select></div>
-        <div class="rp-group"><span class="rp-label">Alignment</span>
-          <select class="rp-select" data-key="align">
-            <option value="left" ${(b.align||"left")==="left"?"selected":""}>Left</option>
-            <option value="center" ${b.align==="center"?"selected":""}>Center</option>
-            <option value="right" ${b.align==="right"?"selected":""}>Right</option>
-          </select></div>
+          <textarea class="rp-ta" data-key="content" rows="7">${esc(b.content||"")}</textarea></div>
+        <div class="rp-group"><span class="rp-label">Font size (px)</span>
+          <input class="rp-input" type="number" data-key="fontSize" value="${b.fontSize||15}" min="10" max="72" step="1"></div>
         <div class="rp-group"><span class="rp-label">Text color</span>
-          <input class="rp-input" type="color" data-key="textColor" value="${b.textColor||"#4A3728"}" style="height:36px;padding:3px;cursor:pointer;"></div>`;
+          <input class="rp-input" type="color" data-key="textColor" value="${b.textColor||"#4A3728"}" style="height:36px;padding:3px;cursor:pointer;"></div>
+        <div class="rp-group" style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button type="button" class="fmt-btn${b.bold?" active":""}" style="flex:1;" onclick="fmtToggle('bold')"><strong>Bold</strong></button>
+          <button type="button" class="fmt-btn${b.italic?" active":""}" style="flex:1;" onclick="fmtToggle('italic')"><em>Italic</em></button>
+          <button type="button" class="fmt-btn${b.underline?" active":""}" style="flex:1;" onclick="fmtToggle('underline')"><u>Underline</u></button>
+        </div>
+        <div class="rp-group"><span class="rp-label">Alignment</span>
+          <div style="display:flex;gap:4px;">
+            <button type="button" class="fmt-btn${(b.align||"left")==="left"?" active":""}" style="flex:1;" onclick="(()=>{const bl=_blocks.find(x=>x.id===_selId);if(bl){bl.align='left';renderBlocks();markDirty();pushHistory();syncFormatBar();}})()">Left</button>
+            <button type="button" class="fmt-btn${b.align==="center"?" active":""}" style="flex:1;" onclick="(()=>{const bl=_blocks.find(x=>x.id===_selId);if(bl){bl.align='center';renderBlocks();markDirty();pushHistory();syncFormatBar();}})()">Center</button>
+            <button type="button" class="fmt-btn${b.align==="right"?" active":""}" style="flex:1;" onclick="(()=>{const bl=_blocks.find(x=>x.id===_selId);if(bl){bl.align='right';renderBlocks();markDirty();pushHistory();syncFormatBar();}})()">Right</button>
+          </div></div>`;
       break;
     case "html":
       html = `
@@ -1142,11 +1334,12 @@ function renderBlockProps(b) {
     const key = inp.dataset.key;
     const isNum = inp.type === "range" || inp.type === "number";
     inp.addEventListener("input", () => {
-      b[key] = isNum ? parseInt(inp.value)||0 : inp.value;
+      b[key] = isNum ? (parseFloat(inp.value)||0) : inp.value;
       if (key === "width") { const l = document.getElementById("imgWidthLabel"); if(l) l.textContent = inp.value+"%"; }
       if (key === "height") { const l = document.getElementById("spacerLabel"); if(l) l.textContent = inp.value+"px"; }
       renderBlocks();
       markDirty();
+      if (b.type === "text") syncFormatBar();
     });
     inp.addEventListener("change", () => pushHistory());
   });
@@ -1238,8 +1431,15 @@ function compileBlocks() {
   const n2b = s => esc(s).replace(/\n/g,"<br>");
   return _blocks.map(b => {
     switch (b.type) {
-      case "text":
-        return `<p style="margin:0 0 18px;font-family:Georgia,'Times New Roman',serif;font-size:${b.fontSize||15}px;color:${b.textColor||"#4A3728"};line-height:1.85;text-align:${b.align||"left"};">${n2b(b.content||"")}</p>`;
+      case "text": {
+        const ff2 = b.fontFamily || "Georgia,'Times New Roman',serif";
+        const fwt = b.bold ? "bold" : "normal";
+        const fst = b.italic ? "italic" : "normal";
+        const tdec = b.underline ? "underline" : "none";
+        const lh2 = b.lineHeight || 1.85;
+        const ls2 = b.letterSpacing || "0";
+        return `<p style="margin:0 0 18px;font-family:${ff2};font-size:${b.fontSize||15}px;color:${b.textColor||"#4A3728"};line-height:${lh2};text-align:${b.align||"left"};font-weight:${fwt};font-style:${fst};text-decoration:${tdec};letter-spacing:${ls2};">${n2b(b.content||"")}</p>`;
+      }
       case "html": return b.content || "";
       case "image": {
         const px = Math.round((b.width||100)/100*440);

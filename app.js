@@ -37,7 +37,15 @@ const BADGES = {
 const BROWSE_ALLOWED_USERNAMES = new Set(["mara", "own", "progresstesting1"]);
 
 function canBrowseUsers(user) {
-  return Boolean(user && BROWSE_ALLOWED_USERNAMES.has(user.username));
+  if (!user) return false;
+  if (BROWSE_ALLOWED_USERNAMES.has(user.username)) return true;
+  return ["owner", "moderator"].includes(user.adminRole);
+}
+
+function canAccessEmails(user) {
+  if (!user) return false;
+  if (BROWSE_ALLOWED_USERNAMES.has(user.username)) return true;
+  return ["owner", "moderator", "analyst", "email_writer"].includes(user.adminRole);
 }
 
 
@@ -723,9 +731,11 @@ function renderAccountDropdown(user, activePage) {
     return;
   }
 
+  const roleLabel = { owner: "Owner", moderator: "Moderator", analyst: "Analyst", email_writer: "Email Writer" }[user.adminRole] || "";
   el.innerHTML = `
-    <div class="dropdown-header">${user.name} &middot; @${user.username}</div>
+    <div class="dropdown-header">${user.name} &middot; @${user.username}${roleLabel ? `<span style="margin-left:6px;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;opacity:.55;">${roleLabel}</span>` : ""}</div>
     ${canBrowseUsers(user) ? `<a class="dropdown-item" href="admin.html">Admin dashboard</a><a class="dropdown-item" href="users.html">Browse users</a>` : ""}
+    ${canAccessEmails(user) ? `<a class="dropdown-item" href="admin-emails.html">✉ Emails</a>` : ""}
     <a class="dropdown-item" href="profile.html?tab=profile">Profile</a>
     <a class="dropdown-item" href="profile.html?tab=settings">Settings</a>
     <button class="dropdown-item danger" id="logoutBtn">Log out</button>
