@@ -345,6 +345,75 @@ html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; font-family:
 .fmt-color-btn:hover { border-color: #A07858; }
 .fmt-color-swatch { width: 18px; height: 18px; border-radius: 3px; pointer-events: none; }
 
+/* Collaborator block tag */
+.ec-block-collab-tag {
+  position: absolute; top: -11px; left: 6px;
+  font-size: 9px; font-weight: 700; padding: 2px 7px;
+  border-radius: 4px; z-index: 20; pointer-events: none;
+  white-space: nowrap; color: #fff; line-height: 1.4;
+}
+.ec-block-collab-ring { box-shadow: 0 0 0 2px; }
+
+/* Block note badge */
+.ec-block-note-badge {
+  position: absolute; top: -10px; right: 28px; background: #FEF3C7;
+  border: 1px solid #FDE68A; border-radius: 4px; font-size: 9px;
+  padding: 1px 6px; color: #92400E; z-index: 6; pointer-events: none;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 120px;
+}
+
+/* Quote block */
+.b-quote {
+  padding: 8px 16px; border-left: 4px solid #A07858;
+  background: rgba(160,120,88,.06); border-radius: 0 6px 6px 0; margin: 4px 0;
+}
+.b-quote-text { font-family: Georgia,'Times New Roman',serif; font-style: italic; font-size: 16px; color: #4A3728; line-height: 1.7; }
+.b-quote-attr { font-size: 11px; color: #9a7a60; margin-top: 5px; font-family: Georgia,serif; }
+
+/* Activity feed in right panel */
+.activity-feed { margin-top: 8px; }
+.activity-item {
+  display: flex; align-items: flex-start; gap: 7px;
+  padding: 6px 0; border-bottom: 1px solid rgba(0,0,0,.06);
+  font-size: 11px; color: #6A5040;
+}
+.activity-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 3px; }
+.activity-time { font-size: 10px; color: #aaa; white-space: nowrap; }
+
+/* Conflict modal */
+#conflictModal {
+  display: none; position: fixed; inset: 0; z-index: 2000;
+  background: rgba(28,23,20,.6); backdrop-filter: blur(4px);
+  align-items: center; justify-content: center;
+}
+#conflictModal.show { display: flex; }
+.conflict-modal-inner {
+  background: #FAF5EE; border-radius: 18px; padding: 28px 30px;
+  max-width: 400px; width: 90%;
+  box-shadow: 0 24px 80px rgba(0,0,0,.3);
+}
+.conflict-modal-inner h3 { margin: 0 0 10px; font-family: Georgia,serif; color: #3B2518; font-size: 18px; }
+.conflict-modal-inner p  { margin: 0 0 20px; font-size: 13px; color: #6A5040; line-height: 1.5; }
+.conflict-actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
+.conflict-btn-mine { padding: 9px 18px; border-radius: 8px; border: 1px solid #DEC9AE; background: none; color: #3B2518; font-size: 13px; font-weight: 600; cursor: pointer; }
+.conflict-btn-server { padding: 9px 18px; border-radius: 8px; border: none; background: #A07858; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; }
+.conflict-btn-server:hover { background: #B08868; }
+
+/* Word count badge */
+#wordCount { font-size: 10px; color: #5a4a38; font-family: monospace; padding: 2px 7px; background: #2a2220; border-radius: 5px; white-space: nowrap; }
+
+/* Collab panel header in right panel */
+#rpCollabBar {
+  padding: 7px 14px; border-bottom: 1px solid var(--mocha-light,#DEC9AE);
+  background: #F5EDE0; display: none; align-items: center; gap: 6px; flex-wrap: wrap;
+}
+#rpCollabBar.has-others { display: flex; }
+.rp-collab-chip {
+  font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px;
+  color: #fff; white-space: nowrap;
+}
+
 /* ── Responsive ── */
 @media (max-width: 900px) {
   #leftPanel { width: 180px; }
@@ -397,7 +466,15 @@ html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; font-family:
       <button class="zoom-btn" id="zoomIn"  title="Zoom in">+</button>
     </div>
 
+    <div class="tb-sep"></div>
+
+    <!-- Save -->
+    <button class="tb-btn tb-btn-primary" id="saveBtn" title="Save (Ctrl+S)">💾 Save</button>
+
     <div class="tb-spacer"></div>
+
+    <!-- Word count -->
+    <span id="wordCount">0 words</span>
 
     <!-- Collaborators -->
     <div id="collabAvatars"></div>
@@ -480,6 +557,7 @@ html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; font-family:
             <div class="pal-item" data-add="html"><span class="pal-icon">&lt;/&gt;</span>HTML</div>
             <div class="pal-item" data-add="image"><span class="pal-icon">🖼</span>Image</div>
             <div class="pal-item" data-add="button"><span class="pal-icon">□</span>Button</div>
+            <div class="pal-item" data-add="quote"><span class="pal-icon">❝</span>Quote</div>
             <div class="pal-item" data-add="divider"><span class="pal-icon">—</span>Divider</div>
             <div class="pal-item" data-add="spacer"><span class="pal-icon">↕</span>Spacer</div>
           </div>
@@ -554,6 +632,8 @@ html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; font-family:
         <span class="rp-title" id="rpTitle">Email Settings</span>
         <button class="rp-close" id="rpClose" title="Close panel" style="display:none;">✕</button>
       </div>
+      <!-- Live collaborator bar -->
+      <div id="rpCollabBar"></div>
       <div class="rp-body" id="rpBody">
         <!-- Filled dynamically -->
       </div>
@@ -583,6 +663,18 @@ html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; font-family:
     <div class="send-modal-actions">
       <button class="sm-btn-cancel" id="smCancel">Cancel</button>
       <button class="sm-btn-send" id="smSend">Send email ✉</button>
+    </div>
+  </div>
+</div>
+
+<!-- Conflict modal -->
+<div id="conflictModal">
+  <div class="conflict-modal-inner">
+    <h3>✦ Editing conflict</h3>
+    <p id="conflictMsg">Someone else saved changes while you were editing. Choose which version to keep.</p>
+    <div class="conflict-actions">
+      <button class="conflict-btn-mine" id="conflictKeepMine">Keep my version</button>
+      <button class="conflict-btn-server" id="conflictAcceptServer">Use server version</button>
     </div>
   </div>
 </div>
@@ -744,6 +836,23 @@ function initUI() {
   });
   document.getElementById("smSend").addEventListener("click", doSend);
 
+  // Save button
+  document.getElementById("saveBtn").addEventListener("click", () => save(true));
+
+  // Conflict modal buttons
+  document.getElementById("conflictAcceptServer").addEventListener("click", () => {
+    document.getElementById("conflictModal").classList.remove("show");
+    if (window._conflictProject) loadProject(window._conflictProject);
+  });
+  document.getElementById("conflictKeepMine").addEventListener("click", () => {
+    document.getElementById("conflictModal").classList.remove("show");
+    if (window._conflictServerVersion != null) {
+      _version = window._conflictServerVersion;
+      _dirty = true;
+      save(true);
+    }
+  });
+
   // Right panel close
   document.getElementById("rpClose").addEventListener("click", () => {
     _selId = null;
@@ -790,11 +899,27 @@ function setZoom(z) {
   const canvas = document.getElementById("emailCanvas");
   canvas.style.transform = `scale(${_zoom})`;
   canvas.style.transformOrigin = "top center";
-  // Adjust wrapper height so scroll area reflects scaled canvas size
-  const scaledH = canvas.scrollHeight * _zoom;
-  canvas.style.marginBottom = `${Math.max(0, scaledH - canvas.scrollHeight)}px`;
+  // requestAnimationFrame ensures offsetHeight is the post-layout (pre-transform) value
+  requestAnimationFrame(() => {
+    const h = canvas.offsetHeight;
+    const w = canvas.offsetWidth;
+    // Push down everything below by how much the scaled canvas exceeds its DOM height
+    canvas.style.marginBottom = `${Math.max(0, h * (_zoom - 1))}px`;
+    // Expand canvas horizontal footprint so the canvasWrap scroll covers it
+    if (_zoom > 1) {
+      const extra = Math.ceil(w * (_zoom - 1) / 2);
+      canvas.style.marginLeft  = extra + "px";
+      canvas.style.marginRight = extra + "px";
+    } else {
+      canvas.style.marginLeft  = "";
+      canvas.style.marginRight = "";
+    }
+  });
   document.getElementById("zoomPct").textContent = Math.round(_zoom * 100) + "%";
 }
+
+// Recalculate zoom compensation whenever blocks change
+function refreshZoom() { if (_zoom !== 1) setZoom(_zoom); }
 
 // ── Format Bar ───────────────────────────────────────────────────────────────
 function initFormatBar() {
@@ -909,6 +1034,7 @@ function makeBlock(type) {
     html:    { id, type, content: "<p>Custom HTML content here.</p>" },
     image:   { id, type, src: "", alt: "", link: "", width: 100 },
     button:  { id, type, text: "Click here", url: SITE, align: "center" },
+    quote:   { id, type, content: "A beautiful quote goes here. Writing is the painting of the voice.", author: "— Someone wonderful" },
     divider: { id, type, lineStyle: "solid", lineColor: "#D4BBA0" },
     spacer:  { id, type, height: 24 },
     "2col":  { id, type, col1: "First column text.", col2: "Second column text." },
@@ -1031,6 +1157,15 @@ function renderBlocks() {
 
     container.appendChild(el);
   });
+
+  // Refresh zoom margins after blocks change layout
+  requestAnimationFrame(refreshZoom);
+
+  // Word count
+  const allText = _blocks.map(b => b.content || b.text || b.col1 || "").join(" ");
+  const wc = allText.trim().split(/\s+/).filter(Boolean).length;
+  const wcEl = document.getElementById("wordCount");
+  if (wcEl) wcEl.textContent = `${wc} word${wc !== 1 ? "s" : ""}`;
 }
 
 function cleanDropIndicators() {
@@ -1066,6 +1201,8 @@ function blockHtml(b) {
       return `<div class="b-2col"><div class="b-col-cell">${n2b(b.col1||"")}</div><div class="b-col-cell">${n2b(b.col2||"")}</div></div>`;
     case "3col":
       return `<div class="b-3col"><div class="b-col-cell">${n2b(b.col1||"")}</div><div class="b-col-cell">${n2b(b.col2||"")}</div><div class="b-col-cell">${n2b(b.col3||"")}</div></div>`;
+    case "quote":
+      return `<div class="b-quote" style="border-left-color:${_accent};"><div class="b-quote-text">${n2b(b.content||"")}</div>${b.author ? `<div class="b-quote-attr">${esc(b.author)}</div>` : ""}</div>`;
     default: return `<div style="padding:6px;color:#aaa;font-size:12px;">[${b.type}]</div>`;
   }
 }
@@ -1315,6 +1452,13 @@ function renderBlockProps(b) {
         <div class="rp-group"><span class="rp-label">Column 3</span>
           <textarea class="rp-ta" data-key="col3" rows="3">${esc(b.col3||"")}</textarea></div>`;
       break;
+    case "quote":
+      html = `
+        <div class="rp-group"><span class="rp-label">Quote text</span>
+          <textarea class="rp-ta" data-key="content" rows="4">${esc(b.content||"")}</textarea></div>
+        <div class="rp-group"><span class="rp-label">Attribution</span>
+          <input class="rp-input" type="text" data-key="author" value="${esc(b.author||"")}" placeholder="— Author Name"></div>`;
+      break;
   }
 
   // Global style section at bottom
@@ -1459,6 +1603,8 @@ function compileBlocks() {
         return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px;"><tr><td width="47%" valign="top" style="font-family:Georgia,'Times New Roman',serif;font-size:14px;color:#4A3728;line-height:1.75;">${n2b(b.col1||"")}</td><td width="6%"></td><td width="47%" valign="top" style="font-family:Georgia,'Times New Roman',serif;font-size:14px;color:#4A3728;line-height:1.75;">${n2b(b.col2||"")}</td></tr></table>`;
       case "3col":
         return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px;"><tr><td width="30%" valign="top" style="font-family:Georgia,'Times New Roman',serif;font-size:13px;color:#4A3728;line-height:1.7;">${n2b(b.col1||"")}</td><td width="5%"></td><td width="30%" valign="top" style="font-family:Georgia,'Times New Roman',serif;font-size:13px;color:#4A3728;line-height:1.7;">${n2b(b.col2||"")}</td><td width="5%"></td><td width="30%" valign="top" style="font-family:Georgia,'Times New Roman',serif;font-size:13px;color:#4A3728;line-height:1.7;">${n2b(b.col3||"")}</td></tr></table>`;
+      case "quote":
+        return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px;"><tr><td style="border-left:4px solid ${_accent};padding:10px 18px;background:rgba(160,120,88,.06);"><p style="margin:0 0 8px;font-family:Georgia,'Times New Roman',serif;font-size:16px;font-style:italic;color:#4A3728;line-height:1.7;">${n2b(b.content||"")}</p>${b.author ? `<p style="margin:0;font-family:Georgia,serif;font-size:12px;color:#9a7a60;">${esc(b.author)}</p>` : ""}</td></tr></table>`;
       default: return "";
     }
   }).join("\n");
@@ -1556,19 +1702,13 @@ async function save(force = false) {
 }
 
 function handleConflict(r) {
-  const choice = confirm(
-    `Someone else saved changes (v${r.serverVersion} vs your v${_version}). ` +
-    `OK = keep server version, Cancel = overwrite with yours.`
-  );
-  if (choice) {
-    // Accept server version
-    loadProject(r.project);
-  } else {
-    // Force our version over server by bumping our version claim
-    _version = r.serverVersion;
-    _dirty = true;
-    save(true);
-  }
+  // Store conflict data for the modal buttons to use
+  window._conflictProject = r.project;
+  window._conflictServerVersion = r.serverVersion;
+  const modal = document.getElementById("conflictModal");
+  document.getElementById("conflictMsg").textContent =
+    `Someone else saved changes (server v${r.serverVersion} vs your v${_version}). Which version should we keep?`;
+  modal.classList.add("show");
 }
 
 // ── Collaboration ─────────────────────────────────────────────────────────────
@@ -1577,43 +1717,85 @@ function startHeartbeat() {
   const beat = async () => {
     const r = await apiFetch(`/api/admin/email-projects/${_projectId}/presence`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ color: _myColor })
+      // Send selId so others can see which block you're editing
+      body: JSON.stringify({ color: _myColor, selId: _selId || null })
     });
     if (r && r.project) updatePresence(r.project.presence || []);
   };
   beat();
-  _heartbeatInterval = setInterval(beat, 15000);
+  _heartbeatInterval = setInterval(beat, 8000);
 }
 
 function startSync() {
-  // Sync every 5s — if server version is ahead, show a subtle indicator
+  // Sync every 2s — real-time collaboration
   _syncInterval = setInterval(async () => {
     if (!_projectId || _dirty) return;
     const r = await apiFetch(`/api/admin/email-projects/${_projectId}`);
     if (!r || r.error) return;
     if (r.version > _version) {
-      // Someone else saved — apply changes
+      // Someone else saved — apply changes seamlessly
+      const was = _selId;
       loadProject(r);
-      showToast("Updated from collaborator ✓");
+      _selId = was;
+      showToast("✦ Updated from collaborator");
     }
     updatePresence(r.presence || []);
-  }, 5000);
+  }, 2000);
 }
 
 function updatePresence(presence) {
   const me = Progress.getCurrentUser?.()?.username;
-  const others = presence.filter(p => p.username !== me);
+  const others = (presence || []).filter(p => p.username !== me);
+
+  // ── Top bar avatars ──
   const container = document.getElementById("collabAvatars");
   container.innerHTML = others.map(u => {
     const initials = (u.name||u.username||"?").slice(0,2).toUpperCase();
+    const editing = u.selId ? ` · editing` : "";
     return `<div class="collab-avatar" style="background:${u.color||"#8C6E58"};">
       ${initials}
-      <span class="ca-tip">${escapeHTML(u.name||u.username)}</span>
+      <span class="ca-tip">${escapeHTML(u.name||u.username)}${editing}</span>
     </div>`;
   }).join("");
+
+  // ── Right panel collab bar ──
+  const bar = document.getElementById("rpCollabBar");
+  if (others.length) {
+    bar.classList.add("has-others");
+    bar.innerHTML = others.map(u =>
+      `<span class="rp-collab-chip" style="background:${u.color||"#8C6E58"};">
+        ${escapeHTML((u.name||u.username||"?").slice(0,12))}${u.selId ? " ✏" : " 👁"}
+      </span>`
+    ).join("");
+  } else {
+    bar.classList.remove("has-others");
+    bar.innerHTML = "";
+  }
+
+  // ── Block-level presence rings ──
+  // Remove old collab tags and rings
+  document.querySelectorAll(".ec-block-collab-tag").forEach(el => el.remove());
+  document.querySelectorAll(".ec-block").forEach(el => {
+    el.style.boxShadow = el.classList.contains("selected")
+      ? "" : el.style.boxShadow?.startsWith("0 0 0 2px") ? "" : el.style.boxShadow;
+  });
+
+  others.forEach(u => {
+    if (!u.selId) return;
+    const blockEl = document.querySelector(`.ec-block[data-id="${u.selId}"]`);
+    if (!blockEl) return;
+    // Colored ring
+    blockEl.style.boxShadow = `0 0 0 2px ${u.color||"#8C6E58"}`;
+    // Name tag above block
+    const tag = document.createElement("div");
+    tag.className = "ec-block-collab-tag";
+    tag.style.background = u.color || "#8C6E58";
+    tag.textContent = (u.name || u.username || "?").slice(0, 14);
+    blockEl.appendChild(tag);
+  });
 }
 
-function markDirty() { _dirty = true; setSaveStatus("unsaved"); clearTimeout(_saveTimeout); _saveTimeout = setTimeout(() => save(), 5000); }
+function markDirty() { _dirty = true; setSaveStatus("unsaved"); clearTimeout(_saveTimeout); _saveTimeout = setTimeout(() => save(), 2000); }
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 start();

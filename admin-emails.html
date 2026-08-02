@@ -295,9 +295,13 @@
 
     <!-- Subscriber list -->
     <div class="section-block">
-      <h2 class="section-title">Subscriber list</h2>
-      <p style="font-size:14px; color:var(--muted); margin:0 0 14px;">Users who have email notifications enabled.</p>
-      <input id="emailSearch" type="search" class="email-search" placeholder="Search subscribers…">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:14px;">
+        <div>
+          <h2 class="section-title" style="margin:0 0 4px;">Subscriber list</h2>
+          <p style="font-size:13px; color:var(--muted); margin:0;" id="subCountLine">Users with email notifications on.</p>
+        </div>
+        <input id="emailSearch" type="search" class="email-search" placeholder="Search name, username, email…" style="max-width:240px;">
+      </div>
       <div id="subscriberList"><p style="color:var(--muted); font-size:14px;">Loading…</p></div>
       <div id="subscriberPager" style="display:flex; gap:8px; margin-top:16px; flex-wrap:wrap;"></div>
     </div>
@@ -394,37 +398,58 @@
 
   // ── Subscriber list ───────────────────────────────────────────────────────────
   let subPage = 0;
-  const SUB_PAGE_SIZE = 30;
+  const SUB_PAGE_SIZE = 50;
   let subSearchTimeout;
 
   async function loadSubscribers(page = 0) {
     subPage = page;
     const el = document.getElementById("subscriberList");
-    el.innerHTML = `<p style="color:var(--muted); font-size:14px;">Loading…</p>`;
+    el.innerHTML = `<p style="color:var(--muted); font-size:14px; padding:12px 0;">Loading…</p>`;
     const q = document.getElementById("emailSearch")?.value || "";
-    const result = await apiFetch(`/api/admin/users-list?page=${page}&limit=${SUB_PAGE_SIZE}&q=${encodeURIComponent(q)}`);
+    const result = await apiFetch(`/api/admin/subscribers?page=${page}&limit=${SUB_PAGE_SIZE}&q=${encodeURIComponent(q)}`);
     if (!result) {
       el.innerHTML = `<p style="color:var(--danger); font-size:14px;">Couldn't load subscribers.</p>`;
       return;
     }
     const users = result.users || [];
+
+    // Update count line
+    const countLine = document.getElementById("subCountLine");
+    if (countLine) countLine.textContent = `${result.total.toLocaleString()} subscriber${result.total !== 1 ? "s" : ""} with email notifications on`;
+
     if (!users.length) {
-      el.innerHTML = `<p style="color:var(--muted); font-size:14px;">No users found.</p>`;
+      el.innerHTML = `<p style="color:var(--muted); font-size:14px; padding:12px 0;">No subscribers found.</p>`;
       document.getElementById("subscriberPager").innerHTML = "";
       return;
     }
-    el.innerHTML = users.map(u => `
-      <div class="email-row">
-        <div style="min-width:0; flex:1;">
-          <div class="email-row-user">
-            <a href="user.html?id=${u.id}" style="color:var(--ink); text-decoration:none; font-weight:600;">${escapeHTML(u.name)}</a>
-            <span style="font-weight:400; color:var(--muted);"> @${escapeHTML(u.username)}</span>
-          </div>
-          <div class="email-row-addr">${u.email ? escapeHTML(u.email) : "<em style='opacity:.5;'>no email on file</em>"}</div>
-        </div>
-        <div class="email-row-date">${Progress.formatDateShort(u.joined)}</div>
-        ${u.banned ? `<span style="font-size:11px; font-family:var(--font-mono); color:var(--danger); font-weight:700;">BANNED</span>` : ""}
-      </div>`).join("");
+
+    el.innerHTML = `
+      <table style="width:100%; border-collapse:collapse; font-size:13px;">
+        <thead>
+          <tr style="border-bottom:2px solid var(--mocha-light);">
+            <th style="text-align:left; padding:8px 10px 8px 0; color:var(--muted); font-weight:600; font-size:11px; letter-spacing:.05em; text-transform:uppercase; white-space:nowrap;">Member</th>
+            <th style="text-align:left; padding:8px 10px; color:var(--muted); font-weight:600; font-size:11px; letter-spacing:.05em; text-transform:uppercase;">Email</th>
+            <th style="text-align:right; padding:8px 0 8px 10px; color:var(--muted); font-weight:600; font-size:11px; letter-spacing:.05em; text-transform:uppercase; white-space:nowrap;">Joined</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${users.map(u => `
+          <tr style="border-bottom:1px solid var(--mocha-wash);">
+            <td style="padding:10px 10px 10px 0;">
+              <a href="user.html?username=${encodeURIComponent(u.username)}" style="font-weight:600; color:var(--ink); text-decoration:none;">${escapeHTML(u.name)}</a>
+              <span style="color:var(--muted); font-size:12px;"> @${escapeHTML(u.username)}</span>
+              ${u.banned ? `<span style="margin-left:6px; font-size:10px; font-weight:700; color:var(--danger); font-family:var(--font-mono); vertical-align:middle;">BANNED</span>` : ""}
+            </td>
+            <td style="padding:10px; color:var(--muted); font-size:12px; font-family:var(--font-mono);">
+              ${u.email ? escapeHTML(u.email) : `<em style="opacity:.45; font-style:normal; font-family:var(--font-body);">no email</em>`}
+            </td>
+            <td style="padding:10px 0 10px 10px; text-align:right; color:var(--muted); font-size:12px; white-space:nowrap;">
+              ${u.joined ? new Date(u.joined).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—"}
+            </td>
+          </tr>`).join("")}
+        </tbody>
+      </table>`;
+
     const pages = Math.ceil(result.total / SUB_PAGE_SIZE);
     const pagerEl = document.getElementById("subscriberPager");
     pagerEl.innerHTML = pages > 1 ? Array.from({ length: pages }, (_, i) =>
@@ -438,7 +463,7 @@
   function wireSearch() {
     document.getElementById("emailSearch").addEventListener("input", () => {
       clearTimeout(subSearchTimeout);
-      subSearchTimeout = setTimeout(() => loadSubscribers(0), 400);
+      subSearchTimeout = setTimeout(() => loadSubscribers(0), 350);
     });
   }
 

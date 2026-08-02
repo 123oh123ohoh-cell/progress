@@ -734,7 +734,6 @@ function renderAccountDropdown(user, activePage) {
   el.innerHTML = `
     <div class="dropdown-header">${user.name} &middot; @${user.username}</div>
     ${canBrowseUsers(user) ? `<a class="dropdown-item" href="admin.html">Admin dashboard</a><a class="dropdown-item" href="users.html">Browse users</a>` : ""}
-    ${(user.adminRole === "email_writer" || BROWSE_ALLOWED_USERNAMES.has(user.username)) ? `<a class="dropdown-item" href="admin-emails.html">✉ Emails</a>` : ""}
     <a class="dropdown-item" href="profile.html?tab=profile">Profile</a>
     <a class="dropdown-item" href="profile.html?tab=settings">Settings</a>
     <button class="dropdown-item danger" id="logoutBtn">Log out</button>

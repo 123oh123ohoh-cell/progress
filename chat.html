@@ -135,6 +135,29 @@
 <div id="nav-root"></div>
 <div id="modal-root"></div>
 
+<!-- Report modal -->
+<div id="reportModal">
+  <div class="report-modal-box">
+    <h3>🚩 Report message</h3>
+    <div class="report-modal-preview" id="reportPreview"></div>
+    <div>
+      <div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;">Reason</div>
+      <div class="report-reasons" id="reportReasons">
+        <button class="report-reason-chip" data-reason="spam">Spam</button>
+        <button class="report-reason-chip" data-reason="harassment">Harassment</button>
+        <button class="report-reason-chip" data-reason="hate">Hate speech</button>
+        <button class="report-reason-chip" data-reason="misinformation">Misinformation</button>
+        <button class="report-reason-chip" data-reason="inappropriate">Inappropriate</button>
+        <button class="report-reason-chip" data-reason="other">Other</button>
+      </div>
+    </div>
+    <div class="report-modal-actions">
+      <button class="report-cancel-btn" id="reportCancel">Cancel</button>
+      <button class="report-submit-btn" id="reportSubmit" disabled>Submit report</button>
+    </div>
+  </div>
+</div>
+
 <div id="chatSidebarOverlay" class="chat-sidebar-overlay"></div>
 
 <!-- Left-edge drawer pull tab — tap or swipe to open the room list -->
@@ -313,7 +336,7 @@
           ${bodyHTML}
           <div class="chat-meta-row">
             <span class="chat-time">${Progress.timeAgo(msg.time)}</span>
-            ${!mine ? `<button type="button" class="chat-report-btn" data-report-id="${escapeHTML(msg.id)}" data-report-author="${escapeHTML(msg.author)}" data-report-body="${escapeHTML(msg.body || "").replace(/"/g, '&quot;')}" aria-label="Report message">⚠️</button>` : ""}
+            ${!mine ? `<button type="button" class="chat-report-btn" data-report-id="${escapeHTML(msg.id)}" data-report-author="${escapeHTML(msg.author)}" data-report-body="${escapeHTML(msg.body || "").replace(/"/g, '&quot;')}" aria-label="Report message">🚩 Report</button>` : ""}
             ${mine && currentRoom.startsWith("dm:") ? '<span class="chat-seen-tick" id="seen-' + msg.id + '"></span>' : ""}
           </div>
         </div>
@@ -1760,18 +1783,9 @@
       const reportBtn = e.target.closest(".chat-report-btn");
       if (reportBtn) {
         const messageId = reportBtn.dataset.reportId;
-        const author = reportBtn.dataset.reportAuthor;
-        const body = reportBtn.dataset.reportBody;
-        const reason = prompt("Why are you reporting this message? (spam, harassment, other)");
-        if (!reason) return;
-        apiFetch("/api/chat/reports", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messageId, room: currentRoom, author, body, reason })
-        }).then(result => {
-          if (result && result.ok) showToast("Report submitted. Thanks.");
-          else showToast(result?.error || "Could not submit report.");
-        });
+        const author    = reportBtn.dataset.reportAuthor;
+        const body      = reportBtn.dataset.reportBody;
+        openReportModal({ messageId, author, body, room: currentRoom });
         return;
       }
       const btn = e.target.closest(".chat-song-preview-btn[data-preview]");
@@ -2556,6 +2570,61 @@
     backdrop.classList.remove("open");
     setTimeout(() => backdrop.remove(), 220);
   }
+
+  // ── Report modal ────────────────────────────────────────────────────────────
+  (function initReportModal() {
+    let _pending = null;
+    let _selectedReason = null;
+
+    const modal   = document.getElementById("reportModal");
+    const preview = document.getElementById("reportPreview");
+    const submit  = document.getElementById("reportSubmit");
+
+    function closeModal() {
+      modal.classList.remove("open");
+      _pending = null;
+      _selectedReason = null;
+      submit.disabled = true;
+      document.querySelectorAll(".report-reason-chip").forEach(c => c.classList.remove("sel"));
+    }
+
+    document.getElementById("reportCancel").addEventListener("click", closeModal);
+    modal.addEventListener("click", e => { if (e.target === modal) closeModal(); });
+
+    document.querySelectorAll(".report-reason-chip").forEach(chip => {
+      chip.addEventListener("click", () => {
+        document.querySelectorAll(".report-reason-chip").forEach(c => c.classList.remove("sel"));
+        chip.classList.add("sel");
+        _selectedReason = chip.dataset.reason;
+        submit.disabled = false;
+      });
+    });
+
+    submit.addEventListener("click", async () => {
+      if (!_pending || !_selectedReason) return;
+      submit.disabled = true;
+      submit.textContent = "Submitting…";
+      const result = await apiFetch("/api/chat/reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ..._pending, reason: _selectedReason })
+      });
+      closeModal();
+      submit.textContent = "Submit report";
+      if (result && result.ok) showToast("✓ Report submitted. We'll review it.");
+      else showToast(result?.error || "Couldn't submit report.");
+    });
+
+    // Global open function called by the click handler
+    window.openReportModal = function({ messageId, author, body, room }) {
+      _pending = { messageId, author, body, room };
+      _selectedReason = null;
+      submit.disabled = true;
+      document.querySelectorAll(".report-reason-chip").forEach(c => c.classList.remove("sel"));
+      preview.textContent = body ? `"${body.slice(0, 80)}${body.length > 80 ? "…" : ""}"` : "(no text)";
+      modal.classList.add("open");
+    };
+  })();
 
   start();
 </script>

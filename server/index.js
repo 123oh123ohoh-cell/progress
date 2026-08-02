@@ -2859,9 +2859,11 @@ app.delete("/api/admin/email-projects/:id", requireAuth, requireRole("email_writ
 app.post("/api/admin/email-projects/:id/presence", requireAuth, requireRole("email_writer"), asyncHandler(async (req, res) => {
   const p = await db.collection("emailProjects").findOne({ _id: req.params.id });
   if (!p) return res.status(404).json({ error: "Project not found" });
-  const { color } = req.body || {};
+  const { color, selId } = req.body || {};
   const safeColor = /^#[0-9A-Fa-f]{3,6}$/.test(color||"") ? color : "#8C6E58";
-  const entry = { username: req.user.username, name: req.user.name || req.user.username, color: safeColor, lastSeen: new Date().toISOString() };
+  // selId: which block the user is currently editing (short string like "b3", or null)
+  const safeSelId = (typeof selId === "string" && /^b\d+$/.test(selId)) ? selId : null;
+  const entry = { username: req.user.username, name: req.user.name || req.user.username, color: safeColor, selId: safeSelId, lastSeen: new Date().toISOString() };
   // Remove stale entry for this user then push fresh one
   await db.collection("emailProjects").updateOne({ _id: req.params.id }, { $pull: { presence: { username: req.user.username } } });
   await db.collection("emailProjects").updateOne({ _id: req.params.id }, { $push: { presence: entry } });
@@ -3231,7 +3233,88 @@ app.get("/api/admin/users-list", requireAuth, requireRole("moderator"), asyncHan
       .toArray()
   ]);
 
-  res.json({ total, page, limit, users: docs.map(u => ({ ...publicUser(normalizeUser(u)), email: u.email || null, adminRole: u.adminRole || null })) });
+  res.json({ total, page, limit, users: docs.map(u => ({
+    ...publicUser(normalizeUser(u)),
+    email: u.email || null,
+    adminRole: u.adminRole || null,
+    emailNotifications: u.emailNotifications !== false, // default true
+  })) });
+}));
+
+// ── Admin: subscribers list ───────────────────────────────────────────────────
+// Users who actually receive emails (have email + notifications on)
+app.get("/api/admin/subscribers", requireAuth, requireRole("email_writer"), asyncHandler(async (req, res) => {
+  const page  = Math.max(0, parseInt(req.query.page) || 0);
+  const limit = Math.min(100, parseInt(req.query.limit) || 50);
+  const q     = (req.query.q || "").toLowerCase().trim();
+
+  const baseFilter = {
+    email: { $exists: true, $ne: "" },
+    emailNotifications: { $ne: false },
+  };
+  const filter = q
+    ? { ...baseFilter, $or: [{ username: { $regex: q, $options: "i" } }, { name: { $regex: q, $options: "i" } }, { email: { $regex: q, $options: "i" } }] }
+    : baseFilter;
+
+  const [total, docs] = await Promise.all([
+    db.collection("users").countDocuments(filter),
+    db.collection("users")
+      .find(filter, { projection: { password: 0 } })
+      .sort({ joined: -1 })
+      .skip(page * limit)
+      .limit(limit)
+      .toArray()
+  ]);
+
+  res.json({ total, page, limit, users: docs.map(u => ({
+    ...publicUser(normalizeUser(u)),
+    email: u.email || null,
+    joined: u.joined || null,
+    emailNotifications: u.emailNotifications !== false,
+  })) });
+}));
+
+// ── Chat: submit report ───────────────────────────────────────────────────────
+app.post("/api/chat/reports", requireAuth, asyncHandler(async (req, res) => {
+  const { messageId, room, author, body, reason } = req.body || {};
+  if (!messageId || !reason) return res.status(400).json({ error: "Missing fields." });
+  const VALID_REASONS = ["spam","harassment","hate","misinformation","inappropriate","other"];
+  if (!VALID_REASONS.includes(reason)) return res.status(400).json({ error: "Invalid reason." });
+
+  await db.collection("chatReports").insertOne({
+    messageId: String(messageId).slice(0, 100),
+    room: String(room || "").slice(0, 100),
+    author: String(author || "").slice(0, 60),
+    body: String(body || "").slice(0, 500),
+    reason,
+    reportedBy: req.user.username,
+    createdAt: new Date().toISOString(),
+    status: "pending",
+  });
+  res.json({ ok: true });
+}));
+
+// ── Admin: view reports ───────────────────────────────────────────────────────
+app.get("/api/admin/reports", requireAuth, requireRole("moderator"), asyncHandler(async (req, res) => {
+  const page  = Math.max(0, parseInt(req.query.page) || 0);
+  const limit = Math.min(50, parseInt(req.query.limit) || 25);
+  const status = req.query.status || "pending";
+
+  const filter = status === "all" ? {} : { status };
+  const [total, docs] = await Promise.all([
+    db.collection("chatReports").countDocuments(filter),
+    db.collection("chatReports").find(filter).sort({ createdAt: -1 }).skip(page * limit).limit(limit).toArray()
+  ]);
+  res.json({ total, page, limit, reports: docs });
+}));
+
+// ── Admin: update report status ────────────────────────────────────────────────
+app.patch("/api/admin/reports/:id", requireAuth, requireRole("moderator"), asyncHandler(async (req, res) => {
+  const { status } = req.body || {};
+  if (!["pending","resolved","dismissed"].includes(status)) return res.status(400).json({ error: "Invalid status." });
+  const { ObjectId } = require("mongodb");
+  await db.collection("chatReports").updateOne({ _id: new ObjectId(req.params.id) }, { $set: { status, resolvedBy: req.user.username, resolvedAt: new Date().toISOString() } });
+  res.json({ ok: true });
 }));
 
 // ── Admin: assign role ────────────────────────────────────────────────────────
