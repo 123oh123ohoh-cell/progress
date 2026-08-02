@@ -3281,39 +3281,43 @@ app.post("/api/chat/reports", requireAuth, asyncHandler(async (req, res) => {
   const VALID_REASONS = ["spam","harassment","hate","misinformation","inappropriate","other"];
   if (!VALID_REASONS.includes(reason)) return res.status(400).json({ error: "Invalid reason." });
 
+  // Store using field names that admin.html expects
   await db.collection("chatReports").insertOne({
-    messageId: String(messageId).slice(0, 100),
-    room: String(room || "").slice(0, 100),
-    author: String(author || "").slice(0, 60),
-    body: String(body || "").slice(0, 500),
+    messageId:     String(messageId).slice(0, 100),
+    room:          String(room || "").slice(0, 100),
+    messageAuthor: String(author || "").slice(0, 60),
+    messageBody:   String(body || "").slice(0, 500),
     reason,
-    reportedBy: req.user.username,
-    createdAt: new Date().toISOString(),
-    status: "pending",
+    reporter:      req.user.username,
+    reportedAt:    new Date().toISOString(),
+    status:        "pending",
   });
   res.json({ ok: true });
 }));
 
-// ── Admin: view reports ───────────────────────────────────────────────────────
-app.get("/api/admin/reports", requireAuth, requireRole("moderator"), asyncHandler(async (req, res) => {
-  const page  = Math.max(0, parseInt(req.query.page) || 0);
-  const limit = Math.min(50, parseInt(req.query.limit) || 25);
-  const status = req.query.status || "pending";
-
-  const filter = status === "all" ? {} : { status };
-  const [total, docs] = await Promise.all([
-    db.collection("chatReports").countDocuments(filter),
-    db.collection("chatReports").find(filter).sort({ createdAt: -1 }).skip(page * limit).limit(limit).toArray()
-  ]);
-  res.json({ total, page, limit, reports: docs });
+// ── Admin: view chat reports ──────────────────────────────────────────────────
+app.get("/api/admin/chat-reports", requireAuth, requireRole("moderator"), asyncHandler(async (req, res) => {
+  const docs = await db.collection("chatReports")
+    .find({ status: "pending" })
+    .sort({ reportedAt: -1 })
+    .limit(100)
+    .toArray();
+  // Return id as string for the frontend
+  res.json(docs.map(r => ({ ...r, id: String(r._id) })));
 }));
 
-// ── Admin: update report status ────────────────────────────────────────────────
-app.patch("/api/admin/reports/:id", requireAuth, requireRole("moderator"), asyncHandler(async (req, res) => {
-  const { status } = req.body || {};
-  if (!["pending","resolved","dismissed"].includes(status)) return res.status(400).json({ error: "Invalid status." });
+// ── Admin: resolve / ignore a report ─────────────────────────────────────────
+app.patch("/api/admin/chat-reports/:id", requireAuth, requireRole("moderator"), asyncHandler(async (req, res) => {
+  const { action } = req.body || {};
+  if (!["resolve","ignore"].includes(action)) return res.status(400).json({ error: "Invalid action." });
   const { ObjectId } = require("mongodb");
-  await db.collection("chatReports").updateOne({ _id: new ObjectId(req.params.id) }, { $set: { status, resolvedBy: req.user.username, resolvedAt: new Date().toISOString() } });
+  let oid;
+  try { oid = new ObjectId(req.params.id); } catch { return res.status(400).json({ error: "Invalid id." }); }
+  const status = action === "resolve" ? "resolved" : "ignored";
+  await db.collection("chatReports").updateOne(
+    { _id: oid },
+    { $set: { status, resolvedBy: req.user.username, resolvedAt: new Date().toISOString() } }
+  );
   res.json({ ok: true });
 }));
 
