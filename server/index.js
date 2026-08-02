@@ -2513,6 +2513,58 @@ async function createChatMessage({ room, author, body, image, replyTo, msgType, 
   return clientMessage;
 }
 
+// ── Chat: community rooms ────────────────────────────────────────────────────
+// GET  — list all community rooms (non-DM)
+app.get("/api/chat/rooms", requireAuth, asyncHandler(async (req, res) => {
+  const rooms = await db.collection("chatRoomDefs")
+    .find({})
+    .sort({ createdAt: 1 })
+    .limit(200)
+    .toArray();
+  res.json(rooms.map(r => ({
+    room:      r.room,
+    label:     r.label,
+    topic:     r.topic || "",
+    image:     r.image || null,
+    createdBy: r.createdBy || null,
+    createdAt: r.createdAt || null,
+  })));
+}));
+
+// POST — create a new community room
+app.post("/api/chat/rooms", requireAuth, asyncHandler(async (req, res) => {
+  const { name, label, topic } = req.body || {};
+  if (!name || !label) return res.status(400).json({ error: "Name and label are required." });
+
+  // Sanitise room ID: lowercase, alphanumeric + hyphens only
+  const roomId = name.toString().toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").slice(0, 60);
+  if (!roomId) return res.status(400).json({ error: "Invalid room name." });
+
+  // Don't allow duplicating "global" or "dm:…" patterns
+  if (roomId === "global" || roomId.startsWith("dm-")) return res.status(400).json({ error: "That name is reserved." });
+
+  const existing = await db.collection("chatRoomDefs").findOne({ room: roomId });
+  if (existing) return res.status(409).json({ error: "A room with that ID already exists." });
+
+  const doc = {
+    room:      roomId,
+    label:     label.toString().slice(0, 80),
+    topic:     (topic || "").toString().slice(0, 200),
+    image:     null,
+    createdBy: req.user.username,
+    createdAt: new Date().toISOString(),
+  };
+  await db.collection("chatRoomDefs").insertOne(doc);
+  res.json({ room: doc.room, label: doc.label, topic: doc.topic, createdAt: doc.createdAt });
+}));
+
+// DELETE — remove a community room (owner/moderator only)
+app.delete("/api/chat/rooms/:room", requireAuth, requireRole("moderator"), asyncHandler(async (req, res) => {
+  const roomId = req.params.room;
+  await db.collection("chatRoomDefs").deleteOne({ room: roomId });
+  res.json({ ok: true });
+}));
+
 app.get("/api/chat/messages", requireAuth, asyncHandler(async (req, res) => {
   const room = (req.query.room || DEFAULT_CHAT_ROOM).toString().slice(0, 200);
   const viewer = req.user.username;
