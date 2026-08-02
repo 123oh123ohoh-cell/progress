@@ -15,11 +15,12 @@ const ALLOWED_CREATOR_USERNAMES = new Set(["mara", "own", "progresstesting1"]);
 // fallback and to repair the local mock DB when the server is unreachable.
 const SIGNUP_BADGE_AWARDS = {
   mara: ["dexterity"],
-  own: ["dexterity", "dark", "tester", "early_supporter"],
-  progresstesting1: ["dexterity", "817x2", "dark", "tester", "early_supporter"],
+  own: ["dexterity", "dark", "tester", "early_supporter", "dolphin_eat", "trop"],
+  progresstesting1: ["dexterity", "817x2", "dark", "tester", "early_supporter", "dolphin_eat", "trop"],
   "817x2": ["dexterity", "817x2"],
   testuser: ["dexterity", "817x2", "dark", "early_supporter"],
   dark: ["early_supporter", "dark"],
+  trop: ["early_supporter", "trop", "dolphin_eat"],
   ohhmytesting: ["dexterity", "817x2", "dark", "tester"]
 };
 const API_ENABLED = true;

@@ -213,6 +213,26 @@
 .cc-submit:hover { opacity: .85; }
 .cc-submit:disabled { opacity: .5; cursor: not-allowed; }
 .cc-error { font-size: 12px; color: var(--danger); margin-top: 8px; min-height: 16px; }
+/* ── Community header bar (join/leave + meta) ───────────────────── */
+.community-header-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 8px 18px; background: var(--mocha-wash);
+  border-bottom: 1px solid var(--mocha-light); flex-shrink: 0; flex-wrap: wrap;
+}
+.community-header-meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }
+.community-header-name { font-weight: 700; font-size: 13px; color: var(--ink); }
+.community-header-topic { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
+.community-header-count { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.community-header-join-btn {
+  flex-shrink: 0; padding: 6px 16px; border-radius: 20px; font-size: 13px;
+  font-weight: 700; cursor: pointer; border: none; font-family: var(--font-body);
+  transition: opacity .15s;
+}
+.community-header-join-btn.join { background: var(--ink); color: var(--cream); }
+.community-header-join-btn.leave { background: none; border: 1.5px solid var(--mocha-light); color: var(--muted); }
+.community-header-join-btn:hover { opacity: .8; }
+.community-header-join-btn:disabled { opacity: .5; cursor: not-allowed; }
+
 /* ── Explore Panel (in-panel full view) ─────────────────────────── */
 .explore-panel {
   position: absolute; inset: 0; z-index: 20;
@@ -1510,6 +1530,69 @@
     });
   }
 
+  async function joinRoom(roomId) {
+    const r = await apiFetch(`/api/chat/rooms/${encodeURIComponent(roomId)}/join`, { method: "POST" });
+    if (r && r.ok) {
+      await loadChatRooms();
+      renderCommunitySidebar();
+      updateCommunityHeader();
+    }
+    return r;
+  }
+
+  async function leaveRoom(roomId) {
+    const r = await apiFetch(`/api/chat/rooms/${encodeURIComponent(roomId)}/leave`, { method: "POST" });
+    if (r && r.ok) {
+      await loadChatRooms();
+      renderCommunitySidebar();
+      updateCommunityHeader();
+    }
+    return r;
+  }
+
+  // Shows/updates the join-leave bar in the community chat header
+  function updateCommunityHeader() {
+    const existing = document.getElementById("communityHeaderBar");
+    const isCommunity = currentRoom && !currentRoom.startsWith("dm:") && currentRoom !== GLOBAL_ROOM;
+    if (!isCommunity) { if (existing) existing.remove(); return; }
+
+    const info = roomMap.get(currentRoom);
+    if (!info) { if (existing) existing.remove(); return; }
+
+    const bar = existing || (() => {
+      const el = document.createElement("div");
+      el.id = "communityHeaderBar";
+      el.className = "community-header-bar";
+      const head = document.querySelector(".chat-panel-head");
+      if (head) head.insertAdjacentElement("afterend", el);
+      return el;
+    })();
+
+    const count = info.memberCount || 0;
+    const joined = info.joined;
+    bar.innerHTML = `
+      <span class="community-header-meta">
+        <span class="community-header-name"># ${escapeHTML(info.label)}</span>
+        ${info.topic ? `<span class="community-header-topic">${escapeHTML(info.topic)}</span>` : ""}
+        <span class="community-header-count">👥 ${count} member${count !== 1 ? "s" : ""}</span>
+      </span>
+      <button type="button" class="community-header-join-btn ${joined ? "leave" : "join"}" id="communityJoinLeaveBtn">
+        ${joined ? "Leave" : "Join community"}
+      </button>`;
+
+    document.getElementById("communityJoinLeaveBtn")?.addEventListener("click", async (e) => {
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      if (joined) {
+        await leaveRoom(currentRoom);
+        showToast(`Left #${info.label}`);
+      } else {
+        await joinRoom(currentRoom);
+        showToast(`Joined #${info.label}! 🎉`);
+      }
+    });
+  }
+
   async function createChatRoom(name, label, topic) {
     const result = await apiFetch("/api/chat/rooms", {
       method: "POST",
@@ -1611,6 +1694,7 @@
       }).then(() => loadSidebar());
     }
     updateCallButtonVisibility();
+    updateCommunityHeader();
     clearTimeout(_dmListenPollTimer);
     updateDmListenBanner();
   }
@@ -2686,14 +2770,20 @@
     const list = document.getElementById("communitySidebarList");
     if (!list) return;
     const fl = (filter || "").trim().toLowerCase();
-    const rooms = [...roomMap.values()]
-      .filter(r => !fl ||
-        r.label.toLowerCase().includes(fl) ||
-        (r.topic || "").toLowerCase().includes(fl) ||
-        r.room.toLowerCase().includes(fl));
+    // Sidebar only shows rooms you've joined
+    const allRooms = [...roomMap.values()];
+    const joinedRooms = allRooms.filter(r => r.joined);
+    const rooms = joinedRooms.filter(r => !fl ||
+      r.label.toLowerCase().includes(fl) ||
+      (r.topic || "").toLowerCase().includes(fl) ||
+      r.room.toLowerCase().includes(fl));
 
+    if (!joinedRooms.length) {
+      list.innerHTML = `<div style="padding:16px 10px;color:var(--muted);font-size:13px;line-height:1.5;">You haven't joined any communities yet.<br>Hit <strong>Explore</strong> to find one!</div>`;
+      return;
+    }
     if (!rooms.length) {
-      list.innerHTML = `<div style="padding:20px 10px;color:var(--muted);font-size:13px;">No communities yet. Create the first one!</div>`;
+      list.innerHTML = `<div style="padding:16px 10px;color:var(--muted);font-size:13px;">No matches.</div>`;
       return;
     }
 
@@ -2701,26 +2791,24 @@
       const [a, b] = roomCardGradient(r.room).match(/#[0-9a-f]{6}/gi) || ["#8C6E58", "#4A3728"];
       const initials = r.label.slice(0, 2).toUpperCase();
       const isActive = currentRoom === r.room;
+      const count = r.memberCount || 0;
       return `<div class="community-item${isActive ? " active" : ""}" data-room="${escapeHTML(r.room)}" role="button" tabindex="0">
         <div class="community-avatar" style="background:linear-gradient(135deg,${a},${b});">${initials}</div>
         <div class="community-info">
           <div class="community-name">${escapeHTML(r.label)}</div>
-          ${r.topic ? `<div class="community-topic">${escapeHTML(r.topic)}</div>` : ""}
+          <div class="community-topic">👥 ${count} member${count !== 1 ? "s" : ""}${r.topic ? ` · ${escapeHTML(r.topic)}` : ""}</div>
         </div>
       </div>`;
     }).join("");
 
     list.querySelectorAll(".community-item[data-room]").forEach(item => {
-      const join = () => {
+      const go = () => {
         const room = item.dataset.room;
         const info = roomMap.get(room);
-        if (info) {
-          switchRoom(room, `#${info.label}`, null);
-          closeChatSidebar();
-        }
+        if (info) { switchRoom(room, `#${info.label}`, null); closeChatSidebar(); }
       };
-      item.addEventListener("click", join);
-      item.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") join(); });
+      item.addEventListener("click", go);
+      item.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") go(); });
     });
   }
 
@@ -2807,10 +2895,16 @@
 
     const roomCards = rooms.map(r => {
       const bg = roomCardGradientForExplore(r.room);
+      const joined = r.joined;
+      const count = r.memberCount || 0;
       return `
         <div class="explore-card" data-room="${escapeHTML(r.room)}"
              style="background:${bg};" role="button" tabindex="0">
           <div class="explore-card-overlay"></div>
+          <div style="position:relative;z-index:2;display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+            ${joined ? `<span style="font-size:10px;background:rgba(255,255,255,.22);color:#fff;padding:2px 7px;border-radius:20px;font-weight:700;letter-spacing:.04em;">JOINED</span>` : ""}
+            <span style="font-size:10px;color:rgba(255,255,255,.7);">👥 ${count} member${count !== 1 ? "s" : ""}</span>
+          </div>
           <p class="explore-card-name">${escapeHTML(r.label)}</p>
           <p class="explore-card-topic">${escapeHTML(r.topic || "No topic")}</p>
         </div>`;
@@ -2830,6 +2924,8 @@
         const room = card.dataset.room;
         const info = roomMap.get(room);
         if (info) {
+          // Auto-join on first visit
+          if (!info.joined) joinRoom(room);
           closeExplorePanel();
           switchRoom(room, `#${info.label}`, null);
           closeChatSidebar();

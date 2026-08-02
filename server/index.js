@@ -2516,19 +2516,53 @@ async function createChatMessage({ room, author, body, image, replyTo, msgType, 
 // ── Chat: community rooms ────────────────────────────────────────────────────
 // GET  — list all community rooms (non-DM)
 app.get("/api/chat/rooms", requireAuth, asyncHandler(async (req, res) => {
+  const username = req.user.username;
   const rooms = await db.collection("chatRoomDefs")
     .find({})
     .sort({ createdAt: 1 })
     .limit(200)
     .toArray();
   res.json(rooms.map(r => ({
-    room:      r.room,
-    label:     r.label,
-    topic:     r.topic || "",
-    image:     r.image || null,
-    createdBy: r.createdBy || null,
-    createdAt: r.createdAt || null,
+    room:        r.room,
+    label:       r.label,
+    topic:       r.topic || "",
+    image:       r.image || null,
+    createdBy:   r.createdBy || null,
+    createdAt:   r.createdAt || null,
+    memberCount: (r.members || []).length,
+    joined:      (r.members || []).includes(username),
   })));
+}));
+
+// POST — join a community room
+app.post("/api/chat/rooms/:room/join", requireAuth, asyncHandler(async (req, res) => {
+  const { room } = req.params;
+  const username = req.user.username;
+  const result = await db.collection("chatRoomDefs").updateOne(
+    { room },
+    { $addToSet: { members: username } }
+  );
+  if (!result.matchedCount) return res.status(404).json({ error: "Room not found." });
+  res.json({ ok: true });
+}));
+
+// POST — leave a community room
+app.post("/api/chat/rooms/:room/leave", requireAuth, asyncHandler(async (req, res) => {
+  const { room } = req.params;
+  const username = req.user.username;
+  await db.collection("chatRoomDefs").updateOne(
+    { room },
+    { $pull: { members: username } }
+  );
+  res.json({ ok: true });
+}));
+
+// GET — members of a room
+app.get("/api/chat/rooms/:room/members", requireAuth, asyncHandler(async (req, res) => {
+  const { room } = req.params;
+  const doc = await db.collection("chatRoomDefs").findOne({ room });
+  if (!doc) return res.status(404).json({ error: "Room not found." });
+  res.json({ members: doc.members || [], memberCount: (doc.members || []).length });
 }));
 
 // POST — create a new community room

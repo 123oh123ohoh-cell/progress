@@ -2116,7 +2116,7 @@ label:has(#themeToggleSwitch[data-on="1"]) .theme-flank-icon.moon { opacity: 1; 
   padding: 16px 12px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 6px;
   /* Butter-smooth touch scrolling on iOS/PWA */
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-y: contain;
@@ -2134,7 +2134,7 @@ label:has(#themeToggleSwitch[data-on="1"]) .theme-flank-icon.moon { opacity: 1; 
   display: flex;
   align-items: center;
   gap: 12px;
-  margin: 6px 0;
+  margin: 10px 0 8px;
   color: var(--muted);
   font-family: var(--font-mono);
   font-size: 11px;
@@ -2166,7 +2166,7 @@ label:has(#themeToggleSwitch[data-on="1"]) .theme-flank-icon.moon { opacity: 1; 
 }
 
 /* Grouped messages: consecutive from same author — tighten + hide repeated avatar/name */
-.chat-msg.grouped { margin-top: -8px; }
+.chat-msg.grouped { margin-top: -2px; }
 .chat-msg.grouped .chat-avatar { visibility: hidden; pointer-events: none; }
 .chat-msg.grouped .chat-author { display: none; }
 
