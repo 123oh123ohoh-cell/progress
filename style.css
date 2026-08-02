@@ -2362,7 +2362,7 @@ label:has(#themeToggleSwitch[data-on="1"]) .theme-flank-icon.moon { opacity: 1; 
   /* Extra right padding so text doesn't hide behind the action icons */
   padding: 11px 76px 11px 18px;
   font-family: var(--font-body);
-  font-size: 15.5px;
+  font-size: var(--chat-font-size, 15.5px);
   background: var(--cream);
   color: var(--ink);
   transition: border-color 0.15s ease;
@@ -2463,6 +2463,143 @@ body.mobile .chat-page-main {
   padding: 0;
   display: flex;
   flex-direction: column;
+}
+
+.chat-room-create-form {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-bottom: 1px solid var(--mocha-light);
+}
+.chat-room-create-form input,
+.chat-room-create-form button {
+  width: 100%;
+}
+.chat-room-create-form input {
+  border: 1px solid var(--mocha-light);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  background: var(--paper);
+  color: var(--ink);
+}
+.chat-room-create-btn {
+  border: none;
+  background: var(--ink);
+  color: var(--cream);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.chat-room-discovery {
+  border-bottom: 1px solid var(--mocha-light);
+  padding: 12px 14px;
+}
+.chat-room-discovery input {
+  width: 100%;
+  border: 1px solid var(--mocha-light);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  background: var(--paper);
+  color: var(--ink);
+  margin-bottom: 10px;
+}
+.chat-rooms-list {
+  display: grid;
+  gap: 8px;
+  max-height: 170px;
+  overflow-y: auto;
+}
+.chat-room-discovery-item {
+  border: 1px solid var(--mocha-light);
+  background: var(--paper);
+  border-radius: var(--radius);
+  padding: 12px;
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+}
+.chat-room-discovery-item:hover {
+  background: var(--mocha-wash);
+}
+.chat-room-discovery-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.chat-room-discovery-sub {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.chat-drag-over .chat-shell {
+  outline: 4px dashed var(--ink);
+  outline-offset: -6px;
+}
+
+body.chat-compact .chat-log {
+  gap: 8px;
+}
+body.chat-compact .chat-msg {
+  gap: 5px;
+}
+body.chat-compact .chat-bubble {
+  padding: 10px 12px;
+}
+body.chat-compact .chat-input {
+  font-size: 13px;
+}
+body.chat-compact .chat-room-item {
+  padding: 8px 10px;
+}
+body.chat-compact .chat-room-discovery-item {
+  padding: 10px;
+}
+
+.admin-report-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px;
+  background: var(--paper);
+  border: 1px solid var(--mocha-light);
+  border-radius: 14px;
+  margin-bottom: 12px;
+}
+.admin-report-content {
+  flex: 1;
+  min-width: 0;
+}
+.admin-report-meta {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.admin-report-details {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.admin-report-message {
+  margin-top: 10px;
+  background: var(--mocha-wash);
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 14px;
+  color: var(--ink);
+  white-space: pre-wrap;
+}
+.admin-report-reason {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.admin-report-actions {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 8px;
 }
 
 .chat-page-main .chat-shell {

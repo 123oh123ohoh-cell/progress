@@ -999,6 +999,62 @@ function applyCandy() {
   document.body.classList.toggle("candy-mode", getCandyMode());
 }
 
+const CHAT_SOUND_KEY = "progressChatSound";
+const CHAT_NOTIF_KEY = "progressChatNotifications";
+const CHAT_FONT_SIZE_KEY = "progressChatFontSize";
+const CHAT_COMPACT_KEY = "progressChatCompact";
+
+function getChatSoundEnabled() {
+  try { return localStorage.getItem(CHAT_SOUND_KEY) !== "0"; } catch (e) { return true; }
+}
+function setChatSoundEnabled(on) {
+  try { localStorage.setItem(CHAT_SOUND_KEY, on ? "1" : "0"); } catch (e) {}
+}
+function getChatNotificationsEnabled() {
+  try { return localStorage.getItem(CHAT_NOTIF_KEY) !== "0"; } catch (e) { return true; }
+}
+function setChatNotificationsEnabled(on) {
+  try { localStorage.setItem(CHAT_NOTIF_KEY, on ? "1" : "0"); } catch (e) {}
+}
+function getChatFontSize() {
+  try { return parseInt(localStorage.getItem(CHAT_FONT_SIZE_KEY), 10) || 14; } catch (e) { return 14; }
+}
+function setChatFontSize(size) {
+  try { localStorage.setItem(CHAT_FONT_SIZE_KEY, String(size)); } catch (e) {}
+}
+function getChatCompactMode() {
+  try { return localStorage.getItem(CHAT_COMPACT_KEY) === "1"; } catch (e) { return false; }
+}
+function setChatCompactMode(on) {
+  try { localStorage.setItem(CHAT_COMPACT_KEY, on ? "1" : "0"); } catch (e) {}
+}
+
+function applyChatPreferences() {
+  const fontSize = getChatFontSize();
+  document.documentElement.style.setProperty("--chat-font-size", `${fontSize}px`);
+  document.body.classList.toggle("chat-compact", getChatCompactMode());
+}
+
+function maybeShowChatNotification(title, body, url) {
+  if (!getChatNotificationsEnabled()) return;
+  if (!("Notification" in window)) return;
+  if (Notification.permission !== "granted") return;
+  try {
+    const note = new Notification(title, { body, icon: "/images/default.jpg", data: { url } });
+    note.onclick = () => { window.focus(); if (url) window.location.href = url; };
+  } catch (e) {}
+}
+
+function requestNotificationPermission() {
+  if (!("Notification" in window)) return Promise.resolve(false);
+  return Notification.requestPermission().then(result => result === "granted");
+}
+
+function setTheme(theme) {
+  try { localStorage.setItem(THEME_STORAGE_KEY, theme); } catch (e) {}
+  applyTheme(theme);
+}
+
 function setDeviceMode() {
   // Treat as mobile if: UA says so, OR the viewport is narrow enough that
   // the desktop layout wouldn't fit (iPad in portrait, small browser window).

@@ -62,6 +62,12 @@
   let songSearchTimer = null;
   let previewAudio = null;
 
+  let oldestMessageTime = null;
+  let hasMoreHistory = true;
+  let loadingMoreHistory = false;
+  let messageCache = new Map();
+  let roomMap = new Map();
+
   let currentUser = null;
   let currentRoom = GLOBAL_ROOM;
   let currentPeer = null; // username, or null for the global room
@@ -175,7 +181,7 @@
     const bodyHTML = songCardHTML || gameCardHTML ||
       ((msg.body || replyHTML) ? `<div class="chat-bubble">${replyHTML}${msg.body ? renderMentionsInHTML(renderEmoticonsText(msg.body, "inline-emoticon")) : ""}</div>` : "");
     return `
-      <div class="chat-msg ${mine ? "mine" : ""} ${grouped ? "grouped" : ""}" data-id="${msg.id}">
+      <div class="chat-msg ${mine ? "mine" : ""} ${grouped ? "grouped" : ""}" data-id="${msg.id}" data-time="${msg.time}">
         ${!mine ? `<a href="user.html?username=${encodeURIComponent(msg.author)}" class="chat-avatar">${avatarHTML(author, 30)}</a>` : ""}
         <div class="chat-bubble-col">
           <div class="chat-reply-arrow" aria-hidden="true">
@@ -186,6 +192,7 @@
           ${bodyHTML}
           <div class="chat-meta-row">
             <span class="chat-time">${Progress.timeAgo(msg.time)}</span>
+            ${!mine ? `<button type="button" class="chat-report-btn" data-report-id="${escapeHTML(msg.id)}" data-report-author="${escapeHTML(msg.author)}" data-report-body="${escapeHTML(msg.body || "").replace(/"/g, '&quot;')}" aria-label="Report message">⚠️</button>` : ""}
             ${mine && currentRoom.startsWith("dm:") ? '<span class="chat-seen-tick" id="seen-' + msg.id + '"></span>' : ""}
           </div>
         </div>
@@ -248,6 +255,7 @@
   function appendMessage(msg, animate) {
     if (seenMessageIds.has(msg.id)) return;
     seenMessageIds.add(msg.id);
+    messageCache.set(msg.id, true);
     const log = document.getElementById("chatLog");
     if (!log) return;
     const empty = log.querySelector(".chat-empty");
@@ -472,6 +480,14 @@
       if (data.type === "message") {
         const msg = data.message;
         appendMessage(msg, true);
+        if (msg.author !== currentUser.username) {
+          if (getChatSoundEnabled()) {
+            new Audio("sounds/notification.mp3").play().catch(() => {});
+          }
+          if (document.hidden && getChatNotificationsEnabled()) {
+            maybeShowChatNotification(`New message from @${msg.author}`, msg.body || "Sent a message", location.href);
+          }
+        }
         if (currentRoom.startsWith("dm:")) {
           loadSidebar();
           if (msg.author !== currentUser.username) {
@@ -533,9 +549,13 @@
     const log = document.getElementById("chatLog");
     log.innerHTML = `<div class="chat-empty">Loading…</div>`;
     seenMessageIds = new Set();
+    messageCache.clear();
     lastRenderedDateKey = null;
     lastGroupAuthor = null;
     lastGroupTime = null;
+    oldestMessageTime = null;
+    hasMoreHistory = true;
+
     const url = `/api/chat/messages?room=${encodeURIComponent(currentRoom)}&limit=${HISTORY_LIMIT}`;
     const history = await apiFetch(url);
     if (!history) {
@@ -546,10 +566,79 @@
       log.innerHTML = `<div class="chat-empty">No messages yet. Say hello.</div>`;
       return;
     }
+
+    if (history.length >= HISTORY_LIMIT) {
+      hasMoreHistory = true;
+    } else {
+      hasMoreHistory = false;
+    }
+
     log.innerHTML = "";
-    history.forEach(appendMessage);
+    history.forEach(msg => {
+      messageCache.set(msg.id, true);
+      appendMessage(msg, false);
+    });
+    oldestMessageTime = history[0] && history[0].time ? history[0].time : null;
     scrollToBottom(true);
     updateSeenTicks();
+  }
+
+  async function loadMoreHistory() {
+    if (!hasMoreHistory || loadingMoreHistory) return;
+    loadingMoreHistory = true;
+    const log = document.getElementById("chatLog");
+    if (!log) { loadingMoreHistory = false; return; }
+    const before = oldestMessageTime;
+    if (!before) { loadingMoreHistory = false; return; }
+    const placeholder = document.createElement("div");
+    placeholder.className = "chat-empty";
+    placeholder.textContent = "Loading older messages…";
+    log.prepend(placeholder);
+    const currentScroll = log.scrollHeight;
+    const url = `/api/chat/messages?room=${encodeURIComponent(currentRoom)}&limit=${HISTORY_LIMIT}&before=${encodeURIComponent(before)}`;
+    const history = await apiFetch(url);
+    placeholder.remove();
+    if (!history || !history.length) {
+      hasMoreHistory = false;
+      loadingMoreHistory = false;
+      return;
+    }
+    if (history.length < HISTORY_LIMIT) hasMoreHistory = false;
+    history.reverse().forEach(msg => {
+      if (messageCache.has(msg.id)) return;
+      messageCache.set(msg.id, true);
+      prependMessage(msg);
+    });
+    oldestMessageTime = history[0] && history[0].time ? history[0].time : oldestMessageTime;
+    log.scrollTop = log.scrollHeight - currentScroll;
+    loadingMoreHistory = false;
+  }
+
+  function prependMessage(msg) {
+    if (seenMessageIds.has(msg.id)) return;
+    seenMessageIds.add(msg.id);
+    const log = document.getElementById("chatLog");
+    if (!log) return;
+    const empty = log.querySelector(".chat-empty");
+    if (empty && empty.textContent.includes("No messages yet")) empty.remove();
+    const dayKey = new Date(msg.time).toDateString();
+    const firstMsg = log.querySelector(".chat-msg");
+    let separatorNeeded = true;
+    if (firstMsg) {
+      const firstDate = new Date(firstMsg.dataset.time).toDateString();
+      separatorNeeded = firstDate !== dayKey;
+    }
+    if (separatorNeeded) {
+      log.insertAdjacentHTML("afterbegin", `<div class="chat-date-separator"><span>${dateSeparatorLabel(msg.time)}</span></div>`);
+    }
+    log.insertAdjacentHTML("afterbegin", messageRow(msg, false));
+    const msgEl = log.querySelector(`[data-id="${msg.id}"]`);
+    if (msgEl) {
+      addSwipeToReply(msgEl, msg);
+      msgEl.querySelectorAll(".chat-reply-quote").forEach(q => {
+        q.addEventListener("click", () => scrollToMessage(q.dataset.targetId));
+      });
+    }
   }
 
   function sendMessage(text, imageUrl) {
@@ -1065,6 +1154,56 @@
       </button>`;
   }
 
+  async function loadChatRooms() {
+    const rooms = await apiFetch(`/api/chat/rooms`);
+    if (!Array.isArray(rooms)) return;
+    roomMap.clear();
+    rooms.forEach(r => roomMap.set(r.room, r));
+    renderChatRooms();
+  }
+
+  function renderChatRooms(filterText = "") {
+    const list = document.getElementById("chatRoomsList");
+    if (!list) return;
+    const filter = String(filterText || "").trim().toLowerCase();
+    const rooms = [...roomMap.values()]
+      .filter(r => !filter || r.label.toLowerCase().includes(filter) || r.topic.toLowerCase().includes(filter) || r.room.toLowerCase().includes(filter))
+      .slice(0, 40);
+    if (!rooms.length) {
+      list.innerHTML = `<div class="chat-room-empty">No rooms found.</div>`;
+      return;
+    }
+    list.innerHTML = rooms.map(r => `
+      <button type="button" class="chat-room-discovery-item" data-room="${escapeHTML(r.room)}">
+        <div class="chat-room-discovery-title"># ${escapeHTML(r.label)}</div>
+        <div class="chat-room-discovery-sub">${escapeHTML(r.topic || "No topic")}</div>
+      </button>
+    `).join("");
+    list.querySelectorAll(".chat-room-discovery-item").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const room = btn.dataset.room;
+        const roomInfo = roomMap.get(room);
+        if (roomInfo) {
+          switchRoom(room, `#${roomInfo.label}`, null);
+        }
+      });
+    });
+  }
+
+  async function createChatRoom(name, label, topic) {
+    const result = await apiFetch("/api/chat/rooms", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, label, topic })
+    });
+    if (!result || result.error) {
+      showToast(result?.error || "Could not create room.");
+      return null;
+    }
+    await loadChatRooms();
+    return result;
+  }
+
   async function loadSidebar() {
     const list = document.getElementById("chatRoomList");
     if (!list) return;
@@ -1354,6 +1493,16 @@
         <aside class="chat-sidebar">
           <button type="button" class="chat-sidebar-close" id="chatSidebarClose" aria-label="Close sidebar">&times;</button>
           <div class="chat-listen-rail" id="chatListenRail"></div>
+          <form class="chat-room-create-form" id="chatRoomCreateForm">
+            <input type="text" id="chatRoomName" placeholder="Room name (e.g. study-group)" autocomplete="off">
+            <input type="text" id="chatRoomLabel" placeholder="Room label (e.g. Study Group)" autocomplete="off">
+            <input type="text" id="chatRoomTopic" placeholder="Topic (optional)" autocomplete="off">
+            <button type="submit" class="chat-room-create-btn">Create room</button>
+          </form>
+          <div class="chat-room-discovery">
+            <input type="search" id="chatRoomSearch" placeholder="Search rooms…" autocomplete="off">
+            <div id="chatRoomsList" class="chat-rooms-list"></div>
+          </div>
           <form class="chat-new-dm" id="newDmForm">
             <input type="text" id="newDmInput" placeholder="Message @username…" autocomplete="off">
           </form>
@@ -1485,11 +1634,31 @@
         const input = document.getElementById("chatInput");
         if (input) input.placeholder = "Say something…";
       });
-      chatLog.addEventListener("scroll", updateScrollBtn, { passive: true });
+      chatLog.addEventListener("scroll", () => {
+        if (chatLog.scrollTop < 140) loadMoreHistory();
+        updateScrollBtn();
+      }, { passive: true });
     }
 
     // Song preview playback (delegated) — stop parent link navigation
     document.getElementById("chatLog").addEventListener("click", (e) => {
+      const reportBtn = e.target.closest(".chat-report-btn");
+      if (reportBtn) {
+        const messageId = reportBtn.dataset.reportId;
+        const author = reportBtn.dataset.reportAuthor;
+        const body = reportBtn.dataset.reportBody;
+        const reason = prompt("Why are you reporting this message? (spam, harassment, other)");
+        if (!reason) return;
+        apiFetch("/api/chat/reports", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ messageId, room: currentRoom, author, body, reason })
+        }).then(result => {
+          if (result && result.ok) showToast("Report submitted. Thanks.");
+          else showToast(result?.error || "Could not submit report.");
+        });
+        return;
+      }
       const btn = e.target.closest(".chat-song-preview-btn[data-preview]");
       if (!btn) return;
       e.preventDefault(); e.stopPropagation();
@@ -1536,6 +1705,24 @@
       }
     });
 
+    document.getElementById("chatLog").addEventListener("dragover", (e) => {
+      e.preventDefault();
+      document.body.classList.add("chat-drag-over");
+    });
+    document.getElementById("chatLog").addEventListener("dragleave", () => {
+      document.body.classList.remove("chat-drag-over");
+    });
+    document.getElementById("chatLog").addEventListener("drop", (e) => {
+      e.preventDefault();
+      document.body.classList.remove("chat-drag-over");
+      const file = e.dataTransfer.files && e.dataTransfer.files[0];
+      if (file && file.type.startsWith("image/")) {
+        stageChatImage(file);
+      } else {
+        showToast("Drop an image file to upload it.");
+      }
+    });
+
     document.getElementById("newDmForm").addEventListener("submit", (e) => {
       e.preventDefault();
       startDmFromInput();
@@ -1555,6 +1742,30 @@
     // Sidebar overlay click-to-close
     const overlay = document.getElementById("chatSidebarOverlay");
     if (overlay) overlay.addEventListener("click", closeChatSidebar);
+
+    // Room search
+    const roomSearch = document.getElementById("chatRoomSearch");
+    if (roomSearch) {
+      roomSearch.addEventListener("input", (e) => renderChatRooms(e.target.value));
+    }
+
+    // Create room form
+    const roomCreateForm = document.getElementById("chatRoomCreateForm");
+    if (roomCreateForm) {
+      roomCreateForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const name = document.getElementById("chatRoomName").value.trim();
+        const label = document.getElementById("chatRoomLabel").value.trim();
+        const topic = document.getElementById("chatRoomTopic")?.value.trim() || "";
+        const room = await createChatRoom(name, label, topic);
+        if (room) {
+          showToast(`Created room #${label}`);
+          document.getElementById("chatRoomName").value = "";
+          document.getElementById("chatRoomLabel").value = "";
+          if (document.getElementById("chatRoomTopic")) document.getElementById("chatRoomTopic").value = "";
+        }
+      });
+    }
 
     // Drawer tab — tap to open
     const drawerTab = document.getElementById("chatDrawerTab");
@@ -1584,8 +1795,10 @@
     if (replyCancel) replyCancel.addEventListener("click", clearReplyContext);
 
     loadSidebar();
+    loadChatRooms();
     loadHistory();
     connectSocket();
+    applyChatPreferences();
     loadListenRail();
     if (listenRailTimer) clearInterval(listenRailTimer);
     // 30s is enough to catch song changes. tickNowPlayingWidgets() in app.js

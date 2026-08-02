@@ -578,6 +578,17 @@ refreshNowPlaying();
               <span>Browser push notifications<span class="sett-row-note" id="pushNote">Get a popup for likes, replies, follows, and messages.</span></span>
             </label>
           </div>
+          <div class="sett-section">
+            <div class="sett-section-title">Chat</div>
+            <label class="sett-toggle-row">
+              <span class="theme-toggle-switch${getChatSoundEnabled() ? " on" : ""}" id="chatSoundToggle" data-on="${getChatSoundEnabled() ? "1" : "0"}"><span class="theme-toggle-knob"></span></span>
+              <span>Chat sounds<span class="sett-row-note">Play a sound when new messages arrive.</span></span>
+            </label>
+            <label class="sett-toggle-row">
+              <span class="theme-toggle-switch${getChatNotificationsEnabled() ? " on" : ""}" id="chatAlertToggle" data-on="${getChatNotificationsEnabled() ? "1" : "0"}"><span class="theme-toggle-knob"></span></span>
+              <span>Chat alerts<span class="sett-row-note">Browser notifications for new messages and mentions.</span></span>
+            </label>
+          </div>
           <div class="sett-section" style="border-bottom:none;">
             <div class="sett-section-title">Per-type controls — coming soon</div>
             ${[["Likes","When someone likes your post"],["Comments","When someone replies to you"],["Follows","When someone follows you"],["Mentions","@mentions in chat"],["Direct messages","New DMs"]].map(([l,n]) => `
@@ -587,6 +598,31 @@ refreshNowPlaying();
               </div>`).join("")}
           </div>
         `;
+        document.getElementById("chatSoundToggle").addEventListener("click", (e) => {
+          const el = e.currentTarget;
+          const on = el.dataset.on !== "1";
+          el.dataset.on = on ? "1" : "0";
+          el.classList.toggle("on", on);
+          setChatSoundEnabled(on);
+          showToast(on ? "Chat sounds enabled." : "Chat sounds disabled.");
+        });
+        document.getElementById("chatAlertToggle").addEventListener("click", async (e) => {
+          const el = e.currentTarget;
+          const on = el.dataset.on !== "1";
+          if (!on) {
+            el.dataset.on = "0";
+            el.classList.remove("on");
+            setChatNotificationsEnabled(false);
+            showToast("Chat alerts disabled.");
+            return;
+          }
+          const granted = await requestNotificationPermission();
+          el.dataset.on = granted ? "1" : "0";
+          el.classList.toggle("on", granted);
+          setChatNotificationsEnabled(granted);
+          if (granted) showToast("Chat alerts enabled.");
+          else showToast("Notifications blocked. Allow them in browser settings.");
+        });
         document.getElementById("notifEmailToggle").addEventListener("click", async (e) => {
           const el = e.currentTarget;
           if (el.dataset.on !== "1" && !user.email) { showToast("Add an email address first."); return; }
@@ -624,6 +660,22 @@ refreshNowPlaying();
             <p class="field-note">Saved to this browser.</p>
           </div>
           <div class="sett-section">
+            <div class="sett-section-title">Chat</div>
+            <div class="sett-row" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+              <span>Font size</span>
+              <select id="chatFontSizeSelect" style="padding:8px 10px;border:1px solid var(--mocha-light);border-radius:8px;background:var(--paper);color:var(--ink);font-size:13px;">
+                <option value="12">Small</option>
+                <option value="14">Normal</option>
+                <option value="16">Large</option>
+                <option value="18">Extra large</option>
+              </select>
+            </div>
+            <label class="sett-toggle-row">
+              <span class="theme-toggle-switch${getChatCompactMode() ? " on" : ""}" id="chatCompactToggle" data-on="${getChatCompactMode() ? "1" : "0"}"><span class="theme-toggle-knob"></span></span>
+              <span>Compact chat mode<span class="sett-row-note">Tighter message spacing and smaller controls.</span></span>
+            </label>
+          </div>
+          <div class="sett-section">
             <div class="sett-section-title">Fun</div>
             <label class="sett-toggle-row">
               <span class="theme-toggle-switch${candyOn ? " on" : ""}" id="candyToggle" data-on="${candyOn ? "1" : "0"}"><span class="theme-toggle-knob"></span></span>
@@ -641,6 +693,23 @@ refreshNowPlaying();
         document.getElementById("themeToggle").addEventListener("click", (e) => {
           const el = e.currentTarget, on = el.dataset.on !== "1";
           el.dataset.on = on ? "1" : "0"; el.classList.toggle("on", on); setTheme(on ? "dark" : "light");
+        });
+        const fontSelect = document.getElementById("chatFontSizeSelect");
+        if (fontSelect) {
+          fontSelect.value = String(getChatFontSize());
+          fontSelect.addEventListener("change", (e) => {
+            const size = parseInt(e.currentTarget.value, 10) || 14;
+            setChatFontSize(size);
+            applyChatPreferences();
+            showToast(`Chat font size set to ${size}px.`);
+          });
+        }
+        document.getElementById("chatCompactToggle").addEventListener("click", (e) => {
+          const el = e.currentTarget, on = el.dataset.on !== "1";
+          el.dataset.on = on ? "1" : "0"; el.classList.toggle("on", on);
+          setChatCompactMode(on);
+          applyChatPreferences();
+          showToast(on ? "Compact chat mode enabled." : "Compact chat mode disabled.");
         });
         document.getElementById("candyToggle").addEventListener("click", (e) => {
           const el = e.currentTarget, on = el.dataset.on !== "1";

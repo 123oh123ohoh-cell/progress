@@ -541,6 +541,9 @@
       <button class="admin-tab" data-tab="users" role="tab">
         <span class="admin-tab-icon">👥</span> Users
       </button>
+      <button class="admin-tab" data-tab="reports" role="tab">
+        <span class="admin-tab-icon">🚨</span> Reports
+      </button>
       <button class="admin-tab" data-tab="analysis" role="tab">
         <span class="admin-tab-icon">🔬</span> Analysis
       </button>
@@ -895,8 +898,19 @@
       <div id="adminUsersPager" style="display:flex; gap:8px; margin-top:16px; flex-wrap:wrap;"></div>
     </div>
 
+    <!-- ── REPORTS tab ─────────────────────────────────────────────────── -->
+    <div id="tab-reports" class="admin-tab-content" style="display:none;">
+      <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:20px;">
+        <div>
+          <h2 class="section-title" style="margin:0;">Chat Reports</h2>
+          <p style="margin:4px 0 0; color:var(--muted); font-size:13px; max-width:720px;">Review reported messages from chat rooms and resolve or ignore them.</p>
+        </div>
+        <button id="refreshReportsBtn" class="btn" style="font-size:13px; padding:8px 14px;">Refresh reports</button>
+      </div>
+      <div id="adminReportsList"><p style="color:var(--muted); font-size:14px;">Loading reports…</p></div>
+    </div>
+
     <!-- ── PLATFORM tab ─────────────────────────────────────────────── -->
-    <div id="tab-platform" class="admin-tab-content" style="display:none;">
 
       <!-- Announcement -->
       <div class="control-card" style="margin-bottom:20px;">
@@ -1052,6 +1066,9 @@
       if (tab === "users" && !usersLoaded) {
         usersLoaded = true;
         loadAdminUsers();
+      }
+      if (tab === "reports") {
+        loadChatReports();
       }
       if (tab === "platform") {
         loadMaintenance();
@@ -2102,6 +2119,52 @@
     adminUserTotal = result.total;
     renderAdminUsers(result.users);
   }
+
+  async function loadChatReports() {
+    const target = document.getElementById("adminReportsList");
+    if (!target) return;
+    target.innerHTML = `<p style="color:var(--muted); font-size:14px;">Loading reports…</p>`;
+    const reports = await apiFetch("/api/admin/chat-reports");
+    if (!reports || !reports.length) {
+      target.innerHTML = `<p style="color:var(--muted); font-size:14px;">No open reports at the moment.</p>`;
+      return;
+    }
+    target.innerHTML = reports.map(r => `
+      <div class="admin-report-row">
+        <div class="admin-report-content">
+          <div class="admin-report-meta">#${escapeHTML(r.room)} · ${escapeHTML(r.messageAuthor)}</div>
+          <div class="admin-report-details">Reported by ${escapeHTML(r.reporter)} · ${new Date(r.reportedAt).toLocaleString()}</div>
+          <div class="admin-report-message">${escapeHTML(r.messageBody)}</div>
+          <div class="admin-report-reason">Reason: ${escapeHTML(r.reason)}</div>
+        </div>
+        <div class="admin-report-actions">
+          <button class="btn" data-report-id="${escapeHTML(r.id)}" data-action="resolve">Resolve</button>
+          <button class="btn secondary" data-report-id="${escapeHTML(r.id)}" data-action="ignore">Ignore</button>
+        </div>
+      </div>
+    `).join("");
+    target.querySelectorAll("button[data-report-id]").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const id = btn.dataset.reportId;
+        const action = btn.dataset.action;
+        btn.disabled = true;
+        const result = await apiFetch(`/api/admin/chat-reports/${encodeURIComponent(id)}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action })
+        });
+        if (result && result.ok) {
+          showToast(action === "resolve" ? "Report resolved." : "Report ignored.");
+          loadChatReports();
+        } else {
+          showToast(result?.error || "Could not update report.");
+          btn.disabled = false;
+        }
+      });
+    });
+  }
+
+  document.getElementById("refreshReportsBtn")?.addEventListener("click", loadChatReports);
 
   function renderAdminUsers(users) {
     const listEl = document.getElementById("adminUsersList");
