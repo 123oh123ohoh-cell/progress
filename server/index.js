@@ -120,11 +120,14 @@ function cleanupSpotifyOAuthStates() {
 }
 
 const SIGNUP_BADGE_AWARDS = {
-  mara:             ["dexterity", "dark", "tester"],
-  own:              ["dexterity", "dark", "tester"],
-  progresstesting1: ["dexterity", "817x2", "dark", "tester"],
-  "817x2":          ["817x2", "dark", "tester"],
-  testuser:         ["817x2", "dexterity", "dark", "tester"]
+  mara:             ["dexterity", "dark", "tester", "early_supporter"],
+  own:              ["dexterity", "dark", "tester", "early_supporter", "dolphin_eat", "trop"],
+  progresstesting1: ["dexterity", "817x2", "dark", "tester", "early_supporter", "dolphin_eat", "trop"],
+  "817x2":          ["817x2", "dexterity", "dark", "tester", "early_supporter"],
+  testuser:         ["817x2", "dexterity", "dark", "tester", "early_supporter"],
+  dark:             ["dark", "early_supporter"],
+  trop:             ["trop", "early_supporter", "dolphin_eat"],
+  ohhmytesting:     ["817x2", "dexterity", "dark", "tester"],
 };
 
 const DEFAULT_SEED = {

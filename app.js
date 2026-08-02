@@ -117,10 +117,12 @@ function attachBadgeTooltip(root) {
 }
 
 const EMOTICON_NAMES = [
-  "backpack", "banana", "bee", "bored", "computer", "computer2", "computersupport",
+  "asleep_couch", "backpack", "banana", "banana_hello", "bee", "bored",
+  "charles", "computer", "computer2", "computersupport", "construction",
   "cow", "dead", "dexterity", "dolphinhead", "fishhead", "hamster", "hi", "kiss",
-  "lion", "mwa", "pancake", "penguin", "raindeer", "romantic", "shark", "shark2",
-  "sharkcat", "squish", "squuish", "starbucks", "turtle_lazy", "two", "windy", "wonder"
+  "lion", "mwa", "pancake", "penguin", "poodle", "raincoat", "raindeer",
+  "romantic", "shark", "shark2", "sharkcat", "squish", "squuish",
+  "starbucks", "turtle_lazy", "two", "windy", "wonder"
 ];
 const EMOTICON_NAME_SET = new Set(EMOTICON_NAMES);
 
