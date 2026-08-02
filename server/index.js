@@ -1038,7 +1038,7 @@ async function auditLog(actor, action, target, details = {}) {
 
 // ── Admin role helpers ────────────────────────────────────────────────────────
 // Role hierarchy: owner > admin > moderator > analyst
-const ROLE_WEIGHTS = { owner: 5, moderator: 4, analyst: 3, email_writer: 2 };
+const ROLE_WEIGHTS = { owner: 5, moderator: 4, analyst: 3, email_writer: 2, tester: 1 };
 
 async function getAdminRole(username) {
   if (ALLOWED_CREATOR_USERNAMES.has(username.toLowerCase())) return "owner";
@@ -2513,27 +2513,6 @@ async function createChatMessage({ room, author, body, image, replyTo, msgType, 
   return clientMessage;
 }
 
-async function createChatReport({ reporter, messageId, room, messageAuthor, messageBody, reason }) {
-  const safeRoom = String(room || DEFAULT_CHAT_ROOM).slice(0, 200);
-  const safeMessageId = String(messageId || "").slice(0, 100);
-  if (!safeMessageId) return null;
-  const report = {
-    _id: generateId("r"),
-    reporter,
-    reportedAt: new Date().toISOString(),
-    messageId: safeMessageId,
-    room: safeRoom,
-    messageAuthor: String(messageAuthor || "").slice(0, 50),
-    messageBody: String(messageBody || "").slice(0, 500),
-    reason: String(reason || "").slice(0, 300),
-    status: "open",
-    resolvedBy: null,
-    resolvedAt: null
-  };
-  await db.collection("chatReports").insertOne(report);
-  return report;
-}
-
 app.get("/api/chat/messages", requireAuth, asyncHandler(async (req, res) => {
   const room = (req.query.room || DEFAULT_CHAT_ROOM).toString().slice(0, 200);
   const viewer = req.user.username;
@@ -2541,60 +2520,12 @@ app.get("/api/chat/messages", requireAuth, asyncHandler(async (req, res) => {
     return res.status(403).json({ error: "Not a participant in this conversation" });
   }
   const limit = Math.min(parseInt(req.query.limit, 10) || 50, 200);
-  const before = req.query.before ? String(req.query.before).slice(0, 30) : null;
-  const query = { room };
-  if (before) query.time = { $lt: before };
   const docs = await db.collection("messages")
-    .find(query)
+    .find({ room })
     .sort({ time: -1 })
     .limit(limit)
     .toArray();
   res.json(docs.map(normalizeChatMessage).reverse());
-}));
-
-app.post("/api/chat/reports", requireAuth, asyncHandler(async (req, res) => {
-  const { messageId, room, author, body, reason } = req.body || {};
-  if (!messageId || !room || !author || !body) {
-    return res.status(400).json({ error: "messageId, room, author and body are required" });
-  }
-  const report = await createChatReport({
-    reporter: req.user.username,
-    messageId,
-    room,
-    messageAuthor: author,
-    messageBody: body,
-    reason
-  });
-  if (!report) return res.status(500).json({ error: "Could not create report" });
-  res.status(201).json({ ok: true, reportId: report._id });
-}));
-
-app.get("/api/chat/rooms", requireAuth, asyncHandler(async (req, res) => {
-  const rooms = await db.collection("chatRooms").find({}).sort({ createdAt: -1 }).toArray();
-  res.json(rooms.map(r => ({ id: r._id, room: r.room, label: r.label, topic: r.topic, createdBy: r.createdBy, createdAt: r.createdAt })));
-}));
-
-app.post("/api/chat/rooms", requireAuth, asyncHandler(async (req, res) => {
-  const { name, label, topic } = req.body || {};
-  const slug = String(name || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-  if (!slug || !label) {
-    return res.status(400).json({ error: "Room name and label are required" });
-  }
-  const room = `room:${slug}`;
-  const existing = await db.collection("chatRooms").findOne({ room });
-  if (existing) {
-    return res.status(409).json({ error: "A room with that name already exists" });
-  }
-  const doc = {
-    _id: generateId("cr"),
-    room,
-    label: String(label).slice(0, 80),
-    topic: String(topic || "").slice(0, 120),
-    createdBy: req.user.username,
-    createdAt: new Date().toISOString()
-  };
-  await db.collection("chatRooms").insertOne(doc);
-  res.status(201).json({ id: doc._id, room: doc.room, label: doc.label, topic: doc.topic, createdBy: doc.createdBy, createdAt: doc.createdAt });
 }));
 
 app.get("/api/chat/conversations", requireAuth, asyncHandler(async (req, res) => {
@@ -2762,39 +2693,6 @@ app.post("/api/admin/send-digest", requireAuth, asyncHandler(async (req, res) =>
   }
   const result = await sendWeeklyDigest();
   res.json(result);
-}));
-
-app.get("/api/admin/chat-reports", requireAuth, requireRole("moderator"), asyncHandler(async (req, res) => {
-  const reports = await db.collection("chatReports").find({}).sort({ status: 1, reportedAt: -1 }).limit(100).toArray();
-  res.json(reports.map(r => ({
-    id: r._id,
-    reporter: r.reporter,
-    reportedAt: r.reportedAt,
-    room: r.room,
-    messageId: r.messageId,
-    messageAuthor: r.messageAuthor,
-    messageBody: r.messageBody,
-    reason: r.reason,
-    status: r.status,
-    resolvedBy: r.resolvedBy,
-    resolvedAt: r.resolvedAt
-  })));
-}));
-
-app.patch("/api/admin/chat-reports/:id", requireAuth, requireRole("moderator"), asyncHandler(async (req, res) => {
-  const { action } = req.body || {};
-  if (!action || !["resolve","ignore"].includes(action)) {
-    return res.status(400).json({ error: "Action must be resolve or ignore." });
-  }
-  const status = action === "resolve" ? "resolved" : "ignored";
-  const update = { status, resolvedBy: req.user.username, resolvedAt: new Date().toISOString() };
-  const result = await db.collection("chatReports").findOneAndUpdate(
-    { _id: req.params.id },
-    { $set: update },
-    { returnDocument: "after" }
-  );
-  if (!result.value) return res.status(404).json({ error: "Report not found." });
-  res.json({ ok: true, report: result.value });
 }));
 
 // ── Admin: custom email blast ─────────────────────────────────────────────────
@@ -3339,7 +3237,7 @@ app.get("/api/admin/users-list", requireAuth, requireRole("moderator"), asyncHan
 // ── Admin: assign role ────────────────────────────────────────────────────────
 app.patch("/api/admin/users/:username/role", requireAuth, requireRole("owner"), asyncHandler(async (req, res) => {
   const { role } = req.body || {};
-  const validRoles = ["moderator", "analyst", "email_writer", null];
+  const validRoles = ["moderator", "tester", "analyst", "email_writer", null];
   if (!validRoles.includes(role ?? null)) return res.status(400).json({ error: "Invalid role." });
 
   const target = await db.collection("users").findOne({ username: req.params.username.toLowerCase() });

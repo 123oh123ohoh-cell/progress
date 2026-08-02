@@ -21,10 +21,11 @@
   .role-card { background: var(--paper); border: 1px solid var(--mocha-light); border-radius: 12px; padding: 16px; }
   .role-card-name { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; font-weight: 700; margin-bottom: 6px; }
   .role-card-desc { font-size: 13px; color: var(--muted); line-height: 1.5; }
-  .role-owner  { border-left: 3px solid #1c1917; }
-  .role-admin  { border-left: 3px solid #dc2626; }
-  .role-moderator { border-left: 3px solid #2563eb; }
-  .role-analyst   { border-left: 3px solid var(--mocha-light); }
+  .role-owner        { border-left: 3px solid #1c1917; }
+  .role-moderator    { border-left: 3px solid #2563eb; }
+  .role-tester       { border-left: 3px solid #16a34a; }
+  .role-analyst      { border-left: 3px solid var(--mocha-light); }
+  .role-email_writer { border-left: 3px solid #7c3aed; }
 
   /* Assign role */
   .assign-form { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 28px; }
@@ -49,10 +50,11 @@
     border-radius: 20px; font-family: var(--font-mono); font-size: 10.5px;
     font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
   }
-  .rp-owner    { background: #1c1917; color: #f5f0eb; }
-  .rp-admin    { background: #dc2626; color: #fff; }
-  .rp-moderator{ background: #dbeafe; color: #1d4ed8; }
-  .rp-analyst  { background: var(--mocha-wash); color: var(--muted); }
+  .rp-owner        { background: #1c1917; color: #f5f0eb; }
+  .rp-moderator    { background: #dbeafe; color: #1d4ed8; }
+  .rp-tester       { background: #dcfce7; color: #15803d; }
+  .rp-analyst      { background: var(--mocha-wash); color: var(--muted); }
+  .rp-email_writer { background: #ede9fe; color: #6d28d9; }
 
   /* Audit log */
   .audit-row { padding: 11px 0; border-bottom: 1px solid var(--mocha-wash); display: flex; gap: 14px; align-items: baseline; }
@@ -118,17 +120,21 @@
           <div class="role-card-name" style="color:#1c1917;">Owner</div>
           <div class="role-card-desc">Full platform access. Assign/revoke any role. Cannot be granted via this panel — set in server config.</div>
         </div>
-        <div class="role-card role-admin">
-          <div class="role-card-name" style="color:#dc2626;">Admin</div>
-          <div class="role-card-desc">Moderation + user management. Ban, lock, delete posts, assign badges, send announcements.</div>
-        </div>
         <div class="role-card role-moderator">
           <div class="role-card-name" style="color:#1d4ed8;">Moderator</div>
-          <div class="role-card-desc">Content moderation. Review reports, delete posts, lock accounts. No analytics access.</div>
+          <div class="role-card-desc">Content moderation. Review reports, delete posts, lock accounts, send announcements. No analytics access.</div>
+        </div>
+        <div class="role-card role-tester">
+          <div class="role-card-name" style="color:#15803d;">Tester</div>
+          <div class="role-card-desc">Helps test new features before they go live. Access to beta features and test environments.</div>
         </div>
         <div class="role-card role-analyst">
           <div class="role-card-name" style="color:var(--muted);">Analyst</div>
           <div class="role-card-desc">Read-only statistics. Can view analytics and audit logs but cannot take any actions.</div>
+        </div>
+        <div class="role-card role-email_writer">
+          <div class="role-card-name" style="color:#6d28d9;">Email Writer</div>
+          <div class="role-card-desc">Can create, draft, and send community emails via the email editor. No other admin access.</div>
         </div>
       </div>
     </div>
@@ -140,9 +146,10 @@
         <input id="roleUsername" type="text" placeholder="@username">
         <select id="roleSelect">
           <option value="">Remove role</option>
-          <option value="admin">Admin</option>
           <option value="moderator">Moderator</option>
+          <option value="tester">Tester</option>
           <option value="analyst">Analyst</option>
+          <option value="email_writer">Email Writer</option>
         </select>
         <button id="assignRoleBtn" class="btn" style="font-size:13px; padding:8px 14px;">Apply</button>
         <span id="roleStatus" style="font-size:13px; color:var(--muted);"></span>

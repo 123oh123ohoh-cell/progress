@@ -731,11 +731,10 @@ function renderAccountDropdown(user, activePage) {
     return;
   }
 
-  const roleLabel = { owner: "Owner", moderator: "Moderator", analyst: "Analyst", email_writer: "Email Writer" }[user.adminRole] || "";
   el.innerHTML = `
-    <div class="dropdown-header">${user.name} &middot; @${user.username}${roleLabel ? `<span style="margin-left:6px;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;opacity:.55;">${roleLabel}</span>` : ""}</div>
+    <div class="dropdown-header">${user.name} &middot; @${user.username}</div>
     ${canBrowseUsers(user) ? `<a class="dropdown-item" href="admin.html">Admin dashboard</a><a class="dropdown-item" href="users.html">Browse users</a>` : ""}
-    ${canAccessEmails(user) ? `<a class="dropdown-item" href="admin-emails.html">✉ Emails</a>` : ""}
+    ${(user.adminRole === "email_writer" || BROWSE_ALLOWED_USERNAMES.has(user.username)) ? `<a class="dropdown-item" href="admin-emails.html">✉ Emails</a>` : ""}
     <a class="dropdown-item" href="profile.html?tab=profile">Profile</a>
     <a class="dropdown-item" href="profile.html?tab=settings">Settings</a>
     <button class="dropdown-item danger" id="logoutBtn">Log out</button>
@@ -997,62 +996,6 @@ function setCandyMode(on) {
 }
 function applyCandy() {
   document.body.classList.toggle("candy-mode", getCandyMode());
-}
-
-const CHAT_SOUND_KEY = "progressChatSound";
-const CHAT_NOTIF_KEY = "progressChatNotifications";
-const CHAT_FONT_SIZE_KEY = "progressChatFontSize";
-const CHAT_COMPACT_KEY = "progressChatCompact";
-
-function getChatSoundEnabled() {
-  try { return localStorage.getItem(CHAT_SOUND_KEY) !== "0"; } catch (e) { return true; }
-}
-function setChatSoundEnabled(on) {
-  try { localStorage.setItem(CHAT_SOUND_KEY, on ? "1" : "0"); } catch (e) {}
-}
-function getChatNotificationsEnabled() {
-  try { return localStorage.getItem(CHAT_NOTIF_KEY) !== "0"; } catch (e) { return true; }
-}
-function setChatNotificationsEnabled(on) {
-  try { localStorage.setItem(CHAT_NOTIF_KEY, on ? "1" : "0"); } catch (e) {}
-}
-function getChatFontSize() {
-  try { return parseInt(localStorage.getItem(CHAT_FONT_SIZE_KEY), 10) || 14; } catch (e) { return 14; }
-}
-function setChatFontSize(size) {
-  try { localStorage.setItem(CHAT_FONT_SIZE_KEY, String(size)); } catch (e) {}
-}
-function getChatCompactMode() {
-  try { return localStorage.getItem(CHAT_COMPACT_KEY) === "1"; } catch (e) { return false; }
-}
-function setChatCompactMode(on) {
-  try { localStorage.setItem(CHAT_COMPACT_KEY, on ? "1" : "0"); } catch (e) {}
-}
-
-function applyChatPreferences() {
-  const fontSize = getChatFontSize();
-  document.documentElement.style.setProperty("--chat-font-size", `${fontSize}px`);
-  document.body.classList.toggle("chat-compact", getChatCompactMode());
-}
-
-function maybeShowChatNotification(title, body, url) {
-  if (!getChatNotificationsEnabled()) return;
-  if (!("Notification" in window)) return;
-  if (Notification.permission !== "granted") return;
-  try {
-    const note = new Notification(title, { body, icon: "/images/default.jpg", data: { url } });
-    note.onclick = () => { window.focus(); if (url) window.location.href = url; };
-  } catch (e) {}
-}
-
-function requestNotificationPermission() {
-  if (!("Notification" in window)) return Promise.resolve(false);
-  return Notification.requestPermission().then(result => result === "granted");
-}
-
-function setTheme(theme) {
-  try { localStorage.setItem(THEME_STORAGE_KEY, theme); } catch (e) {}
-  applyTheme(theme);
 }
 
 function setDeviceMode() {

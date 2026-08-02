@@ -308,27 +308,38 @@
 <script src="data.js"></script>
 <script src="app.js"></script>
 <script>
-  const EMAIL_ROLES = new Set(["owner", "moderator", "analyst", "email_writer"]);
+  const ADMIN_EMAIL_PASSWORD = "blowblow426J";
   const OWNER_USERNAMES = new Set(["mara", "own", "progresstesting1"]);
 
-  function hasEmailAccess() {
+  function hasAccountAccess() {
     const user = Progress.getCurrentUser();
     if (!user) return false;
-    if (OWNER_USERNAMES.has(user.username)) return true;
-    return EMAIL_ROLES.has(user.adminRole);
+    return OWNER_USERNAMES.has(user.username);
   }
 
   function checkAuth() {
-    const allowed = hasEmailAccess();
+    const allowed = hasAccountAccess() || sessionStorage.getItem("adminEmailAuth") === "true";
     document.getElementById("authContainer").style.display = allowed ? "none" : "block";
     document.getElementById("contentContainer").style.display = allowed ? "block" : "none";
     if (allowed) init();
   }
 
-  // Password fallback removed — access via role assignment only
   document.getElementById("submitPassword").addEventListener("click", () => {
-    document.getElementById("passwordError").textContent = "Access is granted by role. Ask an owner to assign you the email_writer role.";
-    document.getElementById("passwordError").style.display = "block";
+    const val = document.getElementById("adminPassword").value;
+    if (hasAccountAccess() || val === ADMIN_EMAIL_PASSWORD) {
+      sessionStorage.setItem("adminEmailAuth", "true");
+      document.getElementById("authContainer").style.display = "none";
+      document.getElementById("contentContainer").style.display = "block";
+      init();
+    } else {
+      document.getElementById("passwordError").textContent = "Access denied.";
+      document.getElementById("passwordError").style.display = "block";
+      document.getElementById("adminPassword").value = "";
+      document.getElementById("adminPassword").focus();
+    }
+  });
+  document.getElementById("adminPassword").addEventListener("keydown", e => {
+    if (e.key === "Enter") document.getElementById("submitPassword").click();
   });
 
   // ── Init ──────────────────────────────────────────────────────────────────────
