@@ -1046,7 +1046,7 @@
       setStatus("Live", "online");
     });
 
-    ws.addEventListener("message", (event) => {
+    ws.addEventListener("message", async (event) => {
       if (ws !== socket) return;
       let data;
       try { data = JSON.parse(event.data); } catch (e) { return; }
