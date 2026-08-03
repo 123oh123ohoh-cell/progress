@@ -2,309 +2,341 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Event — Progress</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;1,500;1,600&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;1,500;1,600&family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 <script>(function(){try{var t=localStorage.getItem("progressTheme");var dark=(t==="dark")||(t!=="light"&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);if(dark)document.documentElement.setAttribute("data-theme","dark");}catch(e){}})();</script>
 <style>
-/* ── Event page ─────────────────────────────────────────────────────── */
-.event-wrap {
-  max-width: 860px;
-  margin: 0 auto;
-  padding: 0 0 100px;
-}
+/* ═══════════════════════════════════════════════════════════════
+   EVENT PAGE
+═══════════════════════════════════════════════════════════════ */
+.ev-wrap { max-width: 900px; margin: 0 auto; padding: 0 0 120px; }
 
-/* Hero */
-.event-hero {
-  border-radius: 24px;
-  padding: 48px 36px 40px;
-  margin-bottom: 32px;
-  position: relative;
-  overflow: hidden;
+/* ── Hero ─────────────────────────────────────────────────────── */
+.ev-hero {
+  border-radius: 28px; padding: 52px 40px 44px;
+  margin-bottom: 36px; position: relative; overflow: hidden;
   color: #fff;
-  text-shadow: 0 1px 4px rgba(0,0,0,.18);
+  background-size: 300% 300%;
+  animation: ev-grad 8s ease infinite;
+  box-shadow: 0 20px 60px rgba(0,0,0,.25);
 }
-.event-hero::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: rgba(0,0,0,.12);
+@keyframes ev-grad {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+/* shimmer sweep */
+.ev-hero::after {
+  content: ""; position: absolute; inset: 0; z-index: 0;
+  background: linear-gradient(110deg, transparent 30%, rgba(255,255,255,.13) 50%, transparent 70%);
+  animation: ev-shimmer 4s ease-in-out infinite;
+}
+@keyframes ev-shimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+/* dark scrim */
+.ev-hero::before {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(170deg, rgba(0,0,0,.05) 0%, rgba(0,0,0,.28) 100%);
   z-index: 0;
 }
-.event-hero-inner { position: relative; z-index: 1; }
-.event-hero-badge {
-  display: inline-flex; align-items: center; gap: 6px;
-  background: rgba(255,255,255,.22); backdrop-filter: blur(6px);
-  border-radius: 20px; padding: 4px 12px; font-size: 11.5px;
-  font-weight: 700; text-transform: uppercase; letter-spacing: .08em;
-  margin-bottom: 18px;
+.ev-floats { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.ev-float {
+  position: absolute;
+  font-size: var(--efz,28px); opacity: var(--efo,.09);
+  animation: ev-bob var(--efd,8s) ease-in-out var(--efx,0s) infinite;
 }
-.event-hero-badge-dot {
-  width: 7px; height: 7px; border-radius: 50%;
-  background: #fff; animation: pulse-dot 1.6s ease-in-out infinite;
+@keyframes ev-bob {
+  0%,100% { transform: translateY(0) rotate(var(--efr,0deg)); }
+  50%      { transform: translateY(-14px) rotate(calc(var(--efr,0deg) + 12deg)); }
 }
-@keyframes pulse-dot {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50%       { opacity: .5; transform: scale(.7); }
+.ev-hero-inner { position: relative; z-index: 1; }
+.ev-live-badge {
+  display: inline-flex; align-items: center; gap: 7px;
+  background: rgba(255,255,255,.2); backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,.3);
+  border-radius: 30px; padding: 5px 14px;
+  font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .12em;
+  margin-bottom: 22px;
 }
-.event-hero-emoji { font-size: 52px; line-height: 1; margin-bottom: 14px; display: block; }
-.event-hero-title {
-  font-family: var(--font-display);
-  font-size: clamp(30px, 5vw, 52px);
-  font-style: italic;
-  font-weight: 600;
-  margin: 0 0 14px;
-  color: #fff;
-  line-height: 1.1;
+.ev-live-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: #fff;
+  animation: ev-pulse 1.4s ease-in-out infinite;
+  box-shadow: 0 0 0 0 rgba(255,255,255,.6);
 }
-.event-hero-desc {
-  font-size: 15px;
-  color: rgba(255,255,255,.9);
-  max-width: 520px;
-  line-height: 1.6;
-  margin: 0 0 24px;
+@keyframes ev-pulse {
+  0%   { transform: scale(1); box-shadow: 0 0 0 0 rgba(255,255,255,.6); }
+  70%  { transform: scale(1.1); box-shadow: 0 0 0 6px rgba(255,255,255,0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255,255,255,0); }
 }
-.event-hero-meta {
-  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+.ev-emoji { font-size: 64px; line-height: 1; display: block; margin-bottom: 16px; }
+.ev-title {
+  font-family: var(--font-display); font-weight: 600; font-style: italic;
+  font-size: clamp(34px, 6vw, 62px); color: #fff; margin: 0 0 14px;
+  line-height: 1.05; text-shadow: 0 2px 12px rgba(0,0,0,.2);
 }
-.event-hero-date {
-  font-size: 12px; font-family: var(--font-mono);
-  color: rgba(255,255,255,.8); letter-spacing: .04em;
+.ev-desc {
+  font-size: 15.5px; color: rgba(255,255,255,.92); max-width: 540px;
+  line-height: 1.65; margin: 0 0 28px;
 }
-.event-hero-prize {
-  font-size: 12.5px; background: rgba(255,255,255,.2);
-  border-radius: 20px; padding: 4px 12px; font-weight: 600;
-  color: #fff;
+.ev-hero-bottom { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-end; }
+/* countdown */
+.ev-countdown { display: flex; align-items: center; gap: 8px; }
+.ev-cd-unit {
+  background: rgba(0,0,0,.28); border-radius: 12px; padding: 8px 13px;
+  text-align: center; min-width: 54px;
 }
-.event-hero-countdown {
-  display: flex; align-items: center; gap: 8px;
-}
-.event-hero-countdown-unit {
-  text-align: center;
-  background: rgba(0,0,0,.22); border-radius: 10px; padding: 6px 10px;
-}
-.event-hero-countdown-num {
-  font-family: var(--font-mono); font-size: 20px; font-weight: 700;
+.ev-cd-num {
+  font-family: var(--font-mono); font-size: 22px; font-weight: 700;
   color: #fff; line-height: 1; display: block;
 }
-.event-hero-countdown-label {
-  font-size: 9px; text-transform: uppercase; letter-spacing: .08em;
-  color: rgba(255,255,255,.7); display: block; margin-top: 2px;
+.ev-cd-label {
+  font-size: 9px; text-transform: uppercase; letter-spacing: .1em;
+  color: rgba(255,255,255,.6); display: block; margin-top: 3px;
 }
-.event-hero-countdown-sep {
-  font-size: 18px; font-weight: 700; color: rgba(255,255,255,.5); margin-top: -4px;
-}
-
-/* Floating candy bg decorations */
-.event-hero-floats {
-  position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden;
-}
-.event-float {
-  position: absolute;
-  font-size: var(--esz, 28px);
-  opacity: var(--eop, .08);
-  animation: efloat var(--edur, 8s) ease-in-out var(--edel, 0s) infinite;
-}
-@keyframes efloat {
-  0%, 100% { transform: translateY(0) rotate(var(--erot, 0deg)); }
-  50%       { transform: translateY(-12px) rotate(calc(var(--erot, 0deg) + 8deg)); }
+.ev-cd-sep { font-size: 20px; font-weight: 700; color: rgba(255,255,255,.35); }
+/* prize pill */
+.ev-prize {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.35);
+  border-radius: 30px; padding: 6px 16px; font-size: 13px; font-weight: 700;
+  color: #fff; backdrop-filter: blur(8px);
 }
 
-/* Two-col layout */
-.event-cols {
-  display: grid;
-  grid-template-columns: 1fr 340px;
-  gap: 24px;
-  align-items: start;
+/* ── Stats bar ───────────────────────────────────────────────── */
+.ev-stats-bar {
+  display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 30px;
 }
-@media (max-width: 680px) {
-  .event-cols { grid-template-columns: 1fr; }
-  .event-leaderboard-col { order: -1; }
+.ev-stat {
+  background: var(--mocha-wash); border-radius: 14px;
+  padding: 14px 20px; flex: 1; min-width: 120px;
+  display: flex; flex-direction: column; gap: 4px;
 }
+.ev-stat-num {
+  font-family: var(--font-mono); font-size: 24px; font-weight: 700; color: var(--ink);
+}
+.ev-stat-label { font-size: 12px; color: var(--muted); }
 
-/* Game section */
-.event-game-section {
-  background: var(--mocha-wash);
-  border-radius: 20px;
-  padding: 24px;
+/* ── Two col ─────────────────────────────────────────────────── */
+.ev-cols { display: grid; grid-template-columns: 1fr 340px; gap: 24px; align-items: start; }
+@media (max-width: 700px) { .ev-cols { grid-template-columns: 1fr; } }
+
+/* ── Play section ────────────────────────────────────────────── */
+.ev-play-section {
+  background: var(--mocha-wash); border-radius: 24px; padding: 36px 28px;
+  text-align: center; position: relative; overflow: hidden;
 }
-.event-section-title {
-  font-family: var(--font-display);
-  font-size: 18px; font-weight: 600; font-style: italic;
-  margin: 0 0 18px; color: var(--ink);
+.ev-play-title {
+  font-family: var(--font-display); font-size: 22px; font-style: italic;
+  font-weight: 600; margin: 0 0 10px; color: var(--ink);
 }
-.event-score-bar {
+.ev-play-desc { font-size: 14px; color: var(--muted); margin: 0 0 28px; line-height: 1.5; }
+.ev-play-btn {
+  display: inline-flex; align-items: center; gap: 10px;
+  background: var(--ink); color: var(--cream);
+  border: none; border-radius: 50px; padding: 16px 36px;
+  font-size: 16px; font-weight: 800; cursor: pointer;
+  font-family: var(--font-body); letter-spacing: .02em;
+  transition: transform .15s, box-shadow .15s;
+  box-shadow: 0 6px 20px rgba(0,0,0,.18);
+}
+.ev-play-btn:hover { transform: translateY(-2px) scale(1.03); box-shadow: 0 12px 28px rgba(0,0,0,.22); }
+.ev-play-btn-icon { font-size: 22px; }
+.ev-personal-best {
+  margin-top: 20px; font-size: 13px; color: var(--muted);
+  font-family: var(--font-mono);
+}
+.ev-personal-best strong { color: var(--ink); }
+.ev-login-prompt {
+  padding: 16px; background: var(--mocha-light); border-radius: 14px;
+  font-size: 13.5px; color: var(--muted); margin-top: 16px;
+}
+.ev-login-prompt a { color: var(--ink); font-weight: 700; }
+
+/* ── Leaderboard ─────────────────────────────────────────────── */
+.ev-lb { background: var(--mocha-wash); border-radius: 24px; padding: 24px; }
+.ev-lb-title {
+  font-family: var(--font-display); font-size: 18px; font-style: italic;
+  font-weight: 600; margin: 0 0 18px; color: var(--ink);
+}
+.ev-lb-podium { display: flex; gap: 10px; margin-bottom: 16px; }
+.ev-lb-podium-card {
+  flex: 1; border-radius: 16px; padding: 14px 10px; text-align: center;
+  position: relative; overflow: hidden;
+}
+.ev-lb-podium-card.gold   { background: linear-gradient(135deg, #ffe259, #ffa751); }
+.ev-lb-podium-card.silver { background: linear-gradient(135deg, #d9d9d9, #a8a8a8); }
+.ev-lb-podium-card.bronze { background: linear-gradient(135deg, #e8a87c, #c17a3a); }
+.ev-lb-pod-medal { font-size: 22px; display: block; margin-bottom: 6px; }
+.ev-lb-pod-avatar {
+  width: 36px; height: 36px; border-radius: 50%; object-fit: cover;
+  background: rgba(255,255,255,.3); margin: 0 auto 6px; display: block;
+  border: 2px solid rgba(255,255,255,.5);
+}
+.ev-lb-pod-initials {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: rgba(255,255,255,.3); border: 2px solid rgba(255,255,255,.5);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 800; color: #fff;
+  margin: 0 auto 6px;
+}
+.ev-lb-pod-name { font-size: 12px; font-weight: 700; color: rgba(0,0,0,.7); line-height: 1.2; }
+.ev-lb-pod-score { font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: rgba(0,0,0,.6); margin-top: 3px; }
+/* rest of leaderboard */
+.ev-lb-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 0; border-bottom: 1px solid var(--mocha-light);
+}
+.ev-lb-row:last-child { border-bottom: none; }
+.ev-lb-rank { font-family: var(--font-mono); font-size: 12px; font-weight: 700; color: var(--muted); min-width: 20px; text-align: center; }
+.ev-lb-av { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; background: var(--mocha-light); flex-shrink: 0; }
+.ev-lb-av-init { width: 30px; height: 30px; border-radius: 50%; background: var(--mocha-light); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: var(--muted); flex-shrink: 0; }
+.ev-lb-name { font-size: 13px; font-weight: 600; color: var(--ink); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ev-lb-you { font-size: 9px; background: var(--ink); color: var(--cream); border-radius: 4px; padding: 1px 4px; font-weight: 800; margin-left: 4px; }
+.ev-lb-score { font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: var(--ink); flex-shrink: 0; }
+/* score bar */
+.ev-lb-bar-wrap { width: 100%; height: 3px; background: var(--mocha-light); border-radius: 2px; margin-top: 4px; }
+.ev-lb-bar { height: 3px; border-radius: 2px; background: linear-gradient(90deg, #ff6b9d, #ffd93d); transition: width .6s ease; }
+.ev-lb-footer { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+.ev-lb-user-rank {
+  text-align: center; padding: 10px; background: var(--mocha-light);
+  border-radius: 10px; font-size: 13px; color: var(--muted);
+}
+.ev-lb-user-rank strong { color: var(--ink); }
+.ev-lb-refresh {
+  width: 100%; padding: 9px; border-radius: 10px; border: 1.5px solid var(--mocha-light);
+  background: none; color: var(--muted); font-size: 13px; cursor: pointer;
+  font-family: var(--font-body); transition: border-color .15s, color .15s;
+}
+.ev-lb-refresh:hover { border-color: var(--ink); color: var(--ink); }
+.ev-lb-empty { text-align: center; padding: 28px 0; color: var(--muted); font-size: 13.5px; }
+
+/* ── No event ─────────────────────────────────────────────────── */
+.ev-none { text-align: center; padding: 80px 24px; }
+.ev-none-emoji { font-size: 54px; display: block; margin-bottom: 18px; }
+.ev-none-title { font-family: var(--font-display); font-size: 26px; font-style: italic; margin: 0 0 10px; color: var(--ink); }
+.ev-none-sub { color: var(--muted); font-size: 14px; margin: 0; }
+
+/* ═══════════════════════════════════════════════════════════════
+   FULLSCREEN GAME OVERLAY
+═══════════════════════════════════════════════════════════════ */
+#gfsOverlay {
+  position: fixed; inset: 0; z-index: 1000;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background-size: 300% 300%; animation: ev-grad 8s ease infinite;
+  overscroll-behavior: none;
+  opacity: 0; transition: opacity .22s;
+}
+#gfsOverlay.open { opacity: 1; }
+/* dark layer so content is readable */
+#gfsOverlay::before {
+  content: ""; position: absolute; inset: 0;
+  background: rgba(0,0,0,.42); z-index: 0;
+}
+.gfs-floats { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.gfs-float {
+  position: absolute; font-size: var(--gz,24px); opacity: var(--go,.07);
+  animation: ev-bob var(--gd,8s) ease-in-out var(--gx,0s) infinite;
+}
+.gfs-inner {
+  position: relative; z-index: 1;
+  width: min(480px, 96vw); display: flex; flex-direction: column;
+  max-height: 100dvh; padding: env(safe-area-inset-top,12px) 0 env(safe-area-inset-bottom,12px);
+}
+/* top bar */
+.gfs-topbar {
   display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 14px; gap: 10px; flex-wrap: wrap;
+  padding: 0 4px 12px; flex-shrink: 0;
 }
-.event-score-display {
-  font-family: var(--font-mono); font-size: 22px; font-weight: 700;
-  color: var(--ink); letter-spacing: .02em;
+.gfs-score-label { font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: rgba(255,255,255,.6); }
+.gfs-score { font-family: var(--font-mono); font-size: 32px; font-weight: 700; color: #fff; line-height: 1; }
+.gfs-timer-wrap { text-align: right; }
+.gfs-time { font-family: var(--font-mono); font-size: 32px; font-weight: 700; color: #fff; line-height: 1; }
+.gfs-time.urgent { color: #ff6b6b; animation: gfs-tick .5s ease infinite alternate; }
+@keyframes gfs-tick { to { opacity: .5; } }
+.gfs-timer-label { font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: rgba(255,255,255,.6); }
+/* timer bar */
+.gfs-bar-wrap { height: 6px; background: rgba(255,255,255,.15); border-radius: 4px; margin-bottom: 10px; overflow: hidden; flex-shrink: 0; }
+.gfs-bar-fill { height: 100%; border-radius: 4px; background: rgba(255,255,255,.85); transition: width .5s linear; }
+/* close btn */
+.gfs-close {
+  position: fixed; top: max(env(safe-area-inset-top, 0px), 14px); right: 16px; z-index: 2;
+  background: rgba(0,0,0,.35); border: none; border-radius: 50%; width: 38px; height: 38px;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+  color: #fff; font-size: 18px; backdrop-filter: blur(6px);
+  transition: background .14s;
 }
-.event-score-best {
-  font-size: 12px; color: var(--muted); font-family: var(--font-mono);
+.gfs-close:hover { background: rgba(0,0,0,.55); }
+/* combo flash */
+.gfs-combo {
+  text-align: center; font-family: var(--font-display); font-size: 22px;
+  font-style: italic; font-weight: 600; color: #fff; min-height: 30px;
+  text-shadow: 0 0 16px rgba(255,220,80,.7); flex-shrink: 0;
+  transition: opacity .3s;
 }
-.event-timer-bar {
-  height: 5px; border-radius: 3px; background: var(--mocha-light);
-  margin-bottom: 16px; overflow: hidden;
+/* board */
+.gfs-board-wrap { flex: 0 0 auto; }
+.gfs-board {
+  display: grid; grid-template-columns: repeat(8, 1fr);
+  gap: 4px; padding: 10px; border-radius: 18px;
+  background: rgba(0,0,0,.25); width: 100%;
+  touch-action: none; user-select: none;
 }
-.event-timer-fill {
-  height: 100%; border-radius: 3px;
-  background: linear-gradient(90deg, #ff6b9d, #ffd93d);
-  transition: width .5s linear;
-}
-
-/* Candy game board */
-.candy-board-wrap {
-  display: flex; justify-content: center; margin-bottom: 16px;
-}
-.candy-board {
-  display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  gap: 3px;
-  background: var(--mocha-light);
-  border-radius: 14px;
-  padding: 8px;
-  width: 100%;
-  max-width: 360px;
-  touch-action: none;
-  user-select: none;
-}
-.candy-cell {
-  aspect-ratio: 1;
-  border-radius: 8px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: clamp(16px, 3.5vw, 22px);
-  cursor: pointer;
-  transition: transform .1s, box-shadow .1s, opacity .18s;
-  background: var(--mocha-wash);
-  position: relative;
+.gfs-cell {
+  aspect-ratio: 1; border-radius: 10px; display: flex;
+  align-items: center; justify-content: center;
+  font-size: clamp(18px, 5vw, 28px);
+  cursor: pointer; background: rgba(255,255,255,.1);
+  transition: transform .1s, background .1s;
   -webkit-tap-highlight-color: transparent;
+  position: relative;
 }
-.candy-cell:hover { transform: scale(1.08); }
-.candy-cell.selected {
-  box-shadow: 0 0 0 2.5px var(--ink);
-  transform: scale(1.1);
-  z-index: 2;
+.gfs-cell:hover { background: rgba(255,255,255,.2); transform: scale(1.06); }
+.gfs-cell.selected { background: rgba(255,255,255,.35); transform: scale(1.12); box-shadow: 0 0 0 2px rgba(255,255,255,.8); z-index: 2; }
+.gfs-cell.matched { animation: gfs-pop .26s ease forwards; }
+.gfs-cell.falling { animation: gfs-fall .2s ease; }
+@keyframes gfs-pop  { 0%{transform:scale(1.2);opacity:1} 100%{transform:scale(0);opacity:0} }
+@keyframes gfs-fall { 0%{transform:translateY(-28px);opacity:.4} 100%{transform:translateY(0);opacity:1} }
+.gfs-cell.hint { animation: gfs-hint .45s ease 3; }
+@keyframes gfs-hint { 0%,100%{transform:scale(1)} 50%{transform:scale(1.2) rotate(8deg)} }
+/* bottom controls */
+.gfs-controls { display: flex; justify-content: center; padding-top: 10px; flex-shrink: 0; }
+.gfs-hint-btn {
+  background: rgba(255,255,255,.15); border: 1.5px solid rgba(255,255,255,.3);
+  color: #fff; border-radius: 20px; padding: 8px 22px; font-size: 13px; font-weight: 700;
+  cursor: pointer; font-family: var(--font-body); transition: background .14s;
+  backdrop-filter: blur(6px);
 }
-.candy-cell.matched {
-  animation: candy-pop .28s ease forwards;
-}
-.candy-cell.falling {
-  animation: candy-fall .18s ease;
-}
-@keyframes candy-pop {
-  0%   { transform: scale(1.2); opacity: 1; }
-  60%  { transform: scale(1.35); opacity: .7; }
-  100% { transform: scale(0); opacity: 0; }
-}
-@keyframes candy-fall {
-  0%   { transform: translateY(-24px); opacity: .6; }
-  100% { transform: translateY(0); opacity: 1; }
-}
-.candy-cell.hint { animation: candy-hint .5s ease 3; }
-@keyframes candy-hint {
-  0%, 100% { transform: scale(1); }
-  50%       { transform: scale(1.15) rotate(8deg); }
-}
+.gfs-hint-btn:hover { background: rgba(255,255,255,.28); }
+.gfs-hint-btn:disabled { opacity: .4; cursor: not-allowed; }
 
-/* Candy game controls */
-.candy-controls { display: flex; gap: 10px; flex-wrap: wrap; }
-.candy-btn {
-  flex: 1; padding: 10px 0; border-radius: 12px; border: none;
-  cursor: pointer; font-size: 14px; font-weight: 700;
-  font-family: var(--font-body); transition: opacity .15s;
+/* ── Results screen (inside overlay) ──────────────────────────── */
+.gfs-results {
+  position: absolute; inset: 0; z-index: 3;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; padding: 32px 24px;
+  background: rgba(0,0,0,.6); backdrop-filter: blur(6px);
+  opacity: 0; pointer-events: none; transition: opacity .3s;
 }
-.candy-btn.primary { background: var(--ink); color: var(--cream); }
-.candy-btn.secondary {
-  background: none; border: 1.5px solid var(--mocha-light);
-  color: var(--muted);
+.gfs-results.show { opacity: 1; pointer-events: all; }
+.gfs-results-emoji { font-size: 56px; margin-bottom: 16px; display: block; }
+.gfs-results-title { font-family: var(--font-display); font-size: 34px; font-style: italic; font-weight: 600; color: #fff; margin: 0 0 8px; }
+.gfs-results-score { font-family: var(--font-mono); font-size: 48px; font-weight: 700; color: #fff; margin: 0 0 6px; line-height: 1; }
+.gfs-results-sub { font-size: 14px; color: rgba(255,255,255,.7); margin: 0 0 28px; }
+.gfs-results-status { font-size: 14px; color: rgba(255,255,255,.8); margin: 0 0 24px; min-height: 20px; }
+.gfs-results-btns { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+.gfs-results-btn {
+  padding: 12px 28px; border-radius: 30px; font-size: 15px;
+  font-weight: 800; cursor: pointer; font-family: var(--font-body);
+  transition: transform .14s;
 }
-.candy-btn:hover { opacity: .82; }
-.candy-btn:disabled { opacity: .45; cursor: not-allowed; }
-.candy-msg {
-  text-align: center; font-size: 14px; color: var(--muted);
-  min-height: 22px; margin-bottom: 8px; font-family: var(--font-mono);
-}
-.candy-not-logged-in {
-  text-align: center; padding: 32px 16px; color: var(--muted); font-size: 14px;
-}
-.candy-not-logged-in a { color: var(--ink); font-weight: 600; }
-
-/* Leaderboard */
-.event-leaderboard-col {
-  background: var(--mocha-wash);
-  border-radius: 20px;
-  padding: 24px;
-}
-.event-lb-loading {
-  text-align: center; padding: 32px 0;
-  color: var(--muted); font-size: 13px;
-}
-.event-lb-empty {
-  text-align: center; padding: 24px 0;
-  color: var(--muted); font-size: 13px;
-}
-.event-lb-row {
-  display: flex; align-items: center; gap: 12px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--mocha-light);
-}
-.event-lb-row:last-child { border-bottom: none; }
-.event-lb-rank {
-  font-family: var(--font-mono); font-size: 13px; font-weight: 700;
-  color: var(--muted); min-width: 22px; text-align: center;
-}
-.event-lb-rank.gold   { color: #f5a623; }
-.event-lb-rank.silver { color: #9b9b9b; }
-.event-lb-rank.bronze { color: #c47728; }
-.event-lb-medal { font-size: 18px; }
-.event-lb-avatar {
-  width: 34px; height: 34px; border-radius: 50%; object-fit: cover;
-  background: var(--mocha-light); flex-shrink: 0;
-}
-.event-lb-avatar-initials {
-  width: 34px; height: 34px; border-radius: 50%;
-  background: var(--mocha-light); color: var(--muted);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 12px; font-weight: 700; flex-shrink: 0;
-}
-.event-lb-name-wrap { flex: 1; min-width: 0; }
-.event-lb-name {
-  font-size: 13.5px; font-weight: 600; color: var(--ink);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.event-lb-username {
-  font-size: 11px; color: var(--muted); font-family: var(--font-mono);
-}
-.event-lb-score {
-  font-family: var(--font-mono); font-size: 14px;
-  font-weight: 700; color: var(--ink); flex-shrink: 0;
-}
-.event-lb-you {
-  font-size: 10px; background: var(--ink); color: var(--cream);
-  border-radius: 6px; padding: 1px 5px; font-weight: 700; margin-left: 4px;
-}
-.event-lb-refresh {
-  width: 100%; margin-top: 14px; padding: 8px; border-radius: 10px;
-  border: 1.5px solid var(--mocha-light); background: none;
-  color: var(--muted); font-size: 13px; cursor: pointer;
-  font-family: var(--font-body); transition: border-color .15s;
-}
-.event-lb-refresh:hover { border-color: var(--ink); color: var(--ink); }
-
-/* No event state */
-.event-none {
-  text-align: center; padding: 80px 24px;
-}
-.event-none-emoji { font-size: 52px; display: block; margin-bottom: 16px; }
-.event-none-title {
-  font-family: var(--font-display); font-size: 24px; font-style: italic;
-  margin: 0 0 10px; color: var(--ink);
-}
-.event-none-sub { color: var(--muted); font-size: 14px; margin: 0; }
+.gfs-results-btn:hover { transform: scale(1.04); }
+.gfs-results-btn.primary { background: #fff; color: #222; border: none; }
+.gfs-results-btn.secondary { background: rgba(255,255,255,.18); color: #fff; border: 1.5px solid rgba(255,255,255,.35); }
 </style>
 </head>
 <body>
@@ -312,45 +344,111 @@
 <div id="nav-root"></div>
 <div id="modal-root"></div>
 
-<main class="container">
-  <div class="event-wrap" id="eventWrap">
-    <div class="event-none" id="eventNone" style="display:none;">
-      <span class="event-none-emoji">🎮</span>
-      <h2 class="event-none-title">No active event right now</h2>
-      <p class="event-none-sub">Check back soon — limited-time events drop regularly.</p>
+<!-- Fullscreen game overlay (hidden until Play is clicked) -->
+<div id="gfsOverlay" role="dialog" aria-modal="true" aria-label="Candy game">
+  <div class="gfs-floats" id="gfsFloats"></div>
+  <button class="gfs-close" id="gfsCloseBtn" aria-label="Close game">✕</button>
+  <div class="gfs-inner">
+    <div class="gfs-topbar">
+      <div>
+        <div class="gfs-score-label">Score</div>
+        <div class="gfs-score" id="gfsScore">0</div>
+      </div>
+      <div class="gfs-combo" id="gfsCombo"></div>
+      <div class="gfs-timer-wrap">
+        <div class="gfs-time" id="gfsTime">90</div>
+        <div class="gfs-timer-label">seconds</div>
+      </div>
     </div>
-    <div id="eventContent" style="display:none;">
-      <div class="event-hero" id="eventHero">
-        <div class="event-hero-floats" id="eventFloats"></div>
-        <div class="event-hero-inner">
-          <div class="event-hero-badge">
-            <span class="event-hero-badge-dot"></span>
-            Live event
+    <div class="gfs-bar-wrap"><div class="gfs-bar-fill" id="gfsBarFill" style="width:100%;"></div></div>
+    <div class="gfs-board-wrap">
+      <div class="gfs-board" id="gfsBoard"></div>
+    </div>
+    <div class="gfs-controls">
+      <button class="gfs-hint-btn" id="gfsHintBtn">💡 Hint</button>
+    </div>
+  </div>
+  <div class="gfs-results" id="gfsResults">
+    <span class="gfs-results-emoji" id="gfsResEmoji">🍬</span>
+    <div class="gfs-results-title">Time's up!</div>
+    <div class="gfs-results-score" id="gfsResScore">0</div>
+    <div class="gfs-results-sub" id="gfsResSub"></div>
+    <div class="gfs-results-status" id="gfsResStatus">Submitting score…</div>
+    <div class="gfs-results-btns">
+      <button class="gfs-results-btn primary" id="gfsPlayAgainBtn">Play again</button>
+      <button class="gfs-results-btn secondary" id="gfsBackBtn">Back to event</button>
+    </div>
+  </div>
+</div>
+
+<main class="container">
+  <div class="ev-wrap" id="evWrap">
+
+    <div class="ev-none" id="evNone" style="display:none;">
+      <span class="ev-none-emoji">🎮</span>
+      <h2 class="ev-none-title">No active event right now</h2>
+      <p class="ev-none-sub">Check back soon — limited-time events drop regularly.</p>
+    </div>
+
+    <div id="evContent" style="display:none;">
+
+      <!-- Hero -->
+      <div class="ev-hero" id="evHero">
+        <div class="ev-floats" id="evFloats"></div>
+        <div class="ev-hero-inner">
+          <div class="ev-live-badge"><span class="ev-live-dot"></span>Limited time event</div>
+          <span class="ev-emoji" id="evEmoji"></span>
+          <h1 class="ev-title" id="evTitle"></h1>
+          <p class="ev-desc" id="evDesc"></p>
+          <div class="ev-hero-bottom">
+            <div class="ev-countdown" id="evCountdown"></div>
+            <div class="ev-prize" id="evPrize" style="display:none;"></div>
           </div>
-          <span class="event-hero-emoji" id="eventEmoji"></span>
-          <h1 class="event-hero-title" id="eventTitle"></h1>
-          <p class="event-hero-desc" id="eventDesc"></p>
-          <div class="event-hero-meta">
-            <span class="event-hero-date" id="eventDateRange"></span>
-            <span class="event-hero-prize" id="eventPrize" style="display:none;"></span>
-          </div>
-          <div class="event-hero-countdown" id="eventCountdown" style="margin-top:20px;"></div>
         </div>
       </div>
 
-      <div class="event-cols">
-        <!-- Game -->
-        <div class="event-game-section">
-          <h2 class="event-section-title" id="gameTitle">Play</h2>
-          <div id="gameArea"></div>
+      <!-- Stats bar -->
+      <div class="ev-stats-bar" id="evStatsBar" style="display:none;">
+        <div class="ev-stat">
+          <div class="ev-stat-num" id="statPlayers">—</div>
+          <div class="ev-stat-label">players competing</div>
+        </div>
+        <div class="ev-stat">
+          <div class="ev-stat-num" id="statGames">—</div>
+          <div class="ev-stat-label">total games played</div>
+        </div>
+        <div class="ev-stat" id="statRankBox" style="display:none;">
+          <div class="ev-stat-num" id="statRank">—</div>
+          <div class="ev-stat-label">your current rank</div>
+        </div>
+      </div>
+
+      <!-- Two-col: game + leaderboard -->
+      <div class="ev-cols">
+
+        <!-- Play section -->
+        <div class="ev-play-section">
+          <h2 class="ev-play-title" id="evGameTitle">Ready to play?</h2>
+          <p class="ev-play-desc" id="evGameDesc">Match 3 or more candies in a row or column. Build combos. 90 seconds on the clock.</p>
+          <button class="ev-play-btn" id="evPlayBtn">
+            <span class="ev-play-btn-icon">▶</span> Play now
+          </button>
+          <div class="ev-personal-best" id="evPersonalBest" style="display:none;"></div>
+          <div class="ev-login-prompt" id="evLoginPrompt" style="display:none;">
+            <a href="signup.html">Sign in</a> to save your score and compete on the leaderboard.
+          </div>
         </div>
 
         <!-- Leaderboard -->
-        <div class="event-leaderboard-col event-leaderboard-col">
-          <h2 class="event-section-title">🏆 Leaderboard</h2>
-          <div id="leaderboardArea"><div class="event-lb-loading">Loading…</div></div>
-          <button class="event-lb-refresh" id="lbRefreshBtn">↻ Refresh</button>
+        <div class="ev-lb">
+          <h2 class="ev-lb-title">🏆 Leaderboard</h2>
+          <div id="lbInner"><div class="ev-lb-empty" style="padding:32px 0;">Loading…</div></div>
+          <div class="ev-lb-footer">
+            <div class="ev-lb-user-rank" id="lbUserRank" style="display:none;"></div>
+            <button class="ev-lb-refresh" id="lbRefreshBtn">↻ Refresh</button>
+          </div>
         </div>
+
       </div>
     </div>
   </div>
@@ -359,388 +457,456 @@
 <script src="data.js"></script>
 <script src="app.js"></script>
 <script>
+'use strict';
 const ready = initShell("event");
 
 let currentEvent = null;
 let currentUser  = null;
 let personalBest = 0;
 
-// ── Load event ────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const CANDY_EMOJIS = ["🍬","🍭","🍫","🍡","🍰","🍩","🍪","🍦","✨","🎀"];
+
+function makeFloats(containerId, count = 14) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  el.innerHTML = CANDY_EMOJIS.concat(CANDY_EMOJIS).slice(0, count).map(e => {
+    const top  = (4  + Math.random() * 86).toFixed(1);
+    const left = (2  + Math.random() * 92).toFixed(1);
+    const sz   = (14 + Math.random() * 22).toFixed(0);
+    const op   = (.05 + Math.random() * .09).toFixed(2);
+    const dur  = (5   + Math.random() * 6).toFixed(1);
+    const del  = (Math.random() * 4).toFixed(1);
+    const rot  = (-30 + Math.random() * 60).toFixed(0);
+    return `<span class="ev-float" style="top:${top}%;left:${left}%;--efz:${sz}px;--efo:${op};--efd:${dur}s;--efx:${del}s;--efr:${rot}deg;">${e}</span>`;
+  }).join("");
+}
+
+// ── Event load ────────────────────────────────────────────────────────────────
 async function loadEvent() {
   const res = await apiFetch("/api/events/current").catch(() => null);
-  if (!res || !res.id) {
-    document.getElementById("eventNone").style.display = "block";
-    return;
-  }
+  if (!res || !res.id) { document.getElementById("evNone").style.display = "block"; return; }
   currentEvent = res;
-  document.getElementById("eventContent").style.display = "block";
+  document.getElementById("evContent").style.display = "block";
   renderHero(res);
-  renderGame(res.game);
   loadLeaderboard(res.id);
   startCountdown(new Date(res.endDate));
+
+  const me = Progress.getCurrentUser();
+  currentUser = me;
+  if (!me) {
+    document.getElementById("evLoginPrompt").style.display = "block";
+  }
 }
 
 // ── Hero ──────────────────────────────────────────────────────────────────────
 function renderHero(ev) {
   document.title = `${ev.title} — Progress`;
-  document.getElementById("eventEmoji").textContent  = ev.emoji || "🎮";
-  document.getElementById("eventTitle").textContent  = ev.title;
-  document.getElementById("eventDesc").textContent   = ev.description || "";
-  const hero = document.getElementById("eventHero");
-  if (ev.gradient) hero.style.background = ev.gradient;
+  const gradient = ev.gradient || "linear-gradient(-45deg, #ff6b9d, #ffd93d, #ff6b35, #c471ed)";
+  const hero = document.getElementById("evHero");
+  hero.style.background = gradient;
+  hero.style.backgroundSize = "300% 300%";
 
-  const fmt = d => new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  document.getElementById("eventDateRange").textContent = `${fmt(ev.startDate)} – ${fmt(ev.endDate)}`;
+  document.getElementById("evEmoji").textContent  = ev.emoji  || "🎮";
+  document.getElementById("evTitle").textContent  = ev.title;
+  document.getElementById("evDesc").textContent   = ev.description || "";
 
-  const prize = document.getElementById("eventPrize");
+  const prize = document.getElementById("evPrize");
   if (ev.prizeNote) { prize.textContent = ev.prizeNote; prize.style.display = ""; }
 
-  // Floating bg decorations
-  const floats = document.getElementById("eventFloats");
-  const FLOAT_EMOJIS = ["🍬","🍭","🍫","🍡","🍰","🍩","🍪","🍦","🎀","✨"];
-  floats.innerHTML = FLOAT_EMOJIS.map((e, i) => {
-    const top  = 5 + Math.random() * 85;
-    const left = 5 + Math.random() * 90;
-    const sz   = 20 + Math.random() * 24;
-    const op   = 0.05 + Math.random() * 0.08;
-    const dur  = 5 + Math.random() * 6;
-    const del  = Math.random() * 4;
-    const rot  = -20 + Math.random() * 40;
-    return `<span class="event-float" style="top:${top.toFixed(1)}%;left:${left.toFixed(1)}%;--esz:${sz.toFixed(0)}px;--eop:${op.toFixed(2)};--edur:${dur.toFixed(1)}s;--edel:${del.toFixed(1)}s;--erot:${rot.toFixed(0)}deg;">${e}</span>`;
-  }).join("");
+  const gTitle = document.getElementById("evGameTitle");
+  const gDesc  = document.getElementById("evGameDesc");
+  if (ev.game === "candy") {
+    gTitle.textContent = "🍬 Sweet Cascade";
+    gDesc.textContent  = "Match 3 or more candies in a row or column. Combos score bigger. 90 seconds on the clock — go.";
+  }
+
+  // Floating bg
+  makeFloats("evFloats", 16);
+
+  // Set the overlay gradient too
+  const ov = document.getElementById("gfsOverlay");
+  ov.style.background = gradient;
+  ov.style.backgroundSize = "300% 300%";
+  makeFloats("gfsFloats", 18);
+
+  const fmt = d => new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  // date shown in countdown label below
 }
 
 // ── Countdown ─────────────────────────────────────────────────────────────────
+let _cdTimer = null;
 function startCountdown(endDate) {
-  const el = document.getElementById("eventCountdown");
+  const el = document.getElementById("evCountdown");
+  clearInterval(_cdTimer);
   function tick() {
     const diff = endDate - Date.now();
-    if (diff <= 0) { el.innerHTML = `<span style="color:rgba(255,255,255,.8);font-size:13px;">Event ended</span>`; return; }
+    if (diff <= 0) {
+      el.innerHTML = `<span style="font-size:13px;color:rgba(255,255,255,.75);font-family:var(--font-mono);">Event ended</span>`;
+      clearInterval(_cdTimer); return;
+    }
     const d = Math.floor(diff / 86400000);
     const h = Math.floor((diff % 86400000) / 3600000);
-    const m = Math.floor((diff % 3600000) / 60000);
-    const s = Math.floor((diff % 60000) / 1000);
-    const unit = (n, l) => `<span class="event-hero-countdown-unit"><span class="event-hero-countdown-num">${String(n).padStart(2,"0")}</span><span class="event-hero-countdown-label">${l}</span></span>`;
-    el.innerHTML = unit(d,"days") + `<span class="event-hero-countdown-sep">:</span>` + unit(h,"hrs") + `<span class="event-hero-countdown-sep">:</span>` + unit(m,"min") + `<span class="event-hero-countdown-sep">:</span>` + unit(s,"sec");
-    setTimeout(tick, 1000);
+    const m = Math.floor((diff % 3600000)  / 60000);
+    const s = Math.floor((diff % 60000)    / 1000);
+    const u = (n, l) => `<div class="ev-cd-unit"><span class="ev-cd-num">${String(n).padStart(2,"0")}</span><span class="ev-cd-label">${l}</span></div>`;
+    el.innerHTML = u(d,"days") + `<span class="ev-cd-sep">:</span>` + u(h,"hrs") + `<span class="ev-cd-sep">:</span>` + u(m,"min") + `<span class="ev-cd-sep">:</span>` + u(s,"sec");
   }
   tick();
+  _cdTimer = setInterval(tick, 1000);
 }
 
 // ── Leaderboard ───────────────────────────────────────────────────────────────
 async function loadLeaderboard(eventId) {
-  const area = document.getElementById("leaderboardArea");
-  area.innerHTML = `<div class="event-lb-loading">Loading…</div>`;
-  const rows = await apiFetch(`/api/events/${encodeURIComponent(eventId)}/leaderboard`).catch(() => null);
+  const inner = document.getElementById("lbInner");
+  inner.innerHTML = `<div class="ev-lb-empty" style="padding:28px 0;">Loading…</div>`;
+
+  const data = await apiFetch(`/api/events/${encodeURIComponent(eventId)}/leaderboard`).catch(() => null);
+
+  // Handle both old (array) and new (object) response shapes
+  const leaderboard    = Array.isArray(data) ? data : (data?.leaderboard || []);
+  const totalPlayers   = data?.totalPlayers   ?? leaderboard.length;
+  const totalSubmissions = data?.totalSubmissions ?? 0;
+  const userRank       = data?.userRank       ?? null;
+  const userBest       = data?.userBest       ?? null;
+
+  // Update stats bar
+  const statsBar = document.getElementById("evStatsBar");
+  statsBar.style.display = "";
+  document.getElementById("statPlayers").textContent = totalPlayers || "0";
+  document.getElementById("statGames").textContent   = totalSubmissions || "0";
+
   const me = Progress.getCurrentUser();
   const myUsername = me?.username || "";
-  if (!rows || !rows.length) {
-    area.innerHTML = `<div class="event-lb-empty">No scores yet — be first! 🎮</div>`;
+
+  // Personal best from leaderboard if not already fetched
+  if (userBest !== null) {
+    personalBest = userBest;
+    updatePersonalBest();
+  } else if (myUsername) {
+    const mine = leaderboard.find(r => r.username === myUsername);
+    if (mine) { personalBest = mine.score; updatePersonalBest(); }
+  }
+
+  // User rank stat
+  if (userRank && myUsername) {
+    const rankBox = document.getElementById("statRankBox");
+    rankBox.style.display = "";
+    document.getElementById("statRank").textContent = `#${userRank}`;
+  }
+
+  // User rank footer
+  const lbUserRank = document.getElementById("lbUserRank");
+  if (userRank && myUsername) {
+    lbUserRank.style.display = "";
+    lbUserRank.innerHTML = `You're ranked <strong>#${userRank}</strong> out of <strong>${totalPlayers}</strong> players${userBest ? ` · best: <strong>${userBest.toLocaleString()}</strong>` : ""}`;
+  } else {
+    lbUserRank.style.display = "none";
+  }
+
+  if (!leaderboard.length) {
+    inner.innerHTML = `<div class="ev-lb-empty">No scores yet — be the first to play! 🎮</div>`;
     return;
   }
-  const medals = { 1: "🥇", 2: "🥈", 3: "🥉" };
-  const rankClass = { 1: "gold", 2: "silver", 3: "bronze" };
-  area.innerHTML = rows.map(r => {
+
+  const topScore = leaderboard[0]?.score || 1;
+  const medals   = { 1: "🥇", 2: "🥈", 3: "🥉" };
+
+  // Podium (top 3)
+  const podium3 = leaderboard.slice(0, 3);
+  const podiumClasses = ["gold", "silver", "bronze"];
+  const podiumHTML = `<div class="ev-lb-podium">` + podium3.map((r, i) => {
+    const cls = podiumClasses[i] || "bronze";
+    const av  = r.avatar
+      ? `<img class="ev-lb-pod-avatar" src="${escapeHTML(r.avatar)}" alt="">`
+      : `<div class="ev-lb-pod-initials">${(r.name||r.username).slice(0,2).toUpperCase()}</div>`;
+    return `<div class="ev-lb-podium-card ${cls}">
+      <span class="ev-lb-pod-medal">${medals[r.rank] || ""}</span>
+      ${av}
+      <div class="ev-lb-pod-name">${escapeHTML(r.name || r.username)}</div>
+      <div class="ev-lb-pod-score">${r.score.toLocaleString()}</div>
+    </div>`;
+  }).join("") + `</div>`;
+
+  // Rows 4–10
+  const rest = leaderboard.slice(3);
+  const rowsHTML = rest.map(r => {
     const isMe = r.username === myUsername;
-    const avatar = r.avatar
-      ? `<img class="event-lb-avatar" src="${escapeHTML(r.avatar)}" alt="">`
-      : `<div class="event-lb-avatar-initials">${(r.name||r.username).slice(0,2).toUpperCase()}</div>`;
-    return `<div class="event-lb-row">
-      <span class="event-lb-rank ${rankClass[r.rank] || ""}">${medals[r.rank] || `#${r.rank}`}</span>
-      ${avatar}
-      <div class="event-lb-name-wrap">
-        <div class="event-lb-name">${escapeHTML(r.name || r.username)}${isMe ? `<span class="event-lb-you">you</span>` : ""}</div>
-        <div class="event-lb-username">@${escapeHTML(r.username)}</div>
+    const av   = r.avatar
+      ? `<img class="ev-lb-av" src="${escapeHTML(r.avatar)}" alt="">`
+      : `<div class="ev-lb-av-init">${(r.name||r.username).slice(0,2).toUpperCase()}</div>`;
+    const barW = Math.round((r.score / topScore) * 100);
+    return `<div class="ev-lb-row">
+      <span class="ev-lb-rank">#${r.rank}</span>
+      ${av}
+      <div style="flex:1;min-width:0;">
+        <div class="ev-lb-name">${escapeHTML(r.name || r.username)}${isMe ? `<span class="ev-lb-you">you</span>` : ""}</div>
+        <div class="ev-lb-bar-wrap"><div class="ev-lb-bar" style="width:${barW}%;"></div></div>
       </div>
-      <span class="event-lb-score">${r.score.toLocaleString()}</span>
+      <span class="ev-lb-score">${r.score.toLocaleString()}</span>
     </div>`;
   }).join("");
+
+  inner.innerHTML = podiumHTML + rowsHTML;
+}
+
+function updatePersonalBest() {
+  const el = document.getElementById("evPersonalBest");
+  if (!el) return;
+  if (personalBest > 0) {
+    el.style.display = "";
+    el.innerHTML = `Your best: <strong>${personalBest.toLocaleString()}</strong>`;
+  }
 }
 
 document.getElementById("lbRefreshBtn").addEventListener("click", () => {
   if (currentEvent) loadLeaderboard(currentEvent.id);
 });
 
-// ── Game dispatcher ───────────────────────────────────────────────────────────
-function renderGame(gameType) {
-  const me = Progress.getCurrentUser();
-  currentUser = me;
-  if (gameType === "candy") renderCandyGame();
-  else {
-    document.getElementById("gameArea").innerHTML = `<div class="candy-msg" style="padding:32px 0;">Game coming soon!</div>`;
+// ══════════════════════════════════════════════════════════════════════════════
+// FULLSCREEN CANDY GAME
+// ══════════════════════════════════════════════════════════════════════════════
+const CANDIES  = ["🍬","🍭","🍫","🍡","🍰","🍩"];
+const COLS = 8, ROWS = 8, GAME_TIME = 90;
+let grid = [], selected = null, score = 0;
+let timeLeft = GAME_TIME, timerId = null, animating = false, running = false;
+let touchStart = null;
+
+function openGame() {
+  const ov = document.getElementById("gfsOverlay");
+  ov.style.display = "flex";
+  requestAnimationFrame(() => ov.classList.add("open"));
+  document.body.style.overflow = "hidden";
+  document.getElementById("gfsResults").classList.remove("show");
+  startGame();
+}
+
+function closeGame() {
+  clearInterval(timerId);
+  running = false;
+  const ov = document.getElementById("gfsOverlay");
+  ov.classList.remove("open");
+  ov.addEventListener("transitionend", () => { ov.style.display = "none"; }, { once: true });
+  document.body.style.overflow = "";
+  // Refresh leaderboard in case score was submitted
+  if (currentEvent) loadLeaderboard(currentEvent.id);
+}
+
+document.getElementById("evPlayBtn").addEventListener("click", () => {
+  if (!currentEvent) return;
+  openGame();
+});
+document.getElementById("gfsCloseBtn").addEventListener("click", closeGame);
+document.getElementById("gfsPlayAgainBtn").addEventListener("click", () => {
+  document.getElementById("gfsResults").classList.remove("show");
+  startGame();
+});
+document.getElementById("gfsBackBtn").addEventListener("click", closeGame);
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeGame(); });
+
+// ── Game logic ────────────────────────────────────────────────────────────────
+function rand() { return CANDIES[Math.floor(Math.random() * CANDIES.length)]; }
+
+function makeGrid() {
+  grid = Array.from({ length: ROWS }, () => Array.from({ length: COLS }, () => rand()));
+  let tries = 0;
+  while (findMatches().length && tries++ < 20) {
+    grid = Array.from({ length: ROWS }, () => Array.from({ length: COLS }, () => rand()));
   }
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// 🍬 CANDY MATCH-3 GAME
-// ══════════════════════════════════════════════════════════════════════════════
-function renderCandyGame() {
-  const me = Progress.getCurrentUser();
-  const area = document.getElementById("gameArea");
-  document.getElementById("gameTitle").textContent = "🍬 Sweet Cascade";
-
-  if (!me) {
-    area.innerHTML = `<div class="candy-not-logged-in">
-      <p><a href="signup.html">Sign in</a> to play and submit your score to the leaderboard.</p>
-    </div>`;
-    return;
-  }
-
-  area.innerHTML = `
-    <div class="event-score-bar">
-      <div>
-        <div class="event-score-display">Score <span id="cScore">0</span></div>
-        <div class="event-score-best" id="cBest">Best: —</div>
-      </div>
-      <div id="cTimerLabel" style="font-family:var(--font-mono);font-size:14px;color:var(--muted);">90s</div>
-    </div>
-    <div class="event-timer-bar"><div class="event-timer-fill" id="cTimerFill" style="width:100%;"></div></div>
-    <p class="candy-msg" id="cMsg">Tap Start to play — match 3 or more to score!</p>
-    <div class="candy-board-wrap"><div class="candy-board" id="cBoard"></div></div>
-    <div class="candy-controls">
-      <button class="candy-btn primary" id="cStartBtn">Start game</button>
-      <button class="candy-btn secondary" id="cHintBtn" disabled>Hint 💡</button>
-    </div>
-  `;
-
-  const CANDIES = ["🍬","🍭","🍫","🍡","🍰","🍩"];
-  const COLS = 8, ROWS = 8, GAME_TIME = 90;
-  let grid = [], selected = null, score = 0, running = false;
-  let timeLeft = GAME_TIME, timerId = null, animating = false;
-
-  personalBest = 0;
-  apiFetch(`/api/events/${encodeURIComponent(currentEvent.id)}/leaderboard`).then(rows => {
-    if (!rows) return;
-    const mine = rows.find(r => r.username === me.username);
-    if (mine) { personalBest = mine.score; updateBest(); }
-  }).catch(() => {});
-
-  function updateBest() {
-    const el = document.getElementById("cBest");
-    if (el) el.textContent = `Best: ${personalBest > 0 ? personalBest.toLocaleString() : "—"}`;
-  }
-
-  function rand() { return CANDIES[Math.floor(Math.random() * CANDIES.length)]; }
-
-  function makeGrid() {
-    grid = Array.from({ length: ROWS }, () => Array.from({ length: COLS }, () => rand()));
-    while (findMatches().length) {
-      grid = Array.from({ length: ROWS }, () => Array.from({ length: COLS }, () => rand()));
-    }
-  }
-
-  function render() {
-    const board = document.getElementById("cBoard");
-    if (!board) return;
-    board.innerHTML = "";
-    for (let r = 0; r < ROWS; r++) {
-      for (let c = 0; c < COLS; c++) {
-        const cell = document.createElement("div");
-        cell.className = "candy-cell";
-        cell.textContent = grid[r][c] || "";
-        cell.dataset.r = r; cell.dataset.c = c;
-        if (selected && selected[0] === r && selected[1] === c) cell.classList.add("selected");
-        cell.addEventListener("click", () => { if (!animating && running) handleClick(r, c); });
-        board.appendChild(cell);
-      }
-    }
-    document.getElementById("cScore").textContent = score.toLocaleString();
-  }
-
-  function handleClick(r, c) {
-    if (!selected) {
-      selected = [r, c];
-      render();
-    } else {
-      const [sr, sc] = selected;
-      selected = null;
-      if (sr === r && sc === c) { render(); return; }
-      const adj = (Math.abs(sr - r) + Math.abs(sc - c)) === 1;
-      if (!adj) { selected = [r, c]; render(); return; }
-      trySwap(sr, sc, r, c);
-    }
-  }
-
-  async function trySwap(r1, c1, r2, c2) {
-    animating = true;
-    swap(r1, c1, r2, c2);
-    const matches = findMatches();
-    if (!matches.length) {
-      swap(r1, c1, r2, c2); // revert
-      render();
-      animating = false;
-      return;
-    }
-    await resolveMatches();
-    animating = false;
-  }
-
-  function swap(r1, c1, r2, c2) {
-    [grid[r1][c1], grid[r2][c2]] = [grid[r2][c2], grid[r1][c1]];
-  }
-
-  function findMatches() {
-    const matched = new Set();
-    for (let r = 0; r < ROWS; r++) {
-      for (let c = 0; c < COLS - 2; c++) {
-        if (grid[r][c] && grid[r][c] === grid[r][c+1] && grid[r][c] === grid[r][c+2]) {
-          let len = 3;
-          while (c + len < COLS && grid[r][c] === grid[r][c+len]) len++;
-          for (let i = 0; i < len; i++) matched.add(`${r},${c+i}`);
-        }
-      }
-    }
+function renderBoard() {
+  const board = document.getElementById("gfsBoard");
+  if (!board) return;
+  board.innerHTML = "";
+  for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
-      for (let r = 0; r < ROWS - 2; r++) {
-        if (grid[r][c] && grid[r][c] === grid[r+1][c] && grid[r][c] === grid[r+2][c]) {
-          let len = 3;
-          while (r + len < ROWS && grid[r][c] === grid[r+len][c]) len++;
-          for (let i = 0; i < len; i++) matched.add(`${r+i},${c}`);
-        }
-      }
-    }
-    return [...matched].map(k => k.split(",").map(Number));
-  }
-
-  async function resolveMatches(combo = 1) {
-    const matches = findMatches();
-    if (!matches.length) return;
-    // Score: more matched + combo bonus
-    const pts = matches.length * 50 * combo;
-    score += pts;
-    document.getElementById("cScore").textContent = score.toLocaleString();
-
-    // Flash matched cells
-    const board = document.getElementById("cBoard");
-    matches.forEach(([r, c]) => {
-      const idx = r * COLS + c;
-      const cell = board?.children[idx];
-      if (cell) cell.classList.add("matched");
-      grid[r][c] = null;
-    });
-    await sleep(280);
-
-    // Gravity — drop cells down
-    for (let c = 0; c < COLS; c++) {
-      const col = [];
-      for (let r = ROWS - 1; r >= 0; r--) {
-        if (grid[r][c] !== null) col.push(grid[r][c]);
-      }
-      while (col.length < ROWS) col.push(rand());
-      for (let r = ROWS - 1; r >= 0; r--) {
-        grid[r][c] = col[ROWS - 1 - r];
-      }
-    }
-
-    render();
-
-    // Mark falling
-    if (board) {
-      board.querySelectorAll(".candy-cell").forEach(c => c.classList.add("falling"));
-    }
-    await sleep(200);
-
-    // Check for cascades
-    if (findMatches().length) {
-      await resolveMatches(combo + 1);
+      const cell = document.createElement("div");
+      cell.className = "gfs-cell";
+      cell.textContent = grid[r][c] || "";
+      cell.dataset.r = r; cell.dataset.c = c;
+      if (selected && selected[0] === r && selected[1] === c) cell.classList.add("selected");
+      board.appendChild(cell);
     }
   }
+  document.getElementById("gfsScore").textContent = score.toLocaleString();
+}
 
-  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+function handleCellClick(r, c) {
+  if (animating || !running) return;
+  if (!selected) {
+    selected = [r, c]; renderBoard(); return;
+  }
+  const [sr, sc] = selected; selected = null;
+  if (sr === r && sc === c) { renderBoard(); return; }
+  if (Math.abs(sr-r) + Math.abs(sc-c) !== 1) { selected = [r,c]; renderBoard(); return; }
+  trySwap(sr, sc, r, c);
+}
 
-  function findHint() {
-    for (let r = 0; r < ROWS; r++) {
-      for (let c = 0; c < COLS; c++) {
-        const dirs = [[0,1],[1,0]];
-        for (const [dr, dc] of dirs) {
-          const r2 = r+dr, c2 = c+dc;
-          if (r2 >= ROWS || c2 >= COLS) continue;
-          swap(r, c, r2, c2);
-          const m = findMatches();
-          swap(r, c, r2, c2);
-          if (m.length) return [[r,c],[r2,c2]];
-        }
+function swap(r1,c1,r2,c2) { [grid[r1][c1],grid[r2][c2]] = [grid[r2][c2],grid[r1][c1]]; }
+
+async function trySwap(r1,c1,r2,c2) {
+  animating = true;
+  swap(r1,c1,r2,c2);
+  if (!findMatches().length) { swap(r1,c1,r2,c2); renderBoard(); animating = false; return; }
+  await resolveMatches(1);
+  animating = false;
+}
+
+function findMatches() {
+  const matched = new Set();
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS-2; c++) {
+      if (grid[r][c] && grid[r][c] === grid[r][c+1] && grid[r][c] === grid[r][c+2]) {
+        let l=3; while(c+l<COLS && grid[r][c]===grid[r][c+l]) l++;
+        for(let i=0;i<l;i++) matched.add(`${r},${c+i}`);
       }
     }
-    return null;
   }
-
-  function startTimer() {
-    timeLeft = GAME_TIME;
-    clearInterval(timerId);
-    timerId = setInterval(() => {
-      timeLeft--;
-      const fill = document.getElementById("cTimerFill");
-      const label = document.getElementById("cTimerLabel");
-      if (fill) fill.style.width = `${(timeLeft / GAME_TIME) * 100}%`;
-      if (label) label.textContent = `${timeLeft}s`;
-      if (timeLeft <= 0) endGame();
-    }, 1000);
+  for (let c = 0; c < COLS; c++) {
+    for (let r = 0; r < ROWS-2; r++) {
+      if (grid[r][c] && grid[r][c] === grid[r+1][c] && grid[r][c] === grid[r+2][c]) {
+        let l=3; while(r+l<ROWS && grid[r][c]===grid[r+l][c]) l++;
+        for(let i=0;i<l;i++) matched.add(`${r+i},${c}`);
+      }
+    }
   }
+  return [...matched].map(k => k.split(",").map(Number));
+}
 
-  async function endGame() {
-    running = false;
-    clearInterval(timerId);
-    animating = true;
-    const msg = document.getElementById("cMsg");
-    const startBtn = document.getElementById("cStartBtn");
-    const hintBtn  = document.getElementById("cHintBtn");
-    if (startBtn) startBtn.textContent = "Play again";
-    if (hintBtn)  hintBtn.disabled = true;
+const COMBO_MSGS = ["Combo! ✨","Nice! 🍭","Sweet! 🍬","Cascade! 🎉","Fire! 🔥","Insane!! 💥","LEGENDARY!! 🌟"];
+async function resolveMatches(combo=1) {
+  const matches = findMatches();
+  if (!matches.length) return;
+  score += matches.length * 50 * combo;
+  document.getElementById("gfsScore").textContent = score.toLocaleString();
+  if (combo > 1) {
+    const comboEl = document.getElementById("gfsCombo");
+    comboEl.textContent = COMBO_MSGS[Math.min(combo-2, COMBO_MSGS.length-1)];
+    setTimeout(() => { if(comboEl) comboEl.textContent = ""; }, 900);
+  }
+  const board = document.getElementById("gfsBoard");
+  matches.forEach(([r,c]) => { const idx=r*COLS+c; board?.children[idx]?.classList.add("matched"); grid[r][c]=null; });
+  await sleep(260);
+  for (let c=0;c<COLS;c++) {
+    const col=[]; for(let r=ROWS-1;r>=0;r--) if(grid[r][c]!==null) col.push(grid[r][c]);
+    while(col.length<ROWS) col.push(rand());
+    for(let r=ROWS-1;r>=0;r--) grid[r][c]=col[ROWS-1-r];
+  }
+  renderBoard();
+  board?.querySelectorAll(".gfs-cell").forEach(c=>c.classList.add("falling"));
+  await sleep(200);
+  if (findMatches().length) await resolveMatches(combo+1);
+}
 
-    // Submit score
-    if (msg) msg.textContent = "Submitting score…";
-    const res = await apiFetch(`/api/events/${encodeURIComponent(currentEvent.id)}/score`, {
+function sleep(ms) { return new Promise(r=>setTimeout(r,ms)); }
+
+function findHint() {
+  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++) {
+    for(const [dr,dc] of [[0,1],[1,0]]) {
+      const r2=r+dr,c2=c+dc;
+      if(r2>=ROWS||c2>=COLS) continue;
+      swap(r,c,r2,c2); const m=findMatches().length; swap(r,c,r2,c2);
+      if(m) return [[r,c],[r2,c2]];
+    }
+  }
+  return null;
+}
+
+document.getElementById("gfsHintBtn").addEventListener("click", () => {
+  if (!running || animating) return;
+  const h = findHint(); if (!h) return;
+  const board = document.getElementById("gfsBoard");
+  h.forEach(([r,c]) => { const cell=board?.children[r*COLS+c]; if(cell){cell.classList.add("hint");setTimeout(()=>cell.classList.remove("hint"),1400);} });
+});
+
+// Touch swipe
+const gfsBoard = document.getElementById("gfsBoard");
+gfsBoard.addEventListener("touchstart", e => {
+  const t = e.target.closest(".gfs-cell");
+  if (!t) return;
+  e.preventDefault();
+  touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY, r: +t.dataset.r, c: +t.dataset.c };
+}, { passive: false });
+gfsBoard.addEventListener("touchend", e => {
+  if (!touchStart || !running || animating) { touchStart = null; return; }
+  const dx = e.changedTouches[0].clientX - touchStart.x;
+  const dy = e.changedTouches[0].clientY - touchStart.y;
+  const adx = Math.abs(dx), ady = Math.abs(dy);
+  if (Math.max(adx, ady) < 16) { handleCellClick(touchStart.r, touchStart.c); touchStart=null; return; }
+  let r2=touchStart.r, c2=touchStart.c;
+  if (adx>ady) c2 += dx>0?1:-1; else r2 += dy>0?1:-1;
+  if (r2>=0&&r2<ROWS&&c2>=0&&c2<COLS) trySwap(touchStart.r, touchStart.c, r2, c2);
+  touchStart = null;
+}, { passive: false });
+
+// Click on board (desktop)
+gfsBoard.addEventListener("click", e => {
+  const t = e.target.closest(".gfs-cell");
+  if (t) handleCellClick(+t.dataset.r, +t.dataset.c);
+});
+
+// Timer
+function startTimer() {
+  timeLeft = GAME_TIME;
+  clearInterval(timerId);
+  const fill  = document.getElementById("gfsBarFill");
+  const label = document.getElementById("gfsTime");
+  timerId = setInterval(() => {
+    timeLeft--;
+    if (fill)  fill.style.width  = `${(timeLeft/GAME_TIME)*100}%`;
+    if (label) { label.textContent = timeLeft; label.classList.toggle("urgent", timeLeft <= 10); }
+    if (timeLeft <= 0) endGame();
+  }, 1000);
+}
+
+async function endGame() {
+  running = false;
+  clearInterval(timerId);
+  animating = true;
+  // Show results
+  const res = document.getElementById("gfsResults");
+  document.getElementById("gfsResScore").textContent = score.toLocaleString();
+  const isNewBest = score > personalBest;
+  document.getElementById("gfsResEmoji").textContent = isNewBest ? "🏅" : "🍬";
+  document.getElementById("gfsResSub").textContent   = isNewBest ? "New personal best!" : `Best: ${Math.max(personalBest, score).toLocaleString()}`;
+  document.getElementById("gfsResStatus").textContent = "Submitting score…";
+  res.classList.add("show");
+
+  if (currentUser && currentEvent) {
+    const r = await apiFetch(`/api/events/${encodeURIComponent(currentEvent.id)}/score`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ score }),
     }).catch(() => null);
-
-    if (res?.ok) {
-      personalBest = Math.max(personalBest, res.best ?? score);
-      updateBest();
-      if (msg) msg.textContent = `Game over! Score: ${score.toLocaleString()} ${score >= personalBest ? "🏅 New best!" : ""}`;
-      loadLeaderboard(currentEvent.id);
+    if (r?.ok) {
+      personalBest = Math.max(personalBest, r.best ?? score);
+      updatePersonalBest();
+      document.getElementById("gfsResStatus").textContent = "Score saved! ✓";
+      if (currentEvent) loadLeaderboard(currentEvent.id);
     } else {
-      if (msg) msg.textContent = `Game over! Score: ${score.toLocaleString()} (not saved)`;
+      document.getElementById("gfsResStatus").textContent = "Couldn't save score.";
     }
-    animating = false;
+  } else {
+    document.getElementById("gfsResStatus").textContent = currentUser ? "" : "Sign in to save your score.";
   }
+  animating = false;
+}
 
-  function startGame() {
-    score = 0; selected = null; animating = false;
-    makeGrid();
-    render();
-    running = true;
-    startTimer();
-    const msg = document.getElementById("cMsg");
-    const startBtn = document.getElementById("cStartBtn");
-    const hintBtn  = document.getElementById("cHintBtn");
-    if (msg) msg.textContent = "Match 3+ in a row or column!";
-    if (startBtn) startBtn.textContent = "Restart";
-    if (hintBtn)  hintBtn.disabled = false;
-  }
-
-  document.getElementById("cStartBtn").addEventListener("click", () => {
-    clearInterval(timerId);
-    startGame();
-  });
-
-  document.getElementById("cHintBtn").addEventListener("click", () => {
-    if (!running || animating) return;
-    const hint = findHint();
-    if (!hint) return;
-    const board = document.getElementById("cBoard");
-    hint.forEach(([r, c]) => {
-      const idx = r * COLS + c;
-      const cell = board?.children[idx];
-      if (cell) { cell.classList.add("hint"); setTimeout(() => cell.classList.remove("hint"), 1800); }
-    });
-  });
-
-  // Initial board (non-interactive until Start pressed)
+function startGame() {
+  score = 0; selected = null; animating = false; running = false;
+  clearInterval(timerId);
   makeGrid();
-  render();
+  renderBoard();
+  document.getElementById("gfsScore").textContent = "0";
+  document.getElementById("gfsTime").textContent  = GAME_TIME;
+  const fill = document.getElementById("gfsBarFill");
+  if (fill) fill.style.width = "100%";
+  document.getElementById("gfsTime").classList.remove("urgent");
+  document.getElementById("gfsCombo").textContent = "";
+  document.getElementById("gfsHintBtn").disabled = false;
+  running = true;
+  startTimer();
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
@@ -748,6 +914,10 @@ async function boot() {
   await ready.catch(() => {});
   currentUser = Progress.getCurrentUser();
   await loadEvent();
+  // Auto-open game if ?play=1
+  if (currentEvent && new URLSearchParams(location.search).get("play") === "1") {
+    openGame();
+  }
 }
 boot();
 </script>

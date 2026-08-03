@@ -2666,36 +2666,54 @@ app.get("/api/events/current", asyncHandler(async (req, res) => {
   res.json(safe);
 }));
 
-// GET — leaderboard for an event (top 10, public)
+// GET — leaderboard for an event (top 10 + community stats, public)
 app.get("/api/events/:id/leaderboard", asyncHandler(async (req, res) => {
   const eventId = req.params.id;
-  // Best score per user
-  const rows = await db.collection("eventScores").aggregate([
+
+  // Optional auth — detect viewer for personal rank
+  let viewerUsername = null;
+  try {
+    const auth = req.headers.authorization;
+    if (auth && auth.startsWith("Bearer ")) {
+      const payload = require("jsonwebtoken").verify(auth.slice(7), JWT_SECRET);
+      viewerUsername = payload.username;
+    }
+  } catch (e) {}
+
+  // All-time best scores per user (ranked)
+  const allRanked = await db.collection("eventScores").aggregate([
     { $match: { eventId } },
-    { $sort:  { score: -1 } },
     { $group: { _id: "$username", score: { $max: "$score" }, submittedAt: { $first: "$submittedAt" } } },
     { $sort:  { score: -1 } },
-    { $limit: 10 },
-    { $project: { _id: 0, username: "$_id", score: 1, submittedAt: 1 } },
   ]).toArray();
 
-  // Enrich with user display info
-  const usernames = rows.map(r => r.username);
+  const totalPlayers = allRanked.length;
+  const totalSubmissions = await db.collection("eventScores").countDocuments({ eventId });
+
+  // Viewer's personal rank
+  let userRank = null, userBest = null;
+  if (viewerUsername) {
+    const idx = allRanked.findIndex(r => r._id === viewerUsername);
+    if (idx >= 0) { userRank = idx + 1; userBest = allRanked[idx].score; }
+  }
+
+  const top10 = allRanked.slice(0, 10);
+  const usernames = top10.map(r => r._id);
   const users = usernames.length
     ? await db.collection("users").find({ username: { $in: usernames } }, { projection: { username: 1, name: 1, avatar: 1 } }).toArray()
     : [];
   const userMap = Object.fromEntries(users.map(u => [u.username, u]));
 
-  const leaderboard = rows.map((r, i) => ({
-    rank:       i + 1,
-    username:   r.username,
-    name:       userMap[r.username]?.name || r.username,
-    avatar:     userMap[r.username]?.avatar || null,
-    score:      r.score,
+  const leaderboard = top10.map((r, i) => ({
+    rank:        i + 1,
+    username:    r._id,
+    name:        userMap[r._id]?.name || r._id,
+    avatar:      userMap[r._id]?.avatar || null,
+    score:       r.score,
     submittedAt: r.submittedAt,
   }));
 
-  res.json(leaderboard);
+  res.json({ leaderboard, totalPlayers, totalSubmissions, userRank, userBest });
 }));
 
 // POST — submit a score (auth required)
