@@ -305,7 +305,7 @@
       const gradient = ev.gradient || "linear-gradient(-45deg,#ff6b9d,#ffd93d,#ff6b35,#c471ed)";
       banner.style.display = "block";
       banner.innerHTML = `
-        <a class="event-feed-card" href="event.html" style="background:${gradient};background-size:300% 300%;">
+        <div class="event-feed-card" onclick="location.href='event.html'" role="link" tabindex="0" style="cursor:pointer;background:${gradient};background-size:300% 300%;">
           <div class="efc-inner">
             <div class="efc-row1">
               <div class="efc-live"><span class="efc-live-dot"></span>Live</div>
@@ -314,10 +314,10 @@
             </div>
             <div class="efc-row2">
               <div class="efc-countdown" id="efcCountdown"></div>
-              <a class="efc-cta" href="event.html?play=1">▶ Play</a>
+              <a class="efc-cta" href="event.html?play=1" onclick="event.stopPropagation()">▶ Play</a>
             </div>
           </div>
-        </a>`;
+        </div>`;
 
       const endDate = new Date(ev.endDate);
       clearInterval(_efcTimer);
