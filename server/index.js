@@ -1076,6 +1076,7 @@ async function connect() {
   db = client.db(dbName);
   console.log(`Connected to MongoDB database "${dbName}"`);
   await seedIfNeeded();
+  await seedDefaultEvent();
 }
 
 async function seedIfNeeded() {
@@ -2595,10 +2596,146 @@ app.post("/api/chat/rooms", requireAuth, asyncHandler(async (req, res) => {
   res.json({ room: doc.room, label: doc.label, topic: doc.topic, createdAt: doc.createdAt });
 }));
 
-// DELETE — remove a community room (owner/moderator only)
-app.delete("/api/chat/rooms/:room", requireAuth, requireRole("moderator"), asyncHandler(async (req, res) => {
+// PATCH — edit a community room (moderator, or the room's creator)
+app.patch("/api/chat/rooms/:room", requireAuth, asyncHandler(async (req, res) => {
   const roomId = req.params.room;
+  const doc = await db.collection("chatRoomDefs").findOne({ room: roomId });
+  if (!doc) return res.status(404).json({ error: "Room not found." });
+  const isMod = ROLE_WEIGHTS[req.user.adminRole] >= ROLE_WEIGHTS["moderator"];
+  const isCreator = doc.createdBy === req.user.username;
+  if (!isMod && !isCreator) return res.status(403).json({ error: "Not allowed." });
+  const { image, topic, label } = req.body || {};
+  const update = {};
+  if (image === null || typeof image === "string") update.image = image === null ? null : (image.trim() || null);
+  if (typeof topic === "string") update.topic = topic.trim().slice(0, 120);
+  if (typeof label === "string" && label.trim()) update.label = label.trim().slice(0, 50);
+  if (!Object.keys(update).length) return res.status(400).json({ error: "Nothing to update." });
+  await db.collection("chatRoomDefs").updateOne({ room: roomId }, { $set: update });
+  res.json({ ok: true, ...update });
+}));
+
+// DELETE — remove a community room (moderator, or the room's creator)
+app.delete("/api/chat/rooms/:room", requireAuth, asyncHandler(async (req, res) => {
+  const roomId = req.params.room;
+  const doc = await db.collection("chatRoomDefs").findOne({ room: roomId });
+  if (!doc) return res.status(404).json({ error: "Room not found." });
+  const isMod = ROLE_WEIGHTS[req.user.adminRole] >= ROLE_WEIGHTS["moderator"];
+  const isCreator = doc.createdBy === req.user.username;
+  if (!isMod && !isCreator) return res.status(403).json({ error: "Not allowed." });
   await db.collection("chatRoomDefs").deleteOne({ room: roomId });
+  res.json({ ok: true });
+}));
+
+// ── Limited-time Events ───────────────────────────────────────────────────────
+
+// Seed a default event if the collection is empty (runs once at startup)
+async function seedDefaultEvent() {
+  try {
+    const count = await db.collection("events").countDocuments();
+    if (count > 0) return;
+    await db.collection("events").insertOne({
+      id:          "candy-cascade-aug2026",
+      title:       "Sweet Cascade",
+      emoji:       "🍬",
+      description: "The candies are falling and it's up to you to clear the board. Match sweets, rack up combos, and climb the leaderboard before time runs out.",
+      teaser:      "Match sweets, rack up combos, and fight for the top spot.",
+      game:        "candy",
+      startDate:   new Date("2026-08-01T00:00:00Z"),
+      endDate:     new Date("2026-08-31T23:59:59Z"),
+      active:      true,
+      gradient:    "linear-gradient(135deg, #ff6b9d 0%, #ffd93d 50%, #ff6b35 100%)",
+      prizeNote:   "Top 3 players earn an exclusive limited badge 🏆",
+      createdAt:   new Date(),
+    });
+    console.log("[events] Seeded default event: candy-cascade-aug2026");
+  } catch (e) {
+    console.warn("[events] Seed error:", e.message);
+  }
+}
+
+// GET — current active event (public)
+app.get("/api/events/current", asyncHandler(async (req, res) => {
+  const now = new Date();
+  const event = await db.collection("events").findOne({
+    active: true,
+    startDate: { $lte: now },
+    endDate:   { $gte: now },
+  }, { sort: { startDate: -1 } });
+  if (!event) return res.json(null);
+  const { _id, ...safe } = event;
+  res.json(safe);
+}));
+
+// GET — leaderboard for an event (top 10, public)
+app.get("/api/events/:id/leaderboard", asyncHandler(async (req, res) => {
+  const eventId = req.params.id;
+  // Best score per user
+  const rows = await db.collection("eventScores").aggregate([
+    { $match: { eventId } },
+    { $sort:  { score: -1 } },
+    { $group: { _id: "$username", score: { $max: "$score" }, submittedAt: { $first: "$submittedAt" } } },
+    { $sort:  { score: -1 } },
+    { $limit: 10 },
+    { $project: { _id: 0, username: "$_id", score: 1, submittedAt: 1 } },
+  ]).toArray();
+
+  // Enrich with user display info
+  const usernames = rows.map(r => r.username);
+  const users = usernames.length
+    ? await db.collection("users").find({ username: { $in: usernames } }, { projection: { username: 1, name: 1, avatar: 1 } }).toArray()
+    : [];
+  const userMap = Object.fromEntries(users.map(u => [u.username, u]));
+
+  const leaderboard = rows.map((r, i) => ({
+    rank:       i + 1,
+    username:   r.username,
+    name:       userMap[r.username]?.name || r.username,
+    avatar:     userMap[r.username]?.avatar || null,
+    score:      r.score,
+    submittedAt: r.submittedAt,
+  }));
+
+  res.json(leaderboard);
+}));
+
+// POST — submit a score (auth required)
+app.post("/api/events/:id/score", requireAuth, asyncHandler(async (req, res) => {
+  const eventId = req.params.id;
+  const score   = parseInt(req.body?.score, 10);
+  if (!Number.isFinite(score) || score < 0 || score > 999999) {
+    return res.status(400).json({ error: "Invalid score." });
+  }
+  const event = await db.collection("events").findOne({ id: eventId, active: true });
+  if (!event) return res.status(404).json({ error: "Event not found or inactive." });
+  const now = new Date();
+  if (now < event.startDate || now > event.endDate) {
+    return res.status(400).json({ error: "Event is not currently active." });
+  }
+  await db.collection("eventScores").insertOne({
+    eventId,
+    username:    req.user.username,
+    score,
+    submittedAt: now,
+  });
+  // Return the user's personal best
+  const best = await db.collection("eventScores").aggregate([
+    { $match: { eventId, username: req.user.username } },
+    { $group: { _id: null, best: { $max: "$score" } } },
+  ]).toArray();
+  res.json({ ok: true, best: best[0]?.best ?? score });
+}));
+
+// (admin) POST — create or update an event
+app.post("/api/events", requireAuth, requireRole("owner"), asyncHandler(async (req, res) => {
+  const { id, title, emoji, description, teaser, game, startDate, endDate, gradient, prizeNote } = req.body || {};
+  if (!id || !title) return res.status(400).json({ error: "id and title required." });
+  await db.collection("events").updateOne(
+    { id },
+    { $set: { id, title, emoji: emoji || "🎮", description, teaser, game: game || "candy",
+               startDate: new Date(startDate), endDate: new Date(endDate),
+               gradient, prizeNote, active: true, updatedAt: new Date() } },
+    { upsert: true }
+  );
   res.json({ ok: true });
 }));
 

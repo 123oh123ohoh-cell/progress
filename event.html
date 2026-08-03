@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Event — Progress</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;1,500;1,600&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script>(function(){try{var t=localStorage.getItem("progressTheme");var dark=(t==="dark")||(t!=="light"&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);if(dark)document.documentElement.setAttribute("data-theme","dark");}catch(e){}})();</script>
+<style>
+/* ── Event page ─────────────────────────────────────────────────────── */
+.event-wrap {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 0 0 100px;
+}
+
+/* Hero */
+.event-hero {
+  border-radius: 24px;
+  padding: 48px 36px 40px;
+  margin-bottom: 32px;
+  position: relative;
+  overflow: hidden;
+  color: #fff;
+  text-shadow: 0 1px 4px rgba(0,0,0,.18);
+}
+.event-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,.12);
+  z-index: 0;
+}
+.event-hero-inner { position: relative; z-index: 1; }
+.event-hero-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(255,255,255,.22); backdrop-filter: blur(6px);
+  border-radius: 20px; padding: 4px 12px; font-size: 11.5px;
+  font-weight: 700; text-transform: uppercase; letter-spacing: .08em;
+  margin-bottom: 18px;
+}
+.event-hero-badge-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: #fff; animation: pulse-dot 1.6s ease-in-out infinite;
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: .5; transform: scale(.7); }
+}
+.event-hero-emoji { font-size: 52px; line-height: 1; margin-bottom: 14px; display: block; }
+.event-hero-title {
+  font-family: var(--font-display);
+  font-size: clamp(30px, 5vw, 52px);
+  font-style: italic;
+  font-weight: 600;
+  margin: 0 0 14px;
+  color: #fff;
+  line-height: 1.1;
+}
+.event-hero-desc {
+  font-size: 15px;
+  color: rgba(255,255,255,.9);
+  max-width: 520px;
+  line-height: 1.6;
+  margin: 0 0 24px;
+}
+.event-hero-meta {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+}
+.event-hero-date {
+  font-size: 12px; font-family: var(--font-mono);
+  color: rgba(255,255,255,.8); letter-spacing: .04em;
+}
+.event-hero-prize {
+  font-size: 12.5px; background: rgba(255,255,255,.2);
+  border-radius: 20px; padding: 4px 12px; font-weight: 600;
+  color: #fff;
+}
+.event-hero-countdown {
+  display: flex; align-items: center; gap: 8px;
+}
+.event-hero-countdown-unit {
+  text-align: center;
+  background: rgba(0,0,0,.22); border-radius: 10px; padding: 6px 10px;
+}
+.event-hero-countdown-num {
+  font-family: var(--font-mono); font-size: 20px; font-weight: 700;
+  color: #fff; line-height: 1; display: block;
+}
+.event-hero-countdown-label {
+  font-size: 9px; text-transform: uppercase; letter-spacing: .08em;
+  color: rgba(255,255,255,.7); display: block; margin-top: 2px;
+}
+.event-hero-countdown-sep {
+  font-size: 18px; font-weight: 700; color: rgba(255,255,255,.5); margin-top: -4px;
+}
+
+/* Floating candy bg decorations */
+.event-hero-floats {
+  position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden;
+}
+.event-float {
+  position: absolute;
+  font-size: var(--esz, 28px);
+  opacity: var(--eop, .08);
+  animation: efloat var(--edur, 8s) ease-in-out var(--edel, 0s) infinite;
+}
+@keyframes efloat {
+  0%, 100% { transform: translateY(0) rotate(var(--erot, 0deg)); }
+  50%       { transform: translateY(-12px) rotate(calc(var(--erot, 0deg) + 8deg)); }
+}
+
+/* Two-col layout */
+.event-cols {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 24px;
+  align-items: start;
+}
+@media (max-width: 680px) {
+  .event-cols { grid-template-columns: 1fr; }
+  .event-leaderboard-col { order: -1; }
+}
+
+/* Game section */
+.event-game-section {
+  background: var(--mocha-wash);
+  border-radius: 20px;
+  padding: 24px;
+}
+.event-section-title {
+  font-family: var(--font-display);
+  font-size: 18px; font-weight: 600; font-style: italic;
+  margin: 0 0 18px; color: var(--ink);
+}
+.event-score-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 14px; gap: 10px; flex-wrap: wrap;
+}
+.event-score-display {
+  font-family: var(--font-mono); font-size: 22px; font-weight: 700;
+  color: var(--ink); letter-spacing: .02em;
+}
+.event-score-best {
+  font-size: 12px; color: var(--muted); font-family: var(--font-mono);
+}
+.event-timer-bar {
+  height: 5px; border-radius: 3px; background: var(--mocha-light);
+  margin-bottom: 16px; overflow: hidden;
+}
+.event-timer-fill {
+  height: 100%; border-radius: 3px;
+  background: linear-gradient(90deg, #ff6b9d, #ffd93d);
+  transition: width .5s linear;
+}
+
+/* Candy game board */
+.candy-board-wrap {
+  display: flex; justify-content: center; margin-bottom: 16px;
+}
+.candy-board {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 3px;
+  background: var(--mocha-light);
+  border-radius: 14px;
+  padding: 8px;
+  width: 100%;
+  max-width: 360px;
+  touch-action: none;
+  user-select: none;
+}
+.candy-cell {
+  aspect-ratio: 1;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: clamp(16px, 3.5vw, 22px);
+  cursor: pointer;
+  transition: transform .1s, box-shadow .1s, opacity .18s;
+  background: var(--mocha-wash);
+  position: relative;
+  -webkit-tap-highlight-color: transparent;
+}
+.candy-cell:hover { transform: scale(1.08); }
+.candy-cell.selected {
+  box-shadow: 0 0 0 2.5px var(--ink);
+  transform: scale(1.1);
+  z-index: 2;
+}
+.candy-cell.matched {
+  animation: candy-pop .28s ease forwards;
+}
+.candy-cell.falling {
+  animation: candy-fall .18s ease;
+}
+@keyframes candy-pop {
+  0%   { transform: scale(1.2); opacity: 1; }
+  60%  { transform: scale(1.35); opacity: .7; }
+  100% { transform: scale(0); opacity: 0; }
+}
+@keyframes candy-fall {
+  0%   { transform: translateY(-24px); opacity: .6; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+.candy-cell.hint { animation: candy-hint .5s ease 3; }
+@keyframes candy-hint {
+  0%, 100% { transform: scale(1); }
+  50%       { transform: scale(1.15) rotate(8deg); }
+}
+
+/* Candy game controls */
+.candy-controls { display: flex; gap: 10px; flex-wrap: wrap; }
+.candy-btn {
+  flex: 1; padding: 10px 0; border-radius: 12px; border: none;
+  cursor: pointer; font-size: 14px; font-weight: 700;
+  font-family: var(--font-body); transition: opacity .15s;
+}
+.candy-btn.primary { background: var(--ink); color: var(--cream); }
+.candy-btn.secondary {
+  background: none; border: 1.5px solid var(--mocha-light);
+  color: var(--muted);
+}
+.candy-btn:hover { opacity: .82; }
+.candy-btn:disabled { opacity: .45; cursor: not-allowed; }
+.candy-msg {
+  text-align: center; font-size: 14px; color: var(--muted);
+  min-height: 22px; margin-bottom: 8px; font-family: var(--font-mono);
+}
+.candy-not-logged-in {
+  text-align: center; padding: 32px 16px; color: var(--muted); font-size: 14px;
+}
+.candy-not-logged-in a { color: var(--ink); font-weight: 600; }
+
+/* Leaderboard */
+.event-leaderboard-col {
+  background: var(--mocha-wash);
+  border-radius: 20px;
+  padding: 24px;
+}
+.event-lb-loading {
+  text-align: center; padding: 32px 0;
+  color: var(--muted); font-size: 13px;
+}
+.event-lb-empty {
+  text-align: center; padding: 24px 0;
+  color: var(--muted); font-size: 13px;
+}
+.event-lb-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--mocha-light);
+}
+.event-lb-row:last-child { border-bottom: none; }
+.event-lb-rank {
+  font-family: var(--font-mono); font-size: 13px; font-weight: 700;
+  color: var(--muted); min-width: 22px; text-align: center;
+}
+.event-lb-rank.gold   { color: #f5a623; }
+.event-lb-rank.silver { color: #9b9b9b; }
+.event-lb-rank.bronze { color: #c47728; }
+.event-lb-medal { font-size: 18px; }
+.event-lb-avatar {
+  width: 34px; height: 34px; border-radius: 50%; object-fit: cover;
+  background: var(--mocha-light); flex-shrink: 0;
+}
+.event-lb-avatar-initials {
+  width: 34px; height: 34px; border-radius: 50%;
+  background: var(--mocha-light); color: var(--muted);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; flex-shrink: 0;
+}
+.event-lb-name-wrap { flex: 1; min-width: 0; }
+.event-lb-name {
+  font-size: 13.5px; font-weight: 600; color: var(--ink);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.event-lb-username {
+  font-size: 11px; color: var(--muted); font-family: var(--font-mono);
+}
+.event-lb-score {
+  font-family: var(--font-mono); font-size: 14px;
+  font-weight: 700; color: var(--ink); flex-shrink: 0;
+}
+.event-lb-you {
+  font-size: 10px; background: var(--ink); color: var(--cream);
+  border-radius: 6px; padding: 1px 5px; font-weight: 700; margin-left: 4px;
+}
+.event-lb-refresh {
+  width: 100%; margin-top: 14px; padding: 8px; border-radius: 10px;
+  border: 1.5px solid var(--mocha-light); background: none;
+  color: var(--muted); font-size: 13px; cursor: pointer;
+  font-family: var(--font-body); transition: border-color .15s;
+}
+.event-lb-refresh:hover { border-color: var(--ink); color: var(--ink); }
+
+/* No event state */
+.event-none {
+  text-align: center; padding: 80px 24px;
+}
+.event-none-emoji { font-size: 52px; display: block; margin-bottom: 16px; }
+.event-none-title {
+  font-family: var(--font-display); font-size: 24px; font-style: italic;
+  margin: 0 0 10px; color: var(--ink);
+}
+.event-none-sub { color: var(--muted); font-size: 14px; margin: 0; }
+</style>
+</head>
+<body>
+
+<div id="nav-root"></div>
+<div id="modal-root"></div>
+
+<main class="container">
+  <div class="event-wrap" id="eventWrap">
+    <div class="event-none" id="eventNone" style="display:none;">
+      <span class="event-none-emoji">🎮</span>
+      <h2 class="event-none-title">No active event right now</h2>
+      <p class="event-none-sub">Check back soon — limited-time events drop regularly.</p>
+    </div>
+    <div id="eventContent" style="display:none;">
+      <div class="event-hero" id="eventHero">
+        <div class="event-hero-floats" id="eventFloats"></div>
+        <div class="event-hero-inner">
+          <div class="event-hero-badge">
+            <span class="event-hero-badge-dot"></span>
+            Live event
+          </div>
+          <span class="event-hero-emoji" id="eventEmoji"></span>
+          <h1 class="event-hero-title" id="eventTitle"></h1>
+          <p class="event-hero-desc" id="eventDesc"></p>
+          <div class="event-hero-meta">
+            <span class="event-hero-date" id="eventDateRange"></span>
+            <span class="event-hero-prize" id="eventPrize" style="display:none;"></span>
+          </div>
+          <div class="event-hero-countdown" id="eventCountdown" style="margin-top:20px;"></div>
+        </div>
+      </div>
+
+      <div class="event-cols">
+        <!-- Game -->
+        <div class="event-game-section">
+          <h2 class="event-section-title" id="gameTitle">Play</h2>
+          <div id="gameArea"></div>
+        </div>
+
+        <!-- Leaderboard -->
+        <div class="event-leaderboard-col event-leaderboard-col">
+          <h2 class="event-section-title">🏆 Leaderboard</h2>
+          <div id="leaderboardArea"><div class="event-lb-loading">Loading…</div></div>
+          <button class="event-lb-refresh" id="lbRefreshBtn">↻ Refresh</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+<script>
+const ready = initShell("event");
+
+let currentEvent = null;
+let currentUser  = null;
+let personalBest = 0;
+
+// ── Load event ────────────────────────────────────────────────────────────────
+async function loadEvent() {
+  const res = await apiFetch("/api/events/current").catch(() => null);
+  if (!res || !res.id) {
+    document.getElementById("eventNone").style.display = "block";
+    return;
+  }
+  currentEvent = res;
+  document.getElementById("eventContent").style.display = "block";
+  renderHero(res);
+  renderGame(res.game);
+  loadLeaderboard(res.id);
+  startCountdown(new Date(res.endDate));
+}
+
+// ── Hero ──────────────────────────────────────────────────────────────────────
+function renderHero(ev) {
+  document.title = `${ev.title} — Progress`;
+  document.getElementById("eventEmoji").textContent  = ev.emoji || "🎮";
+  document.getElementById("eventTitle").textContent  = ev.title;
+  document.getElementById("eventDesc").textContent   = ev.description || "";
+  const hero = document.getElementById("eventHero");
+  if (ev.gradient) hero.style.background = ev.gradient;
+
+  const fmt = d => new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  document.getElementById("eventDateRange").textContent = `${fmt(ev.startDate)} – ${fmt(ev.endDate)}`;
+
+  const prize = document.getElementById("eventPrize");
+  if (ev.prizeNote) { prize.textContent = ev.prizeNote; prize.style.display = ""; }
+
+  // Floating bg decorations
+  const floats = document.getElementById("eventFloats");
+  const FLOAT_EMOJIS = ["🍬","🍭","🍫","🍡","🍰","🍩","🍪","🍦","🎀","✨"];
+  floats.innerHTML = FLOAT_EMOJIS.map((e, i) => {
+    const top  = 5 + Math.random() * 85;
+    const left = 5 + Math.random() * 90;
+    const sz   = 20 + Math.random() * 24;
+    const op   = 0.05 + Math.random() * 0.08;
+    const dur  = 5 + Math.random() * 6;
+    const del  = Math.random() * 4;
+    const rot  = -20 + Math.random() * 40;
+    return `<span class="event-float" style="top:${top.toFixed(1)}%;left:${left.toFixed(1)}%;--esz:${sz.toFixed(0)}px;--eop:${op.toFixed(2)};--edur:${dur.toFixed(1)}s;--edel:${del.toFixed(1)}s;--erot:${rot.toFixed(0)}deg;">${e}</span>`;
+  }).join("");
+}
+
+// ── Countdown ─────────────────────────────────────────────────────────────────
+function startCountdown(endDate) {
+  const el = document.getElementById("eventCountdown");
+  function tick() {
+    const diff = endDate - Date.now();
+    if (diff <= 0) { el.innerHTML = `<span style="color:rgba(255,255,255,.8);font-size:13px;">Event ended</span>`; return; }
+    const d = Math.floor(diff / 86400000);
+    const h = Math.floor((diff % 86400000) / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    const s = Math.floor((diff % 60000) / 1000);
+    const unit = (n, l) => `<span class="event-hero-countdown-unit"><span class="event-hero-countdown-num">${String(n).padStart(2,"0")}</span><span class="event-hero-countdown-label">${l}</span></span>`;
+    el.innerHTML = unit(d,"days") + `<span class="event-hero-countdown-sep">:</span>` + unit(h,"hrs") + `<span class="event-hero-countdown-sep">:</span>` + unit(m,"min") + `<span class="event-hero-countdown-sep">:</span>` + unit(s,"sec");
+    setTimeout(tick, 1000);
+  }
+  tick();
+}
+
+// ── Leaderboard ───────────────────────────────────────────────────────────────
+async function loadLeaderboard(eventId) {
+  const area = document.getElementById("leaderboardArea");
+  area.innerHTML = `<div class="event-lb-loading">Loading…</div>`;
+  const rows = await apiFetch(`/api/events/${encodeURIComponent(eventId)}/leaderboard`).catch(() => null);
+  const me = Progress.getCurrentUser();
+  const myUsername = me?.username || "";
+  if (!rows || !rows.length) {
+    area.innerHTML = `<div class="event-lb-empty">No scores yet — be first! 🎮</div>`;
+    return;
+  }
+  const medals = { 1: "🥇", 2: "🥈", 3: "🥉" };
+  const rankClass = { 1: "gold", 2: "silver", 3: "bronze" };
+  area.innerHTML = rows.map(r => {
+    const isMe = r.username === myUsername;
+    const avatar = r.avatar
+      ? `<img class="event-lb-avatar" src="${escapeHTML(r.avatar)}" alt="">`
+      : `<div class="event-lb-avatar-initials">${(r.name||r.username).slice(0,2).toUpperCase()}</div>`;
+    return `<div class="event-lb-row">
+      <span class="event-lb-rank ${rankClass[r.rank] || ""}">${medals[r.rank] || `#${r.rank}`}</span>
+      ${avatar}
+      <div class="event-lb-name-wrap">
+        <div class="event-lb-name">${escapeHTML(r.name || r.username)}${isMe ? `<span class="event-lb-you">you</span>` : ""}</div>
+        <div class="event-lb-username">@${escapeHTML(r.username)}</div>
+      </div>
+      <span class="event-lb-score">${r.score.toLocaleString()}</span>
+    </div>`;
+  }).join("");
+}
+
+document.getElementById("lbRefreshBtn").addEventListener("click", () => {
+  if (currentEvent) loadLeaderboard(currentEvent.id);
+});
+
+// ── Game dispatcher ───────────────────────────────────────────────────────────
+function renderGame(gameType) {
+  const me = Progress.getCurrentUser();
+  currentUser = me;
+  if (gameType === "candy") renderCandyGame();
+  else {
+    document.getElementById("gameArea").innerHTML = `<div class="candy-msg" style="padding:32px 0;">Game coming soon!</div>`;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 🍬 CANDY MATCH-3 GAME
+// ══════════════════════════════════════════════════════════════════════════════
+function renderCandyGame() {
+  const me = Progress.getCurrentUser();
+  const area = document.getElementById("gameArea");
+  document.getElementById("gameTitle").textContent = "🍬 Sweet Cascade";
+
+  if (!me) {
+    area.innerHTML = `<div class="candy-not-logged-in">
+      <p><a href="signup.html">Sign in</a> to play and submit your score to the leaderboard.</p>
+    </div>`;
+    return;
+  }
+
+  area.innerHTML = `
+    <div class="event-score-bar">
+      <div>
+        <div class="event-score-display">Score <span id="cScore">0</span></div>
+        <div class="event-score-best" id="cBest">Best: —</div>
+      </div>
+      <div id="cTimerLabel" style="font-family:var(--font-mono);font-size:14px;color:var(--muted);">90s</div>
+    </div>
+    <div class="event-timer-bar"><div class="event-timer-fill" id="cTimerFill" style="width:100%;"></div></div>
+    <p class="candy-msg" id="cMsg">Tap Start to play — match 3 or more to score!</p>
+    <div class="candy-board-wrap"><div class="candy-board" id="cBoard"></div></div>
+    <div class="candy-controls">
+      <button class="candy-btn primary" id="cStartBtn">Start game</button>
+      <button class="candy-btn secondary" id="cHintBtn" disabled>Hint 💡</button>
+    </div>
+  `;
+
+  const CANDIES = ["🍬","🍭","🍫","🍡","🍰","🍩"];
+  const COLS = 8, ROWS = 8, GAME_TIME = 90;
+  let grid = [], selected = null, score = 0, running = false;
+  let timeLeft = GAME_TIME, timerId = null, animating = false;
+
+  personalBest = 0;
+  apiFetch(`/api/events/${encodeURIComponent(currentEvent.id)}/leaderboard`).then(rows => {
+    if (!rows) return;
+    const mine = rows.find(r => r.username === me.username);
+    if (mine) { personalBest = mine.score; updateBest(); }
+  }).catch(() => {});
+
+  function updateBest() {
+    const el = document.getElementById("cBest");
+    if (el) el.textContent = `Best: ${personalBest > 0 ? personalBest.toLocaleString() : "—"}`;
+  }
+
+  function rand() { return CANDIES[Math.floor(Math.random() * CANDIES.length)]; }
+
+  function makeGrid() {
+    grid = Array.from({ length: ROWS }, () => Array.from({ length: COLS }, () => rand()));
+    while (findMatches().length) {
+      grid = Array.from({ length: ROWS }, () => Array.from({ length: COLS }, () => rand()));
+    }
+  }
+
+  function render() {
+    const board = document.getElementById("cBoard");
+    if (!board) return;
+    board.innerHTML = "";
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const cell = document.createElement("div");
+        cell.className = "candy-cell";
+        cell.textContent = grid[r][c] || "";
+        cell.dataset.r = r; cell.dataset.c = c;
+        if (selected && selected[0] === r && selected[1] === c) cell.classList.add("selected");
+        cell.addEventListener("click", () => { if (!animating && running) handleClick(r, c); });
+        board.appendChild(cell);
+      }
+    }
+    document.getElementById("cScore").textContent = score.toLocaleString();
+  }
+
+  function handleClick(r, c) {
+    if (!selected) {
+      selected = [r, c];
+      render();
+    } else {
+      const [sr, sc] = selected;
+      selected = null;
+      if (sr === r && sc === c) { render(); return; }
+      const adj = (Math.abs(sr - r) + Math.abs(sc - c)) === 1;
+      if (!adj) { selected = [r, c]; render(); return; }
+      trySwap(sr, sc, r, c);
+    }
+  }
+
+  async function trySwap(r1, c1, r2, c2) {
+    animating = true;
+    swap(r1, c1, r2, c2);
+    const matches = findMatches();
+    if (!matches.length) {
+      swap(r1, c1, r2, c2); // revert
+      render();
+      animating = false;
+      return;
+    }
+    await resolveMatches();
+    animating = false;
+  }
+
+  function swap(r1, c1, r2, c2) {
+    [grid[r1][c1], grid[r2][c2]] = [grid[r2][c2], grid[r1][c1]];
+  }
+
+  function findMatches() {
+    const matched = new Set();
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS - 2; c++) {
+        if (grid[r][c] && grid[r][c] === grid[r][c+1] && grid[r][c] === grid[r][c+2]) {
+          let len = 3;
+          while (c + len < COLS && grid[r][c] === grid[r][c+len]) len++;
+          for (let i = 0; i < len; i++) matched.add(`${r},${c+i}`);
+        }
+      }
+    }
+    for (let c = 0; c < COLS; c++) {
+      for (let r = 0; r < ROWS - 2; r++) {
+        if (grid[r][c] && grid[r][c] === grid[r+1][c] && grid[r][c] === grid[r+2][c]) {
+          let len = 3;
+          while (r + len < ROWS && grid[r][c] === grid[r+len][c]) len++;
+          for (let i = 0; i < len; i++) matched.add(`${r+i},${c}`);
+        }
+      }
+    }
+    return [...matched].map(k => k.split(",").map(Number));
+  }
+
+  async function resolveMatches(combo = 1) {
+    const matches = findMatches();
+    if (!matches.length) return;
+    // Score: more matched + combo bonus
+    const pts = matches.length * 50 * combo;
+    score += pts;
+    document.getElementById("cScore").textContent = score.toLocaleString();
+
+    // Flash matched cells
+    const board = document.getElementById("cBoard");
+    matches.forEach(([r, c]) => {
+      const idx = r * COLS + c;
+      const cell = board?.children[idx];
+      if (cell) cell.classList.add("matched");
+      grid[r][c] = null;
+    });
+    await sleep(280);
+
+    // Gravity — drop cells down
+    for (let c = 0; c < COLS; c++) {
+      const col = [];
+      for (let r = ROWS - 1; r >= 0; r--) {
+        if (grid[r][c] !== null) col.push(grid[r][c]);
+      }
+      while (col.length < ROWS) col.push(rand());
+      for (let r = ROWS - 1; r >= 0; r--) {
+        grid[r][c] = col[ROWS - 1 - r];
+      }
+    }
+
+    render();
+
+    // Mark falling
+    if (board) {
+      board.querySelectorAll(".candy-cell").forEach(c => c.classList.add("falling"));
+    }
+    await sleep(200);
+
+    // Check for cascades
+    if (findMatches().length) {
+      await resolveMatches(combo + 1);
+    }
+  }
+
+  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  function findHint() {
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const dirs = [[0,1],[1,0]];
+        for (const [dr, dc] of dirs) {
+          const r2 = r+dr, c2 = c+dc;
+          if (r2 >= ROWS || c2 >= COLS) continue;
+          swap(r, c, r2, c2);
+          const m = findMatches();
+          swap(r, c, r2, c2);
+          if (m.length) return [[r,c],[r2,c2]];
+        }
+      }
+    }
+    return null;
+  }
+
+  function startTimer() {
+    timeLeft = GAME_TIME;
+    clearInterval(timerId);
+    timerId = setInterval(() => {
+      timeLeft--;
+      const fill = document.getElementById("cTimerFill");
+      const label = document.getElementById("cTimerLabel");
+      if (fill) fill.style.width = `${(timeLeft / GAME_TIME) * 100}%`;
+      if (label) label.textContent = `${timeLeft}s`;
+      if (timeLeft <= 0) endGame();
+    }, 1000);
+  }
+
+  async function endGame() {
+    running = false;
+    clearInterval(timerId);
+    animating = true;
+    const msg = document.getElementById("cMsg");
+    const startBtn = document.getElementById("cStartBtn");
+    const hintBtn  = document.getElementById("cHintBtn");
+    if (startBtn) startBtn.textContent = "Play again";
+    if (hintBtn)  hintBtn.disabled = true;
+
+    // Submit score
+    if (msg) msg.textContent = "Submitting score…";
+    const res = await apiFetch(`/api/events/${encodeURIComponent(currentEvent.id)}/score`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ score }),
+    }).catch(() => null);
+
+    if (res?.ok) {
+      personalBest = Math.max(personalBest, res.best ?? score);
+      updateBest();
+      if (msg) msg.textContent = `Game over! Score: ${score.toLocaleString()} ${score >= personalBest ? "🏅 New best!" : ""}`;
+      loadLeaderboard(currentEvent.id);
+    } else {
+      if (msg) msg.textContent = `Game over! Score: ${score.toLocaleString()} (not saved)`;
+    }
+    animating = false;
+  }
+
+  function startGame() {
+    score = 0; selected = null; animating = false;
+    makeGrid();
+    render();
+    running = true;
+    startTimer();
+    const msg = document.getElementById("cMsg");
+    const startBtn = document.getElementById("cStartBtn");
+    const hintBtn  = document.getElementById("cHintBtn");
+    if (msg) msg.textContent = "Match 3+ in a row or column!";
+    if (startBtn) startBtn.textContent = "Restart";
+    if (hintBtn)  hintBtn.disabled = false;
+  }
+
+  document.getElementById("cStartBtn").addEventListener("click", () => {
+    clearInterval(timerId);
+    startGame();
+  });
+
+  document.getElementById("cHintBtn").addEventListener("click", () => {
+    if (!running || animating) return;
+    const hint = findHint();
+    if (!hint) return;
+    const board = document.getElementById("cBoard");
+    hint.forEach(([r, c]) => {
+      const idx = r * COLS + c;
+      const cell = board?.children[idx];
+      if (cell) { cell.classList.add("hint"); setTimeout(() => cell.classList.remove("hint"), 1800); }
+    });
+  });
+
+  // Initial board (non-interactive until Start pressed)
+  makeGrid();
+  render();
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+async function boot() {
+  await ready.catch(() => {});
+  currentUser = Progress.getCurrentUser();
+  await loadEvent();
+}
+boot();
+</script>
+</body>
+</html>

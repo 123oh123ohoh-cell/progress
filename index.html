@@ -18,6 +18,48 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;1,500;1,600&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 <script>(function(){try{var t=localStorage.getItem("progressTheme");var dark=(t==="dark")||(t!=="light"&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);if(dark)document.documentElement.setAttribute("data-theme","dark");}catch(e){}})();</script>
+<style>
+.event-feed-card {
+  display: flex; align-items: center; gap: 16px;
+  border-radius: 18px; padding: 18px 20px;
+  margin-bottom: 20px; position: relative; overflow: hidden;
+  cursor: pointer; text-decoration: none;
+  transition: transform .14s, box-shadow .14s;
+  color: #fff;
+}
+.event-feed-card:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(0,0,0,.2); }
+.event-feed-card::before {
+  content: ""; position: absolute; inset: 0;
+  background: rgba(0,0,0,.1); z-index: 0;
+}
+.event-feed-card-body { position: relative; z-index: 1; flex: 1; min-width: 0; }
+.event-feed-card-live {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: rgba(255,255,255,.2); border-radius: 20px;
+  padding: 2px 10px; font-size: 10.5px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .07em; margin-bottom: 8px;
+}
+.event-feed-card-live-dot {
+  width: 6px; height: 6px; border-radius: 50%; background: #fff;
+  animation: eflive 1.6s ease-in-out infinite;
+}
+@keyframes eflive { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.65)} }
+.event-feed-card-title {
+  font-family: var(--font-display); font-size: 18px; font-style: italic;
+  font-weight: 600; margin: 0 0 4px; color: #fff; line-height: 1.2;
+}
+.event-feed-card-teaser {
+  font-size: 13px; color: rgba(255,255,255,.85); margin: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.event-feed-card-emoji {
+  font-size: 40px; line-height: 1; position: relative; z-index: 1; flex-shrink: 0;
+}
+.event-feed-card-arrow {
+  position: relative; z-index: 1; flex-shrink: 0;
+  font-size: 18px; color: rgba(255,255,255,.7);
+}
+</style>
 </head>
 <body>
 
@@ -42,6 +84,8 @@
   </div>
 
   <div id="streakBanner" style="display:none;"></div>
+
+  <div id="eventBanner" style="display:none;"></div>
 
   <div class="timeline" id="timeline">
     <div class="feed-loading-state" id="feedLoading">
@@ -207,12 +251,37 @@
     }
   }
 
+  // ── Event banner ───────────────────────────────────────────────────────────
+  async function renderEventBanner() {
+    const banner = document.getElementById("eventBanner");
+    if (!banner) return;
+    try {
+      const ev = await apiFetch("/api/events/current");
+      if (!ev || !ev.id) { banner.style.display = "none"; return; }
+      const gradient = ev.gradient || "linear-gradient(135deg, #ff6b9d, #ffd93d, #ff6b35)";
+      banner.style.display = "block";
+      banner.innerHTML = `
+        <a class="event-feed-card" href="event.html" style="background:${gradient};">
+          <div class="event-feed-card-body">
+            <div class="event-feed-card-live"><span class="event-feed-card-live-dot"></span>Live event</div>
+            <div class="event-feed-card-title">${escapeHTML(ev.title)}</div>
+            <p class="event-feed-card-teaser">${escapeHTML(ev.teaser || ev.description || "")}</p>
+          </div>
+          <span class="event-feed-card-emoji">${ev.emoji || "🎮"}</span>
+          <span class="event-feed-card-arrow">›</span>
+        </a>`;
+    } catch (e) {
+      banner.style.display = "none";
+    }
+  }
+
   // ── Start ──────────────────────────────────────────────────────────────────
   async function start() {
     const ready = initShell("feed");
     initCategoryTabs();
     renderFeed();
     renderStreakBanner();
+    renderEventBanner();
     // Re-render as soon as posts arrive (before users finish loading)
     window.addEventListener("progress:posts-loaded", () => {
       renderFeed();
