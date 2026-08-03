@@ -46,6 +46,13 @@
     { value: "UTC", label: "UTC" }
   ];
 
+  function getNotifPref(key) {
+    try { const p = JSON.parse(localStorage.getItem("notifPrefs") || "{}"); return key in p ? p[key] : true; } catch { return true; }
+  }
+  function setNotifPref(key, val) {
+    try { const p = JSON.parse(localStorage.getItem("notifPrefs") || "{}"); p[key] = val; localStorage.setItem("notifPrefs", JSON.stringify(p)); } catch {}
+  }
+
   function formatZonePreview(zone) {
     if (!zone) return "";
     try {
@@ -590,12 +597,32 @@ refreshNowPlaying();
             </label>
           </div>
           <div class="sett-section" style="border-bottom:none;">
-            <div class="sett-section-title">Per-type controls — coming soon</div>
-            ${[["Likes","When someone likes your post"],["Comments","When someone replies to you"],["Follows","When someone follows you"],["Mentions","@mentions in chat"],["Direct messages","New DMs"]].map(([l,n]) => `
-              <div class="sett-toggle-row sett-disabled">
-                <span class="theme-toggle-switch" style="opacity:.35;pointer-events:none;"><span class="theme-toggle-knob"></span></span>
-                <span>${l}<span class="sett-row-note">${n}</span></span>
-              </div>`).join("")}
+            <div class="sett-section-title">Per-type controls</div>
+            ${[
+              ["notif-likes",     "Likes",              "When someone likes your post"],
+              ["notif-comments",  "Comments",           "When someone replies to you"],
+              ["notif-follows",   "Follows",            "When someone follows you"],
+              ["notif-mentions",  "Community mentions", "@mentions in community chat"],
+              ["notif-reactions", "Reactions",          "When someone reacts to your message"],
+              ["notif-events",    "Event alerts",       "Score saves and leaderboard news"],
+            ].map(([key, label, note]) => {
+              const on = getNotifPref(key);
+              return `<label class="sett-toggle-row">
+                <span class="theme-toggle-switch${on ? " on" : ""}" id="${key}Toggle" data-key="${key}" data-on="${on ? "1" : "0"}"><span class="theme-toggle-knob"></span></span>
+                <span>${label}<span class="sett-row-note">${note}</span></span>
+              </label>`;
+            }).join("")}
+          </div>
+          <div class="sett-section" style="border-bottom:none;">
+            <div class="sett-section-title">Community message level</div>
+            <div class="sett-row-note" style="margin-bottom:10px;">Choose how much activity from communities shows up in your notification bell.</div>
+            ${[["all","All messages"],["mentions","@mentions only"],["off","Off"]].map(([v,l]) => {
+              const checked = (getNotifPref("community-level") || "mentions") === v;
+              return `<label class="sett-toggle-row" style="gap:10px;">
+                <input type="radio" name="communityLevel" value="${v}" ${checked ? "checked" : ""} style="width:16px;height:16px;accent-color:var(--accent,#6366f1);">
+                <span>${l}</span>
+              </label>`;
+            }).join("")}
           </div>
         `;
         document.getElementById("chatSoundToggle").addEventListener("click", (e) => {
@@ -623,6 +650,24 @@ refreshNowPlaying();
           if (granted) showToast("Chat alerts enabled.");
           else showToast("Notifications blocked. Allow them in browser settings.");
         });
+        // Per-type notification toggles
+        panel.querySelectorAll("[id$='Toggle'][data-key]").forEach(el => {
+          el.addEventListener("click", () => {
+            const on = el.dataset.on !== "1";
+            el.dataset.on = on ? "1" : "0";
+            el.classList.toggle("on", on);
+            setNotifPref(el.dataset.key, on);
+            showToast(on ? "Turned on." : "Turned off.");
+          });
+        });
+        // Community level radio
+        panel.querySelectorAll("input[name='communityLevel']").forEach(radio => {
+          radio.addEventListener("change", () => {
+            setNotifPref("community-level", radio.value);
+            showToast(`Community notifications: ${radio.value}`);
+          });
+        });
+
         document.getElementById("notifEmailToggle").addEventListener("click", async (e) => {
           const el = e.currentTarget;
           if (el.dataset.on !== "1" && !user.email) { showToast("Add an email address first."); return; }

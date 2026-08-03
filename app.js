@@ -1161,11 +1161,31 @@ function updateChatNavBadge() {
   badge.style.display = n > 0 ? "flex" : "none";
 }
 
+// ── Notification preference filter ──────────────────────────────────────────
+function _notifPref(key, def = true) {
+  try { const p = JSON.parse(localStorage.getItem("notifPrefs") || "{}"); return key in p ? p[key] : def; } catch { return def; }
+}
+function notifAllowed(notification) {
+  const t = notification.type || "";
+  if (t === "like")     return _notifPref("notif-likes");
+  if (t === "comment")  return _notifPref("notif-comments");
+  if (t === "follow")   return _notifPref("notif-follows");
+  if (t === "reaction") return _notifPref("notif-reactions");
+  if (t === "event")    return _notifPref("notif-events");
+  if (t === "mention")  return _notifPref("notif-mentions");
+  if (t === "message" && notification.room && !notification.room.startsWith("dm:")) {
+    const level = _notifPref("community-level", "mentions") || "mentions";
+    return level === "all";
+  }
+  return true;
+}
+
 // Called whenever a "notification" WS message arrives, regardless of
 // whether it came in on the shared presence socket or chat.html's own
 // dedicated socket - both funnel through here so the behavior is
 // identical no matter which page someone's on.
 function handleIncomingNotification(notification) {
+  if (!notifAllowed(notification)) return;
   Progress.addNotification(notification);
   const badge = document.getElementById("bellBadge");
   const unseen = Progress.unseenCount();

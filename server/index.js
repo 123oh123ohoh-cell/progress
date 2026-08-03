@@ -1551,7 +1551,8 @@ app.post("/api/users", signupRateLimit, asyncHandler(async (req, res) => {
   };
   await db.collection("users").insertOne(user);
   await notifyBadgesAwarded(normalizedUsername, user.badges);
-  const token = signJWT({ username: user.username, id: user._id });
+  const adminRole = ALLOWED_CREATOR_USERNAMES.has(user.username) ? "owner" : (user.adminRole || null);
+  const token = signJWT({ username: user.username, id: user._id, adminRole });
   res.status(201).json({ ...publicUser(normalizeUser(user)), token });
 }));
 
@@ -2441,6 +2442,41 @@ async function createChatMessage({ room, author, body, image, replyTo, msgType, 
   const safeImage = (typeof image === "string" && image.startsWith("https://")) ? image : null;
   const hasSongData = msgType === "song" && songData && typeof songData === "object";
   const hasGameData = msgType === "game" && gameData && typeof gameData === "object";
+
+  // ── Poll detection: /poll [Nh|Nm] Question; Option A; Option B ──────────
+  if (trimmed.startsWith("/poll ")) {
+    let rest = trimmed.slice(6).trim();
+    // Optional duration prefix: 2h, 30m, 1d, etc.
+    let closesAt = null;
+    const durMatch = rest.match(/^(\d+)(h|m|d)\s+/i);
+    if (durMatch) {
+      const n = parseInt(durMatch[1], 10);
+      const unit = durMatch[2].toLowerCase();
+      const ms = unit === "m" ? n * 60000 : unit === "h" ? n * 3600000 : n * 86400000;
+      closesAt = new Date(Date.now() + ms).toISOString();
+      rest = rest.slice(durMatch[0].length);
+    }
+    const parts = rest.split(";").map(s => s.trim()).filter(Boolean);
+    if (parts.length >= 3) {
+      const [question, ...opts] = parts;
+      const pollMsg = {
+        _id: generateId("m"),
+        room: targetRoom,
+        author,
+        body: "",
+        type: "poll",
+        pollData: { question: question.slice(0, 200), options: opts.slice(0, 4).map(o => o.slice(0, 100)) },
+        votes: {},
+        closesAt,
+        time: new Date().toISOString(),
+      };
+      await db.collection("messages").insertOne(pollMsg);
+      const clientPollMsg = normalizeChatMessage(pollMsg);
+      broadcastToRoom(targetRoom, { type: "message", message: clientPollMsg });
+      return clientPollMsg;
+    }
+  }
+
   if (!author || (!trimmed && !safeImage && !hasSongData && !hasGameData)) return null;
   if (!canAccessRoom(targetRoom, author)) return null;
   if (await isUsernameBanned(author)) return null;
@@ -2527,14 +2563,20 @@ app.get("/api/chat/rooms", requireAuth, asyncHandler(async (req, res) => {
     .limit(200)
     .toArray();
   res.json(rooms.map(r => ({
-    room:        r.room,
-    label:       r.label,
-    topic:       r.topic || "",
-    image:       r.image || null,
-    createdBy:   r.createdBy || null,
-    createdAt:   r.createdAt || null,
-    memberCount: (r.members || []).length,
-    joined:      (r.members || []).includes(username),
+    room:          r.room,
+    label:         r.label,
+    topic:         r.topic || "",
+    image:         r.image || null,
+    icon:          r.icon  || null,
+    color:         r.color || null,
+    isPrivate:     r.isPrivate || false,
+    createdBy:     r.createdBy || null,
+    createdAt:     r.createdAt || null,
+    memberCount:   (r.members || []).length,
+    joined:        (r.members || []).includes(username),
+    pinnedMsg:     r.pinnedMsg || null,
+    inviteCode:    r.inviteCode || null,
+    communityMods: r.communityMods || [],
   })));
 }));
 
@@ -2561,12 +2603,17 @@ app.post("/api/chat/rooms/:room/leave", requireAuth, asyncHandler(async (req, re
   res.json({ ok: true });
 }));
 
-// GET — members of a room
+// GET — members of a room (includes communityMods and owner)
 app.get("/api/chat/rooms/:room/members", requireAuth, asyncHandler(async (req, res) => {
   const { room } = req.params;
   const doc = await db.collection("chatRoomDefs").findOne({ room });
   if (!doc) return res.status(404).json({ error: "Room not found." });
-  res.json({ members: doc.members || [], memberCount: (doc.members || []).length });
+  res.json({
+    members:       doc.members || [],
+    memberCount:   (doc.members || []).length,
+    communityMods: doc.communityMods || [],
+    owner:         doc.createdBy || null,
+  });
 }));
 
 // POST — create a new community room
@@ -2601,14 +2648,21 @@ app.patch("/api/chat/rooms/:room", requireAuth, asyncHandler(async (req, res) =>
   const roomId = req.params.room;
   const doc = await db.collection("chatRoomDefs").findOne({ room: roomId });
   if (!doc) return res.status(404).json({ error: "Room not found." });
-  const isMod = ROLE_WEIGHTS[req.user.adminRole] >= ROLE_WEIGHTS["moderator"];
+  // Use DB role as fallback for tokens issued before adminRole was included in JWT
+  const role = req.user.adminRole || await getAdminRole(req.user.username);
+  const isMod = ROLE_WEIGHTS[role] >= ROLE_WEIGHTS["moderator"];
   const isCreator = doc.createdBy === req.user.username;
   if (!isMod && !isCreator) return res.status(403).json({ error: "Not allowed." });
-  const { image, topic, label } = req.body || {};
+  const { image, icon, topic, label, color, isPrivate } = req.body || {};
   const update = {};
-  if (image === null || typeof image === "string") update.image = image === null ? null : (image.trim() || null);
-  if (typeof topic === "string") update.topic = topic.trim().slice(0, 120);
+  // image / icon accept null (clear), https URL, or base64 data URL
+  const isValidImg = v => v === null || (typeof v === "string" && (v.startsWith("http") || v.startsWith("data:image/")));
+  if (isValidImg(image)) update.image = image === null ? null : image.trim();
+  if (isValidImg(icon))  update.icon  = icon  === null ? null : icon.trim();
+  if (typeof topic === "string")  update.topic     = topic.trim().slice(0, 200);
   if (typeof label === "string" && label.trim()) update.label = label.trim().slice(0, 50);
+  if (typeof color === "string")  update.color     = color.slice(0, 30);
+  if (typeof isPrivate === "boolean") update.isPrivate = isPrivate;
   if (!Object.keys(update).length) return res.status(400).json({ error: "Nothing to update." });
   await db.collection("chatRoomDefs").updateOne({ room: roomId }, { $set: update });
   res.json({ ok: true, ...update });
@@ -2619,11 +2673,210 @@ app.delete("/api/chat/rooms/:room", requireAuth, asyncHandler(async (req, res) =
   const roomId = req.params.room;
   const doc = await db.collection("chatRoomDefs").findOne({ room: roomId });
   if (!doc) return res.status(404).json({ error: "Room not found." });
-  const isMod = ROLE_WEIGHTS[req.user.adminRole] >= ROLE_WEIGHTS["moderator"];
+  // Use DB role as fallback for tokens issued before adminRole was included in JWT
+  const role = req.user.adminRole || await getAdminRole(req.user.username);
+  const isMod = ROLE_WEIGHTS[role] >= ROLE_WEIGHTS["moderator"];
   const isCreator = doc.createdBy === req.user.username;
   if (!isMod && !isCreator) return res.status(403).json({ error: "Not allowed." });
   await db.collection("chatRoomDefs").deleteOne({ room: roomId });
+  // Also remove all messages in the room
+  await db.collection("messages").deleteMany({ room: roomId }).catch(() => {});
   res.json({ ok: true });
+}));
+
+// ── Community helpers ────────────────────────────────────────────────────────
+
+function canManageRoom(doc, username, reqUser) {
+  const role = reqUser?.adminRole;
+  const isMod = ROLE_WEIGHTS[role] >= ROLE_WEIGHTS["moderator"];
+  const isCreator = doc.createdBy === username;
+  const isCommunityMod = Array.isArray(doc.communityMods) && doc.communityMods.includes(username);
+  return isMod || isCreator || isCommunityMod;
+}
+
+// ── Pinned messages ──────────────────────────────────────────────────────────
+
+// PUT — pin a message in a community room (owner/mod only)
+app.put("/api/chat/rooms/:room/pin", requireAuth, asyncHandler(async (req, res) => {
+  const roomId = req.params.room;
+  const doc = await db.collection("chatRoomDefs").findOne({ room: roomId });
+  if (!doc) return res.status(404).json({ error: "Room not found." });
+  if (!canManageRoom(doc, req.user.username, req.user)) return res.status(403).json({ error: "Not allowed." });
+  const { messageId } = req.body;
+  if (!messageId) return res.status(400).json({ error: "messageId required." });
+  const msg = await db.collection("messages").findOne({ _id: messageId });
+  if (!msg) return res.status(404).json({ error: "Message not found." });
+  const pinnedMsg = { id: msg._id, author: msg.author, body: (msg.body || "").slice(0, 200), time: msg.time };
+  await db.collection("chatRoomDefs").updateOne({ room: roomId }, { $set: { pinnedMsg } });
+  broadcastToRoom(roomId, { type: "pin", pinnedMsg });
+  res.json({ ok: true, pinnedMsg });
+}));
+
+// DELETE — unpin message
+app.delete("/api/chat/rooms/:room/pin", requireAuth, asyncHandler(async (req, res) => {
+  const roomId = req.params.room;
+  const doc = await db.collection("chatRoomDefs").findOne({ room: roomId });
+  if (!doc) return res.status(404).json({ error: "Room not found." });
+  if (!canManageRoom(doc, req.user.username, req.user)) return res.status(403).json({ error: "Not allowed." });
+  await db.collection("chatRoomDefs").updateOne({ room: roomId }, { $unset: { pinnedMsg: "" } });
+  broadcastToRoom(roomId, { type: "pin", pinnedMsg: null });
+  res.json({ ok: true });
+}));
+
+// ── Invite links ─────────────────────────────────────────────────────────────
+
+function generateInviteCode() {
+  const chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+  let code = "";
+  for (let i = 0; i < 8; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
+}
+
+// POST — generate or retrieve invite link for a room (owner/mod only)
+app.post("/api/chat/rooms/:room/invite", requireAuth, asyncHandler(async (req, res) => {
+  const roomId = req.params.room;
+  const doc = await db.collection("chatRoomDefs").findOne({ room: roomId });
+  if (!doc) return res.status(404).json({ error: "Room not found." });
+  if (!canManageRoom(doc, req.user.username, req.user)) return res.status(403).json({ error: "Not allowed." });
+  let code = doc.inviteCode;
+  if (!code) {
+    code = generateInviteCode();
+    await db.collection("chatRoomDefs").updateOne({ room: roomId }, { $set: { inviteCode: code } });
+  }
+  res.json({ ok: true, code });
+}));
+
+// GET — preview a room by invite code (public)
+app.get("/api/invite/:code", asyncHandler(async (req, res) => {
+  const code = req.params.code;
+  const doc = await db.collection("chatRoomDefs").findOne({ inviteCode: code });
+  if (!doc) return res.status(404).json({ error: "Invalid invite link." });
+  res.json({
+    room:        doc.room,
+    label:       doc.label,
+    icon:        doc.icon  || null,
+    color:       doc.color || null,
+    memberCount: (doc.members || []).length,
+  });
+}));
+
+// POST — accept an invite and join the room
+app.post("/api/invite/:code/accept", requireAuth, asyncHandler(async (req, res) => {
+  const code = req.params.code;
+  const doc = await db.collection("chatRoomDefs").findOne({ inviteCode: code });
+  if (!doc) return res.status(404).json({ error: "Invalid invite link." });
+  const username = req.user.username;
+  const alreadyMember = (doc.members || []).includes(username);
+  await db.collection("chatRoomDefs").updateOne({ inviteCode: code }, { $addToSet: { members: username } });
+  // Broadcast a welcome system message to the room
+  if (!alreadyMember) {
+    const joinMsg = {
+      _id: generateId("m"),
+      room: doc.room,
+      author: "system",
+      body: `👋 @${username} joined the community!`,
+      type: "join",
+      time: new Date().toISOString(),
+    };
+    await db.collection("messages").insertOne(joinMsg);
+    broadcastToRoom(doc.room, { type: "message", message: normalizeChatMessage(joinMsg) });
+  }
+  res.json({ ok: true, room: doc.room, label: doc.label });
+}));
+
+// ── Community moderators ─────────────────────────────────────────────────────
+
+// PUT — promote a member to community mod (creator or global mod only)
+app.put("/api/chat/rooms/:room/mods/:username", requireAuth, asyncHandler(async (req, res) => {
+  const roomId = req.params.room;
+  const targetUser = req.params.username;
+  const doc = await db.collection("chatRoomDefs").findOne({ room: roomId });
+  if (!doc) return res.status(404).json({ error: "Room not found." });
+  const isMod = ROLE_WEIGHTS[req.user.adminRole] >= ROLE_WEIGHTS["moderator"];
+  const isCreator = doc.createdBy === req.user.username;
+  if (!isMod && !isCreator) return res.status(403).json({ error: "Not allowed." });
+  await db.collection("chatRoomDefs").updateOne({ room: roomId }, { $addToSet: { communityMods: targetUser } });
+  broadcastToRoom(roomId, { type: "room-update", room: roomId });
+  res.json({ ok: true });
+}));
+
+// DELETE — demote a community mod
+app.delete("/api/chat/rooms/:room/mods/:username", requireAuth, asyncHandler(async (req, res) => {
+  const roomId = req.params.room;
+  const targetUser = req.params.username;
+  const doc = await db.collection("chatRoomDefs").findOne({ room: roomId });
+  if (!doc) return res.status(404).json({ error: "Room not found." });
+  const isMod = ROLE_WEIGHTS[req.user.adminRole] >= ROLE_WEIGHTS["moderator"];
+  const isCreator = doc.createdBy === req.user.username;
+  if (!isMod && !isCreator) return res.status(403).json({ error: "Not allowed." });
+  await db.collection("chatRoomDefs").updateOne({ room: roomId }, { $pull: { communityMods: targetUser } });
+  broadcastToRoom(roomId, { type: "room-update", room: roomId });
+  res.json({ ok: true });
+}));
+
+// ── Emoji reactions ──────────────────────────────────────────────────────────
+
+const ALLOWED_REACTIONS = ["❤️", "😂", "😮", "😢", "😡", "👍"];
+
+// POST — toggle an emoji reaction on a message
+app.post("/api/chat/messages/:id/react", requireAuth, asyncHandler(async (req, res) => {
+  const msgId = req.params.id;
+  const { emoji } = req.body;
+  if (!ALLOWED_REACTIONS.includes(emoji)) return res.status(400).json({ error: "Invalid emoji." });
+  const username = req.user.username;
+  const msg = await db.collection("messages").findOne({ _id: msgId });
+  if (!msg) return res.status(404).json({ error: "Message not found." });
+  const reactions = msg.reactions ? { ...msg.reactions } : {};
+  const existingUsers = reactions[emoji] || [];
+  if (existingUsers.includes(username)) {
+    const updated = existingUsers.filter(u => u !== username);
+    if (updated.length === 0) delete reactions[emoji];
+    else reactions[emoji] = updated;
+  } else {
+    reactions[emoji] = [...existingUsers, username];
+    if (msg.author !== username) {
+      await createNotification({
+        _id: generateId("n"),
+        type: "reaction",
+        actor: username,
+        recipient: msg.author,
+        room: msg.room,
+        messageId: msgId,
+        body: `${emoji} on: "${(msg.body || "").slice(0, 60)}"`,
+        time: new Date().toISOString(),
+        seen: false
+      });
+    }
+  }
+  await db.collection("messages").updateOne({ _id: msgId }, { $set: { reactions } });
+  broadcastToRoom(msg.room, { type: "reaction", messageId: msgId, reactions });
+  res.json({ ok: true, reactions });
+}));
+
+// ── Polls ────────────────────────────────────────────────────────────────────
+
+// POST — vote on a poll message
+app.post("/api/chat/messages/:id/vote", requireAuth, asyncHandler(async (req, res) => {
+  const msgId = req.params.id;
+  const { optionIndex } = req.body;
+  const username = req.user.username;
+  const msg = await db.collection("messages").findOne({ _id: msgId });
+  if (!msg || msg.type !== "poll") return res.status(404).json({ error: "Poll not found." });
+  if (msg.closesAt && new Date(msg.closesAt) < new Date()) return res.status(400).json({ error: "Poll has closed." });
+  const opts = (msg.pollData && msg.pollData.options) || [];
+  if (typeof optionIndex !== "number" || optionIndex < 0 || optionIndex >= opts.length) {
+    return res.status(400).json({ error: "Invalid option." });
+  }
+  const votes = msg.votes ? { ...msg.votes } : {};
+  // Remove any prior vote by this user
+  for (const k of Object.keys(votes)) {
+    votes[k] = votes[k].filter(u => u !== username);
+    if (votes[k].length === 0) delete votes[k];
+  }
+  votes[optionIndex] = [...(votes[optionIndex] || []), username];
+  await db.collection("messages").updateOne({ _id: msgId }, { $set: { votes } });
+  broadcastToRoom(msg.room, { type: "vote", messageId: msgId, votes });
+  res.json({ ok: true, votes });
 }));
 
 // ── Limited-time Events ───────────────────────────────────────────────────────
@@ -2741,6 +2994,18 @@ app.post("/api/events/:id/score", requireAuth, asyncHandler(async (req, res) => 
     { $group: { _id: null, best: { $max: "$score" } } },
   ]).toArray();
   res.json({ ok: true, best: best[0]?.best ?? score });
+}));
+
+// GET — personal score history (last 5 runs, auth required)
+app.get("/api/events/:id/my-history", requireAuth, asyncHandler(async (req, res) => {
+  const eventId  = req.params.id;
+  const username = req.user.username;
+  const runs = await db.collection("eventScores")
+    .find({ eventId, username })
+    .sort({ submittedAt: -1 })
+    .limit(5)
+    .toArray();
+  res.json(runs.map(r => ({ score: r.score, submittedAt: r.submittedAt })));
 }));
 
 // (admin) POST — create or update an event
@@ -2884,7 +3149,8 @@ app.post("/api/login", loginRateLimit, asyncHandler(async (req, res) => {
   }
   await ensureUsernameBadges(user);
   user = await computeAndSaveStreak(user);
-  const token = signJWT({ username: user.username, id: user._id });
+  const adminRole = ALLOWED_CREATOR_USERNAMES.has(user.username) ? "owner" : (user.adminRole || null);
+  const token = signJWT({ username: user.username, id: user._id, adminRole });
   res.json({ ...publicUser(normalizeUser(user)), token });
 }));
 

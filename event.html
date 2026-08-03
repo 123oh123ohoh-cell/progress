@@ -98,6 +98,14 @@ html { scroll-behavior: smooth; }
 .ev-prize { margin-top: 20px; display: inline-flex; align-items: center; gap: 6px; background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.28); border-radius: 30px; padding: 6px 16px; font-size: 13px; font-weight: 600; color: rgba(255,255,255,.9); backdrop-filter: blur(8px); }
 .ev-personal-best { margin-top: 16px; font-size: 13px; color: rgba(255,255,255,.7); font-family: var(--font-mono); }
 .ev-personal-best strong { color: #fff; }
+.ev-run-history { margin-top: 10px; display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.ev-run-chip {
+  background: rgba(255,255,255,.14); backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,.22); border-radius: 20px;
+  padding: 4px 12px; font-size: 11px; font-family: var(--font-mono);
+  color: rgba(255,255,255,.85); display: flex; align-items: center; gap: 4px;
+}
+.ev-run-chip.best-run { background: rgba(255,220,0,.22); border-color: rgba(255,220,0,.4); }
 .ev-login-note { margin-top: 12px; font-size: 13px; color: rgba(255,255,255,.7); }
 .ev-login-note a { color: #fff; font-weight: 700; }
 @keyframes ev-fadein { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
@@ -148,63 +156,45 @@ html { scroll-behavior: smooth; }
 .ev-none-sub { color:var(--muted);font-size:14px; }
 
 /* ═══════════════════════════════════════════════════════
-   JELLY BLOB STYLES
+   CANDY CELL STYLES
 ═══════════════════════════════════════════════════════ */
-.jelly {
+.candy-piece {
   width: 100%; height: 100%;
-  border-radius: 44% 44% 50% 50%;
-  position: relative; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 14px;
+  font-size: clamp(18px, 4.5vw, 30px);
+  line-height: 1;
+  position: relative;
   transition: transform .16s cubic-bezier(.34,1.56,.64,1);
   will-change: transform;
+  /* inner glow so each candy type pops */
+  box-shadow: inset 0 2px 0 rgba(255,255,255,.45), inset 0 -2px 0 rgba(0,0,0,.12);
 }
-/* Highlight blob on top */
-.jelly-shine {
-  position: absolute; top: 6%; left: 14%; width: 38%; height: 30%;
-  background: rgba(255,255,255,.55); border-radius: 50%;
-  filter: blur(2px); pointer-events: none;
-}
-/* Bottom sheen */
-.jelly-sheen {
-  position: absolute; bottom: 0; left: 0; right: 0; height: 30%;
-  background: rgba(0,0,0,.12); border-radius: 0 0 50% 50%;
-  pointer-events: none;
-}
-/* Eyes */
-.jelly-eye {
-  position: absolute; top: 26%; width: 23%; height: 28%;
-  background: #fff; border-radius: 50%;
-  box-shadow: 0 2px 4px rgba(0,0,0,.2);
-}
-.jelly-eye.l { left: 15%; }
-.jelly-eye.r { right: 15%; }
-/* Pupil */
-.jelly-eye::after {
-  content: ''; position: absolute;
-  top: 18%; left: 16%; width: 46%; height: 48%;
-  background: #111; border-radius: 50%;
-}
-/* Pupil shine */
-.jelly-eye::before {
-  content: ''; position: absolute;
-  top: 9%; right: 12%; width: 28%; height: 28%;
-  background: rgba(255,255,255,.9); border-radius: 50%; z-index: 1;
-}
-/* Worried/squished eyes when selected */
-.gfs-cell.selected .jelly-eye {
-  height: 22%;
-  border-radius: 50% 50% 40% 40%;
+.candy-piece::after {
+  content: '';
+  position: absolute; top: 10%; left: 15%; width: 30%; height: 22%;
+  background: rgba(255,255,255,.45); border-radius: 50%;
+  filter: blur(1.5px); pointer-events: none;
 }
 
 /* ═══════════════════════════════════════════════════════
    FULLSCREEN GAME OVERLAY
 ═══════════════════════════════════════════════════════ */
 #gfsOverlay {
-  position: fixed; inset: 0; z-index: 1000;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  /* Fallback for browsers without dvh support */
+  height: 100vh;
+  /* Modern approach — uses visual viewport height */
+  height: 100dvh;
+  /* iOS Safari fill-available (handles nav bar at bottom) */
+  min-height: -webkit-fill-available;
+  z-index: 1000;
   display: none; flex-direction: column;
   overscroll-behavior: none; overflow: hidden;
   opacity: 0; transition: opacity .25s cubic-bezier(.4,0,.2,1);
-  /* Bright pastel candy background */
-  background: linear-gradient(160deg, #a8edea 0%, #fed6e3 100%);
+  /* Candy shop background */
+  background: linear-gradient(160deg, #ffe4f0 0%, #ffd6fa 40%, #ffe8c0 100%);
 }
 #gfsOverlay.open { opacity: 1; }
 /* Candy particle canvas */
@@ -228,9 +218,15 @@ html { scroll-behavior: smooth; }
   position: relative; z-index: 2;
   display: flex; flex-direction: column; align-items: center;
   justify-content: center;
-  height: 100dvh;
-  padding: max(env(safe-area-inset-top,0px),16px) 10px max(env(safe-area-inset-bottom,0px),10px);
+  /* Fill the overlay completely, respecting safe areas */
+  width: 100%; height: 100%;
+  padding-top: max(env(safe-area-inset-top, 0px), 16px);
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 10px);
+  padding-left: 10px;
+  padding-right: 10px;
+  box-sizing: border-box;
   gap: 6px;
+  overflow: hidden;
 }
 
 /* HUD — score + moves */
@@ -277,17 +273,17 @@ html { scroll-behavior: smooth; }
 .gfs-board {
   display: grid; grid-template-columns: repeat(8,1fr);
   gap: 5px; padding: 10px;
-  background: #5eba3a;
+  background: linear-gradient(145deg, #c471ed 0%, #9c40c8 100%);
   border-radius: 20px;
-  border: 4px solid #4da82e;
-  box-shadow: 0 4px 0 #3a8c1e, 0 8px 24px rgba(0,0,0,.18);
+  border: 4px solid #a855d0;
+  box-shadow: 0 4px 0 #7c2ea8, 0 8px 24px rgba(150,60,220,.28);
   width: 100%; max-width: 440px;
   touch-action: none; user-select: none;
 }
 .gfs-cell {
-  aspect-ratio: 1; border-radius: 10px; padding: 3px;
+  aspect-ratio: 1; border-radius: 12px; padding: 2px;
   cursor: pointer;
-  background: rgba(255,255,255,.1);
+  background: rgba(255,255,255,.08);
   transition: transform .14s cubic-bezier(.34,1.56,.64,1);
   -webkit-tap-highlight-color: transparent;
   position: relative;
@@ -326,7 +322,7 @@ html { scroll-behavior: smooth; }
   60%     { transform: translateX(5px); }
   80%     { transform: translateX(-3px); }
 }
-.gfs-cell.hint-glow .jelly { animation: gfs-hint .5s cubic-bezier(.34,1.56,.64,1) 3; }
+.gfs-cell.hint-glow .candy-piece { animation: gfs-hint .5s cubic-bezier(.34,1.56,.64,1) 3; }
 @keyframes gfs-hint { 0%,100%{transform:scale(1)} 50%{transform:scale(1.25) rotate(10deg)} }
 
 /* Controls */
@@ -348,26 +344,18 @@ html { scroll-behavior: smooth; }
   display: flex; flex-direction: column;
   align-items: center; justify-content: center;
   padding: 32px 24px; text-align: center;
-  background: rgba(255,255,255,.85); backdrop-filter: blur(16px);
+  background: rgba(255,240,255,.88); backdrop-filter: blur(16px);
   opacity: 0; pointer-events: none;
   transition: opacity .4s cubic-bezier(.4,0,.2,1);
 }
 .gfs-results.show { opacity: 1; pointer-events: all; }
-/* Big jelly result character */
-.gfs-res-jelly {
-  width: 90px; height: 90px; border-radius: 44% 44% 50% 50%;
-  position: relative; overflow: hidden; margin: 0 auto 20px;
+/* Big candy result emoji */
+.gfs-res-candy {
+  font-size: 80px; line-height: 1; margin-bottom: 16px;
   animation: gfs-res-bounce .6s cubic-bezier(.34,1.56,.64,1) both;
-  box-shadow: 0 8px 24px rgba(0,0,0,.18);
+  filter: drop-shadow(0 8px 16px rgba(0,0,0,.18));
 }
-@keyframes gfs-res-bounce { from{transform:scale(0) rotate(-10deg)} to{transform:scale(1) rotate(0)} }
-.gfs-res-jelly-shine { position:absolute;top:6%;left:14%;width:38%;height:30%;background:rgba(255,255,255,.6);border-radius:50%;filter:blur(3px); }
-.gfs-res-jelly-sheen { position:absolute;bottom:0;left:0;right:0;height:28%;background:rgba(0,0,0,.1);border-radius:0 0 50% 50%; }
-.gfs-res-eye { position:absolute;top:24%;width:22%;height:26%;background:#fff;border-radius:50%; }
-.gfs-res-eye.l { left:16%; }
-.gfs-res-eye.r { right:16%; }
-.gfs-res-eye::after { content:'';position:absolute;top:18%;left:16%;width:46%;height:48%;background:#111;border-radius:50%; }
-.gfs-res-eye::before { content:'';position:absolute;top:9%;right:12%;width:28%;height:28%;background:rgba(255,255,255,.9);border-radius:50%;z-index:1; }
+@keyframes gfs-res-bounce { from{transform:scale(0) rotate(-12deg)} to{transform:scale(1) rotate(0)} }
 .gfs-res-title { font-family: var(--font-display); font-size: clamp(28px,6vw,38px); font-style: italic; font-weight: 600; color: #333; margin: 0 0 6px; }
 .gfs-res-score { font-family: var(--font-mono); font-size: clamp(48px,9vw,64px); font-weight: 800; color: #333; margin: 0 0 6px; line-height: 1; }
 .gfs-res-sub { font-size: 15px; color: #888; margin: 0 0 8px; }
@@ -396,9 +384,9 @@ html { scroll-behavior: smooth; }
 <div id="modal-root"></div>
 
 <!-- ══════════════════════════════════════════════════════
-     FULLSCREEN JELLY GAME OVERLAY
+     FULLSCREEN CANDY GAME OVERLAY
 ══════════════════════════════════════════════════════ -->
-<div id="gfsOverlay" role="dialog" aria-modal="true" aria-label="Jelly match game">
+<div id="gfsOverlay" role="dialog" aria-modal="true" aria-label="Candy match game">
   <canvas id="gfsCanvas"></canvas>
   <button class="gfs-close" id="gfsCloseBtn" aria-label="Close">✕</button>
   <div class="gfs-inner">
@@ -423,12 +411,7 @@ html { scroll-behavior: smooth; }
   </div>
   <!-- Results screen -->
   <div class="gfs-results" id="gfsResults">
-    <div class="gfs-res-jelly" id="gfsResJelly">
-      <div class="gfs-res-jelly-shine"></div>
-      <div class="gfs-res-jelly-sheen"></div>
-      <div class="gfs-res-eye l"></div>
-      <div class="gfs-res-eye r"></div>
-    </div>
+    <div class="gfs-res-candy" id="gfsResCandy">🍬</div>
     <div class="gfs-res-title" id="gfsResTitle">Nice!</div>
     <div class="gfs-res-score" id="gfsResScore">0</div>
     <div class="gfs-res-sub" id="gfsResSub"></div>
@@ -471,6 +454,7 @@ html { scroll-behavior: smooth; }
       </div>
       <div class="ev-prize" id="evPrize" style="display:none;"></div>
       <div class="ev-personal-best" id="evPersonalBest" style="display:none;"></div>
+      <div class="ev-run-history" id="evRunHistory" style="display:none;"></div>
       <div class="ev-login-note" id="evLoginNote" style="display:none;"><a href="signup.html">Sign in</a> to save your score</div>
     </div>
   </div>
@@ -500,16 +484,18 @@ html { scroll-behavior: smooth; }
 'use strict';
 
 /* ══════════════════════════════════════════════════════
-   JELLY DEFINITIONS — 6 colors
+   CANDY DEFINITIONS — 6 types
 ══════════════════════════════════════════════════════ */
-const JELLIES = [
-  { id:0, grad:'radial-gradient(ellipse at 38% 30%, #ff9999 0%, #cc0000 100%)', res:'#e53935' },  // red
-  { id:1, grad:'radial-gradient(ellipse at 38% 30%, #cc88ff 0%, #7700cc 100%)', res:'#8e24aa' },  // purple
-  { id:2, grad:'radial-gradient(ellipse at 38% 30%, #99ee44 0%, #2d8a00 100%)', res:'#43a047' },  // green
-  { id:3, grad:'radial-gradient(ellipse at 38% 30%, #ffee55 0%, #dd8800 100%)', res:'#f9a825' },  // yellow
-  { id:4, grad:'radial-gradient(ellipse at 38% 30%, #66ccff 0%, #0044ee 100%)', res:'#1e88e5' },  // blue
-  { id:5, grad:'radial-gradient(ellipse at 38% 30%, #ffbb55 0%, #dd4400 100%)', res:'#e64a19' },  // orange
+const CANDIES = [
+  { id:0, emoji:'🍬', bg:'linear-gradient(145deg,#ff9dc8,#e0558a)' },   // pink candy
+  { id:1, emoji:'🍭', bg:'linear-gradient(145deg,#d48cff,#a020f0)' },   // lollipop purple
+  { id:2, emoji:'🍫', bg:'linear-gradient(145deg,#c8955a,#7b4a20)' },   // chocolate brown
+  { id:3, emoji:'🍡', bg:'linear-gradient(145deg,#ffd966,#e09a10)' },   // dango gold
+  { id:4, emoji:'🍩', bg:'linear-gradient(145deg,#ffaa5a,#d95f10)' },   // donut orange
+  { id:5, emoji:'🍦', bg:'linear-gradient(145deg,#a8d8ff,#4488cc)' },   // ice cream blue
 ];
+// Result emojis by score tier
+const CANDY_RESULT_EMOJIS = ['🍬','🍭','🍫','🍡','🍩','🍦','🎉','🏆'];
 const COLS = 8, ROWS = 8, MAX_MOVES = 20;
 
 /* ── Candy rain for canvases ───────────────────────── */
@@ -560,6 +546,7 @@ function renderHero(ev) {
   if (ev.prizeNote) { prize.textContent = ev.prizeNote; prize.style.display = ''; }
   initRain(document.getElementById('heroCanvas'));
   initRain(document.getElementById('gfsCanvas'));
+  if (currentUser) loadRunHistory(ev.id);
 }
 
 /* ── Countdown ──────────────────────────────────────── */
@@ -635,6 +622,19 @@ function updatePersonalBest() {
   el.style.display=personalBest>0?'':'none';
   el.innerHTML=`Your best: <strong>${personalBest.toLocaleString()}</strong>`;
 }
+
+async function loadRunHistory(eventId) {
+  if (!currentUser || !eventId) return;
+  const runs = await apiFetch(`/api/events/${encodeURIComponent(eventId)}/my-history`).catch(()=>null);
+  const el = document.getElementById('evRunHistory');
+  if (!el || !Array.isArray(runs) || !runs.length) return;
+  const maxScore = Math.max(...runs.map(r=>r.score));
+  el.style.display='';
+  el.innerHTML = runs.map((r,i) => {
+    const isBest = r.score === maxScore && i === runs.findIndex(x=>x.score===maxScore);
+    return `<span class="ev-run-chip${isBest?' best-run':''}">${isBest?'⭐ ':''}${r.score.toLocaleString()}</span>`;
+  }).join('');
+}
 document.getElementById('lbRefreshBtn').addEventListener('click', ()=>{ if(currentEvent) loadLeaderboard(currentEvent.id); });
 
 /* ══════════════════════════════════════════════════════
@@ -644,14 +644,14 @@ let grid = [], selected = null, score = 0, displayScore = 0;
 let movesLeft = MAX_MOVES, animating = false, running = false;
 let touchStart = null, scoreRaf = null;
 
-/* ── Cell renderer — returns a div with CSS jelly blob ── */
+/* ── Cell renderer — returns a div with candy emoji ── */
 function makeCell(r, c, isSelected, isDrop) {
   const div = document.createElement('div');
   div.className = `gfs-cell${isSelected?' selected':''}${isDrop?' dropping':''}`;
   div.dataset.r = r; div.dataset.c = c;
   if (grid[r][c] === null) return div;
-  const j = JELLIES[grid[r][c]];
-  div.innerHTML = `<div class="jelly" style="background:${j.grad}"><div class="jelly-shine"></div><div class="jelly-sheen"></div><div class="jelly-eye l"></div><div class="jelly-eye r"></div></div>`;
+  const candy = CANDIES[grid[r][c]];
+  div.innerHTML = `<div class="candy-piece" style="background:${candy.bg}">${candy.emoji}</div>`;
   return div;
 }
 
@@ -664,11 +664,17 @@ function renderBoard(fallingSet) {
 }
 
 /* ── Open / close ───────────────────────────────────── */
+let _bodySavedScrollY = 0;
 function openGame() {
   const ov = document.getElementById('gfsOverlay');
   ov.style.display = 'flex';
   requestAnimationFrame(()=>requestAnimationFrame(()=>ov.classList.add('open')));
+  // Lock scroll on iOS Safari (prevents address bar from shifting the overlay)
+  _bodySavedScrollY = window.scrollY;
   document.body.style.overflow = 'hidden';
+  document.body.style.position = 'fixed';
+  document.body.style.top = `-${_bodySavedScrollY}px`;
+  document.body.style.width = '100%';
   document.getElementById('gfsResults').classList.remove('show');
   startGame();
 }
@@ -677,7 +683,12 @@ function closeGame() {
   const ov = document.getElementById('gfsOverlay');
   ov.classList.remove('open');
   ov.addEventListener('transitionend', ()=>{ ov.style.display='none'; }, {once:true});
+  // Restore scroll
   document.body.style.overflow = '';
+  document.body.style.position = '';
+  document.body.style.top = '';
+  document.body.style.width = '';
+  window.scrollTo(0, _bodySavedScrollY);
   if (currentEvent) loadLeaderboard(currentEvent.id);
 }
 document.getElementById('evPlayBtn').addEventListener('click', openGame);
@@ -708,11 +719,11 @@ function setMoves(n) {
 }
 
 /* ── Grid logic ─────────────────────────────────────── */
-function randJelly() { return Math.floor(Math.random() * JELLIES.length); }
+function randCandy() { return Math.floor(Math.random() * CANDIES.length); }
 function makeGrid() {
-  grid = Array.from({length:ROWS}, ()=>Array.from({length:COLS}, randJelly));
+  grid = Array.from({length:ROWS}, ()=>Array.from({length:COLS}, randCandy));
   let tries=0;
-  while(findMatches().length && tries++<40) grid=Array.from({length:ROWS},()=>Array.from({length:COLS},randJelly));
+  while(findMatches().length && tries++<40) grid=Array.from({length:ROWS},()=>Array.from({length:COLS},randCandy));
 }
 function findMatches() {
   const m=new Set();
@@ -773,7 +784,7 @@ async function resolveMatches(combo=1) {
   const fallingSet=new Set();
   for(let c=0;c<COLS;c++) {
     const col=[]; for(let r=ROWS-1;r>=0;r--) if(grid[r][c]!==null) col.push(grid[r][c]);
-    const newCount=ROWS-col.length; while(col.length<ROWS) col.push(randJelly());
+    const newCount=ROWS-col.length; while(col.length<ROWS) col.push(randCandy());
     for(let r=ROWS-1;r>=0;r--) { grid[r][c]=col[ROWS-1-r]; if(ROWS-1-r<newCount) fallingSet.add(`${r},${c}`); }
   }
   renderBoard(fallingSet);
@@ -823,10 +834,10 @@ gfsBoard.addEventListener('click',e=>{ const t=e.target.closest('.gfs-cell'); if
 async function endGame() {
   if(!running) return; running=false; animating=true;
   const isNew=score>personalBest;
-  // Result jelly gets the color of the winning score tier
-  const resJelly=document.getElementById('gfsResJelly');
-  const tier = score>2000?1:score>1000?3:score>500?4:0; // purple > yellow > blue > red
-  resJelly.style.background=JELLIES[tier].grad;
+  // Candy emoji changes based on score tier
+  const resCandy = document.getElementById('gfsResCandy');
+  const candyEmoji = score>2500?'🏆':score>1800?'🎉':score>1200?'🍭':score>700?'🍬':score>300?'🍩':'🍫';
+  resCandy.textContent = candyEmoji;
   document.getElementById('gfsResTitle').textContent=isNew?'New best! 🎉':score>1500?'Amazing!':score>800?'Nice one!':'Keep going!';
   document.getElementById('gfsResScore').textContent=score.toLocaleString();
   document.getElementById('gfsResSub').textContent=isNew?'Personal best 🏅':personalBest>0?`Best: ${Math.max(personalBest,score).toLocaleString()}`:'';
@@ -834,7 +845,7 @@ async function endGame() {
   document.getElementById('gfsResults').classList.add('show');
   if(currentUser&&currentEvent) {
     const r=await apiFetch(`/api/events/${encodeURIComponent(currentEvent.id)}/score`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({score})}).catch(()=>null);
-    if(r?.ok){personalBest=Math.max(personalBest,r.best??score);updatePersonalBest();document.getElementById('gfsResStatus').textContent='Score saved ✓';}
+    if(r?.ok){personalBest=Math.max(personalBest,r.best??score);updatePersonalBest();document.getElementById('gfsResStatus').textContent='Score saved ✓';loadRunHistory(currentEvent.id);}
     else document.getElementById('gfsResStatus').textContent='';
   }
   animating=false;

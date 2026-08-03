@@ -2187,7 +2187,13 @@ label:has(#themeToggleSwitch[data-on="1"]) .theme-flank-icon.moon { opacity: 1; 
 .chat-bubble-col { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .chat-msg.mine .chat-bubble-col { align-items: flex-end; }
 
-.chat-author { font-size: 12px; color: var(--muted); padding-left: 2px; }
+.chat-author { font-size: 12px; color: var(--muted); padding-left: 2px; display: flex; align-items: center; gap: 5px; }
+.chat-owner-badge {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 9.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em;
+  background: linear-gradient(135deg, #f59e0b, #f97316);
+  color: #fff; border-radius: 5px; padding: 1px 5px; line-height: 1.4;
+}
 
 .chat-image {
   max-width: 260px;
@@ -5090,3 +5096,164 @@ body.mobile main.container {
   user-select: none;
 }
 .cg-dpad:active { background: var(--mocha-light); }
+
+/* ── Community mod badge ──────────────────────────────────────────────────── */
+.chat-mod-badge {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 9.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em;
+  background: linear-gradient(135deg, #3b82f6, #6366f1);
+  color: #fff; border-radius: 5px; padding: 1px 5px; line-height: 1.4;
+}
+
+/* ── Pinned message bar ───────────────────────────────────────────────────── */
+.pinned-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 14px;
+  background: linear-gradient(90deg, rgba(99,102,241,.08) 0%, rgba(99,102,241,.04) 100%);
+  border-bottom: 1px solid rgba(99,102,241,.18);
+  font-size: 12.5px; color: var(--ink); flex-shrink: 0;
+  animation: pinSlide .2s ease;
+}
+@keyframes pinSlide { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:none; } }
+.pinned-bar-icon { font-size: 14px; flex-shrink: 0; }
+.pinned-bar-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+.pinned-bar-close {
+  flex-shrink: 0; background: none; border: none; cursor: pointer;
+  font-size: 16px; color: var(--muted); padding: 0 4px; line-height: 1;
+  opacity: .6;
+}
+.pinned-bar-close:hover { opacity: 1; }
+
+/* ── Emoji reactions ──────────────────────────────────────────────────────── */
+.msg-reactions {
+  display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; align-items: center;
+}
+.reaction-pill {
+  display: inline-flex; align-items: center; gap: 2px;
+  background: var(--paper); border: 1.5px solid var(--mocha-light);
+  border-radius: 20px; padding: 2px 8px; font-size: 13px;
+  cursor: pointer; transition: background .15s, border-color .15s;
+  line-height: 1.4;
+}
+.reaction-pill:hover { background: var(--mocha-light); }
+.reaction-pill.me {
+  background: rgba(99,102,241,.12);
+  border-color: rgba(99,102,241,.45);
+}
+.reaction-add-btn {
+  background: none; border: 1.5px dashed var(--mocha-light);
+  border-radius: 20px; padding: 2px 7px; font-size: 13px; color: var(--muted);
+  cursor: pointer; opacity: 0; transition: opacity .15s;
+  line-height: 1.4;
+}
+.chat-msg:hover .reaction-add-btn,
+.chat-msg .msg-reactions:has(.reaction-pill) .reaction-add-btn { opacity: 1; }
+.reaction-picker {
+  position: fixed; z-index: 9000;
+  background: var(--paper); border: 1px solid var(--mocha-light);
+  border-radius: 14px; padding: 8px 10px;
+  display: flex; gap: 6px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.16);
+  animation: popIn .15s cubic-bezier(.34,1.56,.64,1);
+}
+.rp-emoji {
+  background: none; border: none; font-size: 22px; cursor: pointer;
+  padding: 4px 6px; border-radius: 10px; transition: background .12s;
+}
+.rp-emoji:hover { background: var(--mocha-light); transform: scale(1.2); }
+
+/* ── Poll card ────────────────────────────────────────────────────────────── */
+.poll-card {
+  background: var(--paper); border: 1.5px solid var(--mocha-light);
+  border-radius: 16px; padding: 14px 16px; max-width: 320px; min-width: 220px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.poll-card-q {
+  font-weight: 700; font-size: 14px; line-height: 1.35; color: var(--ink);
+}
+.poll-card-opts { display: flex; flex-direction: column; gap: 7px; }
+.poll-option {
+  position: relative; overflow: hidden;
+  background: var(--cream); border: 1.5px solid var(--mocha-light);
+  border-radius: 10px; padding: 8px 12px;
+  display: flex; align-items: center; justify-content: space-between;
+  cursor: pointer; font-size: 13px; font-weight: 500; text-align: left;
+  transition: border-color .15s;
+}
+.poll-option:hover { border-color: var(--accent, #6366f1); }
+.poll-option.voted { border-color: var(--accent, #6366f1); background: rgba(99,102,241,.06); }
+.poll-option-bar {
+  position: absolute; left: 0; top: 0; bottom: 0;
+  background: rgba(99,102,241,.12); pointer-events: none;
+  transition: width .4s ease;
+}
+.poll-option-label { position: relative; z-index: 1; }
+.poll-option-pct { position: relative; z-index: 1; font-size: 11px; color: var(--muted); font-weight: 600; }
+.poll-card-meta { font-size: 11px; color: var(--muted); }
+
+/* ── Message context menu ─────────────────────────────────────────────────── */
+.msg-context-menu {
+  position: fixed; z-index: 9100;
+  background: var(--paper); border: 1px solid var(--mocha-light);
+  border-radius: 10px; padding: 4px;
+  box-shadow: 0 8px 28px rgba(0,0,0,.18);
+  min-width: 150px;
+  animation: popIn .12s ease;
+}
+.mcm-item {
+  display: block; width: 100%; background: none; border: none;
+  padding: 8px 14px; text-align: left; font-size: 13px;
+  cursor: pointer; border-radius: 7px; color: var(--ink);
+}
+.mcm-item:hover { background: var(--mocha-light); }
+
+/* ── Settings panel — invite + members ───────────────────────────────────── */
+.rs-invite-row {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-top: 8px;
+}
+.rs-invite-link {
+  flex: 1; font-size: 12px; word-break: break-all; min-width: 0;
+  color: var(--accent, #6366f1);
+}
+.rs-invite-gen, .rs-invite-copy {
+  padding: 5px 12px; border-radius: 8px; font-size: 12px; font-weight: 600;
+  border: 1.5px solid var(--mocha-light); background: var(--paper);
+  cursor: pointer; white-space: nowrap; color: var(--ink);
+  transition: background .12s;
+}
+.rs-invite-gen:hover, .rs-invite-copy:hover { background: var(--mocha-light); }
+.rs-members-list { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+.rs-member-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 4px; border-bottom: 1px solid var(--mocha-light);
+  font-size: 13px;
+}
+.rs-member-name { display: flex; align-items: center; gap: 6px; }
+.rs-promote-btn, .rs-demote-btn {
+  font-size: 11px; padding: 3px 9px; border-radius: 7px;
+  border: 1.5px solid var(--mocha-light); background: var(--paper);
+  cursor: pointer; color: var(--ink); transition: background .12s;
+}
+.rs-promote-btn:hover { background: #e0f2fe; border-color: #3b82f6; }
+.rs-demote-btn:hover  { background: #fee2e2; border-color: #ef4444; }
+
+/* ── Community join system message ───────────────────────────────────────── */
+.chat-join-msg {
+  text-align: center; font-size: 12px; color: var(--muted);
+  padding: 4px 12px; margin: 4px 0;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+.chat-join-msg::before, .chat-join-msg::after {
+  content: ''; flex: 1; height: 1px; background: var(--mocha-light);
+}
+
+/* ── Poll closed / timer ─────────────────────────────────────────────────── */
+.poll-closed-badge {
+  display: inline-block; font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; background: var(--mocha-light); color: var(--muted);
+  border-radius: 5px; padding: 1px 6px; vertical-align: middle; margin-left: 4px;
+}
+.poll-timer { font-size: 11px; color: var(--muted); font-style: italic; }
+.poll-option.closed { cursor: default; opacity: .85; }
+.poll-option:disabled { cursor: default; }

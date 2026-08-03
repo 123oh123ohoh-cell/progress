@@ -238,57 +238,167 @@
   line-height: 1; transition: background .14s, color .14s;
 }
 .community-header-gear:hover { background: var(--mocha-light); color: var(--ink); }
-/* ── Room Settings Panel ─────────────────────────────────────────── */
+/* ── Room Settings Panel — Discord-style ─────────────────────────── */
 .room-settings-panel {
   position: absolute; inset: 0; z-index: 30;
   background: var(--cream); display: flex; flex-direction: column;
-  opacity: 0; transition: opacity .18s;
+  opacity: 0; transition: opacity .2s; overflow: hidden;
 }
 .room-settings-panel.open { opacity: 1; }
 .room-settings-head {
   display: flex; align-items: center; gap: 10px;
-  padding: 14px 16px 10px; border-bottom: 1px solid var(--mocha-light); flex-shrink: 0;
+  padding: 14px 16px 12px; border-bottom: 1px solid var(--mocha-light); flex-shrink: 0;
 }
 .room-settings-back {
   background: none; border: none; cursor: pointer; font-size: 18px;
-  color: var(--muted); padding: 2px 6px; border-radius: 8px;
-  transition: background .14s; line-height: 1;
+  color: var(--muted); padding: 4px 7px; border-radius: 8px;
+  transition: background .14s, color .14s; line-height: 1;
 }
-.room-settings-back:hover { background: var(--mocha-light); }
+.room-settings-back:hover { background: var(--mocha-light); color: var(--ink); }
 .room-settings-title {
-  font-family: var(--font-display); font-size: 15px; font-weight: 700;
-  color: var(--ink); margin: 0; flex: 1;
+  font-size: 14px; font-weight: 700; color: var(--ink); margin: 0; flex: 1;
 }
-.room-settings-body { flex: 1; overflow-y: auto; padding: 20px 20px 12px; display: flex; flex-direction: column; gap: 18px; }
-.rs-field { display: flex; flex-direction: column; gap: 6px; }
-.rs-label { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+/* Scrollable body */
+.room-settings-body {
+  flex: 1; overflow-y: auto; overscroll-behavior: contain;
+  padding: 0 0 24px; display: flex; flex-direction: column;
+}
+/* Cover banner */
+.rs-cover {
+  width: 100%; height: 100px; position: relative; cursor: pointer;
+  background: var(--mocha-light); overflow: hidden; flex-shrink: 0;
+}
+.rs-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.rs-cover-overlay {
+  position: absolute; inset: 0; background: rgba(0,0,0,.35);
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; transition: opacity .18s; gap: 6px;
+  font-size: 12px; font-weight: 700; color: #fff;
+}
+.rs-cover:hover .rs-cover-overlay { opacity: 1; }
+.rs-cover-empty {
+  width: 100%; height: 100%; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 5px;
+  font-size: 11px; color: var(--muted); font-weight: 600;
+}
+.rs-cover-empty span { font-size: 22px; }
+/* Icon */
+.rs-icon-row {
+  display: flex; align-items: flex-end; gap: 12px;
+  padding: 0 16px; margin-top: -24px; margin-bottom: 16px; position: relative; z-index: 2;
+}
+.rs-icon {
+  width: 52px; height: 52px; border-radius: 14px; cursor: pointer; position: relative;
+  flex-shrink: 0; overflow: hidden; border: 3px solid var(--cream);
+  background: var(--mocha-light);
+}
+.rs-icon img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.rs-icon-initials {
+  width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
+  font-size: 18px; font-weight: 800; color: #fff;
+}
+.rs-icon-overlay {
+  position: absolute; inset: 0; background: rgba(0,0,0,.45);
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; transition: opacity .15s; font-size: 16px;
+}
+.rs-icon:hover .rs-icon-overlay { opacity: 1; }
+.rs-icon-hint { font-size: 11px; color: var(--muted); padding-bottom: 4px; }
+
+/* Sections */
+.rs-section { padding: 0 16px; margin-bottom: 4px; }
+.rs-section-divider {
+  margin: 16px 16px 14px; border: none; border-top: 1px solid var(--mocha-light);
+}
+.rs-label {
+  font-size: 10.5px; font-weight: 800; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .07em; margin-bottom: 6px;
+}
 .rs-input {
-  padding: 10px 13px; border-radius: 10px; border: 1.5px solid var(--mocha-light);
+  width: 100%; box-sizing: border-box;
+  padding: 9px 12px; border-radius: 10px; border: 1.5px solid var(--mocha-light);
   background: var(--mocha-wash); color: var(--ink); font-size: 14px;
   font-family: var(--font-body); outline: none; transition: border-color .15s;
+  resize: vertical;
 }
 .rs-input:focus { border-color: var(--ink); }
-.rs-img-preview {
-  width: 100%; height: 110px; border-radius: 12px; object-fit: cover;
-  background: var(--mocha-light); border: 1.5px solid var(--mocha-light);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 28px; color: var(--muted); overflow: hidden;
+.rs-textarea { min-height: 68px; line-height: 1.5; }
+/* URL hint below image inputs */
+.rs-url-row { display: flex; gap: 6px; margin-top: 6px; }
+.rs-url-input { flex: 1; }
+.rs-url-clear {
+  padding: 9px 12px; border-radius: 10px; border: 1.5px solid var(--mocha-light);
+  background: none; color: var(--muted); cursor: pointer; font-size: 14px;
+  font-family: var(--font-body); transition: background .14s, color .14s;
+  white-space: nowrap;
 }
-.rs-img-preview img { width: 100%; height: 100%; object-fit: cover; border-radius: 11px; }
+.rs-url-clear:hover { background: var(--mocha-light); color: var(--ink); }
+/* Color swatches */
+.rs-colors { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.rs-color-swatch {
+  width: 28px; height: 28px; border-radius: 50%; cursor: pointer; border: none;
+  transition: transform .15s cubic-bezier(.34,1.56,.64,1), box-shadow .15s;
+  flex-shrink: 0;
+}
+.rs-color-swatch:hover { transform: scale(1.2); }
+.rs-color-swatch.selected { box-shadow: 0 0 0 2.5px var(--cream), 0 0 0 4.5px currentColor; }
+.rs-color-custom {
+  padding: 5px 10px; border-radius: 20px; border: 1.5px solid var(--mocha-light);
+  background: none; color: var(--muted); font-size: 12px; cursor: pointer;
+  font-family: var(--font-body); font-weight: 600; white-space: nowrap;
+  transition: border-color .14s, color .14s;
+}
+.rs-color-custom:hover { border-color: var(--ink); color: var(--ink); }
+.rs-color-hex {
+  padding: 5px 10px; border-radius: 8px; border: 1.5px solid var(--mocha-light);
+  background: var(--mocha-wash); color: var(--ink); font-size: 12px;
+  font-family: var(--font-mono); width: 88px; outline: none;
+  transition: border-color .15s;
+}
+.rs-color-hex:focus { border-color: var(--ink); }
+/* Privacy toggle */
+.rs-toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.rs-toggle-info { display: flex; flex-direction: column; gap: 2px; }
+.rs-toggle-label { font-size: 13px; font-weight: 600; color: var(--ink); }
+.rs-toggle-sub { font-size: 11px; color: var(--muted); }
+.rs-toggle {
+  width: 42px; height: 24px; border-radius: 12px; border: none; cursor: pointer; padding: 0;
+  background: var(--mocha-light); position: relative; transition: background .2s; flex-shrink: 0;
+}
+.rs-toggle.on { background: #22c55e; }
+.rs-toggle::after {
+  content: ''; position: absolute; top: 3px; left: 3px;
+  width: 18px; height: 18px; border-radius: 50%; background: #fff;
+  transition: left .2s cubic-bezier(.34,1.56,.64,1);
+  box-shadow: 0 1px 4px rgba(0,0,0,.2);
+}
+.rs-toggle.on::after { left: 21px; }
+/* Status + buttons */
+.rs-status { font-size: 12px; min-height: 16px; color: var(--muted); margin: 0 16px 10px; }
 .rs-save-btn {
-  padding: 10px; border-radius: 12px; border: none; cursor: pointer;
+  margin: 0 16px 8px; padding: 11px; border-radius: 12px; border: none; cursor: pointer;
   background: var(--ink); color: var(--cream); font-size: 14px;
   font-weight: 700; font-family: var(--font-body); transition: opacity .15s;
 }
 .rs-save-btn:hover { opacity: .85; }
-.rs-save-btn:disabled { opacity: .5; cursor: not-allowed; }
+.rs-save-btn:disabled { opacity: .45; cursor: not-allowed; }
+/* Danger zone */
+.rs-danger-zone {
+  margin: 4px 16px 0; padding: 14px; border-radius: 12px;
+  border: 1.5px solid rgba(224,80,80,.35);
+  background: rgba(224,80,80,.04);
+}
+.rs-danger-title {
+  font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .07em;
+  color: #e05050; margin-bottom: 10px;
+}
 .rs-delete-btn {
-  padding: 10px; border-radius: 12px; border: 1.5px solid #e05050; cursor: pointer;
-  background: none; color: #e05050; font-size: 14px; font-weight: 700;
+  width: 100%; padding: 10px; border-radius: 10px; border: 1.5px solid #e05050; cursor: pointer;
+  background: none; color: #e05050; font-size: 13px; font-weight: 700;
   font-family: var(--font-body); transition: background .15s, color .15s;
 }
 .rs-delete-btn:hover { background: #e05050; color: #fff; }
-.rs-status { font-size: 12px; min-height: 16px; color: var(--muted); }
+.rs-delete-btn:disabled { opacity: .45; cursor: not-allowed; }
 
 /* ── Explore Panel (in-panel full view) ─────────────────────────── */
 .explore-panel {
@@ -427,6 +537,7 @@
 <script>
   const GLOBAL_ROOM = "global";
   const HISTORY_LIMIT = 50;
+  const ROLE_WEIGHTS_CLIENT = { owner: 5, moderator: 4, analyst: 3, email_writer: 2, tester: 1 };
 
   let socket = null;
   let reconnectDelay = 1000;
@@ -511,6 +622,10 @@
   }
 
   function messageRow(msg, grouped) {
+    // System join message — render inline centered pill
+    if (msg.type === "join") {
+      return `<div class="chat-join-msg" data-id="${escapeHTML(msg.id)}" data-time="${msg.time}">${escapeHTML(msg.body)}</div>`;
+    }
     const author = Progress.getUser(msg.author);
     const mine = currentUser && msg.author === currentUser.username;
     const imageHTML = msg.image ? `<div class="chat-image"><img src="${msg.image}" alt="Shared image" loading="lazy"></div>` : "";
@@ -571,7 +686,43 @@
       </div>`;
     }
 
-    const bodyHTML = songCardHTML || gameCardHTML ||
+    // Poll card
+    let pollCardHTML = "";
+    if (msg.type === "poll" && msg.pollData) {
+      const p = msg.pollData;
+      const totalVotes = Object.values(msg.votes || {}).reduce((s, arr) => s + arr.length, 0);
+      const myVote = Object.keys(msg.votes || {}).find(k => (msg.votes[k] || []).includes(currentUser?.username));
+      const isClosed = msg.closesAt && new Date(msg.closesAt) < new Date();
+      const optionBtns = p.options.map((opt, i) => {
+        const count = (msg.votes?.[i] || []).length;
+        const pct = totalVotes > 0 ? Math.round(count / totalVotes * 100) : 0;
+        const voted = String(i) === String(myVote);
+        return `<button type="button" class="poll-option${voted ? " voted" : ""}${isClosed ? " closed" : ""}" data-msg-id="${escapeHTML(msg.id)}" data-opt="${i}" ${isClosed ? "disabled" : ""}>
+          <span class="poll-option-bar" style="width:${pct}%"></span>
+          <span class="poll-option-label">${escapeHTML(opt)}</span>
+          <span class="poll-option-pct">${(myVote !== undefined || isClosed) ? pct + "%" : ""}</span>
+        </button>`;
+      }).join("");
+      const closedBadge = isClosed ? `<span class="poll-closed-badge">Closed</span>` :
+        msg.closesAt ? `<span class="poll-timer" data-closes="${escapeHTML(msg.closesAt)}"></span>` : "";
+      pollCardHTML = `<div class="poll-card">
+        <div class="poll-card-q">${escapeHTML(p.question)} ${closedBadge}</div>
+        <div class="poll-card-opts">${optionBtns}</div>
+        <div class="poll-card-meta">${totalVotes} vote${totalVotes !== 1 ? "s" : ""}</div>
+      </div>`;
+    }
+
+    // Reactions
+    const reactions = msg.reactions || {};
+    const reactionHTML = Object.keys(reactions).length ? `<div class="msg-reactions">
+      ${Object.entries(reactions).map(([e, users]) => {
+        const mine2 = users.includes(currentUser?.username);
+        return `<button type="button" class="reaction-pill${mine2 ? " me" : ""}" data-msg-id="${escapeHTML(msg.id)}" data-emoji="${escapeHTML(e)}" title="${escapeHTML(users.join(", "))}">${e} ${users.length}</button>`;
+      }).join("")}
+      <button type="button" class="reaction-add-btn" data-msg-id="${escapeHTML(msg.id)}" title="Add reaction">+</button>
+    </div>` : `<div class="msg-reactions"><button type="button" class="reaction-add-btn" data-msg-id="${escapeHTML(msg.id)}" title="Add reaction">+</button></div>`;
+
+    const bodyHTML = songCardHTML || gameCardHTML || pollCardHTML ||
       ((msg.body || replyHTML) ? `<div class="chat-bubble">${replyHTML}${msg.body ? renderMentionsInHTML(renderEmoticonsText(msg.body, "inline-emoticon")) : ""}</div>` : "");
     return `
       <div class="chat-msg ${mine ? "mine" : ""} ${grouped ? "grouped" : ""}" data-id="${msg.id}" data-time="${msg.time}">
@@ -580,9 +731,17 @@
           <div class="chat-reply-arrow" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>
           </div>
-          ${!mine && currentRoom === GLOBAL_ROOM && !grouped ? `<span class="chat-author">@${escapeHTML(msg.author)}</span>` : ""}
+          ${!mine && !currentRoom.startsWith("dm:") && !grouped ? (() => {
+            const roomDoc = roomMap.get(currentRoom);
+            const roomOwner = roomDoc?.createdBy;
+            const communityMods = roomDoc?.communityMods || [];
+            const isOwner = roomOwner && msg.author === roomOwner;
+            const isCMod = communityMods.includes(msg.author);
+            return `<span class="chat-author"><a href="user.html?username=${encodeURIComponent(msg.author)}" style="color:inherit;text-decoration:none;">@${escapeHTML(msg.author)}</a>${isOwner ? `<span class="chat-owner-badge">👑 Owner</span>` : isCMod ? `<span class="chat-mod-badge">🛡 Mod</span>` : ""}</span>`;
+          })() : ""}
           ${imageHTML}
           ${bodyHTML}
+          ${!currentRoom.startsWith("dm:") ? reactionHTML : ""}
           <div class="chat-meta-row">
             <span class="chat-time">${Progress.timeAgo(msg.time)}</span>
             ${!mine ? `<button type="button" class="chat-report-btn" data-report-id="${escapeHTML(msg.id)}" data-report-author="${escapeHTML(msg.author)}" data-report-body="${escapeHTML(msg.body || "").replace(/"/g, '&quot;')}" aria-label="Report message">🚩 Report</button>` : ""}
@@ -710,10 +869,15 @@
   function renderPresence(users) {
     const el = document.getElementById("chatPresence");
     if (!el) return;
-    if (currentRoom !== GLOBAL_ROOM) { el.textContent = ""; return; }
     const unique = Array.from(new Set(users || []));
-    if (!unique.length) { el.textContent = ""; return; }
-    el.textContent = unique.length === 1 ? `@${unique[0]} is here` : `${unique.length} people here now`;
+    if (currentRoom === GLOBAL_ROOM) {
+      el.textContent = unique.length ? (unique.length === 1 ? `@${unique[0]} is here` : `${unique.length} here now`) : "";
+    } else if (!currentRoom.startsWith("dm:")) {
+      // Community room — show live online count
+      el.textContent = unique.length ? `🟢 ${unique.length} online` : "";
+    } else {
+      el.textContent = "";
+    }
   }
 
   // ── Online presence ──────────────────────────────────────────────────────────
@@ -829,13 +993,29 @@
     });
   }
 
-  function showTypingHint(username) {
-    if (!username || username === currentUser.username) return;
+  // ── Multi-user typing tracker ────────────────────────────────────────────────
+  const typingUsers = new Map(); // username → clearTimeout handle
+
+  function renderTypingBar() {
     const el = document.getElementById("chatTyping");
     if (!el) return;
-    el.innerHTML = `<span>@${escapeHTML(username)} is typing</span><span class="typing-dots"><span></span><span></span><span></span></span>`;
-    clearTimeout(typingHintTimer);
-    typingHintTimer = setTimeout(() => { el.innerHTML = ""; }, 2800);
+    const names = [...typingUsers.keys()];
+    if (!names.length) { el.innerHTML = ""; return; }
+    const label = names.length === 1
+      ? `@${escapeHTML(names[0])} is typing`
+      : names.length === 2
+        ? `@${escapeHTML(names[0])} and @${escapeHTML(names[1])} are typing`
+        : `${names.length} people are typing`;
+    el.innerHTML = `<span>${label}</span><span class="typing-dots"><span></span><span></span><span></span></span>`;
+  }
+
+  function showTypingHint(username) {
+    if (!username || username === currentUser?.username) return;
+    // Clear any existing expire timer for this user
+    if (typingUsers.has(username)) clearTimeout(typingUsers.get(username));
+    const timer = setTimeout(() => { typingUsers.delete(username); renderTypingBar(); }, 3000);
+    typingUsers.set(username, timer);
+    renderTypingBar();
   }
 
   function closeSocket() {
@@ -889,6 +1069,42 @@
           }
           if (msg.author === currentUser.username) updateSeenTicks();
         }
+      } else if (data.type === "reaction") {
+        const el = document.querySelector(`.chat-msg[data-id="${data.messageId}"] .msg-reactions`);
+        if (el) {
+          const reactions = data.reactions || {};
+          const addBtn = `<button type="button" class="reaction-add-btn" data-msg-id="${data.messageId}" title="Add reaction">+</button>`;
+          const pills = Object.entries(reactions).map(([e, users]) => {
+            const isMine = users.includes(currentUser?.username);
+            return `<button type="button" class="reaction-pill${isMine ? " me" : ""}" data-msg-id="${data.messageId}" data-emoji="${escapeHTML(e)}" title="${escapeHTML(users.join(", "))}">${e} ${users.length}</button>`;
+          }).join("");
+          el.innerHTML = pills + addBtn;
+        }
+      } else if (data.type === "vote") {
+        const el = document.querySelector(`.chat-msg[data-id="${data.messageId}"] .poll-card`);
+        if (el) {
+          const votes = data.votes || {};
+          const totalVotes = Object.values(votes).reduce((s, arr) => s + arr.length, 0);
+          const myVote = Object.keys(votes).find(k => (votes[k] || []).includes(currentUser?.username));
+          el.querySelectorAll(".poll-option").forEach((btn, i) => {
+            const count = (votes[i] || []).length;
+            const pct = totalVotes > 0 ? Math.round(count / totalVotes * 100) : 0;
+            const voted = String(i) === String(myVote);
+            btn.classList.toggle("voted", voted);
+            const barEl = btn.querySelector(".poll-option-bar");
+            const pctEl = btn.querySelector(".poll-option-pct");
+            if (barEl) barEl.style.width = pct + "%";
+            if (pctEl) pctEl.textContent = myVote !== undefined ? pct + "%" : "";
+          });
+          const metaEl = el.querySelector(".poll-card-meta");
+          if (metaEl) metaEl.textContent = `${totalVotes} vote${totalVotes !== 1 ? "s" : ""}`;
+        }
+      } else if (data.type === "pin") {
+        updatePinnedBar(data.pinnedMsg);
+      } else if (data.type === "room-update") {
+        // Refresh room data (mod list changed etc.)
+        await loadChatRooms();
+        renderCommunitySidebar();
       } else if (data.type === "presence") {
         renderPresence(data.users);
       } else if (data.type === "global-presence") {
@@ -948,6 +1164,8 @@
     lastGroupTime = null;
     oldestMessageTime = null;
     hasMoreHistory = true;
+    // Refresh pinned bar for this room
+    updatePinnedBar(roomMap.get(currentRoom)?.pinnedMsg || null);
 
     const url = `/api/chat/messages?room=${encodeURIComponent(currentRoom)}&limit=${HISTORY_LIMIT}`;
     const history = await apiFetch(url);
@@ -1633,11 +1851,16 @@
     const isCreator = info.createdBy && info.createdBy === currentUser?.username;
     const canManage = isMod || isCreator;
 
+    const ownerName = info.createdBy || null;
+    const youAreOwner = ownerName && ownerName === currentUser?.username;
     bar.innerHTML = `
       <span class="community-header-meta">
         <span class="community-header-name"># ${escapeHTML(info.label)}</span>
         ${info.topic ? `<span class="community-header-topic">${escapeHTML(info.topic)}</span>` : ""}
-        <span class="community-header-count">👥 ${count} member${count !== 1 ? "s" : ""}</span>
+        <span class="community-header-count">
+          👥 ${count} member${count !== 1 ? "s" : ""}
+          ${ownerName ? `<span style="display:inline-flex;align-items:center;gap:3px;margin-left:8px;font-size:11px;color:var(--muted);">· 👑 <a href="user.html?username=${encodeURIComponent(ownerName)}" style="color:var(--muted);text-decoration:none;font-weight:600;">${youAreOwner ? "you" : "@" + escapeHTML(ownerName)}</a></span>` : ""}
+        </span>
       </span>
       <span style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
         ${canManage ? `<button type="button" class="community-header-gear" id="communitySettingsBtn" title="Room settings">⚙️</button>` : ""}
@@ -1664,128 +1887,387 @@
   }
 
   // ── Room Settings Panel (cover image, delete) ────────────────────
+  // ── Image helpers ──────────────────────────────────────────────────
+  function resizeImageFile(file, maxW, maxH, quality = 0.85) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = reject;
+      reader.onload = e => {
+        const img = new Image();
+        img.onerror = reject;
+        img.onload = () => {
+          let { width: w, height: h } = img;
+          if (w > maxW || h > maxH) {
+            const r = Math.min(maxW / w, maxH / h);
+            w = Math.round(w * r); h = Math.round(h * r);
+          }
+          const c = document.createElement("canvas");
+          c.width = w; c.height = h;
+          c.getContext("2d").drawImage(img, 0, 0, w, h);
+          resolve(c.toDataURL("image/jpeg", quality));
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function openImagePicker(accept, onDataUrl) {
+    const inp = document.createElement("input");
+    inp.type = "file"; inp.accept = accept || "image/*";
+    inp.style.display = "none";
+    document.body.appendChild(inp);
+    inp.onchange = async () => {
+      const f = inp.files[0]; inp.remove();
+      if (!f) return;
+      try { onDataUrl(await resizeImageFile(f, 1200, 600, 0.85)); }
+      catch { onDataUrl(null); }
+    };
+    inp.click();
+  }
+
+  function openIconPicker(onDataUrl) {
+    const inp = document.createElement("input");
+    inp.type = "file"; inp.accept = "image/*";
+    inp.style.display = "none";
+    document.body.appendChild(inp);
+    inp.onchange = async () => {
+      const f = inp.files[0]; inp.remove();
+      if (!f) return;
+      try { onDataUrl(await resizeImageFile(f, 256, 256, 0.9)); }
+      catch { onDataUrl(null); }
+    };
+    inp.click();
+  }
+
+  // ── Room Settings Panel ─────────────────────────────────────────────
   function openRoomSettingsPanel(roomId, info) {
     if (document.getElementById("roomSettingsPanelEl")) return;
     const chatPanel = document.querySelector(".chat-panel");
     if (!chatPanel) return;
     chatPanel.style.position = "relative";
 
+    const ACCENT_COLORS = ["#6366f1","#ec4899","#f59e0b","#10b981","#3b82f6","#8b5cf6"];
+
+    // Working state (mutated by pickers before Save)
+    let pendingImage = info.image || null;
+    let pendingIcon  = info.icon  || null;
+    let pendingColor = info.color || ACCENT_COLORS[0];
+    let isPrivate    = !!info.isPrivate;
+
     const panel = document.createElement("div");
     panel.id = "roomSettingsPanelEl";
     panel.className = "room-settings-panel";
 
-    const currentImg = info.image || "";
+    function initials(s) { return (s || "?").slice(0, 2).toUpperCase(); }
+    function coverHTML(img) {
+      return img
+        ? `<img src="${escapeHTML(img)}" alt="cover"><div class="rs-cover-overlay">📷 Change cover</div>`
+        : `<div class="rs-cover-empty"><span>🖼️</span>Click to add a cover</div><div class="rs-cover-overlay">📷 Upload cover</div>`;
+    }
+    function iconHTML(img, color) {
+      return img
+        ? `<img src="${escapeHTML(img)}" alt="icon"><div class="rs-icon-overlay">✏️</div>`
+        : `<div class="rs-icon-initials" style="background:${color || ACCENT_COLORS[0]}">${initials(info.label)}</div><div class="rs-icon-overlay">✏️</div>`;
+    }
+    function swatchesHTML(selected) {
+      return ACCENT_COLORS.map(c =>
+        `<button type="button" class="rs-color-swatch${c===selected?" selected":""}" style="background:${c};color:${c};" data-color="${c}" title="${c}"></button>`
+      ).join("") +
+      `<button type="button" class="rs-color-custom" id="rsColorCustomBtn">Custom…</button>
+       <input type="text" class="rs-color-hex" id="rsColorHex" placeholder="#6366f1" value="${selected||""}" maxlength="7">`;
+    }
+
+    const youOwn = info.createdBy && info.createdBy === currentUser?.username;
 
     panel.innerHTML = `
       <div class="room-settings-head">
         <button type="button" class="room-settings-back" id="rsBackBtn" title="Back">←</button>
-        <h2 class="room-settings-title">⚙️ Room Settings</h2>
+        <h2 class="room-settings-title">Community Settings</h2>
+        ${youOwn ? `<span style="font-size:11px;background:linear-gradient(135deg,#f59e0b,#f97316);color:#fff;border-radius:6px;padding:2px 8px;font-weight:800;">👑 Owner</span>` : ""}
       </div>
       <div class="room-settings-body">
-        <div class="rs-field">
-          <label class="rs-label">Room Name</label>
-          <input class="rs-input" id="rsLabelInput" type="text" value="${escapeHTML(info.label)}" maxlength="50" placeholder="Room name">
+        <!-- Cover banner -->
+        <div class="rs-cover" id="rsCover" title="Click to upload a cover image">${coverHTML(pendingImage)}</div>
+        <!-- Icon -->
+        <div class="rs-icon-row">
+          <div class="rs-icon" id="rsIcon" title="Click to upload an icon">${iconHTML(pendingIcon, pendingColor)}</div>
+          <span class="rs-icon-hint">Click to change icon</span>
         </div>
-        <div class="rs-field">
-          <label class="rs-label">Topic</label>
-          <input class="rs-input" id="rsTopicInput" type="text" value="${escapeHTML(info.topic || "")}" maxlength="120" placeholder="What's this room about?">
+        <!-- Name -->
+        <div class="rs-section">
+          <div class="rs-label">Community Name</div>
+          <input class="rs-input" id="rsLabelInput" type="text" value="${escapeHTML(info.label)}" maxlength="50" placeholder="Name your community">
         </div>
-        <div class="rs-field">
-          <label class="rs-label">Cover Image URL</label>
-          <div class="rs-img-preview" id="rsImgPreview">
-            ${currentImg ? `<img id="rsImgEl" src="${escapeHTML(currentImg)}" alt="cover">` : `<span id="rsImgPlaceholder">🖼️</span>`}
+        <!-- Description -->
+        <div class="rs-section" style="margin-top:12px;">
+          <div class="rs-label">Description</div>
+          <textarea class="rs-input rs-textarea" id="rsTopicInput" maxlength="200" placeholder="What's this community about?">${escapeHTML(info.topic || "")}</textarea>
+        </div>
+        <!-- Cover URL fallback -->
+        <div class="rs-section" style="margin-top:12px;">
+          <div class="rs-label">Cover Image URL <span style="font-weight:400;text-transform:none;font-size:10px;">(or upload above)</span></div>
+          <div class="rs-url-row">
+            <input class="rs-input rs-url-input" id="rsImageUrlInput" type="url" placeholder="https://…" value="${escapeHTML(pendingImage&&pendingImage.startsWith("http")?pendingImage:"")}">
+            <button type="button" class="rs-url-clear" id="rsCoverClearBtn">✕ Clear</button>
           </div>
-          <input class="rs-input" id="rsImageInput" type="url" value="${escapeHTML(currentImg)}" placeholder="https://..." style="margin-top:6px;">
         </div>
+        <hr class="rs-section-divider">
+        <!-- Accent color -->
+        <div class="rs-section">
+          <div class="rs-label">Accent Color</div>
+          <div class="rs-colors" id="rsColors">${swatchesHTML(pendingColor)}</div>
+        </div>
+        <hr class="rs-section-divider">
+        <!-- Privacy -->
+        <div class="rs-section">
+          <div class="rs-toggle-row">
+            <div class="rs-toggle-info">
+              <div class="rs-toggle-label">Private community</div>
+              <div class="rs-toggle-sub">Only members can see messages</div>
+            </div>
+            <button type="button" class="rs-toggle${isPrivate?" on":""}" id="rsPrivateToggle" role="switch" aria-checked="${isPrivate}"></button>
+          </div>
+        </div>
+        <hr class="rs-section-divider">
+        <!-- Invite link (owner/mod only) -->
+        ${youOwn ? `
+        <div class="rs-section">
+          <div class="rs-label">Invite Link</div>
+          <div class="rs-invite-row" id="rsInviteRow">
+            <span class="rs-invite-link" id="rsInviteLink" style="color:var(--muted);font-style:italic;">Click Generate to create a link</span>
+            <button type="button" class="rs-invite-gen" id="rsInviteGenBtn">Generate</button>
+            <button type="button" class="rs-invite-copy" id="rsInviteCopyBtn" style="display:none;">📋 Copy</button>
+          </div>
+        </div>
+        <hr class="rs-section-divider">` : ""}
+        <!-- Members tab (all rooms) -->
+        <div class="rs-section">
+          <div class="rs-label">Members</div>
+          <div class="rs-members-list" id="rsMembersList"><span style="color:var(--muted);font-size:13px;">Loading…</span></div>
+        </div>
+        <hr class="rs-section-divider">
+        <!-- Save -->
         <div class="rs-status" id="rsStatus"></div>
         <button type="button" class="rs-save-btn" id="rsSaveBtn">Save changes</button>
-        <button type="button" class="rs-delete-btn" id="rsDeleteBtn">🗑 Delete this room</button>
+        <!-- Danger zone -->
+        <div class="rs-danger-zone">
+          <div class="rs-danger-title">⚠ Danger Zone</div>
+          <button type="button" class="rs-delete-btn" id="rsDeleteBtn">🗑 Delete this community</button>
+        </div>
       </div>`;
 
     chatPanel.appendChild(panel);
     requestAnimationFrame(() => panel.classList.add("open"));
-
-    // Live image preview
-    panel.querySelector("#rsImageInput").addEventListener("input", (e) => {
-      const url = e.target.value.trim();
-      const preview = panel.querySelector("#rsImgPreview");
-      if (url) {
-        preview.innerHTML = `<img id="rsImgEl" src="${escapeHTML(url)}" alt="cover" onerror="this.style.display='none';document.getElementById('rsImgPlaceholder2').style.display='block'">
-          <span id="rsImgPlaceholder2" style="display:none;font-size:28px;color:var(--muted)">❌</span>`;
-      } else {
-        preview.innerHTML = `<span style="font-size:28px;color:var(--muted)">🖼️</span>`;
-      }
-    });
 
     function closePanel() {
       panel.classList.remove("open");
       panel.addEventListener("transitionend", () => panel.remove(), { once: true });
     }
 
+    // Cover upload / URL
+    panel.querySelector("#rsCover").addEventListener("click", () => {
+      openImagePicker("image/*", dataUrl => {
+        if (!dataUrl) return;
+        pendingImage = dataUrl;
+        panel.querySelector("#rsCover").innerHTML = coverHTML(pendingImage);
+        panel.querySelector("#rsImageUrlInput").value = "";
+      });
+    });
+    panel.querySelector("#rsImageUrlInput").addEventListener("input", e => {
+      const v = e.target.value.trim();
+      pendingImage = v || null;
+      panel.querySelector("#rsCover").innerHTML = coverHTML(pendingImage);
+    });
+    panel.querySelector("#rsCoverClearBtn").addEventListener("click", () => {
+      pendingImage = null;
+      panel.querySelector("#rsCover").innerHTML = coverHTML(null);
+      panel.querySelector("#rsImageUrlInput").value = "";
+    });
+
+    // Icon upload
+    panel.querySelector("#rsIcon").addEventListener("click", () => {
+      openIconPicker(dataUrl => {
+        if (!dataUrl) return;
+        pendingIcon = dataUrl;
+        panel.querySelector("#rsIcon").innerHTML = iconHTML(pendingIcon, pendingColor);
+      });
+    });
+
+    // Color swatches
+    function updateSwatches() {
+      panel.querySelectorAll(".rs-color-swatch").forEach(s => {
+        s.classList.toggle("selected", s.dataset.color === pendingColor);
+      });
+      panel.querySelector("#rsColorHex").value = pendingColor;
+      // Reflect on icon if no custom icon
+      if (!pendingIcon) panel.querySelector("#rsIcon").innerHTML = iconHTML(null, pendingColor);
+    }
+    panel.querySelector("#rsColors").addEventListener("click", e => {
+      const sw = e.target.closest(".rs-color-swatch");
+      if (!sw) return;
+      pendingColor = sw.dataset.color;
+      updateSwatches();
+    });
+    panel.querySelector("#rsColorHex").addEventListener("input", e => {
+      const v = e.target.value.trim();
+      if (/^#[0-9a-fA-F]{6}$/.test(v)) { pendingColor = v; updateSwatches(); }
+    });
+    panel.querySelector("#rsColorCustomBtn").addEventListener("click", () => {
+      const inp = document.createElement("input");
+      inp.type = "color"; inp.value = pendingColor || "#6366f1"; inp.style.display = "none";
+      document.body.appendChild(inp);
+      inp.oninput = () => { pendingColor = inp.value; updateSwatches(); };
+      inp.onchange = () => inp.remove();
+      inp.click();
+    });
+
+    // Privacy toggle
+    panel.querySelector("#rsPrivateToggle").addEventListener("click", () => {
+      isPrivate = !isPrivate;
+      const btn = panel.querySelector("#rsPrivateToggle");
+      btn.classList.toggle("on", isPrivate);
+      btn.setAttribute("aria-checked", String(isPrivate));
+    });
+
     panel.querySelector("#rsBackBtn").addEventListener("click", closePanel);
 
+    // Save
     panel.querySelector("#rsSaveBtn").addEventListener("click", async () => {
       const saveBtn = panel.querySelector("#rsSaveBtn");
-      const status = panel.querySelector("#rsStatus");
-      const image = panel.querySelector("#rsImageInput").value.trim();
-      const label = panel.querySelector("#rsLabelInput").value.trim();
-      const topic = panel.querySelector("#rsTopicInput").value.trim();
-      if (!label) { status.textContent = "Room name can't be empty."; status.style.color = "var(--danger)"; return; }
-      saveBtn.disabled = true;
-      status.textContent = "Saving…";
-      status.style.color = "var(--muted)";
+      const status  = panel.querySelector("#rsStatus");
+      const label   = panel.querySelector("#rsLabelInput").value.trim();
+      const topic   = panel.querySelector("#rsTopicInput").value.trim();
+      if (!label) { status.textContent = "Name can't be empty."; status.style.color = "var(--danger,#e05050)"; return; }
+      saveBtn.disabled = true; status.textContent = "Saving…"; status.style.color = "var(--muted)";
+      const body = { label, topic, color: pendingColor, isPrivate,
+                     image: pendingImage !== undefined ? pendingImage : null,
+                     icon:  pendingIcon  !== undefined ? pendingIcon  : null };
       const res = await apiFetch(`/api/chat/rooms/${encodeURIComponent(roomId)}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: image || null, label, topic })
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body)
       });
       saveBtn.disabled = false;
       if (res && res.ok) {
-        status.textContent = "✓ Saved!";
-        status.style.color = "green";
+        status.textContent = "✓ Saved!"; status.style.color = "#22c55e";
         await loadChatRooms();
         renderCommunitySidebar();
         updateCommunityHeader();
-        renderExploreGrid && renderExploreGrid("");
-        setTimeout(() => { if (status) status.textContent = ""; }, 2000);
+        if (typeof renderExploreGrid === "function") renderExploreGrid("");
+        setTimeout(() => { if (status) status.textContent = ""; }, 2500);
       } else {
-        status.textContent = res?.error || "Could not save.";
-        status.style.color = "var(--danger)";
+        status.textContent = res?.error || "Could not save."; status.style.color = "var(--danger,#e05050)";
       }
     });
 
+    // Delete
     panel.querySelector("#rsDeleteBtn").addEventListener("click", async () => {
       const deleteBtn = panel.querySelector("#rsDeleteBtn");
-      const status = panel.querySelector("#rsStatus");
+      const status    = panel.querySelector("#rsStatus");
       if (!deleteBtn.dataset.confirmed) {
-        deleteBtn.textContent = "⚠️ Tap again to confirm delete";
+        deleteBtn.textContent = "⚠️ Tap again to permanently delete";
+        deleteBtn.style.background = "#e05050"; deleteBtn.style.color = "#fff";
         deleteBtn.dataset.confirmed = "1";
-        setTimeout(() => { if (deleteBtn) { deleteBtn.textContent = "🗑 Delete this room"; delete deleteBtn.dataset.confirmed; } }, 4000);
+        setTimeout(() => {
+          if (!deleteBtn) return;
+          deleteBtn.textContent = "🗑 Delete this community";
+          deleteBtn.style.background = ""; deleteBtn.style.color = "";
+          delete deleteBtn.dataset.confirmed;
+        }, 5000);
         return;
       }
       deleteBtn.disabled = true;
-      status.textContent = "Deleting…";
-      status.style.color = "var(--muted)";
+      status.textContent = "Deleting…"; status.style.color = "var(--muted)";
       const res = await apiFetch(`/api/chat/rooms/${encodeURIComponent(roomId)}`, { method: "DELETE" });
       if (res && res.ok) {
-        showToast(`Room deleted.`);
+        showToast("Community deleted.");
         closePanel();
         await loadChatRooms();
-        // Switch to global room if we were in the deleted room
-        if (currentRoom === roomId) {
-          await switchRoom(GLOBAL_ROOM);
-        }
+        if (currentRoom === roomId) await switchRoom(GLOBAL_ROOM);
         renderCommunitySidebar();
       } else {
         deleteBtn.disabled = false;
-        status.textContent = res?.error || "Could not delete.";
-        status.style.color = "var(--danger)";
+        status.textContent = res?.error || "Could not delete. You may not have permission.";
+        status.style.color = "var(--danger,#e05050)";
       }
     });
 
-    panel.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") closePanel();
-    });
+    panel.addEventListener("keydown", e => { if (e.key === "Escape") closePanel(); });
+
+    // ── Invite link ───────────────────────────────────────────────────────────
+    if (youOwn) {
+      let inviteCode = info.inviteCode || null;
+
+      function refreshInviteUI() {
+        const linkEl = panel.querySelector("#rsInviteLink");
+        const copyBtn = panel.querySelector("#rsInviteCopyBtn");
+        if (!linkEl) return;
+        if (inviteCode) {
+          const url = `${location.origin}/chat.html?invite=${inviteCode}`;
+          linkEl.textContent = url;
+          linkEl.style.fontStyle = "normal";
+          linkEl.style.color = "var(--accent, #6366f1)";
+          if (copyBtn) copyBtn.style.display = "";
+        } else {
+          linkEl.textContent = "Click Generate to create a link";
+          linkEl.style.fontStyle = "italic";
+          linkEl.style.color = "var(--muted)";
+          if (copyBtn) copyBtn.style.display = "none";
+        }
+      }
+
+      refreshInviteUI();
+
+      panel.querySelector("#rsInviteGenBtn")?.addEventListener("click", async () => {
+        const res = await apiFetch(`/api/chat/rooms/${encodeURIComponent(roomId)}/invite`, { method: "POST" });
+        if (res && res.code) { inviteCode = res.code; refreshInviteUI(); }
+      });
+
+      panel.querySelector("#rsInviteCopyBtn")?.addEventListener("click", () => {
+        if (!inviteCode) return;
+        const url = `${location.origin}/chat.html?invite=${inviteCode}`;
+        navigator.clipboard.writeText(url).then(() => showToast("Invite link copied!")).catch(() => showToast("Copy failed"));
+      });
+    }
+
+    // ── Members list ─────────────────────────────────────────────────────────
+    (async () => {
+      const membersEl = panel.querySelector("#rsMembersList");
+      if (!membersEl) return;
+      const data = await apiFetch(`/api/chat/rooms/${encodeURIComponent(roomId)}/members`);
+      if (!data) { membersEl.innerHTML = `<span style="color:var(--muted)">Could not load members.</span>`; return; }
+      const { members, communityMods = [], owner } = data;
+      const canPromote = youOwn || (currentUser?.adminRole && ROLE_WEIGHTS_CLIENT[currentUser.adminRole] >= ROLE_WEIGHTS_CLIENT["moderator"]);
+
+      membersEl.innerHTML = members.map(u => {
+        const isOwner = u === owner;
+        const isMod = communityMods.includes(u);
+        const badge = isOwner ? `<span class="chat-owner-badge">👑 Owner</span>` : isMod ? `<span class="chat-mod-badge">🛡 Mod</span>` : "";
+        const modBtn = canPromote && !isOwner && u !== currentUser?.username
+          ? (isMod
+            ? `<button type="button" class="rs-demote-btn" data-username="${escapeHTML(u)}">Remove mod</button>`
+            : `<button type="button" class="rs-promote-btn" data-username="${escapeHTML(u)}">Make mod</button>`)
+          : "";
+        return `<div class="rs-member-row">
+          <span class="rs-member-name">@${escapeHTML(u)}${badge}</span>
+          ${modBtn}
+        </div>`;
+      }).join("") || `<span style="color:var(--muted)">No members yet.</span>`;
+
+      membersEl.addEventListener("click", async e => {
+        const promoteBtn = e.target.closest(".rs-promote-btn");
+        const demoteBtn  = e.target.closest(".rs-demote-btn");
+        if (promoteBtn) {
+          const un = promoteBtn.dataset.username;
+          const res = await apiFetch(`/api/chat/rooms/${encodeURIComponent(roomId)}/mods/${encodeURIComponent(un)}`, { method: "PUT" });
+          if (res?.ok) { showToast(`@${un} is now a mod.`); promoteBtn.closest(".rs-member-row").querySelector("span").innerHTML = `@${escapeHTML(un)}<span class="chat-mod-badge">🛡 Mod</span>`; promoteBtn.outerHTML = `<button type="button" class="rs-demote-btn" data-username="${escapeHTML(un)}">Remove mod</button>`; }
+        }
+        if (demoteBtn) {
+          const un = demoteBtn.dataset.username;
+          const res = await apiFetch(`/api/chat/rooms/${encodeURIComponent(roomId)}/mods/${encodeURIComponent(un)}`, { method: "DELETE" });
+          if (res?.ok) { showToast(`@${un} is no longer a mod.`); demoteBtn.closest(".rs-member-row").querySelector("span").innerHTML = `@${escapeHTML(un)}`; demoteBtn.outerHTML = `<button type="button" class="rs-promote-btn" data-username="${escapeHTML(un)}">Make mod</button>`; }
+        }
+      });
+    })();
   }
 
   async function createChatRoom(name, label, topic) {
@@ -1864,6 +2346,59 @@
     }
   }
 
+  // ── Poll timer tick ──────────────────────────────────────────────────────────
+  function tickPollTimers() {
+    document.querySelectorAll(".poll-timer[data-closes]").forEach(el => {
+      const closes = new Date(el.dataset.closes);
+      const diff = closes - Date.now();
+      if (diff <= 0) {
+        el.textContent = " · closed";
+        el.closest(".poll-card")?.querySelectorAll(".poll-option").forEach(b => b.disabled = true);
+        return;
+      }
+      const h = Math.floor(diff / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      el.textContent = h > 0 ? ` · ${h}h ${m}m left` : ` · ${m}m left`;
+    });
+  }
+  setInterval(tickPollTimers, 30000);
+
+  // ── Pinned message bar ───────────────────────────────────────────────────────
+
+  function updatePinnedBar(pinnedMsg) {
+    const bar  = document.getElementById("pinnedBar");
+    const text = document.getElementById("pinnedBarText");
+    if (!bar || !text) return;
+    if (pinnedMsg && !currentRoom.startsWith("dm:")) {
+      text.textContent = `📌 ${pinnedMsg.author}: ${(pinnedMsg.body || "").slice(0, 80)}`;
+      bar.style.display = "flex";
+      bar._pinnedMsg = pinnedMsg;
+    } else {
+      bar.style.display = "none";
+      bar._pinnedMsg = null;
+    }
+  }
+
+  // ── Reaction picker ──────────────────────────────────────────────────────────
+
+  const REACTION_EMOJIS = ["❤️", "😂", "😮", "😢", "😡", "👍"];
+
+  function showReactionPicker(msgId, anchorEl) {
+    document.getElementById("reactionPickerEl")?.remove();
+    const picker = document.createElement("div");
+    picker.id = "reactionPickerEl";
+    picker.className = "reaction-picker";
+    picker.innerHTML = REACTION_EMOJIS.map(e =>
+      `<button type="button" class="rp-emoji" data-msg-id="${msgId}" data-emoji="${e}">${e}</button>`
+    ).join("");
+    document.body.appendChild(picker);
+    const rect = anchorEl.getBoundingClientRect();
+    picker.style.bottom = (window.innerHeight - rect.top + 4) + "px";
+    picker.style.left = Math.min(rect.left, window.innerWidth - 220) + "px";
+    const close = e => { if (!picker.contains(e.target)) { picker.remove(); document.removeEventListener("click", close, true); } };
+    setTimeout(() => document.addEventListener("click", close, true), 10);
+  }
+
   function switchRoom(room, label, peer) {
     if (room === currentRoom) return;
     currentRoom = room;
@@ -1873,9 +2408,13 @@
       btn.classList.toggle("active", btn.dataset.room === room);
     });
     closeSocket();
+    typingUsers.forEach(t => clearTimeout(t));
+    typingUsers.clear();
+    renderTypingBar();
     loadHistory();
     connectSocket();
     updateChatHeader();
+    updatePinnedBar(roomMap.get(room)?.pinnedMsg || null);
     const chatInput = document.getElementById("chatInput");
     if (chatInput) setTimeout(() => chatInput.focus(), 80);
     const url = new URL(location.href);
@@ -2148,6 +2687,11 @@
             </button>
           </div>
           <div class="dm-listen-banner" id="dmListenBanner" style="display:none;"></div>
+          <div class="pinned-bar" id="pinnedBar" style="display:none;">
+            <span class="pinned-bar-icon">📌</span>
+            <span class="pinned-bar-text" id="pinnedBarText"></span>
+            <button type="button" class="pinned-bar-close" id="pinnedBarClose" title="Unpin">×</button>
+          </div>
           <div class="chat-log" id="chatLog">
             <div class="chat-empty">Loading…</div>
           </div>
@@ -2296,6 +2840,129 @@
         btn.innerHTML = PLAY_SVG;
         previewAudio = null;
       });
+    });
+
+    // Reaction pills and + button (delegated)
+    document.getElementById("chatLog").addEventListener("click", async (e) => {
+      // Reaction pill — toggle
+      const pill = e.target.closest(".reaction-pill");
+      if (pill) {
+        const msgId = pill.dataset.msgId;
+        const emoji = pill.dataset.emoji;
+        await apiFetch(`/api/chat/messages/${encodeURIComponent(msgId)}/react`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ emoji })
+        });
+        return;
+      }
+      // Add-reaction button
+      const addBtn = e.target.closest(".reaction-add-btn");
+      if (addBtn) {
+        showReactionPicker(addBtn.dataset.msgId, addBtn);
+        return;
+      }
+      // Poll vote
+      const pollBtn = e.target.closest(".poll-option");
+      if (pollBtn) {
+        const msgId = pollBtn.dataset.msgId;
+        const optionIndex = parseInt(pollBtn.dataset.opt, 10);
+        await apiFetch(`/api/chat/messages/${encodeURIComponent(msgId)}/vote`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ optionIndex })
+        });
+        return;
+      }
+      // Pin message (right-click context menu handled separately)
+    });
+
+    // Reaction picker delegate — body
+    document.body.addEventListener("click", async (e) => {
+      const btn = e.target.closest(".rp-emoji");
+      if (!btn) return;
+      const msgId = btn.dataset.msgId;
+      const emoji = btn.dataset.emoji;
+      document.getElementById("reactionPickerEl")?.remove();
+      await apiFetch(`/api/chat/messages/${encodeURIComponent(msgId)}/react`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emoji })
+      });
+    });
+
+    // Long-press on mobile → reaction picker
+    let _lpTimer = null, _lpMoved = false;
+    document.getElementById("chatLog").addEventListener("touchstart", (e) => {
+      if (currentRoom.startsWith("dm:")) return;
+      const msgEl = e.target.closest(".chat-msg[data-id]");
+      if (!msgEl) return;
+      _lpMoved = false;
+      _lpTimer = setTimeout(() => {
+        if (_lpMoved) return;
+        const addBtn = msgEl.querySelector(".reaction-add-btn");
+        if (addBtn) {
+          e.preventDefault();
+          showReactionPicker(addBtn.dataset.msgId, addBtn);
+          navigator.vibrate?.(18);
+        }
+      }, 420);
+    }, { passive: true });
+    document.getElementById("chatLog").addEventListener("touchmove", () => { _lpMoved = true; clearTimeout(_lpTimer); }, { passive: true });
+    document.getElementById("chatLog").addEventListener("touchend", () => clearTimeout(_lpTimer), { passive: true });
+
+    // Right-click on message → pin option (community rooms, owner/mod only)
+    document.getElementById("chatLog").addEventListener("contextmenu", (e) => {
+      const msgEl = e.target.closest(".chat-msg[data-id]");
+      if (!msgEl || currentRoom.startsWith("dm:")) return;
+      const roomDoc = roomMap.get(currentRoom);
+      if (!roomDoc) return;
+      const isMine = msgEl.classList.contains("mine");
+      const communityMods = roomDoc.communityMods || [];
+      const canPin = roomDoc.createdBy === currentUser?.username
+        || communityMods.includes(currentUser?.username)
+        || currentUser?.adminRole === "owner"
+        || currentUser?.adminRole === "moderator";
+      if (!canPin) return;
+      e.preventDefault();
+      document.getElementById("msgContextMenuEl")?.remove();
+      const menu = document.createElement("div");
+      menu.id = "msgContextMenuEl";
+      menu.className = "msg-context-menu";
+      const msgId = msgEl.dataset.id;
+      menu.innerHTML = `<button class="mcm-item" data-action="pin" data-msg-id="${msgId}">📌 Pin message</button>`;
+      document.body.appendChild(menu);
+      menu.style.left = Math.min(e.clientX, window.innerWidth - 160) + "px";
+      menu.style.top  = Math.min(e.clientY, window.innerHeight - 60) + "px";
+      const close = () => { menu.remove(); document.removeEventListener("click", close, true); };
+      setTimeout(() => document.addEventListener("click", close, true), 10);
+    });
+
+    document.body.addEventListener("click", async (e) => {
+      const item = e.target.closest(".mcm-item[data-action]");
+      if (!item) return;
+      if (item.dataset.action === "pin") {
+        await apiFetch(`/api/chat/rooms/${encodeURIComponent(currentRoom)}/pin`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ messageId: item.dataset.msgId })
+        });
+      }
+    });
+
+    // Pinned bar close (unpin)
+    document.getElementById("pinnedBarClose")?.addEventListener("click", async () => {
+      const canPin = (() => {
+        const roomDoc = roomMap.get(currentRoom);
+        if (!roomDoc) return false;
+        const communityMods = roomDoc.communityMods || [];
+        return roomDoc.createdBy === currentUser?.username
+          || communityMods.includes(currentUser?.username)
+          || currentUser?.adminRole === "owner"
+          || currentUser?.adminRole === "moderator";
+      })();
+      if (!canPin) return;
+      await apiFetch(`/api/chat/rooms/${encodeURIComponent(currentRoom)}/pin`, { method: "DELETE" });
     });
 
     // Game card button interactions (delegated)
@@ -2684,12 +3351,32 @@
 
     const params = new URLSearchParams(location.search);
     const withUsername = params.get("with");
+    const inviteCode   = params.get("invite");
     if (withUsername && withUsername.toLowerCase() !== currentUser.username.toLowerCase()) {
         currentRoom = dmRoomId(currentUser.username, withUsername);
         currentPeer = withUsername;
     }
 
     renderChat();
+
+    // Handle invite link — join room and switch to it
+    if (inviteCode) {
+      (async () => {
+        const info = await apiFetch(`/api/invite/${encodeURIComponent(inviteCode)}`);
+        if (!info || info.error) { showToast("Invalid or expired invite link."); return; }
+        const joined = await apiFetch(`/api/invite/${encodeURIComponent(inviteCode)}/accept`, { method: "POST" });
+        if (joined && joined.ok) {
+          showToast(`Joined #${info.label}!`);
+          await loadChatRooms();
+          renderCommunitySidebar();
+          switchRoom(info.room, `#${info.label}`, null);
+          // Remove invite param from URL
+          const cleanUrl = new URL(location.href);
+          cleanUrl.searchParams.delete("invite");
+          history.replaceState(null, "", cleanUrl);
+        }
+      })();
+    }
     if (currentPeer) {
         document.getElementById("chatRoomTitle").textContent = `@${currentPeer}`;
     }
@@ -2983,14 +3670,18 @@
     }
 
     list.innerHTML = rooms.map(r => {
-      const [a, b] = roomCardGradient(r.room).match(/#[0-9a-f]{6}/gi) || ["#8C6E58", "#4A3728"];
+      const accentColor = r.color || (roomCardGradient(r.room).match(/#[0-9a-f]{6}/gi) || ["#8C6E58"])[0];
       const initials = r.label.slice(0, 2).toUpperCase();
       const isActive = currentRoom === r.room;
       const count = r.memberCount || 0;
+      const avatarStyle = r.icon
+        ? `background:url(${escapeHTML(r.icon)}) center/cover; color:transparent;`
+        : `background:${accentColor};`;
+      const iOwnThis = r.createdBy && r.createdBy === (currentUser?.username || "");
       return `<div class="community-item${isActive ? " active" : ""}" data-room="${escapeHTML(r.room)}" role="button" tabindex="0">
-        <div class="community-avatar" style="background:linear-gradient(135deg,${a},${b});">${initials}</div>
+        <div class="community-avatar" style="${avatarStyle}" title="${iOwnThis ? "You own this" : ""}">${r.icon ? "" : initials}</div>
         <div class="community-info">
-          <div class="community-name">${escapeHTML(r.label)}</div>
+          <div class="community-name">${escapeHTML(r.label)}${iOwnThis ? `<span style="font-size:11px;margin-left:4px;" title="You own this community">👑</span>` : ""}</div>
           <div class="community-topic">👥 ${count} member${count !== 1 ? "s" : ""}${r.topic ? ` · ${escapeHTML(r.topic)}` : ""}</div>
         </div>
       </div>`;
@@ -3094,23 +3785,32 @@
     const myUsername = currentUser?.username || "";
 
     const roomCards = rooms.map(r => {
+      const accentColor = r.color || (roomCardGradientForExplore(r.room).match(/#[0-9a-f]{6}/gi) || ["#8C6E58"])[0];
       const bg = r.image
         ? `url(${escapeHTML(r.image)}) center/cover no-repeat`
-        : roomCardGradientForExplore(r.room);
+        : r.color ? `linear-gradient(135deg,${r.color}cc,${r.color}88)` : roomCardGradientForExplore(r.room);
       const joined = r.joined;
       const count = r.memberCount || 0;
       const canManageThis = isMod || r.createdBy === myUsername;
+      const iconHTML = r.icon
+        ? `<img src="${escapeHTML(r.icon)}" style="width:32px;height:32px;border-radius:9px;object-fit:cover;border:2px solid rgba(255,255,255,.5);flex-shrink:0;" alt="">`
+        : `<div style="width:32px;height:32px;border-radius:9px;background:${accentColor};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;flex-shrink:0;border:2px solid rgba(255,255,255,.3);">${r.label.slice(0,2).toUpperCase()}</div>`;
       return `
         <div class="explore-card" data-room="${escapeHTML(r.room)}"
              style="background:${bg};" role="button" tabindex="0">
           <div class="explore-card-overlay"></div>
           <div style="position:relative;z-index:2;display:flex;align-items:center;gap:6px;margin-bottom:6px;">
             ${joined ? `<span style="font-size:10px;background:rgba(255,255,255,.22);color:#fff;padding:2px 7px;border-radius:20px;font-weight:700;letter-spacing:.04em;">JOINED</span>` : ""}
-            <span style="font-size:10px;color:rgba(255,255,255,.7);">👥 ${count} member${count !== 1 ? "s" : ""}</span>
-            ${canManageThis ? `<button class="explore-card-gear" data-manage="${escapeHTML(r.room)}" title="Edit room" style="margin-left:auto;background:rgba(0,0,0,.35);border:none;cursor:pointer;font-size:13px;padding:2px 6px;border-radius:8px;color:#fff;line-height:1;z-index:3;position:relative;" onclick="event.stopPropagation()">⚙️</button>` : ""}
+            <span style="font-size:10px;color:rgba(255,255,255,.7);">👥 ${count}</span>
+            ${canManageThis ? `<button class="explore-card-gear" data-manage="${escapeHTML(r.room)}" title="Edit" style="margin-left:auto;background:rgba(0,0,0,.35);border:none;cursor:pointer;font-size:13px;padding:2px 6px;border-radius:8px;color:#fff;line-height:1;z-index:3;position:relative;" onclick="event.stopPropagation()">⚙️</button>` : ""}
           </div>
-          <p class="explore-card-name">${escapeHTML(r.label)}</p>
-          <p class="explore-card-topic">${escapeHTML(r.topic || "No topic")}</p>
+          <div style="position:relative;z-index:2;display:flex;align-items:center;gap:8px;">
+            ${iconHTML}
+            <div style="min-width:0;">
+              <p class="explore-card-name" style="margin:0 0 2px;">${escapeHTML(r.label)}</p>
+              <p class="explore-card-topic">${escapeHTML(r.topic || "")}</p>
+            </div>
+          </div>
         </div>`;
     }).join("");
 
