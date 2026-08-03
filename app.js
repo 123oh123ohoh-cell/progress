@@ -26,6 +26,7 @@ const BADGES = {
   dexterity: { label: "Dexterity", description: "Awarded for playing during the Valorant ban on July 4th.", image: "images/emoticons/dexterity.png" },
   "817x2": { label: "817x2", description: "Awarded for 817x2, OurSpawn easter egg!", image: "images/emoticons/817x2.png" },
   trop: { label: "Trop", description: "Awarded for being a dedicated, early member!", image: "images/emoticons/trop.png" },
+  jason: { label: "Jason", description: "Awarded for being here.. <em>or is he here?</em>", image: "images/emoticons/jason.png" },
   dolphin_eat: { label: "Ate By Dolphin", description: "Awarded for being eaten by a dolphin.", image: "images/emoticons/dolphin_eat.png" },
   creator: { label: "Creator", description: "Awarded for creator contributions.", image: "images/creator.png" },
   dark: { label: "Dark", description: "Awarded for being a early supporter, one and only!", image: "images/emoticons/dark.png" },
@@ -119,8 +120,8 @@ function attachBadgeTooltip(root) {
 const EMOTICON_NAMES = [
   "asleep_couch", "backpack", "banana", "banana_hello", "bee", "bored",
   "charles", "computer", "computer2", "computersupport", "construction",
-  "cow", "dead", "dexterity", "dolphinhead", "fishhead", "hamster", "hi", "kiss",
-  "lion", "mwa", "pancake", "penguin", "poodle", "raincoat", "raindeer",
+  "cow", "dead", "dexterity", "dolphinhead", "fishhead", "hamster", "hi", "jason",
+  "kiss", "lion", "mwa", "pancake", "penguin", "poodle", "raincoat", "raindeer",
   "romantic", "shark", "shark2", "sharkcat", "squish", "squuish",
   "starbucks", "turtle_lazy", "two", "windy", "wonder"
 ];

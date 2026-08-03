@@ -122,7 +122,7 @@ function cleanupSpotifyOAuthStates() {
 const SIGNUP_BADGE_AWARDS = {
   mara:             ["dexterity", "dark", "tester", "early_supporter"],
   own:              ["dexterity", "dark", "tester", "early_supporter", "dolphin_eat", "trop"],
-  progresstesting1: ["dexterity", "817x2", "dark", "tester", "early_supporter", "dolphin_eat", "trop"],
+  progresstesting1: ["dexterity", "817x2", "dark", "tester", "early_supporter", "dolphin_eat", "trop", "jason"],
   "817x2":          ["817x2", "dexterity", "dark", "tester", "early_supporter"],
   testuser:         ["817x2", "dexterity", "dark", "tester", "early_supporter"],
   dark:             ["dark", "early_supporter"],
