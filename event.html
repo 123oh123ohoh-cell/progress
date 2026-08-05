@@ -108,6 +108,8 @@ html { scroll-behavior: smooth; }
 .ev-run-chip.best-run { background: rgba(255,220,0,.22); border-color: rgba(255,220,0,.4); }
 .ev-login-note { margin-top: 12px; font-size: 13px; color: rgba(255,255,255,.7); }
 .ev-login-note a { color: #fff; font-weight: 700; }
+.ev-donate-btn { display: inline-block; margin-top: 14px; padding: 6px 16px; background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.3); border-radius: 20px; color: rgba(255,255,255,.85); font-size: 13px; font-weight: 600; text-decoration: none; backdrop-filter: blur(8px); transition: background .2s, color .2s; }
+.ev-donate-btn:hover { background: rgba(255,255,255,.28); color: #fff; }
 @keyframes ev-fadein { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
 
 /* ── Stats / Leaderboard / Wrap ───────────────────────── */
@@ -456,6 +458,7 @@ html { scroll-behavior: smooth; }
       <div class="ev-personal-best" id="evPersonalBest" style="display:none;"></div>
       <div class="ev-run-history" id="evRunHistory" style="display:none;"></div>
       <div class="ev-login-note" id="evLoginNote" style="display:none;"><a href="signup.html">Sign in</a> to save your score</div>
+      <a class="ev-donate-btn" href="https://ko-fi.com/progressingonline" target="_blank" rel="noopener">☕ donate!</a>
     </div>
   </div>
 
