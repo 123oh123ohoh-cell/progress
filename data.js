@@ -20,6 +20,7 @@ const SIGNUP_BADGE_AWARDS = {
   "817x2": ["dexterity", "817x2"],
   testuser: ["dexterity", "817x2", "dark", "early_supporter"],
   dark: ["early_supporter", "dark"],
+  realixityz: ["early_supporter"],
   trop: ["early_supporter", "trop", "dolphin_eat"],
   ohhmytesting: ["dexterity", "817x2", "dark", "tester"]
 };
