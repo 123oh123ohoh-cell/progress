@@ -342,7 +342,6 @@ refreshNowPlaying();
         { id: "appearance",    label: "Appearance",    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8L6 18M18 6l1.8-1.8"/></svg>` },
         { id: "privacy",       label: "Privacy",       icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>` },
         { id: "integrations",  label: "Integrations",  icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>` },
-        ...(user.adminRole === "owner" ? [{ id: "daily-prompts", label: "Daily Prompts", icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>` }] : []),
       ];
 
       content.innerHTML = `
@@ -379,7 +378,7 @@ refreshNowPlaying();
           case "appearance":    renderSubAppearance(panel); break;
           case "privacy":       renderSubPrivacy(panel); break;
           case "integrations":  renderSubIntegrations(panel); break;
-          case "daily-prompts": renderSubDailyPrompts(panel); break;
+
           default:              renderSubProfile(panel);
         }
       }
@@ -876,37 +875,6 @@ refreshNowPlaying();
             else { disconnectBtn.disabled = false; showToast("Could not disconnect. Try again."); }
           });
         }
-      }
-
-      // ── Daily Prompts (owner only) ────────────────────────────────────────
-      async function renderSubDailyPrompts(panel) {
-        panel.innerHTML = `<h2 class="sett-panel-title">Daily Prompts</h2><p style="color:var(--muted);font-size:14px;">Loading…</p>`;
-        const data = await apiFetch("/api/daily-prompt").catch(() => null);
-        const current = data?.prompt || "";
-        const history = Array.isArray(data?.history) ? data.history : [];
-        panel.innerHTML = `
-          <h2 class="sett-panel-title">Daily Prompts</h2>
-          <div class="sett-section">
-            <div class="sett-section-title">Today's prompt</div>
-            <p class="field-note">This shows on the home feed for all users. Leave blank to hide it.</p>
-            <textarea id="dailyPromptText" rows="3" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--mocha-light);border-radius:10px;background:var(--paper);color:var(--ink);font-size:14px;font-family:var(--font-body);resize:vertical;">${escapeHTML(current)}</textarea>
-            <button class="btn" id="savePromptBtn" style="margin-top:10px;">Save prompt</button>
-          </div>
-          ${history.length ? `
-          <div class="sett-section" style="border-bottom:none;">
-            <div class="sett-section-title">Recent prompts</div>
-            ${history.map(h => `<div style="padding:7px 0;border-bottom:1px solid var(--mocha-wash);font-size:13px;color:var(--muted);"><span style="color:var(--ink);font-weight:600;">${escapeHTML(h.date)}</span> — ${escapeHTML(h.prompt)}</div>`).join("")}
-          </div>` : ""}
-        `;
-        document.getElementById("savePromptBtn")?.addEventListener("click", async () => {
-          const btn = document.getElementById("savePromptBtn");
-          const text = document.getElementById("dailyPromptText")?.value.trim() || "";
-          btn.disabled = true; btn.textContent = "Saving…";
-          const res = await apiFetch("/api/daily-prompt", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt: text }) });
-          btn.disabled = false; btn.textContent = "Save prompt";
-          if (res) { showToast(text ? "Prompt saved!" : "Prompt cleared."); renderSubDailyPrompts(panel); }
-          else showToast("Could not save. Try again.");
-        });
       }
 
       renderSubNav();

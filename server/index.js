@@ -2563,20 +2563,21 @@ app.get("/api/chat/rooms", requireAuth, asyncHandler(async (req, res) => {
     .limit(200)
     .toArray();
   res.json(rooms.map(r => ({
-    room:          r.room,
-    label:         r.label,
-    topic:         r.topic || "",
-    image:         r.image || null,
-    icon:          r.icon  || null,
-    color:         r.color || null,
-    isPrivate:     r.isPrivate || false,
-    createdBy:     r.createdBy || null,
-    createdAt:     r.createdAt || null,
-    memberCount:   (r.members || []).length,
-    joined:        (r.members || []).includes(username),
-    pinnedMsg:     r.pinnedMsg || null,
-    inviteCode:    r.inviteCode || null,
-    communityMods: r.communityMods || [],
+    room:           r.room,
+    label:          r.label,
+    topic:          r.topic || "",
+    image:          r.image || null,
+    icon:           r.icon  || null,
+    color:          r.color || null,
+    isPrivate:      r.isPrivate || false,
+    createdBy:      r.createdBy || null,
+    createdAt:      r.createdAt || null,
+    memberCount:    (r.members || []).length,
+    joined:         (r.members || []).includes(username),
+    pinnedMsg:      r.pinnedMsg || null,
+    inviteCode:     r.inviteCode || null,
+    communityMods:  r.communityMods || [],
+    communityRoles: r.communityRoles || [],
   })));
 }));
 
@@ -2693,6 +2694,90 @@ function canManageRoom(doc, username, reqUser) {
   const isCommunityMod = Array.isArray(doc.communityMods) && doc.communityMods.includes(username);
   return isMod || isCreator || isCommunityMod;
 }
+
+function normalizeCommunityRoleId(label) {
+  return label
+    .toString()
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/(^-|-$)/g, "");
+}
+
+function findCommunityRole(doc, roleId) {
+  return (doc.communityRoles || []).find(r => r.id === roleId);
+}
+
+// ── Community role management ─────────────────────────────────────────────────
+app.post("/api/chat/rooms/:room/roles", requireAuth, asyncHandler(async (req, res) => {
+  const roomId = req.params.room;
+  const { label, description } = req.body || {};
+  if (!label || typeof label !== "string") return res.status(400).json({ error: "Role name is required." });
+  const doc = await db.collection("chatRoomDefs").findOne({ room: roomId });
+  if (!doc) return res.status(404).json({ error: "Room not found." });
+  if (!canManageRoom(doc, req.user.username, req.user)) return res.status(403).json({ error: "Not allowed." });
+
+  const name = label.trim().slice(0, 50);
+  const roleId = normalizeCommunityRoleId(name);
+  if (!roleId) return res.status(400).json({ error: "Invalid role name." });
+  const roles = doc.communityRoles || [];
+  if (roles.some(r => r.id === roleId || r.label.toLowerCase() === name.toLowerCase())) {
+    return res.status(409).json({ error: "A role with that name already exists." });
+  }
+
+  const role = { id: roleId, label: name, description: (description || "").toString().slice(0, 200), members: [] };
+  await db.collection("chatRoomDefs").updateOne({ room: roomId }, { $push: { communityRoles: role } });
+  broadcastToRoom(roomId, { type: "room-update", room: roomId });
+  res.json({ ok: true, role });
+}));
+
+app.delete("/api/chat/rooms/:room/roles/:roleId", requireAuth, asyncHandler(async (req, res) => {
+  const roomId = req.params.room;
+  const roleId = req.params.roleId;
+  const doc = await db.collection("chatRoomDefs").findOne({ room: roomId });
+  if (!doc) return res.status(404).json({ error: "Room not found." });
+  if (!canManageRoom(doc, req.user.username, req.user)) return res.status(403).json({ error: "Not allowed." });
+  const role = findCommunityRole(doc, roleId);
+  if (!role) return res.status(404).json({ error: "Role not found." });
+
+  await db.collection("chatRoomDefs").updateOne({ room: roomId }, { $pull: { communityRoles: { id: roleId } } });
+  broadcastToRoom(roomId, { type: "room-update", room: roomId });
+  res.json({ ok: true });
+}));
+
+app.put("/api/chat/rooms/:room/roles/:roleId/members/:username", requireAuth, asyncHandler(async (req, res) => {
+  const roomId = req.params.room;
+  const roleId = req.params.roleId;
+  const targetUser = req.params.username;
+  const doc = await db.collection("chatRoomDefs").findOne({ room: roomId });
+  if (!doc) return res.status(404).json({ error: "Room not found." });
+  if (!canManageRoom(doc, req.user.username, req.user)) return res.status(403).json({ error: "Not allowed." });
+  if (!Array.isArray(doc.members) || !doc.members.includes(targetUser)) {
+    return res.status(400).json({ error: "Member must join the room before receiving a role." });
+  }
+  const role = findCommunityRole(doc, roleId);
+  if (!role) return res.status(404).json({ error: "Role not found." });
+
+  await db.collection("chatRoomDefs").updateOne({ room: roomId, "communityRoles.id": roleId }, { $addToSet: { "communityRoles.$.members": targetUser } });
+  broadcastToRoom(roomId, { type: "room-update", room: roomId });
+  res.json({ ok: true });
+}));
+
+app.delete("/api/chat/rooms/:room/roles/:roleId/members/:username", requireAuth, asyncHandler(async (req, res) => {
+  const roomId = req.params.room;
+  const roleId = req.params.roleId;
+  const targetUser = req.params.username;
+  const doc = await db.collection("chatRoomDefs").findOne({ room: roomId });
+  if (!doc) return res.status(404).json({ error: "Room not found." });
+  if (!canManageRoom(doc, req.user.username, req.user)) return res.status(403).json({ error: "Not allowed." });
+  const role = findCommunityRole(doc, roleId);
+  if (!role) return res.status(404).json({ error: "Role not found." });
+
+  await db.collection("chatRoomDefs").updateOne({ room: roomId, "communityRoles.id": roleId }, { $pull: { "communityRoles.$.members": targetUser } });
+  broadcastToRoom(roomId, { type: "room-update", room: roomId });
+  res.json({ ok: true });
+}));
 
 // ── Pinned messages ──────────────────────────────────────────────────────────
 
@@ -4339,38 +4424,6 @@ connect()
         wss.emit("connection", ws, req, { room, username });
       });
     });
-
-// ── Daily Prompts ─────────────────────────────────────────────────────────────
-app.get("/api/daily-prompt", asyncHandler(async (req, res) => {
-  const doc = await db.collection("config").findOne({ _id: "daily-prompt" });
-  const history = await db.collection("daily-prompt-history")
-    .find({}).sort({ date: -1 }).limit(10).toArray();
-  res.json({
-    prompt: doc?.prompt || "",
-    history: history.map(h => ({ date: h.date, prompt: h.prompt })),
-  });
-}));
-
-app.put("/api/daily-prompt", requireAuth, asyncHandler(async (req, res) => {
-  if (!ALLOWED_CREATOR_USERNAMES.has(req.user.username.toLowerCase())) {
-    return res.status(403).json({ error: "Owner only" });
-  }
-  const prompt = String(req.body.prompt || "").slice(0, 500);
-  const today = new Date().toISOString().slice(0, 10);
-  await db.collection("config").updateOne(
-    { _id: "daily-prompt" },
-    { $set: { prompt, updatedAt: new Date().toISOString(), updatedBy: req.user.username } },
-    { upsert: true }
-  );
-  if (prompt) {
-    await db.collection("daily-prompt-history").updateOne(
-      { date: today },
-      { $set: { date: today, prompt, setBy: req.user.username } },
-      { upsert: true }
-    );
-  }
-  res.json({ ok: true, prompt });
-}));
 
     server.listen(port, () => {
       console.log(`Server running on port ${port}`);

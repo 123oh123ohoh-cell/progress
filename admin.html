@@ -553,6 +553,9 @@
       <button class="admin-tab" data-tab="platform" role="tab">
         <span class="admin-tab-icon">⚙️</span> Platform
       </button>
+      <button class="admin-tab" data-tab="prompts" role="tab">
+        <span class="admin-tab-icon">✏️</span> Prompts
+      </button>
     </nav>
 
     <!-- ── OVERVIEW tab ─────────────────────────────────────────────── -->
@@ -994,6 +997,25 @@
       </div>
 
     </div><!-- /tab-platform -->
+
+    <!-- ── PROMPTS tab ────────────────────────────────────────────────── -->
+    <div id="tab-prompts" class="admin-tab-content" style="display:none;">
+      <div class="control-card">
+        <h4>✏️ Today's Writing Prompt</h4>
+        <p>Set a prompt that appears at the top of the home feed for all users. Leave blank to hide it.</p>
+        <textarea id="dailyPromptInput" rows="3" placeholder="e.g. Write about a moment you almost gave up but didn't." maxlength="500" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--mocha-light);border-radius:10px;background:var(--paper);color:var(--ink);font-size:14px;font-family:var(--font-body);resize:vertical;margin-bottom:10px;"></textarea>
+        <div style="display:flex;gap:10px;align-items:center;">
+          <button class="btn" id="savePromptBtn" style="background:var(--ink);color:var(--cream);padding:9px 20px;font-size:14px;">Save prompt</button>
+          <button class="btn" id="clearPromptBtn" style="padding:9px 16px;font-size:14px;">Clear</button>
+          <span id="promptStatus" style="font-size:13px;color:var(--muted);"></span>
+        </div>
+      </div>
+      <div class="control-card" id="promptHistoryCard" style="display:none;">
+        <h4>📅 Recent Prompts</h4>
+        <div id="promptHistoryList"></div>
+      </div>
+    </div><!-- /tab-prompts -->
+
     </div>
 
   </div>
@@ -1075,7 +1097,63 @@
       if (tab === "platform") {
         loadMaintenance();
       }
+      if (tab === "prompts") {
+        loadDailyPrompt();
+      }
     });
+  });
+
+  // ── Daily Prompts ───────────────────────────────────────────────────────────
+  let promptLoaded = false;
+  async function loadDailyPrompt() {
+    if (promptLoaded) return;
+    promptLoaded = true;
+    const statusEl = document.getElementById("promptStatus");
+    try {
+      const data = await apiFetch("/api/daily-prompt");
+      const input = document.getElementById("dailyPromptInput");
+      if (input && data?.prompt) input.value = data.prompt;
+
+      if (data?.history?.length) {
+        const histCard = document.getElementById("promptHistoryCard");
+        const histList = document.getElementById("promptHistoryList");
+        if (histCard) histCard.style.display = "block";
+        if (histList) histList.innerHTML = data.history.map(h =>
+          `<div style="padding:8px 0;border-bottom:1px solid var(--mocha-wash);font-size:13px;">
+            <strong style="color:var(--ink)">${escapeHTML(h.date)}</strong>
+            <span style="color:var(--muted);margin-left:8px;">${escapeHTML(h.prompt)}</span>
+          </div>`
+        ).join("");
+      }
+    } catch(e) {
+      if (statusEl) statusEl.textContent = "Failed to load prompt.";
+    }
+  }
+
+  document.getElementById("savePromptBtn").addEventListener("click", async () => {
+    const btn = document.getElementById("savePromptBtn");
+    const statusEl = document.getElementById("promptStatus");
+    const text = document.getElementById("dailyPromptInput")?.value.trim() || "";
+    btn.disabled = true; btn.textContent = "Saving…";
+    statusEl.textContent = "";
+    const res = await apiFetch("/api/daily-prompt", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt: text })
+    });
+    btn.disabled = false; btn.textContent = "Save prompt";
+    if (res) {
+      statusEl.textContent = text ? "✓ Prompt saved!" : "✓ Cleared.";
+      promptLoaded = false;
+      loadDailyPrompt();
+    } else {
+      statusEl.textContent = "❌ Failed to save.";
+    }
+  });
+
+  document.getElementById("clearPromptBtn").addEventListener("click", () => {
+    const input = document.getElementById("dailyPromptInput");
+    if (input) input.value = "";
   });
 
   // ── Init ────────────────────────────────────────────────────────────────────
