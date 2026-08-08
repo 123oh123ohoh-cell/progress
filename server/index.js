@@ -4340,6 +4340,38 @@ connect()
       });
     });
 
+// ── Daily Prompts ─────────────────────────────────────────────────────────────
+app.get("/api/daily-prompt", asyncHandler(async (req, res) => {
+  const doc = await db.collection("config").findOne({ _id: "daily-prompt" });
+  const history = await db.collection("daily-prompt-history")
+    .find({}).sort({ date: -1 }).limit(10).toArray();
+  res.json({
+    prompt: doc?.prompt || "",
+    history: history.map(h => ({ date: h.date, prompt: h.prompt })),
+  });
+}));
+
+app.put("/api/daily-prompt", requireAuth, asyncHandler(async (req, res) => {
+  if (!ALLOWED_CREATOR_USERNAMES.has(req.user.username.toLowerCase())) {
+    return res.status(403).json({ error: "Owner only" });
+  }
+  const prompt = String(req.body.prompt || "").slice(0, 500);
+  const today = new Date().toISOString().slice(0, 10);
+  await db.collection("config").updateOne(
+    { _id: "daily-prompt" },
+    { $set: { prompt, updatedAt: new Date().toISOString(), updatedBy: req.user.username } },
+    { upsert: true }
+  );
+  if (prompt) {
+    await db.collection("daily-prompt-history").updateOne(
+      { date: today },
+      { $set: { date: today, prompt, setBy: req.user.username } },
+      { upsert: true }
+    );
+  }
+  res.json({ ok: true, prompt });
+}));
+
     server.listen(port, () => {
       console.log(`Server running on port ${port}`);
 

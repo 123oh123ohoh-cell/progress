@@ -1002,6 +1002,20 @@ function applyCandy() {
   document.body.classList.toggle("candy-mode", getCandyMode());
 }
 
+// ── Chat preferences ──────────────────────────────────────────────────────────
+function getChatSoundEnabled()       { try { return localStorage.getItem("chatSound") !== "off"; } catch { return true; } }
+function setChatSoundEnabled(on)     { try { localStorage.setItem("chatSound", on ? "on" : "off"); } catch {} }
+function getChatNotificationsEnabled() { try { return localStorage.getItem("chatAlerts") === "on"; } catch { return false; } }
+function setChatNotificationsEnabled(on) { try { localStorage.setItem("chatAlerts", on ? "on" : "off"); } catch {} }
+function getChatFontSize()           { try { return parseInt(localStorage.getItem("chatFontSize") || "14", 10); } catch { return 14; } }
+function setChatFontSize(size)       { try { localStorage.setItem("chatFontSize", String(size)); } catch {} }
+function getChatCompactMode()        { try { return localStorage.getItem("chatCompact") === "on"; } catch { return false; } }
+function setChatCompactMode(on)      { try { localStorage.setItem("chatCompact", on ? "on" : "off"); } catch {} }
+function applyChatPreferences() {
+  document.documentElement.style.setProperty("--chat-font-size", getChatFontSize() + "px");
+  document.body.classList.toggle("chat-compact", getChatCompactMode());
+}
+
 function setDeviceMode() {
   // Treat as mobile if: UA says so, OR the viewport is narrow enough that
   // the desktop layout wouldn't fit (iPad in portrait, small browser window).
