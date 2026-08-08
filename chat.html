@@ -2687,6 +2687,8 @@
             </button>
           </div>
           <div class="dm-listen-banner" id="dmListenBanner" style="display:none;"></div>
+          <div id="dmSteamSlot"></div>
+          <div id="dmRobloxSlot"></div>
           <div class="pinned-bar" id="pinnedBar" style="display:none;">
             <span class="pinned-bar-icon">📌</span>
             <span class="pinned-bar-text" id="pinnedBarText"></span>
@@ -3164,14 +3166,24 @@
     // formal listen-together session, so the banner appears whenever the peer
     // is playing anything.
     let np = null;
+    let steamData = null;
+    let robloxData = null;
     if (peerId) {
-      const npData = await apiFetch(`/api/users/${encodeURIComponent(peerId)}/spotify/now-playing`).catch(() => null);
-      if (npData && npData.playing) np = npData.playing;
+      const [npData, sd, rd] = await Promise.all([
+        apiFetch(`/api/users/${encodeURIComponent(peerId)}/spotify/now-playing`).catch(() => null),
+        peerUser?.steamAccount?.connected ? apiFetch(`/api/users/${encodeURIComponent(peerId)}/steam/now-playing`).catch(() => null) : null,
+        peerUser?.robloxAccount?.connected ? apiFetch(`/api/users/${encodeURIComponent(peerId)}/roblox/presence`).catch(() => null) : null,
+      ]);
+      if (npData?.playing) np = npData.playing;
+      if (sd?.playing) steamData = sd;
+      if (rd?.presence?.inGame) robloxData = rd;
     }
 
     // Nothing to show: no session and not actively playing → hide
-    if (!peerSession && (!np || !np.isPlaying)) {
+    if (!peerSession && (!np || !np.isPlaying) && !steamData && !robloxData) {
       banner.style.display = "none";
+      const ss = document.getElementById("dmSteamSlot"); if (ss) ss.innerHTML = "";
+      const rs = document.getElementById("dmRobloxSlot"); if (rs) rs.innerHTML = "";
       clearTimeout(_dmListenPollTimer);
       _dmListenPollTimer = setTimeout(updateDmListenBanner, 5000);
       return;
@@ -3227,6 +3239,12 @@
       </div>
       ${actionButtons ? `<div class="dm-listen-actions">${actionButtons}</div>` : ""}
     `;
+
+    // Steam / Roblox widgets alongside Spotify banner
+    const steamSlot = document.getElementById("dmSteamSlot");
+    if (steamSlot) steamSlot.innerHTML = steamData ? renderSteamWidget(steamData) : "";
+    const robloxSlot = document.getElementById("dmRobloxSlot");
+    if (robloxSlot) robloxSlot.innerHTML = robloxData ? renderRobloxWidget(robloxData) : "";
 
     banner.querySelectorAll(".dm-listen-action").forEach(btn => {
       btn.addEventListener("click", async () => {

@@ -81,6 +81,8 @@
         </div>
       </div>
       <div id="nowPlayingSlot"></div>
+      <div id="steamSlot"></div>
+      <div id="robloxSlot"></div>
 ${user.spotify ? `
 <div class="settings-section" style="margin-top:24px;">
   <h3>Featured Track</h3>
@@ -141,7 +143,24 @@ async function refreshNowPlaying() {
 }
 
 refreshNowPlaying();
-setInterval(refreshNowPlaying, 30000); // Refresh every 30 seconds
+setInterval(refreshNowPlaying, 30000);
+
+async function refreshSteamNowPlaying() {
+  const slot = document.getElementById("steamSlot");
+  if (!slot || !user?.steamAccount?.connected) { if (slot) slot.innerHTML = ""; return; }
+  const data = await fetchSteamNowPlaying(user.id).catch(() => null);
+  slot.innerHTML = renderSteamWidget(data);
+}
+async function refreshRobloxPresence() {
+  const slot = document.getElementById("robloxSlot");
+  if (!slot || !user?.robloxAccount?.connected) { if (slot) slot.innerHTML = ""; return; }
+  const data = await fetchRobloxPresence(user.id).catch(() => null);
+  slot.innerHTML = renderRobloxWidget(data);
+}
+refreshSteamNowPlaying();
+refreshRobloxPresence();
+setInterval(refreshSteamNowPlaying, 30000);
+setInterval(refreshRobloxPresence, 30000);
 
 function applyOnlineStatus(statuses) {
   const el = document.getElementById("onlineIndicator");
