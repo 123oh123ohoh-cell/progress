@@ -142,6 +142,8 @@
     initShell("connect");
     const user = Progress.getCurrentUser();
     if (!user) { window.location.href = "profile.html"; return; }
+    // Debug: show user ID in console so we can verify it matches the server
+    console.log("[connect] user.id =", user.id, "| username =", user.username);
 
     // ── Steam ──────────────────────────────────────────────────────────────────
     function extractSteamId(val) {
@@ -176,28 +178,27 @@
       const btn = document.getElementById("steamConnectBtn");
       const msg = document.getElementById("steamMsg");
       btn.disabled = true; btn.textContent = "Connecting…"; msg.textContent = "";
-      const res = await apiFetch(`/api/users/${user.id}/steam`, {
+      const res = await apiFetchAuth(`/api/users/${user.id}/steam`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ steamId })
       });
       btn.disabled = false; btn.textContent = "Connect";
-      if (res) {
-        Object.assign(user, res);
-        Progress.updateCachedUser?.(res);
+      if (res?.ok) {
+        Object.assign(user, res.data);
         renderSteamState();
         showMsg("steamMsg", "Steam connected!", true);
       } else {
-        showMsg("steamMsg", "Couldn't connect — check your Steam ID and try again.", false);
+        showMsg("steamMsg", res?.error || `Error ${res?.status || "?"} — check your Steam ID and try again.`, false);
       }
     });
 
     document.getElementById("steamDisconnectBtn").addEventListener("click", async () => {
       const btn = document.getElementById("steamDisconnectBtn");
       btn.disabled = true;
-      const res = await apiFetch(`/api/users/${user.id}/steam`, { method: "DELETE" });
+      const res = await apiFetchAuth(`/api/users/${user.id}/steam`, { method: "DELETE" });
       btn.disabled = false;
-      if (res) { Object.assign(user, res); renderSteamState(); showMsg("steamMsg", "Disconnected.", true); }
-      else showMsg("steamMsg", "Failed. Try again.", false);
+      if (res?.ok) { Object.assign(user, res.data); renderSteamState(); showMsg("steamMsg", "Disconnected.", true); }
+      else showMsg("steamMsg", res?.error || "Failed. Try again.", false);
     });
 
     // ── Roblox ─────────────────────────────────────────────────────────────────
@@ -225,27 +226,27 @@
       if (!username) { showMsg("robloxMsg", "Enter your Roblox username.", false); return; }
       const btn = document.getElementById("robloxConnectBtn");
       btn.disabled = true; btn.textContent = "Connecting…";
-      const res = await apiFetch(`/api/users/${user.id}/roblox`, {
+      const res = await apiFetchAuth(`/api/users/${user.id}/roblox`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username })
       });
       btn.disabled = false; btn.textContent = "Connect";
-      if (res) {
-        Object.assign(user, res);
+      if (res?.ok) {
+        Object.assign(user, res.data);
         renderRobloxState();
-        showMsg("robloxMsg", `Connected as ${res.robloxAccount?.robloxUsername || username}!`, true);
+        showMsg("robloxMsg", `Connected as ${res.data?.robloxAccount?.robloxUsername || username}!`, true);
       } else {
-        showMsg("robloxMsg", "Roblox user not found — double-check the username.", false);
+        showMsg("robloxMsg", res?.error || `Error ${res?.status || "?"} — check the username and try again.`, false);
       }
     });
 
     document.getElementById("robloxDisconnectBtn").addEventListener("click", async () => {
       const btn = document.getElementById("robloxDisconnectBtn");
       btn.disabled = true;
-      const res = await apiFetch(`/api/users/${user.id}/roblox`, { method: "DELETE" });
+      const res = await apiFetchAuth(`/api/users/${user.id}/roblox`, { method: "DELETE" });
       btn.disabled = false;
-      if (res) { Object.assign(user, res); renderRobloxState(); showMsg("robloxMsg", "Disconnected.", true); }
-      else showMsg("robloxMsg", "Failed. Try again.", false);
+      if (res?.ok) { Object.assign(user, res.data); renderRobloxState(); showMsg("robloxMsg", "Disconnected.", true); }
+      else showMsg("robloxMsg", res?.error || "Failed. Try again.", false);
     });
 
     function showMsg(id, text, ok) {

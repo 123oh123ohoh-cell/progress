@@ -1195,19 +1195,19 @@
     if (!text) { statusEl.textContent = "Write a prompt first."; return; }
     btn.disabled = true; btn.textContent = "Saving…";
     statusEl.textContent = "";
-    const res = await apiFetch("/api/daily-prompt", {
+    const res = await apiFetchAuth("/api/daily-prompt", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prompt: text, durationMs: durationMs || null })
     });
     btn.disabled = false; btn.textContent = "Save prompt";
-    if (res) {
+    if (res?.ok) {
       statusEl.textContent = "✓ Prompt saved!";
       promptLoaded = false;
       clearInterval(_promptCountdownTimer);
       loadDailyPrompt();
     } else {
-      statusEl.textContent = "❌ Failed — are you logged in as an owner?";
+      statusEl.textContent = `❌ ${res?.error || "Error " + (res?.status || "?")} — are you logged in as an owner?`;
     }
   });
 
@@ -1215,13 +1215,13 @@
     const btn = document.getElementById("clearPromptBtn");
     const statusEl = document.getElementById("promptStatus");
     btn.disabled = true;
-    const res = await apiFetch("/api/daily-prompt", {
+    const res = await apiFetchAuth("/api/daily-prompt", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prompt: "" })
     });
     btn.disabled = false;
-    if (res) {
+    if (res?.ok) {
       statusEl.textContent = "✓ Cleared.";
       document.getElementById("dailyPromptInput").value = "";
       document.getElementById("promptActiveBar").style.display = "none";
