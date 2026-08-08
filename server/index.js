@@ -4312,6 +4312,162 @@ app.get("/api/admin/data/pageviews", requireAuth, requireRole("analyst"), asyncH
   })) });
 }));
 
+// ── Daily Prompts ─────────────────────────────────────────────────────────────
+app.get("/api/daily-prompt", asyncHandler(async (req, res) => {
+  const doc = await db.collection("config").findOne({ _id: "daily-prompt" });
+  const history = await db.collection("daily-prompt-history").find({}).sort({ date: -1 }).limit(10).toArray();
+  const now = Date.now();
+  const expired = doc?.expiresAt && new Date(doc.expiresAt).getTime() < now;
+  res.json({
+    prompt: (doc?.prompt && !expired) ? doc.prompt : "",
+    expiresAt: (!expired && doc?.expiresAt) ? doc.expiresAt : null,
+    updatedAt: doc?.updatedAt || null,
+    history: history.map(h => ({ date: h.date, prompt: h.prompt, expiresAt: h.expiresAt || null }))
+  });
+}));
+app.put("/api/daily-prompt", requireAuth, asyncHandler(async (req, res) => {
+  if (!ALLOWED_CREATOR_USERNAMES.has(req.user.username.toLowerCase())) return res.status(403).json({ error: "Owner only" });
+  const prompt = String(req.body.prompt || "").slice(0, 500);
+  const durationMs = typeof req.body.durationMs === "number" && req.body.durationMs > 0 ? req.body.durationMs : null;
+  const expiresAt = (prompt && durationMs) ? new Date(Date.now() + durationMs).toISOString() : null;
+  const today = new Date().toISOString().slice(0, 10);
+  await db.collection("config").updateOne(
+    { _id: "daily-prompt" },
+    { $set: { prompt, expiresAt, updatedAt: new Date().toISOString(), updatedBy: req.user.username } },
+    { upsert: true }
+  );
+  if (prompt) await db.collection("daily-prompt-history").updateOne(
+    { date: today },
+    { $set: { date: today, prompt, expiresAt, setBy: req.user.username } },
+    { upsert: true }
+  );
+  res.json({ ok: true, prompt, expiresAt });
+}));
+
+// ── Steam Integration ──────────────────────────────────────────────────────────
+app.patch("/api/users/:id/steam", requireAuth, asyncHandler(async (req, res) => {
+  const users = db.collection("users");
+  const doc = await users.findOne({ _id: req.params.id });
+  if (!doc) return res.status(404).json({ error: "User not found" });
+  if (req.user.id !== doc._id) return res.status(403).json({ error: "Forbidden" });
+  let steamId = String(req.body.steamId || "").trim();
+  if (!steamId) return res.status(400).json({ error: "steamId required" });
+  const profileMatch = steamId.match(/\/profiles\/(\d{17})/);
+  if (profileMatch) steamId = profileMatch[1];
+  else {
+    const vanityMatch = steamId.match(/\/id\/([^\/\?]+)/);
+    if (vanityMatch) steamId = vanityMatch[1];
+  }
+  let resolvedId = steamId;
+  if (!/^\d{17}$/.test(steamId)) {
+    const key = process.env.STEAM_API_KEY;
+    if (key) {
+      const vr = await fetch(`https://api.steampowered.com/ISteamUser/ResolveVanityURL/v1/?key=${key}&vanityurl=${encodeURIComponent(steamId)}`).then(r => r.json()).catch(() => null);
+      if (vr?.response?.success === 1) resolvedId = vr.response.steamid;
+      else return res.status(400).json({ error: "Could not resolve Steam vanity URL" });
+    } else {
+      return res.status(400).json({ error: "Enter your 17-digit Steam ID (no API key configured for vanity lookup)" });
+    }
+  }
+  await users.updateOne({ _id: req.params.id }, { $set: { "steamAccount.steamId": resolvedId, "steamAccount.connected": true } });
+  const updated = await users.findOne({ _id: req.params.id });
+  res.json(publicUser(normalizeUser(updated)));
+}));
+app.delete("/api/users/:id/steam", requireAuth, asyncHandler(async (req, res) => {
+  const users = db.collection("users");
+  const doc = await users.findOne({ _id: req.params.id });
+  if (!doc) return res.status(404).json({ error: "User not found" });
+  if (req.user.id !== doc._id) return res.status(403).json({ error: "Forbidden" });
+  await users.updateOne({ _id: req.params.id }, { $unset: { steamAccount: "" } });
+  const updated = await users.findOne({ _id: req.params.id });
+  res.json(publicUser(normalizeUser(updated)));
+}));
+app.get("/api/users/:id/steam/now-playing", asyncHandler(async (req, res) => {
+  const doc = await db.collection("users").findOne({ _id: req.params.id });
+  if (!doc) return res.status(404).json({ error: "User not found" });
+  if (!doc.steamAccount?.connected) return res.json({ connected: false, playing: null });
+  const key = process.env.STEAM_API_KEY;
+  if (!key) return res.json({ connected: true, playing: null, error: "no_key" });
+  try {
+    const data = await fetch(`https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?key=${key}&steamids=${doc.steamAccount.steamId}`).then(r => r.json());
+    const player = data?.response?.players?.[0];
+    if (!player) return res.json({ connected: true, playing: null });
+    return res.json({
+      connected: true,
+      steamName: player.personaname || null,
+      avatarUrl: player.avatarmedium || null,
+      profileUrl: player.profileurl || null,
+      playing: player.gameextrainfo ? {
+        gameName: player.gameextrainfo,
+        gameId: player.gameid || null,
+        gameUrl: player.gameid ? `https://store.steampowered.com/app/${player.gameid}` : null,
+        fetchedAt: Date.now()
+      } : null
+    });
+  } catch(e) { return res.json({ connected: true, playing: null }); }
+}));
+
+// ── Roblox Integration ─────────────────────────────────────────────────────────
+app.patch("/api/users/:id/roblox", requireAuth, asyncHandler(async (req, res) => {
+  const users = db.collection("users");
+  const doc = await users.findOne({ _id: req.params.id });
+  if (!doc) return res.status(404).json({ error: "User not found" });
+  if (req.user.id !== doc._id) return res.status(403).json({ error: "Forbidden" });
+  const username = String(req.body.username || "").trim();
+  if (!username) return res.status(400).json({ error: "username required" });
+  const search = await fetch(`https://users.roblox.com/v1/usernames/users`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ usernames: [username], excludeBannedUsers: true })
+  }).then(r => r.json()).catch(() => null);
+  const rbxUser = search?.data?.[0];
+  if (!rbxUser) return res.status(400).json({ error: "Roblox user not found" });
+  await users.updateOne({ _id: req.params.id }, { $set: { "robloxAccount.robloxId": String(rbxUser.id), "robloxAccount.robloxUsername": rbxUser.name, "robloxAccount.connected": true } });
+  const updated = await users.findOne({ _id: req.params.id });
+  res.json(publicUser(normalizeUser(updated)));
+}));
+app.delete("/api/users/:id/roblox", requireAuth, asyncHandler(async (req, res) => {
+  const users = db.collection("users");
+  const doc = await users.findOne({ _id: req.params.id });
+  if (!doc) return res.status(404).json({ error: "User not found" });
+  if (req.user.id !== doc._id) return res.status(403).json({ error: "Forbidden" });
+  await users.updateOne({ _id: req.params.id }, { $unset: { robloxAccount: "" } });
+  const updated = await users.findOne({ _id: req.params.id });
+  res.json(publicUser(normalizeUser(updated)));
+}));
+app.get("/api/users/:id/roblox/presence", asyncHandler(async (req, res) => {
+  const doc = await db.collection("users").findOne({ _id: req.params.id });
+  if (!doc) return res.status(404).json({ error: "User not found" });
+  if (!doc.robloxAccount?.connected) return res.json({ connected: false, presence: null });
+  const robloxId = doc.robloxAccount.robloxId;
+  try {
+    const [presenceRes, avatarRes] = await Promise.all([
+      fetch("https://presence.roblox.com/v1/presence/users", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userIds: [parseInt(robloxId)] })
+      }).then(r => r.json()).catch(() => null),
+      fetch(`https://thumbnails.roblox.com/v1/users/avatar?userIds=${robloxId}&size=150x150&format=Png&isCircular=true`).then(r => r.json()).catch(() => null)
+    ]);
+    const presence = presenceRes?.userPresences?.[0];
+    const avatarUrl = avatarRes?.data?.[0]?.imageUrl || null;
+    const inGame = presence?.userPresenceType === 2;
+    return res.json({
+      connected: true,
+      robloxUsername: doc.robloxAccount.robloxUsername,
+      avatarUrl,
+      profileUrl: `https://www.roblox.com/users/${robloxId}/profile`,
+      presence: presence ? {
+        type: presence.userPresenceType,
+        inGame,
+        gameName: inGame ? (presence.lastLocation || "Roblox") : null,
+        placeId: presence.rootPlaceId || null,
+        gameUrl: presence.rootPlaceId ? `https://www.roblox.com/games/${presence.rootPlaceId}` : null,
+        fetchedAt: Date.now()
+      } : null
+    });
+  } catch(e) { return res.json({ connected: true, presence: null }); }
+}));
+
 app.use((req, res) => {
   res.status(404).json({ error: "Not found" });
 });
@@ -4426,167 +4582,6 @@ connect()
         wss.emit("connection", ws, req, { room, username });
       });
     });
-
-// ── Daily Prompts ─────────────────────────────────────────────────────────────
-app.get("/api/daily-prompt", asyncHandler(async (req, res) => {
-  const doc = await db.collection("config").findOne({ _id: "daily-prompt" });
-  const history = await db.collection("daily-prompt-history").find({}).sort({ date: -1 }).limit(10).toArray();
-  // Auto-expire: if expiresAt is set and in the past, treat as no prompt
-  const now = Date.now();
-  const expired = doc?.expiresAt && new Date(doc.expiresAt).getTime() < now;
-  res.json({
-    prompt: (doc?.prompt && !expired) ? doc.prompt : "",
-    expiresAt: (!expired && doc?.expiresAt) ? doc.expiresAt : null,
-    updatedAt: doc?.updatedAt || null,
-    history: history.map(h => ({ date: h.date, prompt: h.prompt, expiresAt: h.expiresAt || null }))
-  });
-}));
-app.put("/api/daily-prompt", requireAuth, asyncHandler(async (req, res) => {
-  if (!ALLOWED_CREATOR_USERNAMES.has(req.user.username.toLowerCase())) return res.status(403).json({ error: "Owner only" });
-  const prompt = String(req.body.prompt || "").slice(0, 500);
-  const durationMs = typeof req.body.durationMs === "number" && req.body.durationMs > 0 ? req.body.durationMs : null;
-  const expiresAt = (prompt && durationMs) ? new Date(Date.now() + durationMs).toISOString() : null;
-  const today = new Date().toISOString().slice(0, 10);
-  await db.collection("config").updateOne(
-    { _id: "daily-prompt" },
-    { $set: { prompt, expiresAt, updatedAt: new Date().toISOString(), updatedBy: req.user.username } },
-    { upsert: true }
-  );
-  if (prompt) await db.collection("daily-prompt-history").updateOne(
-    { date: today },
-    { $set: { date: today, prompt, expiresAt, setBy: req.user.username } },
-    { upsert: true }
-  );
-  res.json({ ok: true, prompt, expiresAt });
-}));
-
-// ── Steam Integration ──────────────────────────────────────────────────────────
-app.patch("/api/users/:id/steam", requireAuth, asyncHandler(async (req, res) => {
-  const users = db.collection("users");
-  const doc = await users.findOne({ _id: req.params.id });
-  if (!doc) return res.status(404).json({ error: "User not found" });
-  if (req.user.id !== doc._id) return res.status(403).json({ error: "Forbidden" });
-  let steamId = String(req.body.steamId || "").trim();
-  if (!steamId) return res.status(400).json({ error: "steamId required" });
-  // Extract ID from full steamcommunity.com URLs
-  const profileMatch = steamId.match(/\/profiles\/(\d{17})/);
-  if (profileMatch) steamId = profileMatch[1];
-  else {
-    const vanityMatch = steamId.match(/\/id\/([^\/\?]+)/);
-    if (vanityMatch) steamId = vanityMatch[1];
-  }
-  // Resolve vanity URL if not numeric
-  let resolvedId = steamId;
-  if (!/^\d{17}$/.test(steamId)) {
-    const key = process.env.STEAM_API_KEY;
-    if (key) {
-      const vr = await fetch(`https://api.steampowered.com/ISteamUser/ResolveVanityURL/v1/?key=${key}&vanityurl=${encodeURIComponent(steamId)}`).then(r => r.json()).catch(() => null);
-      if (vr?.response?.success === 1) resolvedId = vr.response.steamid;
-      else return res.status(400).json({ error: "Could not resolve Steam vanity URL" });
-    } else {
-      return res.status(400).json({ error: "Enter your 17-digit Steam ID (no API key configured for vanity lookup)" });
-    }
-  }
-  await users.updateOne({ _id: req.params.id }, { $set: { "steamAccount.steamId": resolvedId, "steamAccount.connected": true } });
-  const updated = await users.findOne({ _id: req.params.id });
-  res.json(publicUser(normalizeUser(updated)));
-}));
-app.delete("/api/users/:id/steam", requireAuth, asyncHandler(async (req, res) => {
-  const users = db.collection("users");
-  const doc = await users.findOne({ _id: req.params.id });
-  if (!doc) return res.status(404).json({ error: "User not found" });
-  if (req.user.id !== doc._id) return res.status(403).json({ error: "Forbidden" });
-  await users.updateOne({ _id: req.params.id }, { $unset: { steamAccount: "" } });
-  const updated = await users.findOne({ _id: req.params.id });
-  res.json(publicUser(normalizeUser(updated)));
-}));
-app.get("/api/users/:id/steam/now-playing", asyncHandler(async (req, res) => {
-  const doc = await db.collection("users").findOne({ _id: req.params.id });
-  if (!doc) return res.status(404).json({ error: "User not found" });
-  if (!doc.steamAccount?.connected) return res.json({ connected: false, playing: null });
-  const key = process.env.STEAM_API_KEY;
-  if (!key) return res.json({ connected: true, playing: null, error: "no_key" });
-  try {
-    const data = await fetch(`https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?key=${key}&steamids=${doc.steamAccount.steamId}`).then(r => r.json());
-    const player = data?.response?.players?.[0];
-    if (!player) return res.json({ connected: true, playing: null });
-    return res.json({
-      connected: true,
-      steamName: player.personaname || null,
-      avatarUrl: player.avatarmedium || null,
-      profileUrl: player.profileurl || null,
-      playing: player.gameextrainfo ? {
-        gameName: player.gameextrainfo,
-        gameId: player.gameid || null,
-        gameUrl: player.gameid ? `https://store.steampowered.com/app/${player.gameid}` : null,
-        fetchedAt: Date.now()
-      } : null
-    });
-  } catch(e) { return res.json({ connected: true, playing: null }); }
-}));
-
-// ── Roblox Integration ─────────────────────────────────────────────────────────
-app.patch("/api/users/:id/roblox", requireAuth, asyncHandler(async (req, res) => {
-  const users = db.collection("users");
-  const doc = await users.findOne({ _id: req.params.id });
-  if (!doc) return res.status(404).json({ error: "User not found" });
-  if (req.user.id !== doc._id) return res.status(403).json({ error: "Forbidden" });
-  const username = String(req.body.username || "").trim();
-  if (!username) return res.status(400).json({ error: "username required" });
-  // Resolve Roblox username → user ID
-  const search = await fetch(`https://users.roblox.com/v1/usernames/users`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ usernames: [username], excludeBannedUsers: true })
-  }).then(r => r.json()).catch(() => null);
-  const rbxUser = search?.data?.[0];
-  if (!rbxUser) return res.status(400).json({ error: "Roblox user not found" });
-  await users.updateOne({ _id: req.params.id }, { $set: { "robloxAccount.robloxId": String(rbxUser.id), "robloxAccount.robloxUsername": rbxUser.name, "robloxAccount.connected": true } });
-  const updated = await users.findOne({ _id: req.params.id });
-  res.json(publicUser(normalizeUser(updated)));
-}));
-app.delete("/api/users/:id/roblox", requireAuth, asyncHandler(async (req, res) => {
-  const users = db.collection("users");
-  const doc = await users.findOne({ _id: req.params.id });
-  if (!doc) return res.status(404).json({ error: "User not found" });
-  if (req.user.id !== doc._id) return res.status(403).json({ error: "Forbidden" });
-  await users.updateOne({ _id: req.params.id }, { $unset: { robloxAccount: "" } });
-  const updated = await users.findOne({ _id: req.params.id });
-  res.json(publicUser(normalizeUser(updated)));
-}));
-app.get("/api/users/:id/roblox/presence", asyncHandler(async (req, res) => {
-  const doc = await db.collection("users").findOne({ _id: req.params.id });
-  if (!doc) return res.status(404).json({ error: "User not found" });
-  if (!doc.robloxAccount?.connected) return res.json({ connected: false, presence: null });
-  const robloxId = doc.robloxAccount.robloxId;
-  try {
-    const [presenceRes, avatarRes] = await Promise.all([
-      fetch("https://presence.roblox.com/v1/presence/users", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userIds: [parseInt(robloxId)] })
-      }).then(r => r.json()).catch(() => null),
-      fetch(`https://thumbnails.roblox.com/v1/users/avatar?userIds=${robloxId}&size=150x150&format=Png&isCircular=true`).then(r => r.json()).catch(() => null)
-    ]);
-    const presence = presenceRes?.userPresences?.[0];
-    const avatarUrl = avatarRes?.data?.[0]?.imageUrl || null;
-    // presenceType: 0=offline,1=online website,2=in-game,3=in-studio
-    const inGame = presence?.userPresenceType === 2;
-    return res.json({
-      connected: true,
-      robloxUsername: doc.robloxAccount.robloxUsername,
-      avatarUrl,
-      profileUrl: `https://www.roblox.com/users/${robloxId}/profile`,
-      presence: presence ? {
-        type: presence.userPresenceType,
-        inGame,
-        gameName: inGame ? (presence.lastLocation || "Roblox") : null,
-        placeId: presence.rootPlaceId || null,
-        gameUrl: presence.rootPlaceId ? `https://www.roblox.com/games/${presence.rootPlaceId}` : null,
-        fetchedAt: Date.now()
-      } : null
-    });
-  } catch(e) { return res.json({ connected: true, presence: null }); }
-}));
 
     server.listen(port, () => {
       console.log(`Server running on port ${port}`);
