@@ -4466,8 +4466,15 @@ app.patch("/api/users/:id/steam", requireAuth, asyncHandler(async (req, res) => 
   const doc = await users.findOne({ _id: req.params.id });
   if (!doc) return res.status(404).json({ error: "User not found" });
   if (req.user.id !== doc._id) return res.status(403).json({ error: "Forbidden" });
-  const steamId = String(req.body.steamId || "").trim();
+  let steamId = String(req.body.steamId || "").trim();
   if (!steamId) return res.status(400).json({ error: "steamId required" });
+  // Extract ID from full steamcommunity.com URLs
+  const profileMatch = steamId.match(/\/profiles\/(\d{17})/);
+  if (profileMatch) steamId = profileMatch[1];
+  else {
+    const vanityMatch = steamId.match(/\/id\/([^\/\?]+)/);
+    if (vanityMatch) steamId = vanityMatch[1];
+  }
   // Resolve vanity URL if not numeric
   let resolvedId = steamId;
   if (!/^\d{17}$/.test(steamId)) {

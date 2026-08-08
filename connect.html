@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Connect — Progress</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+  <style>
+    .connect-page { max-width: 480px; margin: 40px auto; padding: 0 16px 60px; }
+    .connect-back { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; text-decoration: none; margin-bottom: 28px; }
+    .connect-back:hover { color: var(--ink); }
+    .connect-card {
+      background: var(--paper); border: 1px solid var(--mocha-light);
+      border-radius: 16px; padding: 28px 24px; margin-bottom: 20px;
+    }
+    .connect-header { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+    .connect-logo {
+      width: 52px; height: 52px; border-radius: 12px;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .connect-logo img { width: 32px; height: 32px; object-fit: contain; }
+    .connect-logo.steam { background: #1b2838; }
+    .connect-logo.roblox { background: #e2231a; }
+    .connect-logo.roblox svg { fill: #fff; }
+    .connect-name { font-size: 20px; font-weight: 700; color: var(--ink); }
+    .connect-status { font-size: 13px; color: var(--muted); margin-top: 2px; }
+    .connect-status.connected { color: #22c55e; font-weight: 600; }
+    .connect-desc { font-size: 14px; color: var(--muted); margin-bottom: 20px; line-height: 1.6; }
+    .connect-steps { background: var(--mocha-wash); border-radius: 10px; padding: 14px 16px; margin-bottom: 18px; }
+    .connect-steps ol { margin: 0; padding-left: 18px; font-size: 13px; color: var(--muted); line-height: 1.9; }
+    .connect-steps ol a { color: var(--ink); font-weight: 600; }
+    .connect-input-row { display: flex; gap: 8px; margin-bottom: 10px; }
+    .connect-input-row input {
+      flex: 1; padding: 10px 12px; border: 1px solid var(--mocha-light);
+      border-radius: 10px; background: var(--paper); color: var(--ink); font-size: 14px;
+    }
+    .connect-input-row input:focus { outline: none; border-color: var(--accent, #6366f1); }
+    .connect-btn { padding: 10px 20px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; }
+    .connect-btn.primary { background: var(--ink); color: var(--cream); }
+    .connect-btn.primary:disabled { opacity: .5; cursor: not-allowed; }
+    .connect-btn.danger { background: #ef4444; color: #fff; }
+    .connect-msg { font-size: 13px; margin-top: 8px; min-height: 18px; }
+    .connect-msg.ok { color: #22c55e; }
+    .connect-msg.err { color: #ef4444; }
+    .connect-connected-info { display: flex; align-items: center; gap: 12px; background: var(--mocha-wash); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; }
+    .connect-connected-info img { width: 36px; height: 36px; border-radius: 50%; }
+    .connect-connected-info .cc-name { font-weight: 600; font-size: 14px; }
+    .connect-connected-info .cc-id { font-size: 12px; color: var(--muted); font-family: var(--font-mono); }
+  </style>
+</head>
+<body>
+<div id="nav-root"></div>
+<div id="modal-root"></div>
+
+<div class="connect-page">
+  <a class="connect-back" href="profile.html?tab=settings">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+    Back to Settings
+  </a>
+
+  <!-- Steam -->
+  <div class="connect-card" id="steamCard">
+    <div class="connect-header">
+      <div class="connect-logo steam">
+        <svg viewBox="0 0 24 24" width="28" height="28" fill="#c6d4df"><path d="M11.979 0C5.678 0 .511 4.86.022 11.037l6.432 2.658c.545-.371 1.203-.59 1.912-.59.063 0 .125.004.187.006l2.861-4.142V8.91c0-2.495 2.028-4.524 4.524-4.524 2.494 0 4.524 2.029 4.524 4.524s-2.03 4.525-4.524 4.525h-.105l-4.076 2.911c0 .052.004.105.004.159 0 1.875-1.515 3.396-3.39 3.396-1.635 0-3.016-1.173-3.331-2.718L.436 15.27C1.862 20.307 6.486 24 11.979 24c6.627 0 11.999-5.373 11.999-12S18.606 0 11.979 0z"/></svg>
+      </div>
+      <div>
+        <div class="connect-name">Steam</div>
+        <div class="connect-status" id="steamStatusText">Not connected</div>
+      </div>
+    </div>
+    <p class="connect-desc">Shows what game you're currently playing on your public profile and in DMs.</p>
+    <div id="steamConnectedInfo" style="display:none;" class="connect-connected-info">
+      <div>
+        <div class="cc-name" id="steamConnectedName"></div>
+        <div class="cc-id" id="steamConnectedId"></div>
+      </div>
+    </div>
+    <div id="steamConnectForm">
+      <div class="connect-steps">
+        <ol>
+          <li>Open <a href="https://store.steampowered.com" target="_blank">Steam</a> and go to your profile</li>
+          <li>Copy the URL from your browser (e.g. <code>steamcommunity.com/profiles/76561…</code>)</li>
+          <li>Paste it below — or just your Steam ID or vanity name</li>
+        </ol>
+      </div>
+      <div class="connect-input-row">
+        <input id="steamInput" type="text" placeholder="Paste Steam URL or enter your Steam ID">
+        <button class="connect-btn primary" id="steamConnectBtn">Connect</button>
+      </div>
+    </div>
+    <div id="steamDisconnectForm" style="display:none;">
+      <button class="connect-btn danger" id="steamDisconnectBtn">Disconnect Steam</button>
+    </div>
+    <div class="connect-msg" id="steamMsg"></div>
+  </div>
+
+  <!-- Roblox -->
+  <div class="connect-card" id="robloxCard">
+    <div class="connect-header">
+      <div class="connect-logo roblox">
+        <img src="images/Roblox.png" alt="Roblox" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+        <svg viewBox="0 0 24 24" width="28" height="28" style="display:none;fill:#fff"><path d="M18.926 23.998 0 18.074 5.075.002 24 5.926z"/></svg>
+      </div>
+      <div>
+        <div class="connect-name">Roblox</div>
+        <div class="connect-status" id="robloxStatusText">Not connected</div>
+      </div>
+    </div>
+    <p class="connect-desc">Shows what Roblox game you're currently in on your public profile and in DMs.</p>
+    <div id="robloxConnectedInfo" style="display:none;" class="connect-connected-info">
+      <img id="robloxConnectedAvatar" src="" alt="" style="display:none;">
+      <div>
+        <div class="cc-name" id="robloxConnectedName"></div>
+        <div class="cc-id">via Roblox</div>
+      </div>
+    </div>
+    <div id="robloxConnectForm">
+      <div class="connect-steps">
+        <ol>
+          <li>Open <a href="https://www.roblox.com" target="_blank">Roblox</a> and find your profile</li>
+          <li>Your username is shown at the top of your profile page</li>
+          <li>Type it below exactly as it appears</li>
+        </ol>
+      </div>
+      <div class="connect-input-row">
+        <input id="robloxInput" type="text" placeholder="Your Roblox username">
+        <button class="connect-btn primary" id="robloxConnectBtn">Connect</button>
+      </div>
+    </div>
+    <div id="robloxDisconnectForm" style="display:none;">
+      <button class="connect-btn danger" id="robloxDisconnectBtn">Disconnect Roblox</button>
+    </div>
+    <div class="connect-msg" id="robloxMsg"></div>
+  </div>
+</div>
+
+<script>
+  async function start() {
+    initShell("connect");
+    const user = Progress.getCurrentUser();
+    if (!user) { window.location.href = "profile.html"; return; }
+
+    // ── Steam ──────────────────────────────────────────────────────────────────
+    function extractSteamId(val) {
+      // Full URL: steamcommunity.com/profiles/76561...
+      const idMatch = val.match(/\/profiles\/(\d{17})/);
+      if (idMatch) return idMatch[1];
+      // Vanity URL: steamcommunity.com/id/somevanity
+      const vanityMatch = val.match(/\/id\/([^\/\?]+)/);
+      if (vanityMatch) return vanityMatch[1];
+      // Raw 17-digit ID
+      if (/^\d{17}$/.test(val.trim())) return val.trim();
+      // Fallback: treat as vanity name
+      return val.trim();
+    }
+
+    function renderSteamState() {
+      const connected = user.steamAccount?.connected;
+      document.getElementById("steamStatusText").textContent = connected ? "✓ Connected" : "Not connected";
+      document.getElementById("steamStatusText").className = "connect-status" + (connected ? " connected" : "");
+      document.getElementById("steamConnectForm").style.display = connected ? "none" : "block";
+      document.getElementById("steamDisconnectForm").style.display = connected ? "block" : "none";
+      document.getElementById("steamConnectedInfo").style.display = connected ? "flex" : "none";
+      if (connected) {
+        document.getElementById("steamConnectedId").textContent = user.steamAccount.steamId;
+      }
+    }
+
+    document.getElementById("steamConnectBtn").addEventListener("click", async () => {
+      const raw = document.getElementById("steamInput").value.trim();
+      if (!raw) { showMsg("steamMsg", "Enter your Steam URL or ID.", false); return; }
+      const steamId = extractSteamId(raw);
+      const btn = document.getElementById("steamConnectBtn");
+      const msg = document.getElementById("steamMsg");
+      btn.disabled = true; btn.textContent = "Connecting…"; msg.textContent = "";
+      const res = await apiFetch(`/api/users/${user.id}/steam`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ steamId })
+      });
+      btn.disabled = false; btn.textContent = "Connect";
+      if (res) {
+        Object.assign(user, res);
+        Progress.updateCachedUser?.(res);
+        renderSteamState();
+        showMsg("steamMsg", "Steam connected!", true);
+      } else {
+        showMsg("steamMsg", "Couldn't connect — check your Steam ID and try again.", false);
+      }
+    });
+
+    document.getElementById("steamDisconnectBtn").addEventListener("click", async () => {
+      const btn = document.getElementById("steamDisconnectBtn");
+      btn.disabled = true;
+      const res = await apiFetch(`/api/users/${user.id}/steam`, { method: "DELETE" });
+      btn.disabled = false;
+      if (res) { Object.assign(user, res); renderSteamState(); showMsg("steamMsg", "Disconnected.", true); }
+      else showMsg("steamMsg", "Failed. Try again.", false);
+    });
+
+    // ── Roblox ─────────────────────────────────────────────────────────────────
+    function renderRobloxState() {
+      const connected = user.robloxAccount?.connected;
+      document.getElementById("robloxStatusText").textContent = connected ? `✓ Connected as ${user.robloxAccount.robloxUsername}` : "Not connected";
+      document.getElementById("robloxStatusText").className = "connect-status" + (connected ? " connected" : "");
+      document.getElementById("robloxConnectForm").style.display = connected ? "none" : "block";
+      document.getElementById("robloxDisconnectForm").style.display = connected ? "block" : "none";
+      document.getElementById("robloxConnectedInfo").style.display = connected ? "flex" : "none";
+      if (connected) {
+        document.getElementById("robloxConnectedName").textContent = user.robloxAccount.robloxUsername;
+        // Load avatar
+        apiFetch(`/api/users/${user.id}/roblox/presence`).then(d => {
+          if (d?.avatarUrl) {
+            const img = document.getElementById("robloxConnectedAvatar");
+            img.src = d.avatarUrl; img.style.display = "block";
+          }
+        }).catch(() => {});
+      }
+    }
+
+    document.getElementById("robloxConnectBtn").addEventListener("click", async () => {
+      const username = document.getElementById("robloxInput").value.trim();
+      if (!username) { showMsg("robloxMsg", "Enter your Roblox username.", false); return; }
+      const btn = document.getElementById("robloxConnectBtn");
+      btn.disabled = true; btn.textContent = "Connecting…";
+      const res = await apiFetch(`/api/users/${user.id}/roblox`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username })
+      });
+      btn.disabled = false; btn.textContent = "Connect";
+      if (res) {
+        Object.assign(user, res);
+        renderRobloxState();
+        showMsg("robloxMsg", `Connected as ${res.robloxAccount?.robloxUsername || username}!`, true);
+      } else {
+        showMsg("robloxMsg", "Roblox user not found — double-check the username.", false);
+      }
+    });
+
+    document.getElementById("robloxDisconnectBtn").addEventListener("click", async () => {
+      const btn = document.getElementById("robloxDisconnectBtn");
+      btn.disabled = true;
+      const res = await apiFetch(`/api/users/${user.id}/roblox`, { method: "DELETE" });
+      btn.disabled = false;
+      if (res) { Object.assign(user, res); renderRobloxState(); showMsg("robloxMsg", "Disconnected.", true); }
+      else showMsg("robloxMsg", "Failed. Try again.", false);
+    });
+
+    function showMsg(id, text, ok) {
+      const el = document.getElementById(id);
+      el.textContent = text;
+      el.className = "connect-msg " + (ok ? "ok" : "err");
+    }
+
+    renderSteamState();
+    renderRobloxState();
+
+    // Auto-scroll to the right platform if ?platform= is set
+    const platform = new URLSearchParams(location.search).get("platform");
+    if (platform === "steam") {
+      document.getElementById("steamCard").scrollIntoView({ behavior: "smooth" });
+      document.getElementById("steamInput")?.focus();
+    } else if (platform === "roblox") {
+      document.getElementById("robloxCard").scrollIntoView({ behavior: "smooth" });
+      document.getElementById("robloxInput")?.focus();
+    }
+  }
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start);
+  else start();
+</script>
+</body>
+</html>

@@ -852,12 +852,10 @@ refreshNowPlaying();
                   ${user.steamAccount?.connected ? `<span class="sett-connected-badge">✓ Connected (${escapeHTML(user.steamAccount.steamId)})</span>` : `<span style="color:var(--muted);font-size:13px;">Not connected</span>`}
                 </div>
                 <p class="field-note" style="margin:6px 0 8px;">Shows what game you're playing on your profile and in DMs.</p>
-                ${user.steamAccount?.connected
-                  ? `<button class="btn danger" id="disconnectSteamBtn">Disconnect</button>`
-                  : `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-                       <input id="steamIdInput" type="text" placeholder="Steam ID (17 digits) or vanity URL" style="padding:8px 10px;border:1px solid var(--mocha-light);border-radius:8px;font-size:13px;background:var(--paper);color:var(--ink);flex:1;min-width:200px;">
-                       <button class="btn" id="connectSteamBtn">Connect</button>
-                     </div>`}
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                  <a class="btn" href="connect.html?platform=steam" style="text-decoration:none;">⚙️ ${user.steamAccount?.connected ? "Manage" : "Connect"} Steam</a>
+                  ${user.steamAccount?.connected ? `<button class="btn danger" id="disconnectSteamBtn">Disconnect</button>` : ""}
+                </div>
               </div>
             </div>
           </div>
@@ -873,12 +871,10 @@ refreshNowPlaying();
                   ${user.robloxAccount?.connected ? `<span class="sett-connected-badge">✓ Connected as ${escapeHTML(user.robloxAccount.robloxUsername)}</span>` : `<span style="color:var(--muted);font-size:13px;">Not connected</span>`}
                 </div>
                 <p class="field-note" style="margin:6px 0 8px;">Shows what Roblox game you're in on your profile and in DMs.</p>
-                ${user.robloxAccount?.connected
-                  ? `<button class="btn danger" id="disconnectRobloxBtn">Disconnect</button>`
-                  : `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-                       <input id="robloxUsernameInput" type="text" placeholder="Your Roblox username" style="padding:8px 10px;border:1px solid var(--mocha-light);border-radius:8px;font-size:13px;background:var(--paper);color:var(--ink);flex:1;min-width:180px;">
-                       <button class="btn" id="connectRobloxBtn">Connect</button>
-                     </div>`}
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                  <a class="btn" href="connect.html?platform=roblox" style="text-decoration:none;">⚙️ ${user.robloxAccount?.connected ? "Manage" : "Connect"} Roblox</a>
+                  ${user.robloxAccount?.connected ? `<button class="btn danger" id="disconnectRobloxBtn">Disconnect</button>` : ""}
+                </div>
               </div>
             </div>
           </div>
@@ -903,20 +899,7 @@ refreshNowPlaying();
           });
         }
 
-        // Steam
-        const connectSteamBtn = document.getElementById("connectSteamBtn");
-        if (connectSteamBtn) {
-          connectSteamBtn.addEventListener("click", async () => {
-            const input = document.getElementById("steamIdInput");
-            const steamId = input?.value.trim();
-            if (!steamId) { showToast("Enter your Steam ID or vanity URL."); return; }
-            connectSteamBtn.disabled = true; connectSteamBtn.textContent = "Connecting…";
-            const result = await apiFetch(`/api/users/${user.id}/steam`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ steamId }) });
-            connectSteamBtn.disabled = false; connectSteamBtn.textContent = "Connect";
-            if (result) { user = result; activeSettingsTab = "integrations"; render(); showToast("Steam connected!"); }
-            else showToast("Could not connect. Check your Steam ID and try again.");
-          });
-        }
+        // Steam disconnect (connect is handled by connect.html)
         const disconnectSteamBtn = document.getElementById("disconnectSteamBtn");
         if (disconnectSteamBtn) {
           disconnectSteamBtn.addEventListener("click", async () => {
@@ -927,20 +910,7 @@ refreshNowPlaying();
           });
         }
 
-        // Roblox
-        const connectRobloxBtn = document.getElementById("connectRobloxBtn");
-        if (connectRobloxBtn) {
-          connectRobloxBtn.addEventListener("click", async () => {
-            const input = document.getElementById("robloxUsernameInput");
-            const username = input?.value.trim();
-            if (!username) { showToast("Enter your Roblox username."); return; }
-            connectRobloxBtn.disabled = true; connectRobloxBtn.textContent = "Connecting…";
-            const result = await apiFetch(`/api/users/${user.id}/roblox`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username }) });
-            connectRobloxBtn.disabled = false; connectRobloxBtn.textContent = "Connect";
-            if (result) { user = result; activeSettingsTab = "integrations"; render(); showToast("Roblox connected!"); }
-            else showToast("Roblox user not found. Check the username and try again.");
-          });
-        }
+        // Roblox disconnect (connect is handled by connect.html)
         const disconnectRobloxBtn = document.getElementById("disconnectRobloxBtn");
         if (disconnectRobloxBtn) {
           disconnectRobloxBtn.addEventListener("click", async () => {
