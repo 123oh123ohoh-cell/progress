@@ -3515,6 +3515,23 @@ body.mobile .tb-sep {
 @keyframes eq-bar-2 { 0%,100%{height:10px} 30%{height:4px}  70%{height:16px} }
 @keyframes eq-bar-3 { 0%,100%{height:7px}  40%{height:16px} 80%{height:3px}  }
 
+.dm-activity-row {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 0;
+}
+.dm-activity-row > * { flex: 1 1 0; min-width: 180px; }
+.dm-activity-row .now-playing-widget {
+  border-radius: 0; margin: 0;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  border: none; border-left: 1px solid rgba(255,255,255,.08);
+  color: #fff;
+}
+.dm-activity-row .now-playing-widget .now-playing-header { color: rgba(255,255,255,.6); }
+.dm-activity-row .now-playing-widget .now-playing-track { color: #fff; }
+.dm-activity-row .now-playing-widget .now-playing-artist { color: rgba(255,255,255,.65); }
+.dm-activity-row .now-playing-widget:hover { background: linear-gradient(135deg, #222240 0%, #1a2a50 100%); }
 .dm-listen-banner {
   display: flex;
   align-items: center;

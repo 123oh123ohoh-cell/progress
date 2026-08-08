@@ -355,14 +355,32 @@
   }
 
   // ── Daily Prompt Banner ────────────────────────────────────────────────────
+  let _promptExpireTimer = null;
   async function renderDailyPromptBanner() {
     const banner = document.getElementById("dailyPromptBanner");
     if (!banner) return;
     try {
       const data = await apiFetch("/api/daily-prompt");
       if (!data?.prompt) { banner.style.display = "none"; return; }
+      const expiresAt = data.expiresAt ? new Date(data.expiresAt) : null;
+      if (expiresAt && expiresAt.getTime() < Date.now()) { banner.style.display = "none"; return; }
       banner.style.display = "block";
-      banner.innerHTML = `<div class="daily-prompt-card"><span class="daily-prompt-label">✏️ today's prompt</span><p class="daily-prompt-text">${escapeHTML(data.prompt)}</p></div>`;
+      banner.innerHTML = `<div class="daily-prompt-card">
+        <span class="daily-prompt-label">✏️ today's prompt${expiresAt ? ` <span id="promptBannerExpiry" style="font-weight:400;opacity:.7;"></span>` : ""}</span>
+        <p class="daily-prompt-text">${escapeHTML(data.prompt)}</p>
+      </div>`;
+      if (expiresAt) {
+        clearInterval(_promptExpireTimer);
+        const tick = () => {
+          const left = expiresAt.getTime() - Date.now();
+          const el = document.getElementById("promptBannerExpiry");
+          if (left <= 0) { clearInterval(_promptExpireTimer); banner.style.display = "none"; return; }
+          const h = Math.floor(left / 3600000), m = Math.floor((left % 3600000) / 60000);
+          if (el) el.textContent = `· ${h > 0 ? h + "h " : ""}${m}m left`;
+        };
+        tick();
+        _promptExpireTimer = setInterval(tick, 60000);
+      }
     } catch { banner.style.display = "none"; }
   }
 

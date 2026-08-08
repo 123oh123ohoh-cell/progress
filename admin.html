@@ -1002,11 +1002,29 @@
     <div id="tab-prompts" class="admin-tab-content" style="display:none;">
       <div class="control-card">
         <h4>✏️ Today's Writing Prompt</h4>
-        <p>Set a prompt that appears at the top of the home feed for all users. Leave blank to hide it.</p>
+        <p>Set a prompt that appears at the top of the home feed. It auto-disappears when the timer runs out.</p>
+        <div id="promptActiveBar" style="display:none;margin-bottom:12px;padding:10px 14px;background:var(--mocha-wash);border-radius:10px;font-size:13px;">
+          <strong>Active:</strong> <span id="promptActiveText"></span><br>
+          <span style="color:var(--muted);">Expires: <span id="promptExpireLabel"></span></span>
+          <span id="promptCountdown" style="margin-left:8px;font-family:var(--font-mono);font-size:12px;color:var(--accent,#6366f1);"></span>
+        </div>
         <textarea id="dailyPromptInput" rows="3" placeholder="e.g. Write about a moment you almost gave up but didn't." maxlength="500" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--mocha-light);border-radius:10px;background:var(--paper);color:var(--ink);font-size:14px;font-family:var(--font-body);resize:vertical;margin-bottom:10px;"></textarea>
-        <div style="display:flex;gap:10px;align-items:center;">
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
+          <label style="font-size:13px;color:var(--muted);white-space:nowrap;">Expires after:</label>
+          <select id="promptDuration" style="padding:8px 10px;border:1px solid var(--mocha-light);border-radius:8px;font-size:13px;background:var(--paper);color:var(--ink);">
+            <option value="0">Never (manual clear only)</option>
+            <option value="1800000">30 minutes</option>
+            <option value="3600000">1 hour</option>
+            <option value="7200000">2 hours</option>
+            <option value="14400000">4 hours</option>
+            <option value="28800000">8 hours</option>
+            <option value="86400000" selected>24 hours</option>
+            <option value="172800000">48 hours</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
           <button class="btn" id="savePromptBtn" style="background:var(--ink);color:var(--cream);padding:9px 20px;font-size:14px;">Save prompt</button>
-          <button class="btn" id="clearPromptBtn" style="padding:9px 16px;font-size:14px;">Clear</button>
+          <button class="btn" id="clearPromptBtn" style="padding:9px 16px;font-size:14px;">Clear active prompt</button>
           <span id="promptStatus" style="font-size:13px;color:var(--muted);"></span>
         </div>
       </div>
@@ -1105,6 +1123,18 @@
 
   // ── Daily Prompts ───────────────────────────────────────────────────────────
   let promptLoaded = false;
+  let _promptCountdownTimer = null;
+
+  function formatCountdown(ms) {
+    if (ms <= 0) return "expired";
+    const h = Math.floor(ms / 3600000);
+    const m = Math.floor((ms % 3600000) / 60000);
+    const s = Math.floor((ms % 60000) / 1000);
+    if (h > 0) return `${h}h ${m}m left`;
+    if (m > 0) return `${m}m ${s}s left`;
+    return `${s}s left`;
+  }
+
   async function loadDailyPrompt() {
     if (promptLoaded) return;
     promptLoaded = true;
@@ -1112,7 +1142,33 @@
     try {
       const data = await apiFetch("/api/daily-prompt");
       const input = document.getElementById("dailyPromptInput");
-      if (input && data?.prompt) input.value = data.prompt;
+      const activeBar = document.getElementById("promptActiveBar");
+      const activeText = document.getElementById("promptActiveText");
+      const expireLabel = document.getElementById("promptExpireLabel");
+      const countdown = document.getElementById("promptCountdown");
+
+      if (data?.prompt) {
+        if (activeBar) activeBar.style.display = "block";
+        if (activeText) activeText.textContent = data.prompt;
+        if (input) input.value = data.prompt;
+
+        if (data.expiresAt && expireLabel) {
+          const expDate = new Date(data.expiresAt);
+          expireLabel.textContent = expDate.toLocaleString();
+          clearInterval(_promptCountdownTimer);
+          _promptCountdownTimer = setInterval(() => {
+            const left = expDate.getTime() - Date.now();
+            if (countdown) countdown.textContent = left > 0 ? `(${formatCountdown(left)})` : "(expired)";
+            if (left <= 0) { clearInterval(_promptCountdownTimer); if (activeBar) activeBar.style.display = "none"; }
+          }, 1000);
+          if (countdown) countdown.textContent = `(${formatCountdown(expDate.getTime() - Date.now())})`;
+        } else {
+          if (expireLabel) expireLabel.textContent = "Never";
+          if (countdown) countdown.textContent = "";
+        }
+      } else {
+        if (activeBar) activeBar.style.display = "none";
+      }
 
       if (data?.history?.length) {
         const histCard = document.getElementById("promptHistoryCard");
@@ -1121,6 +1177,7 @@
         if (histList) histList.innerHTML = data.history.map(h =>
           `<div style="padding:8px 0;border-bottom:1px solid var(--mocha-wash);font-size:13px;">
             <strong style="color:var(--ink)">${escapeHTML(h.date)}</strong>
+            ${h.expiresAt ? `<span style="color:var(--accent,#6366f1);font-size:11px;margin-left:6px;">⏱ ${new Date(h.expiresAt).toLocaleTimeString()}</span>` : ""}
             <span style="color:var(--muted);margin-left:8px;">${escapeHTML(h.prompt)}</span>
           </div>`
         ).join("");
@@ -1134,26 +1191,46 @@
     const btn = document.getElementById("savePromptBtn");
     const statusEl = document.getElementById("promptStatus");
     const text = document.getElementById("dailyPromptInput")?.value.trim() || "";
+    const durationMs = parseInt(document.getElementById("promptDuration")?.value || "0", 10);
+    if (!text) { statusEl.textContent = "Write a prompt first."; return; }
     btn.disabled = true; btn.textContent = "Saving…";
     statusEl.textContent = "";
     const res = await apiFetch("/api/daily-prompt", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt: text })
+      body: JSON.stringify({ prompt: text, durationMs: durationMs || null })
     });
     btn.disabled = false; btn.textContent = "Save prompt";
     if (res) {
-      statusEl.textContent = text ? "✓ Prompt saved!" : "✓ Cleared.";
+      statusEl.textContent = "✓ Prompt saved!";
       promptLoaded = false;
+      clearInterval(_promptCountdownTimer);
       loadDailyPrompt();
     } else {
-      statusEl.textContent = "❌ Failed to save.";
+      statusEl.textContent = "❌ Failed — are you logged in as an owner?";
     }
   });
 
-  document.getElementById("clearPromptBtn").addEventListener("click", () => {
-    const input = document.getElementById("dailyPromptInput");
-    if (input) input.value = "";
+  document.getElementById("clearPromptBtn").addEventListener("click", async () => {
+    const btn = document.getElementById("clearPromptBtn");
+    const statusEl = document.getElementById("promptStatus");
+    btn.disabled = true;
+    const res = await apiFetch("/api/daily-prompt", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt: "" })
+    });
+    btn.disabled = false;
+    if (res) {
+      statusEl.textContent = "✓ Cleared.";
+      document.getElementById("dailyPromptInput").value = "";
+      document.getElementById("promptActiveBar").style.display = "none";
+      clearInterval(_promptCountdownTimer);
+      promptLoaded = false;
+      loadDailyPrompt();
+    } else {
+      statusEl.textContent = "❌ Failed.";
+    }
   });
 
   // ── Init ────────────────────────────────────────────────────────────────────

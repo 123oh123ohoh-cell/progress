@@ -4431,15 +4431,33 @@ connect()
 app.get("/api/daily-prompt", asyncHandler(async (req, res) => {
   const doc = await db.collection("config").findOne({ _id: "daily-prompt" });
   const history = await db.collection("daily-prompt-history").find({}).sort({ date: -1 }).limit(10).toArray();
-  res.json({ prompt: doc?.prompt || "", history: history.map(h => ({ date: h.date, prompt: h.prompt })) });
+  // Auto-expire: if expiresAt is set and in the past, treat as no prompt
+  const now = Date.now();
+  const expired = doc?.expiresAt && new Date(doc.expiresAt).getTime() < now;
+  res.json({
+    prompt: (doc?.prompt && !expired) ? doc.prompt : "",
+    expiresAt: (!expired && doc?.expiresAt) ? doc.expiresAt : null,
+    updatedAt: doc?.updatedAt || null,
+    history: history.map(h => ({ date: h.date, prompt: h.prompt, expiresAt: h.expiresAt || null }))
+  });
 }));
 app.put("/api/daily-prompt", requireAuth, asyncHandler(async (req, res) => {
   if (!ALLOWED_CREATOR_USERNAMES.has(req.user.username.toLowerCase())) return res.status(403).json({ error: "Owner only" });
   const prompt = String(req.body.prompt || "").slice(0, 500);
+  const durationMs = typeof req.body.durationMs === "number" && req.body.durationMs > 0 ? req.body.durationMs : null;
+  const expiresAt = (prompt && durationMs) ? new Date(Date.now() + durationMs).toISOString() : null;
   const today = new Date().toISOString().slice(0, 10);
-  await db.collection("config").updateOne({ _id: "daily-prompt" }, { $set: { prompt, updatedAt: new Date().toISOString(), updatedBy: req.user.username } }, { upsert: true });
-  if (prompt) await db.collection("daily-prompt-history").updateOne({ date: today }, { $set: { date: today, prompt, setBy: req.user.username } }, { upsert: true });
-  res.json({ ok: true, prompt });
+  await db.collection("config").updateOne(
+    { _id: "daily-prompt" },
+    { $set: { prompt, expiresAt, updatedAt: new Date().toISOString(), updatedBy: req.user.username } },
+    { upsert: true }
+  );
+  if (prompt) await db.collection("daily-prompt-history").updateOne(
+    { date: today },
+    { $set: { date: today, prompt, expiresAt, setBy: req.user.username } },
+    { upsert: true }
+  );
+  res.json({ ok: true, prompt, expiresAt });
 }));
 
 // ── Steam Integration ──────────────────────────────────────────────────────────
