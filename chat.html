@@ -2751,9 +2751,7 @@
             </button>
           </div>
           <div class="dm-activity-row" id="dmActivityRow">
-            <div id="dmNowPlayingRow" style="display:none; padding:10px 20px 2px;">
-              <span class="profile-now-playing-indicator" id="dmGameStatus" style="display:none;"></span>
-            </div>
+            <div id="dmGameBanner" style="display:none;"></div>
             <div class="dm-listen-banner" id="dmListenBanner" style="display:none;"></div>
           </div>
           <div class="pinned-bar" id="pinnedBar" style="display:none;">
@@ -3248,10 +3246,8 @@
     const banner = document.getElementById("dmListenBanner");
     if (!banner || !currentPeer) {
       if (banner) banner.style.display = "none";
-      const _gsi = document.getElementById("dmGameStatus");
-      if (_gsi) { _gsi.innerHTML = ""; _gsi.style.display = "none"; }
-      const _npr = document.getElementById("dmNowPlayingRow");
-      if (_npr) _npr.style.display = "none";
+      const _gb = document.getElementById("dmGameBanner");
+      if (_gb) { _gb.style.display = "none"; _gb.innerHTML = ""; }
       return;
     }
 
@@ -3301,52 +3297,44 @@
       }
     }
 
-    // ── Compact game/music indicator in DM header ─────────────────────────────
+    // ── Game banner above Spotify strip — only shown when playing a game ────────
     {
-      const gameStatusEl = document.getElementById("dmGameStatus");
-      if (gameStatusEl) {
+      const gameBanner = document.getElementById("dmGameBanner");
+      if (gameBanner) {
         const robloxGame = robloxData?.presence?.inGame
           ? (robloxData.presence.gameName || "Roblox") : null;
-        const steamGame = steamData?.playing?.gameName || null;
-        const gameName = robloxGame || steamGame;
-        const sessionTrack = peerSession?.trackName || null;
-        const songName = (np?.isPlaying && np?.trackName) ? np.trackName : sessionTrack;
-        const label = gameName || songName;
-        if (label) {
-          let artHTML = "";
-          if (robloxGame) {
-            const gameIconUrl = robloxData?.presence?.gameIconUrl;
-            if (gameIconUrl && /^https:\/\//i.test(gameIconUrl)) {
-              artHTML = `<span class="dm-game-art-wrap">
-                <img class="pnp-game-img" src="${escapeHTML(gameIconUrl)}" alt="" onerror="this.onerror=null;this.src='images/Roblox.png';">
-                <img class="pnp-platform-badge" src="images/Roblox.png" alt="Roblox">
-              </span>`;
-            } else {
-              artHTML = `<span class="dm-game-art-wrap pnp-roblox-solo">
-                <img class="pnp-game-img pnp-solo-icon" src="images/Roblox.png" alt="Roblox" onerror="this.parentElement.remove()">
-              </span>`;
-            }
-            gameStatusEl.classList.add("has-art");
-          } else if (steamGame && steamData?.playing?.gameId) {
-            const steamArt = `https://cdn.akamai.steamstatic.com/steam/apps/${steamData.playing.gameId}/header.jpg`;
-            artHTML = `<span class="dm-game-art-wrap">
-              <img class="pnp-game-img" src="${steamArt}" alt="" onerror="this.parentElement.remove()">
-              <span class="pnp-platform-badge steam-badge"><svg viewBox="0 0 24 24" fill="#c6d4df" width="8" height="8"><path d="M11.979 0C5.678 0 .511 4.86.022 11.037l6.432 2.658c.545-.371 1.203-.59 1.912-.59.063 0 .125.004.187.006l2.861-4.142V8.91c0-2.495 2.028-4.524 4.524-4.524 2.494 0 4.524 2.029 4.524 4.524s-2.03 4.525-4.524 4.525h-.105l-4.076 2.911c0 .052.004.105.004.159 0 1.875-1.515 3.396-3.39 3.396-1.635 0-3.016-1.173-3.331-2.718L.436 15.27C1.862 20.307 6.486 24 11.979 24c6.627 0 11.999-5.373 11.999-12S18.606 0 11.979 0z"/></svg></span>
-            </span>`;
-            gameStatusEl.classList.add("has-art");
-          } else {
-            gameStatusEl.classList.remove("has-art");
-          }
-          gameStatusEl.innerHTML = `${artHTML}Now Playing — <strong>${escapeHTML(label)}</strong>`;
-          gameStatusEl.style.display = "inline-flex";
-          const _npr = document.getElementById("dmNowPlayingRow");
-          if (_npr) _npr.style.display = "block";
+        const steamGame  = steamData?.playing?.gameName || null;
+
+        if (robloxGame) {
+          const gameIconUrl = robloxData?.presence?.gameIconUrl;
+          const iconHTML = gameIconUrl && /^https:\/\//i.test(gameIconUrl)
+            ? `<img class="dm-game-banner-icon" src="${escapeHTML(gameIconUrl)}" alt="" onerror="this.style.display='none'">`
+            : `<div class="dm-game-banner-icon dm-game-banner-icon-rb"></div>`;
+          gameBanner.innerHTML = `
+            ${iconHTML}
+            <div class="dm-game-banner-info">
+              <span class="dm-game-banner-label">Playing on Roblox</span>
+              <span class="dm-game-banner-name">${escapeHTML(robloxGame)}</span>
+            </div>
+            <img class="dm-game-banner-platform" src="images/Roblox.png" alt="Roblox">
+          `;
+          gameBanner.className = "dm-game-banner dm-game-banner-roblox";
+          gameBanner.style.display = "flex";
+        } else if (steamGame && steamData?.playing?.gameId) {
+          const steamArt = `https://cdn.akamai.steamstatic.com/steam/apps/${steamData.playing.gameId}/header.jpg`;
+          gameBanner.innerHTML = `
+            <img class="dm-game-banner-icon dm-game-banner-icon-wide" src="${escapeHTML(steamArt)}" alt="" onerror="this.style.display='none'">
+            <div class="dm-game-banner-info">
+              <span class="dm-game-banner-label">Playing on Steam</span>
+              <span class="dm-game-banner-name">${escapeHTML(steamGame)}</span>
+            </div>
+            <svg class="dm-game-banner-platform" viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M11.979 0C5.678 0 .511 4.86.022 11.037l6.432 2.658c.545-.371 1.203-.59 1.912-.59.063 0 .125.004.187.006l2.861-4.142V8.91c0-2.495 2.028-4.524 4.524-4.524 2.494 0 4.524 2.029 4.524 4.524s-2.03 4.525-4.524 4.525h-.105l-4.076 2.911c0 .052.004.105.004.159 0 1.875-1.515 3.396-3.39 3.396-1.635 0-3.016-1.173-3.331-2.718L.436 15.27C1.862 20.307 6.486 24 11.979 24c6.627 0 11.999-5.373 11.999-12S18.606 0 11.979 0z"/></svg>
+          `;
+          gameBanner.className = "dm-game-banner dm-game-banner-steam";
+          gameBanner.style.display = "flex";
         } else {
-          gameStatusEl.classList.remove("has-art");
-          gameStatusEl.innerHTML = "";
-          gameStatusEl.style.display = "none";
-          const _npr = document.getElementById("dmNowPlayingRow");
-          if (_npr) _npr.style.display = "none";
+          gameBanner.style.display = "none";
+          gameBanner.innerHTML = "";
         }
       }
     }

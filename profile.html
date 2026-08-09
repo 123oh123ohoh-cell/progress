@@ -168,7 +168,7 @@
     const content = document.getElementById("tabContent");
     if (activeTab === "profile") {
       content.innerHTML = `
-        <div id="nowPlayingSlot"></div>
+        <div id="nowPlayingSlot" style="max-width:360px;"></div>
         <div class="settings-section">
           <h3>Joined</h3>
           <p style="margin:0;">${Progress.formatDate(user.joined || "Unknown")}</p>

@@ -3745,6 +3745,75 @@ body.mobile .tb-sep {
 .dm-activity-row .now-playing-widget .now-playing-track { color: #fff; }
 .dm-activity-row .now-playing-widget .now-playing-artist { color: rgba(255,255,255,.65); }
 .dm-activity-row .now-playing-widget:hover { background: linear-gradient(135deg, #222240 0%, #1a2a50 100%); }
+/* ── DM game banner (Roblox / Steam) — shown above Spotify strip ── */
+.dm-game-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 18px;
+  border-bottom: 1px solid rgba(255,255,255,.07);
+}
+.dm-game-banner-roblox {
+  background: linear-gradient(90deg, #5a0a0a 0%, #3a0505 100%);
+}
+.dm-game-banner-steam {
+  background: linear-gradient(90deg, #0f1923 0%, #1a2535 100%);
+}
+.dm-game-banner-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,.4);
+}
+.dm-game-banner-icon-wide {
+  width: 64px;
+  height: 30px;
+  border-radius: 6px;
+}
+.dm-game-banner-icon-rb {
+  background: #c0392b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.dm-game-banner-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+.dm-game-banner-label {
+  font-size: 9.5px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: rgba(255,255,255,.45);
+}
+.dm-game-banner-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dm-game-banner-platform {
+  flex-shrink: 0;
+  opacity: .55;
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  filter: brightness(10);
+}
+.dm-game-banner-steam .dm-game-banner-platform {
+  color: #c6d4df;
+  filter: none;
+  opacity: .6;
+}
+
 .dm-listen-banner {
   display: flex;
   align-items: center;
