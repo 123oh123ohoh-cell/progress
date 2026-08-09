@@ -207,12 +207,26 @@ function renderRobloxWidget(data) {
   if (!data?.presence?.inGame) return "";
   const p = data.presence;
   const safeUrl = p.gameUrl || `https://www.roblox.com`;
-  const safeArt = data.avatarUrl && /^https:\/\//i.test(data.avatarUrl) ? data.avatarUrl : null;
+  const gameIcon = p.gameIconUrl && /^https:\/\//i.test(p.gameIconUrl) ? p.gameIconUrl : null;
+  const safeAvatar = data.avatarUrl && /^https:\/\//i.test(data.avatarUrl) ? data.avatarUrl : null;
+  // Game icon with Roblox badge overlay is preferred; fall back to player avatar
+  let artHTML;
+  if (gameIcon) {
+    artHTML = `<div class="roblox-widget-art-wrap">
+      <img src="${escapeHTML(gameIcon)}" alt="" onerror="this.src=''; this.onerror=null;">
+      <img class="roblox-widget-badge" src="images/Roblox.png" alt="Roblox" onerror="this.style.display='none'">
+    </div>`;
+  } else {
+    // No game icon — show Roblox logo on red background as art placeholder
+    artHTML = `<div class="roblox-widget-art-wrap roblox-widget-art-solo">
+      <img class="roblox-widget-solo-icon" src="images/Roblox.png" alt="Roblox" onerror="this.style.display='none'">
+    </div>`;
+  }
   return `
     <a class="now-playing-widget is-playing roblox-widget" href="${escapeHTML(safeUrl)}" target="_blank" rel="noopener noreferrer">
       <div class="now-playing-header">${ROBLOX_ICON_SVG}<span>Playing on Roblox</span></div>
       <div class="now-playing-body">
-        ${safeArt ? `<img src="${escapeHTML(safeArt)}" alt="">` : `<div class="now-playing-art-fallback">🟥</div>`}
+        ${artHTML}
         <div class="now-playing-info">
           <span class="now-playing-track">${escapeHTML(p.gameName || "Roblox")}</span>
           <span class="now-playing-artist">${escapeHTML(data.robloxUsername || "")}</span>

@@ -3301,6 +3301,11 @@
               <img class="pnp-platform-badge" src="images/Roblox.png" alt="Roblox" onerror="this.style.display='none'">
             </span>`;
             gameStatusEl.classList.add("has-art");
+          } else if (robloxGame) {
+            artHTML = `<span class="dm-game-art-wrap pnp-roblox-solo">
+              <img class="pnp-game-img pnp-solo-icon" src="images/Roblox.png" alt="Roblox" onerror="this.parentElement.remove()">
+            </span>`;
+            gameStatusEl.classList.add("has-art");
           } else if (steamGame && steamData?.playing?.gameId) {
             const steamArt = `https://cdn.akamai.steamstatic.com/steam/apps/${steamData.playing.gameId}/header.jpg`;
             artHTML = `<span class="dm-game-art-wrap">

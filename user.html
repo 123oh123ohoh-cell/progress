@@ -188,8 +188,13 @@ async function refreshProfileNowPlayingIndicator() {
     if (robloxGame && robloxData?.presence?.gameIconUrl && /^https:\/\//i.test(robloxData.presence.gameIconUrl)) {
       const iconUrl = robloxData.presence.gameIconUrl.replace(/"/g, "%22");
       artHTML = `<span class="pnp-art-wrap">
-        <img class="pnp-game-img" src="${iconUrl}" alt="" onerror="this.parentElement.remove()">
+        <img class="pnp-game-img" src="${iconUrl}" alt="" onerror="this.classList.add('hidden')">
         <img class="pnp-platform-badge" src="images/Roblox.png" alt="Roblox" onerror="this.style.display='none'">
+      </span>`;
+      el.classList.add("has-art");
+    } else if (robloxGame) {
+      artHTML = `<span class="pnp-art-wrap pnp-roblox-solo">
+        <img class="pnp-game-img pnp-solo-icon" src="images/Roblox.png" alt="Roblox" onerror="this.parentElement.remove()">
       </span>`;
       el.classList.add("has-art");
     } else if (steamGame && steamData?.playing?.gameId) {
