@@ -1773,6 +1773,27 @@ label:has(#themeToggleSwitch[data-on="1"]) .theme-flank-icon.moon { opacity: 1; 
 .spotify-embed { border-radius: 12px; overflow: hidden; background: var(--mocha-wash); line-height: 0; }
 .spotify-embed iframe { display: block; border: none; }
 
+/* ── Profile activity grid (side-by-side Spotify / Steam / Roblox cards) ─── */
+.profile-activity-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 20px;
+  align-items: flex-start;
+}
+.profile-activity-grid > div {
+  flex: 1 1 calc(50% - 6px);
+  min-width: 200px;
+  box-sizing: border-box;
+}
+/* Let the grid column control width instead of the widget's own max-width */
+.profile-activity-grid .now-playing-widget {
+  max-width: 100%;
+  width: 100%;
+  margin: 0;
+  box-sizing: border-box;
+}
+
 .now-playing-widget {
   display: block; padding: 14px 16px;
   border: 1.5px solid var(--mocha-light); border-radius: 14px;

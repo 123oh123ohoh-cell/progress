@@ -899,13 +899,28 @@ refreshNowPlaying();
           });
         }
 
+        // Helper: update local Progress cache with fresh user data
+        function applyUserResult(result) {
+          if (!result) return;
+          // Patch the in-memory users list so the cache reflects the change immediately
+          const idx = (Progress.db.users || []).findIndex(u => u.id === result.id);
+          if (idx >= 0) Progress.db.users[idx] = { ...Progress.db.users[idx], ...result };
+          else if (Progress.db.users) Progress.db.users.push(result);
+          // Also update currentUser record if it's our own profile
+          const cu = Progress.getCurrentUser();
+          if (cu && cu.username === result.username) {
+            Progress.db.currentUser = result.username;
+            try { localStorage.setItem("progressUser_" + result.username, JSON.stringify(result)); } catch(e) {}
+          }
+        }
+
         // Steam disconnect (connect is handled by connect.html)
         const disconnectSteamBtn = document.getElementById("disconnectSteamBtn");
         if (disconnectSteamBtn) {
           disconnectSteamBtn.addEventListener("click", async () => {
             disconnectSteamBtn.disabled = true;
             const result = await apiFetch(`/api/users/${user.id}/steam`, { method: "DELETE" });
-            if (result) { user = result; activeSettingsTab = "integrations"; render(); showToast("Steam disconnected."); }
+            if (result) { applyUserResult(result); user = result; activeSettingsTab = "integrations"; render(); showToast("Steam disconnected."); }
             else { disconnectSteamBtn.disabled = false; showToast("Could not disconnect. Try again."); }
           });
         }
@@ -916,7 +931,7 @@ refreshNowPlaying();
           disconnectRobloxBtn.addEventListener("click", async () => {
             disconnectRobloxBtn.disabled = true;
             const result = await apiFetch(`/api/users/${user.id}/roblox`, { method: "DELETE" });
-            if (result) { user = result; activeSettingsTab = "integrations"; render(); showToast("Roblox disconnected."); }
+            if (result) { applyUserResult(result); user = result; activeSettingsTab = "integrations"; render(); showToast("Roblox disconnected."); }
             else { disconnectRobloxBtn.disabled = false; showToast("Could not disconnect. Try again."); }
           });
         }

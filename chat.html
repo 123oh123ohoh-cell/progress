@@ -3289,7 +3289,8 @@
           ? (robloxData.presence.gameName || "Roblox") : null;
         const steamGame = steamData?.playing?.gameName || null;
         const gameName = robloxGame || steamGame;
-        const songName = (np?.isPlaying && np?.trackName) ? np.trackName : null;
+        const sessionTrack = peerSession?.trackName || null;
+        const songName = (np?.isPlaying && np?.trackName) ? np.trackName : sessionTrack;
         const label = gameName || songName;
         if (label) {
           let artHTML = "";

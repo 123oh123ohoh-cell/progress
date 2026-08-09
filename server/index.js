@@ -4379,6 +4379,7 @@ app.patch("/api/users/:id/steam", requireAuth, asyncHandler(async (req, res) => 
     }
   }
   await users.updateOne({ _id: req.params.id }, { $set: { "steamAccount.steamId": resolvedId, "steamAccount.connected": true } });
+  cacheInvalidate("users:all", `users:${doc.username}`);
   const updated = await users.findOne({ _id: req.params.id });
   res.json(publicUser(normalizeUser(updated)));
 }));
@@ -4388,6 +4389,7 @@ app.delete("/api/users/:id/steam", requireAuth, asyncHandler(async (req, res) =>
   if (!doc) return res.status(404).json({ error: "User not found" });
   if (req.user.id !== doc._id) return res.status(403).json({ error: "Forbidden" });
   await users.updateOne({ _id: req.params.id }, { $unset: { steamAccount: "" } });
+  cacheInvalidate("users:all", `users:${doc.username}`);
   const updated = await users.findOne({ _id: req.params.id });
   res.json(publicUser(normalizeUser(updated)));
 }));
@@ -4432,6 +4434,7 @@ app.patch("/api/users/:id/roblox", requireAuth, asyncHandler(async (req, res) =>
   const rbxUser = search?.data?.[0];
   if (!rbxUser) return res.status(400).json({ error: "Roblox user not found" });
   await users.updateOne({ _id: req.params.id }, { $set: { "robloxAccount.robloxId": String(rbxUser.id), "robloxAccount.robloxUsername": rbxUser.name, "robloxAccount.connected": true } });
+  cacheInvalidate("users:all", `users:${doc.username}`);
   const updated = await users.findOne({ _id: req.params.id });
   res.json(publicUser(normalizeUser(updated)));
 }));
@@ -4441,6 +4444,7 @@ app.delete("/api/users/:id/roblox", requireAuth, asyncHandler(async (req, res) =
   if (!doc) return res.status(404).json({ error: "User not found" });
   if (req.user.id !== doc._id) return res.status(403).json({ error: "Forbidden" });
   await users.updateOne({ _id: req.params.id }, { $unset: { robloxAccount: "" } });
+  cacheInvalidate("users:all", `users:${doc.username}`);
   const updated = await users.findOne({ _id: req.params.id });
   res.json(publicUser(normalizeUser(updated)));
 }));
