@@ -3294,14 +3294,8 @@
         const label = gameName || songName;
         if (label) {
           let artHTML = "";
-          if (robloxGame && robloxData?.presence?.gameIconUrl && /^https:\/\//i.test(robloxData.presence.gameIconUrl)) {
-            const iconUrl = robloxData.presence.gameIconUrl.replace(/"/g, "%22");
-            artHTML = `<span class="dm-game-art-wrap">
-              <img class="pnp-game-img" src="${iconUrl}" alt="" onerror="this.parentElement.remove()">
-              <img class="pnp-platform-badge" src="images/Roblox.png" alt="Roblox" onerror="this.style.display='none'">
-            </span>`;
-            gameStatusEl.classList.add("has-art");
-          } else if (robloxGame) {
+          if (robloxGame) {
+            // Pill always shows Roblox logo only — no game thumbnail here
             artHTML = `<span class="dm-game-art-wrap pnp-roblox-solo">
               <img class="pnp-game-img pnp-solo-icon" src="images/Roblox.png" alt="Roblox" onerror="this.parentElement.remove()">
             </span>`;

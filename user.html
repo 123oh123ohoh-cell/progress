@@ -148,16 +148,25 @@ async function refreshNowPlaying() {
 refreshNowPlaying();
 setInterval(refreshNowPlaying, 30000);
 
+// Shared Roblox cache — both the widget and the pill use the same fetch result
+let _robloxData = null, _robloxFetchedAt = 0;
+async function getSharedRobloxPresence() {
+  if (_robloxData && Date.now() - _robloxFetchedAt < 25000) return _robloxData;
+  const d = await fetchRobloxPresence(user.id).catch(() => null);
+  _robloxData = d; _robloxFetchedAt = Date.now();
+  return d;
+}
+
 async function refreshSteamNowPlaying() {
   const slot = document.getElementById("steamSlot");
-  if (!slot || !user?.steamAccount?.connected) { if (slot) slot.innerHTML = ""; return; }
+  if (!slot) return;
   const data = await fetchSteamNowPlaying(user.id).catch(() => null);
   slot.innerHTML = renderSteamWidget(data);
 }
 async function refreshRobloxPresence() {
   const slot = document.getElementById("robloxSlot");
-  if (!slot || !user?.robloxAccount?.connected) { if (slot) slot.innerHTML = ""; return; }
-  const data = await fetchRobloxPresence(user.id).catch(() => null);
+  if (!slot) return;
+  const data = await getSharedRobloxPresence();
   slot.innerHTML = renderRobloxWidget(data);
 }
 refreshSteamNowPlaying();
@@ -171,7 +180,7 @@ async function refreshProfileNowPlayingIndicator() {
   // Dot indicator comes from CSS ::before — no inline SVG needed
 
   const [robloxData, steamData, npData] = await Promise.all([
-    fetchRobloxPresence(user.id).catch(() => null),
+    getSharedRobloxPresence(),
     fetchSteamNowPlaying(user.id).catch(() => null),
     user?.spotifyAccount?.connected ? fetchSpotifyNowPlaying(user.id).catch(() => null) : Promise.resolve(null),
   ]);
@@ -185,14 +194,8 @@ async function refreshProfileNowPlayingIndicator() {
   const label = gameName || songName;
   if (label) {
     let artHTML = "";
-    if (robloxGame && robloxData?.presence?.gameIconUrl && /^https:\/\//i.test(robloxData.presence.gameIconUrl)) {
-      const iconUrl = robloxData.presence.gameIconUrl.replace(/"/g, "%22");
-      artHTML = `<span class="pnp-art-wrap">
-        <img class="pnp-game-img" src="${iconUrl}" alt="" onerror="this.classList.add('hidden')">
-        <img class="pnp-platform-badge" src="images/Roblox.png" alt="Roblox" onerror="this.style.display='none'">
-      </span>`;
-      el.classList.add("has-art");
-    } else if (robloxGame) {
+    if (robloxGame) {
+      // Pill always shows Roblox logo only — no game thumbnail here
       artHTML = `<span class="pnp-art-wrap pnp-roblox-solo">
         <img class="pnp-game-img pnp-solo-icon" src="images/Roblox.png" alt="Roblox" onerror="this.parentElement.remove()">
       </span>`;
