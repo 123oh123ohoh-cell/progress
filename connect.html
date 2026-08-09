@@ -60,41 +60,21 @@
     Back to Settings
   </a>
 
-  <!-- Steam -->
-  <div class="connect-card" id="steamCard">
+  <!-- Steam — Coming Soon -->
+  <div class="connect-card" style="opacity:0.55; pointer-events:none; user-select:none;">
     <div class="connect-header">
       <div class="connect-logo steam">
         <svg viewBox="0 0 24 24" width="28" height="28" fill="#c6d4df"><path d="M11.979 0C5.678 0 .511 4.86.022 11.037l6.432 2.658c.545-.371 1.203-.59 1.912-.59.063 0 .125.004.187.006l2.861-4.142V8.91c0-2.495 2.028-4.524 4.524-4.524 2.494 0 4.524 2.029 4.524 4.524s-2.03 4.525-4.524 4.525h-.105l-4.076 2.911c0 .052.004.105.004.159 0 1.875-1.515 3.396-3.39 3.396-1.635 0-3.016-1.173-3.331-2.718L.436 15.27C1.862 20.307 6.486 24 11.979 24c6.627 0 11.999-5.373 11.999-12S18.606 0 11.979 0z"/></svg>
       </div>
-      <div>
-        <div class="connect-name">Steam</div>
-        <div class="connect-status" id="steamStatusText">Not connected</div>
+      <div style="flex:1;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <div class="connect-name">Steam</div>
+          <span style="font-size:10.5px; font-weight:600; letter-spacing:.05em; text-transform:uppercase; background:var(--mocha-wash); color:var(--muted); border-radius:6px; padding:2px 7px;">Coming Soon</span>
+        </div>
+        <div class="connect-status">Not available yet</div>
       </div>
     </div>
-    <p class="connect-desc">Shows what game you're currently playing on your public profile and in DMs.</p>
-    <div id="steamConnectedInfo" style="display:none;" class="connect-connected-info">
-      <div>
-        <div class="cc-name" id="steamConnectedName"></div>
-        <div class="cc-id" id="steamConnectedId"></div>
-      </div>
-    </div>
-    <div id="steamConnectForm">
-      <div class="connect-steps">
-        <ol>
-          <li>Open <a href="https://store.steampowered.com" target="_blank">Steam</a> and go to your profile</li>
-          <li>Copy the URL from your browser (e.g. <code>steamcommunity.com/profiles/76561…</code>)</li>
-          <li>Paste it below — or just your Steam ID or vanity name</li>
-        </ol>
-      </div>
-      <div class="connect-input-row">
-        <input id="steamInput" type="text" placeholder="Paste Steam URL or enter your Steam ID">
-        <button class="connect-btn primary" id="steamConnectBtn">Connect</button>
-      </div>
-    </div>
-    <div id="steamDisconnectForm" style="display:none;">
-      <button class="connect-btn danger" id="steamDisconnectBtn">Disconnect Steam</button>
-    </div>
-    <div class="connect-msg" id="steamMsg"></div>
+    <p class="connect-desc" style="margin-bottom:0;">Shows what game you're currently playing on your public profile and in DMs.</p>
   </div>
 
   <!-- Roblox -->
