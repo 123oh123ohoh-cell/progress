@@ -1828,7 +1828,7 @@ label:has(#themeToggleSwitch[data-on="1"]) .theme-flank-icon.moon { opacity: 1; 
   align-items: flex-start;
 }
 .profile-activity-grid > div {
-  flex: 1 1 calc(50% - 6px);
+  flex: 0 1 calc(50% - 6px);
   min-width: 200px;
   box-sizing: border-box;
 }
@@ -3631,8 +3631,15 @@ body.mobile .tb-sep {
   color: #15803d;
   font-weight: 500;
   margin-top: 12px;
-  width: fit-content;
+  max-width: 220px;
+  min-width: 0;
   line-height: 1.4;
+}
+.pnp-label-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 [data-theme="dark"] .profile-now-playing-indicator {
   color: #4ade80;
