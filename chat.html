@@ -2740,7 +2740,6 @@
               <div class="chat-header-peer-info">
                 <span class="chat-header-peer-name" id="chatHeaderPeerName"></span>
                 <span class="chat-header-peer-status" id="chatHeaderPeerStatus"></span>
-                <span class="dm-game-status" id="dmGameStatus"></span>
               </div>
             </div>
             <!-- Global room title (shown when not in DM) -->
@@ -2752,6 +2751,9 @@
             </button>
           </div>
           <div class="dm-activity-row" id="dmActivityRow">
+            <div id="dmNowPlayingRow" style="display:none; padding:10px 20px 2px;">
+              <span class="profile-now-playing-indicator" id="dmGameStatus" style="display:none;"></span>
+            </div>
             <div class="dm-listen-banner" id="dmListenBanner" style="display:none;"></div>
           </div>
           <div class="pinned-bar" id="pinnedBar" style="display:none;">
@@ -3243,6 +3245,8 @@
       if (banner) banner.style.display = "none";
       const _gsi = document.getElementById("dmGameStatus");
       if (_gsi) { _gsi.innerHTML = ""; _gsi.style.display = "none"; }
+      const _npr = document.getElementById("dmNowPlayingRow");
+      if (_npr) _npr.style.display = "none";
       return;
     }
 
@@ -3311,11 +3315,15 @@
             gameStatusEl.classList.remove("has-art");
           }
           gameStatusEl.innerHTML = `${artHTML}Now Playing — <strong>${escapeHTML(label)}</strong>`;
-          gameStatusEl.style.display = "flex";
+          gameStatusEl.style.display = "inline-flex";
+          const _npr = document.getElementById("dmNowPlayingRow");
+          if (_npr) _npr.style.display = "block";
         } else {
           gameStatusEl.classList.remove("has-art");
           gameStatusEl.innerHTML = "";
           gameStatusEl.style.display = "none";
+          const _npr = document.getElementById("dmNowPlayingRow");
+          if (_npr) _npr.style.display = "none";
         }
       }
     }

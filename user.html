@@ -138,11 +138,14 @@ async function refreshNowPlaying() {
 
   if (!connected) {
     nowPlayingSlot.innerHTML = "";
+    nowPlayingSlot.style.display = "none";
     return;
   }
 
   const data = await fetchSpotifyNowPlaying(user.id);
-  nowPlayingSlot.innerHTML = renderNowPlayingWidget(data);
+  const html = renderNowPlayingWidget(data);
+  nowPlayingSlot.innerHTML = html;
+  nowPlayingSlot.style.display = html ? "" : "none";
 }
 
 refreshNowPlaying();
@@ -161,13 +164,17 @@ async function refreshSteamNowPlaying() {
   const slot = document.getElementById("steamSlot");
   if (!slot) return;
   const data = await fetchSteamNowPlaying(user.id).catch(() => null);
-  slot.innerHTML = renderSteamWidget(data);
+  const html = renderSteamWidget(data);
+  slot.innerHTML = html;
+  slot.style.display = html ? "" : "none";
 }
 async function refreshRobloxPresence() {
   const slot = document.getElementById("robloxSlot");
   if (!slot) return;
   const data = await getSharedRobloxPresence();
-  slot.innerHTML = renderRobloxWidget(data);
+  const html = renderRobloxWidget(data);
+  slot.innerHTML = html;
+  slot.style.display = html ? "" : "none";
 }
 refreshSteamNowPlaying();
 refreshRobloxPresence();
