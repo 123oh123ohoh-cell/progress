@@ -1778,7 +1778,7 @@ label:has(#themeToggleSwitch[data-on="1"]) .theme-flank-icon.moon { opacity: 1; 
   border: 1.5px solid var(--mocha-light); border-radius: 14px;
   background: var(--paper);
   box-shadow: 0 2px 10px rgba(28,25,23,0.06);
-  text-decoration: none; color: var(--ink); max-width: 360px; margin: 6px 0 20px;
+  text-decoration: none; color: var(--ink); max-width: 520px; margin: 6px 0 20px;
   transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
 }
 .now-playing-widget:hover {
@@ -3519,41 +3519,68 @@ body.mobile .tb-sep {
   display: block;
 }
 
-/* Compact game/music status line in the DM header */
+/* ── Live pulsing dot animation (shared) ─────────────────────────────────── */
+@keyframes pnp-live-pulse {
+  0%   { box-shadow: 0 0 0 0   rgba(34,197,94,.55); }
+  70%  { box-shadow: 0 0 0 5px rgba(34,197,94,0);   }
+  100% { box-shadow: 0 0 0 0   rgba(34,197,94,0);   }
+}
+
+/* Compact game/music indicator in the DM header */
 .dm-game-status {
   display: flex;
   align-items: center;
-  gap: 4px;
-  font-size: 11.5px;
-  color: #22c55e;
+  gap: 6px;
+  font-size: 11px;
+  color: #16a34a;
   font-weight: 500;
-  margin-top: 1px;
+  margin-top: 3px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 220px;
+  max-width: 210px;
+}
+[data-theme="dark"] .dm-game-status { color: #4ade80; }
+.dm-game-status::before {
+  content: "";
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #22c55e;
+  flex-shrink: 0;
+  animation: pnp-live-pulse 1.8s ease-out infinite;
+}
+.dm-gs-icon { display: none; } /* dot via ::before instead */
+
+/* Profile page compact now-playing pill near avatar/name */
+.profile-now-playing-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 14px 5px 10px;
+  background: rgba(34, 197, 94, .08);
+  border: 1px solid rgba(34, 197, 94, .22);
+  border-radius: 999px;
+  font-size: 12.5px;
+  color: #15803d;
+  font-weight: 500;
+  margin-top: 12px;
+  width: fit-content;
   line-height: 1.4;
 }
-.dm-gs-icon {
+[data-theme="dark"] .profile-now-playing-indicator {
+  color: #4ade80;
+  background: rgba(34, 197, 94, .12);
+  border-color: rgba(34, 197, 94, .28);
+}
+.profile-now-playing-indicator::before {
+  content: "";
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: #22c55e;
   flex-shrink: 0;
-  color: #22c55e;
+  animation: pnp-live-pulse 1.8s ease-out infinite;
 }
-
-/* Profile page compact now-playing indicator near avatar/name */
-.profile-now-playing-indicator {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 13px;
-  color: #22c55e;
-  font-weight: 500;
-  margin-top: 10px;
-}
-.profile-now-playing-indicator svg {
-  flex-shrink: 0;
-  color: #22c55e;
-  stroke: #22c55e;
-}
+.profile-now-playing-indicator svg { display: none; } /* dot via ::before */
 .dm-activity-row .now-playing-widget {
   border-radius: 0; margin: 0;
   background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);

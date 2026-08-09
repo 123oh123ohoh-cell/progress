@@ -4443,13 +4443,23 @@ app.get("/api/users/:id/roblox/presence", asyncHandler(async (req, res) => {
   try {
     const [presenceRes, avatarRes] = await Promise.all([
       fetch("https://presence.roblox.com/v1/presence/users", {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "User-Agent": "Mozilla/5.0 (compatible; Progress-App/1.0)"
+        },
         body: JSON.stringify({ userIds: [parseInt(robloxId)] })
-      }).then(r => r.json()).catch(() => null),
+      }).then(async r => {
+        const json = await r.json().catch(() => null);
+        if (!r.ok) console.error("[roblox presence] API error", r.status, JSON.stringify(json));
+        return json;
+      }).catch(e => { console.error("[roblox presence] fetch failed:", e.message); return null; }),
       fetch(`https://thumbnails.roblox.com/v1/users/avatar?userIds=${robloxId}&size=150x150&format=Png&isCircular=true`).then(r => r.json()).catch(() => null)
     ]);
     const presence = presenceRes?.userPresences?.[0];
     const avatarUrl = avatarRes?.data?.[0]?.imageUrl || null;
+    console.log("[roblox presence] userId:", robloxId, "raw:", JSON.stringify(presence));
     const inGame = presence?.userPresenceType === 2;
     return res.json({
       connected: true,
