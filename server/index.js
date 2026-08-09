@@ -2438,12 +2438,13 @@ app.delete("/api/notifications/:id", requireAuth, asyncHandler(async (req, res) 
   res.json({ ok: true });
 }));
 
-async function createChatMessage({ room, author, body, image, replyTo, msgType, songData, gameData }) {
+async function createChatMessage({ room, author, body, image, replyTo, msgType, songData, gameData, sessionData }) {
   const targetRoom = (room || DEFAULT_CHAT_ROOM).toString().slice(0, 200);
   const trimmed = (body || "").toString().trim();
   const safeImage = (typeof image === "string" && image.startsWith("https://")) ? image : null;
   const hasSongData = msgType === "song" && songData && typeof songData === "object";
   const hasGameData = msgType === "game" && gameData && typeof gameData === "object";
+  const hasListenData = msgType === "listentogether" && sessionData && typeof sessionData === "object";
 
   // ── Poll detection: /poll [Nh|Nm] Question; Option A; Option B ──────────
   if (trimmed.startsWith("/poll ")) {
@@ -2479,7 +2480,7 @@ async function createChatMessage({ room, author, body, image, replyTo, msgType, 
     }
   }
 
-  if (!author || (!trimmed && !safeImage && !hasSongData && !hasGameData)) return null;
+  if (!author || (!trimmed && !safeImage && !hasSongData && !hasGameData && !hasListenData)) return null;
   if (!canAccessRoom(targetRoom, author)) return null;
   if (await isUsernameBanned(author)) return null;
   const safeReplyTo = replyTo && typeof replyTo === "object" ? {
@@ -2501,6 +2502,13 @@ async function createChatMessage({ room, author, body, image, replyTo, msgType, 
     optionA:  gameData.optionA ? String(gameData.optionA).slice(0, 200) : undefined,
     optionB:  gameData.optionB ? String(gameData.optionB).slice(0, 200) : undefined,
   } : null;
+  const safeSessionData = hasListenData ? {
+    id:          String(sessionData.id          || "").slice(0, 50),
+    hostUsername: String(sessionData.hostUsername || "").slice(0, 50),
+    trackName:   sessionData.trackName  ? String(sessionData.trackName).slice(0, 200)  : null,
+    artistNames: sessionData.artistNames ? String(sessionData.artistNames).slice(0, 200) : null,
+    albumArt:    typeof sessionData.albumArt === "string" && sessionData.albumArt.startsWith("https://") ? sessionData.albumArt : null,
+  } : null;
   const message = {
     _id: generateId("m"),
     room: targetRoom,
@@ -2508,9 +2516,10 @@ async function createChatMessage({ room, author, body, image, replyTo, msgType, 
     body: trimmed.slice(0, 2000),
     image: safeImage,
     replyTo: safeReplyTo,
-    type: safeSongData ? "song" : safeGameData ? "game" : undefined,
+    type: safeSongData ? "song" : safeGameData ? "game" : safeSessionData ? "listentogether" : undefined,
     songData: safeSongData,
     gameData: safeGameData,
+    sessionData: safeSessionData,
     time: new Date().toISOString()
   };
   await db.collection("messages").insertOne(message);
@@ -4441,26 +4450,37 @@ app.get("/api/users/:id/roblox/presence", asyncHandler(async (req, res) => {
   if (!doc.robloxAccount?.connected) return res.json({ connected: false, presence: null });
   const robloxId = doc.robloxAccount.robloxId;
   try {
-    const [presenceRes, avatarRes] = await Promise.all([
-      fetch("https://presence.roblox.com/v1/presence/users", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json",
-          "User-Agent": "Mozilla/5.0 (compatible; Progress-App/1.0)"
-        },
-        body: JSON.stringify({ userIds: [parseInt(robloxId)] })
-      }).then(async r => {
-        const json = await r.json().catch(() => null);
-        if (!r.ok) console.error("[roblox presence] API error", r.status, JSON.stringify(json));
-        return json;
-      }).catch(e => { console.error("[roblox presence] fetch failed:", e.message); return null; }),
-      fetch(`https://thumbnails.roblox.com/v1/users/avatar?userIds=${robloxId}&size=150x150&format=Png&isCircular=true`).then(r => r.json()).catch(() => null)
-    ]);
+    // 1. Fetch presence first (need universeId before we can request game icon)
+    const presenceRes = await fetch("https://presence.roblox.com/v1/presence/users", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "User-Agent": "Mozilla/5.0 (compatible; Progress-App/1.0)"
+      },
+      body: JSON.stringify({ userIds: [parseInt(robloxId)] })
+    }).then(async r => {
+      const json = await r.json().catch(() => null);
+      if (!r.ok) console.error("[roblox presence] API error", r.status, JSON.stringify(json));
+      return json;
+    }).catch(e => { console.error("[roblox presence] fetch failed:", e.message); return null; });
+
     const presence = presenceRes?.userPresences?.[0];
-    const avatarUrl = avatarRes?.data?.[0]?.imageUrl || null;
     console.log("[roblox presence] userId:", robloxId, "raw:", JSON.stringify(presence));
     const inGame = presence?.userPresenceType === 2;
+    const universeId = presence?.universeId || null;
+
+    // 2. Avatar + game icon thumbnail in parallel
+    const [avatarRes, gameIconRes] = await Promise.all([
+      fetch(`https://thumbnails.roblox.com/v1/users/avatar?userIds=${robloxId}&size=150x150&format=Png&isCircular=true`).then(r => r.json()).catch(() => null),
+      (inGame && universeId)
+        ? fetch(`https://thumbnails.roblox.com/v1/games/icons?universeIds=${universeId}&size=150x150&format=Png&isCircular=false`).then(r => r.json()).catch(() => null)
+        : null
+    ]);
+
+    const avatarUrl   = avatarRes?.data?.[0]?.imageUrl   || null;
+    const gameIconUrl = gameIconRes?.data?.[0]?.imageUrl || null;
+
     return res.json({
       connected: true,
       robloxUsername: doc.robloxAccount.robloxUsername,
@@ -4470,8 +4490,10 @@ app.get("/api/users/:id/roblox/presence", asyncHandler(async (req, res) => {
         type: presence.userPresenceType,
         inGame,
         gameName: inGame ? (presence.lastLocation || "Roblox") : null,
+        universeId,
         placeId: presence.rootPlaceId || null,
         gameUrl: presence.rootPlaceId ? `https://www.roblox.com/games/${presence.rootPlaceId}` : null,
+        gameIconUrl,
         fetchedAt: Date.now()
       } : null
     });
@@ -4514,7 +4536,7 @@ connect()
           return;
         }
         if (data.type === "send") {
-          createChatMessage({ room: ws.room, author: ws.username, body: data.body, image: data.image, replyTo: data.replyTo, msgType: data.msgType, songData: data.songData, gameData: data.gameData }).catch(err => {
+          createChatMessage({ room: ws.room, author: ws.username, body: data.body, image: data.image, replyTo: data.replyTo, msgType: data.msgType, songData: data.songData, gameData: data.gameData, sessionData: data.sessionData }).catch(err => {
             console.error("Chat message failed:", err);
           });
         } else if (data.type === "typing") {

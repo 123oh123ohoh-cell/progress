@@ -712,6 +712,26 @@
       </div>`;
     }
 
+    // Listen-together invite card
+    let listenInviteHTML = "";
+    if (msg.type === "listentogether" && msg.sessionData) {
+      const sd = msg.sessionData;
+      const artEl = sd.albumArt && /^https:\/\//i.test(sd.albumArt)
+        ? `<img class="chat-listen-invite-art" src="${escapeHTML(sd.albumArt)}" alt="">`
+        : `<div class="chat-listen-invite-art-fallback"><svg viewBox="0 0 24 24" fill="#1DB954" width="22" height="22"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg></div>`;
+      const trackLabel = sd.trackName
+        ? `${escapeHTML(sd.trackName)}${sd.artistNames ? ` <span style="opacity:.7;font-weight:400;">— ${escapeHTML(sd.artistNames)}</span>` : ""}`
+        : `Listen along…`;
+      listenInviteHTML = `<div class="chat-listen-invite-card">
+        ${artEl}
+        <div class="chat-listen-invite-info">
+          <span class="chat-listen-invite-label">🎵 Listen Together</span>
+          <span class="chat-listen-invite-track">${trackLabel}</span>
+        </div>
+        <button type="button" class="chat-listen-invite-btn" data-listen-session-id="${escapeHTML(sd.id)}">Join</button>
+      </div>`;
+    }
+
     // Reactions
     const reactions = msg.reactions || {};
     const reactionHTML = Object.keys(reactions).length ? `<div class="msg-reactions">
@@ -722,7 +742,7 @@
       <button type="button" class="reaction-add-btn" data-msg-id="${escapeHTML(msg.id)}" title="Add reaction">+</button>
     </div>` : `<div class="msg-reactions"><button type="button" class="reaction-add-btn" data-msg-id="${escapeHTML(msg.id)}" title="Add reaction">+</button></div>`;
 
-    const bodyHTML = songCardHTML || gameCardHTML || pollCardHTML ||
+    const bodyHTML = songCardHTML || gameCardHTML || pollCardHTML || listenInviteHTML ||
       ((msg.body || replyHTML) ? `<div class="chat-bubble">${replyHTML}${msg.body ? renderMentionsInHTML(renderEmoticonsText(msg.body, "inline-emoticon")) : ""}</div>` : "");
     return `
       <div class="chat-msg ${mine ? "mine" : ""} ${grouped ? "grouped" : ""}" data-id="${msg.id}" data-time="${msg.time}">
@@ -1293,6 +1313,50 @@
     if (socket && socket.readyState === WebSocket.OPEN) {
       socket.send(JSON.stringify(payload));
     }
+  }
+
+  // ── /listentogether command ──────────────────────────────────────────────────
+
+  async function handleListenTogetherCommand() {
+    const me = Progress.getCurrentUser();
+    if (!me?.spotifyAccount?.connected) {
+      showToast("Connect Spotify first to start a listening session.");
+      return;
+    }
+    if (!currentPeer) {
+      showToast("/listentogether only works in a DM.");
+      return;
+    }
+    let session;
+    try {
+      session = await createListenSession();
+    } catch (err) {
+      showToast("Couldn't start session — is Spotify playing?");
+      return;
+    }
+    if (!session?.id) {
+      showToast("Couldn't start session — make sure Spotify is playing.");
+      return;
+    }
+    const payload = {
+      type: "send",
+      body: "🎵 invited you to listen together",
+      msgType: "listentogether",
+      sessionData: {
+        id: session.id,
+        hostUsername: session.hostUsername || me.username,
+        trackName:   session.trackName   || null,
+        artistNames: session.artistNames || null,
+        albumArt:    session.albumArt    || null,
+      },
+      image: null,
+      replyTo: null
+    };
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify(payload));
+    }
+    showToast("Listening session started! Invite sent 🎵");
+    updateDmListenBanner();
   }
 
   // ── Reply context ────────────────────────────────────────────────────────────
@@ -2787,6 +2851,11 @@
         e.target.value = "";
         showGamePicker();
       }
+      // /listentogether command
+      if (val === "/listentogether") {
+        e.target.value = "";
+        handleListenTogetherCommand();
+      }
     });
 
     // Scroll-to-bottom button
@@ -2805,6 +2874,33 @@
         updateScrollBtn();
       }, { passive: true });
     }
+
+    // Listen-together invite card "Join" button (delegated)
+    document.getElementById("chatLog").addEventListener("click", async (e) => {
+      const joinBtn = e.target.closest(".chat-listen-invite-btn[data-listen-session-id]");
+      if (!joinBtn) return;
+      e.preventDefault();
+      const sessionId = joinBtn.dataset.listenSessionId;
+      joinBtn.disabled = true;
+      joinBtn.textContent = "Joining…";
+      try {
+        await joinListenSession(sessionId);
+        const r = await syncMeToListenSession(sessionId);
+        if (r && r.synced) {
+          joinBtn.textContent = "Joined!";
+          showToast("Joined and synced!");
+          updateDmListenBanner();
+        } else {
+          joinBtn.disabled = false;
+          joinBtn.textContent = "Join";
+          showToast((r && r.reason) || "Couldn't sync — is Spotify open?");
+        }
+      } catch (err) {
+        joinBtn.disabled = false;
+        joinBtn.textContent = "Join";
+        showToast("Couldn't join session.");
+      }
+    });
 
     // Song preview playback (delegated) — stop parent link navigation
     document.getElementById("chatLog").addEventListener("click", (e) => {
@@ -3196,9 +3292,28 @@
         const songName = (np?.isPlaying && np?.trackName) ? np.trackName : null;
         const label = gameName || songName;
         if (label) {
-          gameStatusEl.innerHTML = `Now Playing — <strong>${escapeHTML(label)}</strong>`;
+          let artHTML = "";
+          if (robloxGame && robloxData?.presence?.gameIconUrl && /^https:\/\//i.test(robloxData.presence.gameIconUrl)) {
+            const iconUrl = robloxData.presence.gameIconUrl.replace(/"/g, "%22");
+            artHTML = `<span class="dm-game-art-wrap">
+              <img class="pnp-game-img" src="${iconUrl}" alt="" onerror="this.parentElement.remove()">
+              <img class="pnp-platform-badge" src="images/Roblox.png" alt="Roblox" onerror="this.style.display='none'">
+            </span>`;
+            gameStatusEl.classList.add("has-art");
+          } else if (steamGame && steamData?.playing?.gameId) {
+            const steamArt = `https://cdn.akamai.steamstatic.com/steam/apps/${steamData.playing.gameId}/header.jpg`;
+            artHTML = `<span class="dm-game-art-wrap">
+              <img class="pnp-game-img" src="${steamArt}" alt="" onerror="this.parentElement.remove()">
+              <span class="pnp-platform-badge steam-badge"><svg viewBox="0 0 24 24" fill="#c6d4df" width="8" height="8"><path d="M11.979 0C5.678 0 .511 4.86.022 11.037l6.432 2.658c.545-.371 1.203-.59 1.912-.59.063 0 .125.004.187.006l2.861-4.142V8.91c0-2.495 2.028-4.524 4.524-4.524 2.494 0 4.524 2.029 4.524 4.524s-2.03 4.525-4.524 4.525h-.105l-4.076 2.911c0 .052.004.105.004.159 0 1.875-1.515 3.396-3.39 3.396-1.635 0-3.016-1.173-3.331-2.718L.436 15.27C1.862 20.307 6.486 24 11.979 24c6.627 0 11.999-5.373 11.999-12S18.606 0 11.979 0z"/></svg></span>
+            </span>`;
+            gameStatusEl.classList.add("has-art");
+          } else {
+            gameStatusEl.classList.remove("has-art");
+          }
+          gameStatusEl.innerHTML = `${artHTML}Now Playing — <strong>${escapeHTML(label)}</strong>`;
           gameStatusEl.style.display = "flex";
         } else {
+          gameStatusEl.classList.remove("has-art");
           gameStatusEl.innerHTML = "";
           gameStatusEl.style.display = "none";
         }
