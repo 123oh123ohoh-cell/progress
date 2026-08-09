@@ -3516,12 +3516,44 @@ body.mobile .tb-sep {
 @keyframes eq-bar-3 { 0%,100%{height:7px}  40%{height:16px} 80%{height:3px}  }
 
 .dm-activity-row {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  gap: 0;
+  display: block;
 }
-.dm-activity-row > * { flex: 1 1 0; min-width: 180px; }
+
+/* Compact game/music status line in the DM header */
+.dm-game-status {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  color: #22c55e;
+  font-weight: 500;
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+  line-height: 1.4;
+}
+.dm-gs-icon {
+  flex-shrink: 0;
+  color: #22c55e;
+}
+
+/* Profile page compact now-playing indicator near avatar/name */
+.profile-now-playing-indicator {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  color: #22c55e;
+  font-weight: 500;
+  margin-top: 10px;
+}
+.profile-now-playing-indicator svg {
+  flex-shrink: 0;
+  color: #22c55e;
+  stroke: #22c55e;
+}
 .dm-activity-row .now-playing-widget {
   border-radius: 0; margin: 0;
   background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);

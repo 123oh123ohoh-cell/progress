@@ -78,6 +78,7 @@
           </div>
           ${viewer && !isOwnProfile ? `<button type="button" class="upload-btn ${Progress.isFollowing(user.username) ? "following" : ""}" id="followBtn">${Progress.isFollowing(user.username) ? "Following" : "Follow"}</button>` : ""}
           <div class="bio-text" style="margin-top:12px;">${user.bio ? renderEmoticonsText(user.bio, "bio-emoticon") : `<span style="color:var(--muted);">No bio yet.</span>`}</div>
+          <div id="profileNowPlayingIndicator" class="profile-now-playing-indicator" style="display:none;"></div>
         </div>
       </div>
       <div id="nowPlayingSlot"></div>
@@ -161,6 +162,38 @@ refreshSteamNowPlaying();
 refreshRobloxPresence();
 setInterval(refreshSteamNowPlaying, 30000);
 setInterval(refreshRobloxPresence, 30000);
+
+async function refreshProfileNowPlayingIndicator() {
+  const el = document.getElementById("profileNowPlayingIndicator");
+  if (!el) return;
+  const GAME_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><rect x="2" y="7" width="20" height="12" rx="2"/><path d="M7 11v2M8 12H6M15 12h2M17 11v2"/></svg>`;
+  const MUSIC_ICON = `<svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`;
+
+  const [robloxData, steamData, npData] = await Promise.all([
+    user?.robloxAccount?.connected ? fetchRobloxPresence(user.id).catch(() => null) : Promise.resolve(null),
+    user?.steamAccount?.connected  ? fetchSteamNowPlaying(user.id).catch(() => null) : Promise.resolve(null),
+    user?.spotifyAccount?.connected ? fetchSpotifyNowPlaying(user.id).catch(() => null) : Promise.resolve(null),
+  ]);
+
+  const robloxGame = robloxData?.presence?.inGame ? (robloxData.presence.gameName || "Roblox") : null;
+  const steamGame  = steamData?.playing?.gameName || null;
+  const gameName = robloxGame || steamGame;
+  const np = npData?.playing;
+  const songName = (np?.isPlaying && np?.trackName) ? np.trackName : null;
+
+  if (gameName) {
+    el.innerHTML = `${GAME_ICON} Now Playing — ${escapeHTML(gameName)}`;
+    el.style.display = "flex";
+  } else if (songName) {
+    el.innerHTML = `${MUSIC_ICON} Now Playing — ${escapeHTML(songName)}`;
+    el.style.display = "flex";
+  } else {
+    el.innerHTML = "";
+    el.style.display = "none";
+  }
+}
+refreshProfileNowPlayingIndicator();
+setInterval(refreshProfileNowPlayingIndicator, 30000);
 
 function applyOnlineStatus(statuses) {
   const el = document.getElementById("onlineIndicator");
