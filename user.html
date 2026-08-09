@@ -170,7 +170,7 @@ async function refreshProfileNowPlayingIndicator() {
 
   const [robloxData, steamData, npData] = await Promise.all([
     fetchRobloxPresence(user.id).catch(() => null),
-    user?.steamAccount?.connected  ? fetchSteamNowPlaying(user.id).catch(() => null) : Promise.resolve(null),
+    fetchSteamNowPlaying(user.id).catch(() => null),
     user?.spotifyAccount?.connected ? fetchSpotifyNowPlaying(user.id).catch(() => null) : Promise.resolve(null),
   ]);
 

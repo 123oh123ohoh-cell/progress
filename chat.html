@@ -3273,11 +3273,11 @@
     if (peerId) {
       const [npData, sd, rd] = await Promise.all([
         apiFetch(`/api/users/${encodeURIComponent(peerId)}/spotify/now-playing`).catch(() => null),
-        peerUser?.steamAccount?.connected ? apiFetch(`/api/users/${encodeURIComponent(peerId)}/steam/now-playing`).catch(() => null) : null,
+        apiFetch(`/api/users/${encodeURIComponent(peerId)}/steam/now-playing`).catch(() => null),
         apiFetch(`/api/users/${encodeURIComponent(peerId)}/roblox/presence`).catch(() => null),
       ]);
       if (npData?.playing) np = npData.playing;
-      if (sd?.playing) steamData = sd;
+      if (sd) steamData = sd;
       if (rd?.presence?.inGame) robloxData = rd;
     }
 
