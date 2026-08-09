@@ -4449,6 +4449,12 @@ app.delete("/api/users/:id/roblox", requireAuth, asyncHandler(async (req, res) =
   res.json(publicUser(normalizeUser(updated)));
 }));
 app.get("/api/users/:id/roblox/presence", asyncHandler(async (req, res) => {
+  // Cache responses for 45 seconds — each call hits 3 external Roblox API
+  // endpoints, so even a few open DMs at 5-second poll intervals adds up fast.
+  const cacheKey = `roblox:presence:${req.params.id}`;
+  const cached = cacheGet(cacheKey);
+  if (cached) return res.json(cached);
+
   const doc = await db.collection("users").findOne({ _id: req.params.id });
   if (!doc) return res.status(404).json({ error: "User not found" });
   if (!doc.robloxAccount?.connected) return res.json({ connected: false, presence: null });
@@ -4470,11 +4476,10 @@ app.get("/api/users/:id/roblox/presence", asyncHandler(async (req, res) => {
     }).catch(e => { console.error("[roblox presence] fetch failed:", e.message); return null; });
 
     const presence = presenceRes?.userPresences?.[0];
-    console.log("[roblox presence] userId:", robloxId, "raw:", JSON.stringify(presence));
     const inGame = presence?.userPresenceType === 2;
     const universeId = presence?.universeId || null;
 
-    // 2. Avatar + game icon thumbnail in parallel
+    // 2. Avatar + game icon thumbnail in parallel (skip avatar when not needed)
     const [avatarRes, gameIconRes] = await Promise.all([
       fetch(`https://thumbnails.roblox.com/v1/users/avatar?userIds=${robloxId}&size=150x150&format=Png&isCircular=true`).then(r => r.json()).catch(() => null),
       (inGame && universeId)
@@ -4485,7 +4490,7 @@ app.get("/api/users/:id/roblox/presence", asyncHandler(async (req, res) => {
     const avatarUrl   = avatarRes?.data?.[0]?.imageUrl   || null;
     const gameIconUrl = gameIconRes?.data?.[0]?.imageUrl || null;
 
-    return res.json({
+    const result = {
       connected: true,
       robloxUsername: doc.robloxAccount.robloxUsername,
       avatarUrl,
@@ -4500,7 +4505,9 @@ app.get("/api/users/:id/roblox/presence", asyncHandler(async (req, res) => {
         gameIconUrl,
         fetchedAt: Date.now()
       } : null
-    });
+    };
+    cacheSet(cacheKey, result, 45000); // 45-second TTL
+    return res.json(result);
   } catch(e) { return res.json({ connected: true, presence: null }); }
 }));
 
