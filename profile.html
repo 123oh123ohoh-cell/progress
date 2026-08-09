@@ -840,30 +840,26 @@ refreshNowPlaying();
               </div>
             </div>
           </div>
-          <!-- Steam -->
+          <!-- Steam — Coming Soon -->
           <div class="sett-section">
-            <div class="sett-integration-card">
+            <div class="sett-integration-card" style="opacity:0.55; pointer-events:none; user-select:none;">
               <div class="sett-integration-icon" style="background:#1b2838;color:#c6d4df;">
                 <svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.979 0C5.678 0 .511 4.86.022 11.037l6.432 2.658c.545-.371 1.203-.59 1.912-.59.063 0 .125.004.187.006l2.861-4.142V8.91c0-2.495 2.028-4.524 4.524-4.524 2.494 0 4.524 2.029 4.524 4.524s-2.03 4.525-4.524 4.525h-.105l-4.076 2.911c0 .052.004.105.004.159 0 1.875-1.515 3.396-3.39 3.396-1.635 0-3.016-1.173-3.331-2.718L.436 15.27C1.862 20.307 6.486 24 11.979 24c6.627 0 11.999-5.373 11.999-12S18.606 0 11.979 0z"/></svg>
               </div>
               <div class="sett-integration-info">
-                <div class="sett-integration-name">Steam</div>
-                <div class="sett-integration-status" id="steamStatus">
-                  ${user.steamAccount?.connected ? `<span class="sett-connected-badge">✓ Connected (${escapeHTML(user.steamAccount.steamId)})</span>` : `<span style="color:var(--muted);font-size:13px;">Not connected</span>`}
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <div class="sett-integration-name">Steam</div>
+                  <span style="font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;background:var(--mocha-wash);color:var(--muted);border-radius:6px;padding:2px 6px;">Coming Soon</span>
                 </div>
-                <p class="field-note" style="margin:6px 0 8px;">Shows what game you're playing on your profile and in DMs.</p>
-                <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                  <a class="btn" href="connect.html?platform=steam" style="text-decoration:none;">⚙️ ${user.steamAccount?.connected ? "Manage" : "Connect"} Steam</a>
-                  ${user.steamAccount?.connected ? `<button class="btn danger" id="disconnectSteamBtn">Disconnect</button>` : ""}
-                </div>
+                <p class="field-note" style="margin:6px 0 0;">Shows what game you're playing on your profile and in DMs.</p>
               </div>
             </div>
           </div>
           <!-- Roblox -->
           <div class="sett-section" style="border-bottom:none;">
             <div class="sett-integration-card">
-              <div class="sett-integration-icon" style="background:#e2231a;color:#fff;">
-                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.926 23.998 0 18.074 5.075.002 24 5.926z"/></svg>
+              <div class="sett-integration-icon" style="background:#e2231a;">
+                <img src="images/Roblox.png" alt="Roblox" style="width:26px;height:26px;object-fit:contain;filter:brightness(10);">
               </div>
               <div class="sett-integration-info">
                 <div class="sett-integration-name">Roblox</div>
@@ -914,16 +910,7 @@ refreshNowPlaying();
           }
         }
 
-        // Steam disconnect (connect is handled by connect.html)
-        const disconnectSteamBtn = document.getElementById("disconnectSteamBtn");
-        if (disconnectSteamBtn) {
-          disconnectSteamBtn.addEventListener("click", async () => {
-            disconnectSteamBtn.disabled = true;
-            const result = await apiFetch(`/api/users/${user.id}/steam`, { method: "DELETE" });
-            if (result) { applyUserResult(result); user = result; activeSettingsTab = "integrations"; render(); showToast("Steam disconnected."); }
-            else { disconnectSteamBtn.disabled = false; showToast("Could not disconnect. Try again."); }
-          });
-        }
+        // Steam is coming soon — no disconnect handler needed
 
         // Roblox disconnect (connect is handled by connect.html)
         const disconnectRobloxBtn = document.getElementById("disconnectRobloxBtn");

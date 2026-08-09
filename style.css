@@ -3631,8 +3631,7 @@ body.mobile .tb-sep {
   color: #15803d;
   font-weight: 500;
   margin-top: 12px;
-  max-width: 220px;
-  min-width: 0;
+  width: fit-content;
   line-height: 1.4;
 }
 .pnp-label-text {
