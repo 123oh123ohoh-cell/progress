@@ -698,7 +698,7 @@ function connectWs(rid) {
         // forceSync=true so the viewer snaps to the exact current position
         if (data.videoId) applyServerState(data, true);
         if (!isLeader && playerReady) startDriftCorrection();
-        appendChatMsg({ body: `🪵 You joined the watch party`, isSystem: true });
+        appendChatMsg({ body: `<img src="images/emoticons/icecream.png" alt="icecream" style="width:20px;height:20px;object-fit:contain;vertical-align:middle;"> You joined the watch party`, isSystem: true });
         break;
       case "play":
         if (!isLeader) {
@@ -920,7 +920,7 @@ function renderWatchShell() {
   const root = document.getElementById("wpRoot");
   root.innerHTML = `
     <div class="wp-topbar">
-      <div class="wp-topbar-title">🪵 Watch Party <span>· ${escapeHTML(roomId)}</span></div>
+      <div class="wp-topbar-title"><img src="images/emoticons/icecream.png" alt="icecream" style="width:20px;height:20px;object-fit:contain;vertical-align:middle;"> Watch Party <span>· ${escapeHTML(roomId)}</span></div>
       <button class="wp-room-code" id="wpShareBtn" title="Copy invite link">🔗 share</button>
       <span class="wp-sync-badge off" id="wpSyncBadge">● connecting…</span>
     </div>
@@ -929,7 +929,7 @@ function renderWatchShell() {
         <div class="wp-video-wrap" id="wpVideoWrap">
           <div id="ytPlayer"></div>
           <div class="wp-video-placeholder" id="wpPlaceholder">
-            <span class="wp-flicker">🕯️</span>
+            <span class="wp-flicker"><img src="images/emoticons/donut_sit.png" alt="donut_sit" style="width:48px;height:48px;object-fit:contain;"></span>
             <span>Waiting for video…</span>
           </div>
           <div class="wp-reactions-layer" id="wpReactionsLayer"></div>
@@ -986,7 +986,7 @@ function renderLobby() {
             <img src="images/emoticons/icecream.png"    alt="" style="width:44px; height:44px; object-fit:contain;" draggable="false">
             <img src="images/emoticons/donut_sit.png"   alt="" style="width:48px; height:48px; object-fit:contain;" draggable="false">
           </div>
-          <div class="wp-lobby-title">🪵 Watch Party</div>
+          <div class="wp-lobby-title"><img src="images/emoticons/icecream.png" alt="icecream" style="width:20px;height:20px;object-fit:contain;vertical-align:middle;"> Watch Party</div>
           <p class="wp-lobby-sub">Start a room, share the link, watch YouTube together — paused when your host pauses, playing when they play.</p>
         </div>
         <div class="wp-lobby-card">
