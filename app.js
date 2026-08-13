@@ -813,6 +813,8 @@ function closeAllDropdowns(except) {
   });
 }
 
+let _dropdownDocumentClickBound = false;
+
 function wireDropdowns() {
   const bellBtn = document.getElementById("bellBtn");
   const avatarBtn = document.getElementById("avatarBtn");
@@ -840,11 +842,14 @@ function wireDropdowns() {
     if (willOpen) accountDD.classList.add("open");
   });
 
-  document.addEventListener("click", (e) => {
-    if (!notifDD.contains(e.target) && e.target !== bellBtn && !accountDD.contains(e.target) && e.target !== avatarBtn) {
-      closeAllDropdowns();
-    }
-  });
+  if (!_dropdownDocumentClickBound) {
+    document.addEventListener("click", (e) => {
+      if (!notifDD.contains(e.target) && e.target !== bellBtn && !accountDD.contains(e.target) && e.target !== avatarBtn) {
+        closeAllDropdowns();
+      }
+    });
+    _dropdownDocumentClickBound = true;
+  }
   notifDD && notifDD.addEventListener("click", (e) => e.stopPropagation());
   accountDD && accountDD.addEventListener("click", (e) => e.stopPropagation());
 
@@ -1688,6 +1693,7 @@ async function _subscribeToPush(reg) {
 }
 
 function initShell(activePage) {
+  const authUserBeforeLoad = (Progress.getCurrentUser() && Progress.getCurrentUser().username) || null;
   applyTheme(getStoredTheme());
   applyCandy();
   setDeviceMode();
@@ -1713,6 +1719,10 @@ function initShell(activePage) {
   return Progress.loadFromApi()
     .catch(() => {})
     .then(async () => {
+      const authUserAfterLoad = (Progress.getCurrentUser() && Progress.getCurrentUser().username) || null;
+      if (authUserAfterLoad !== authUserBeforeLoad) {
+        renderNav(activePage);
+      }
       const banned = await applyBannedOverlayIfNeeded();
       if (!banned) applyLockedOverlayIfNeeded();
       const badge = document.getElementById("bellBadge");

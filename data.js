@@ -382,7 +382,12 @@ function loadDB() {
     parsed.notifications = parsed.notifications || [];
     parsed.comments = parsed.comments || [];
     parsed.currentUser = parsed.currentUser || null;
-    if (API_ENABLED && !getAuthToken()) {
+    const cookieUser = getCurrentUserCookie();
+    const token = getAuthToken();
+    if (!parsed.currentUser && cookieUser && token) {
+      parsed.currentUser = cookieUser;
+    }
+    if (API_ENABLED && !token) {
       parsed.currentUser = null;
     }
     parsed.users = (parsed.users || []).map(u => ({
@@ -453,6 +458,25 @@ function loadDB() {
         delete copy.password;
         return copy;
       });
+    }
+    const cookieUser = getCurrentUserCookie();
+    const token = getAuthToken();
+    if (cookieUser && token) {
+      fallback.currentUser = cookieUser;
+      if (!fallback.users.some(u => u.username === cookieUser)) {
+        fallback.users.push({
+          id: "u" + Date.now(),
+          username: cookieUser,
+          name: cookieUser,
+          avatar: null,
+          joined: new Date().toISOString().slice(0, 10),
+          timezone: DEFAULT_TIMEZONE,
+          following: [],
+          followers: [],
+          bio: "",
+          badges: []
+        });
+      }
     }
     localStorage.setItem(DB_KEY, JSON.stringify(fallback));
     return fallback;
