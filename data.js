@@ -327,7 +327,23 @@ function loadDB() {
         return copy;
       });
     }
-    if (cookieUser && token) base.currentUser = cookieUser;
+    if (cookieUser && token) {
+      base.currentUser = cookieUser;
+      if (!base.users.some(u => u.username === cookieUser)) {
+        base.users.push({
+          id: "u" + Date.now(),
+          username: cookieUser,
+          name: cookieUser,
+          avatar: null,
+          joined: new Date().toISOString().slice(0, 10),
+          timezone: DEFAULT_TIMEZONE,
+          following: [],
+          followers: [],
+          bio: "",
+          badges: []
+        });
+      }
+    }
     try { localStorage.setItem(DB_KEY, JSON.stringify(base)); } catch (e) {}
     return base;
   }
@@ -374,6 +390,22 @@ function loadDB() {
       badges: u.badges || [],
       displayBadge: u.displayBadge || null
     }));
+
+    if (parsed.currentUser && !parsed.users.some(u => u.username === parsed.currentUser)) {
+      parsed.users.push({
+        id: "u" + Date.now(),
+        username: parsed.currentUser,
+        name: parsed.currentUser,
+        avatar: null,
+        joined: new Date().toISOString().slice(0, 10),
+        timezone: DEFAULT_TIMEZONE,
+        following: [],
+        followers: [],
+        bio: "",
+        badges: [],
+        displayBadge: null
+      });
+    }
 
     if (parsed.currentUser) {
       const currentUser = parsed.users.find(u => u.username === parsed.currentUser);
@@ -493,7 +525,30 @@ const Progress = {
 },
 
   async _doLoad() {
-    const savedCurrent = this.getCurrentUser();
+    let savedCurrent = this.getCurrentUser();
+
+    // If token exists but currentUser/user cache was lost, recover from /api/me
+    // before loading the rest of the app state.
+    if (!savedCurrent && API_ENABLED && getAuthToken()) {
+      const me = await apiFetch("/api/me");
+      if (me && me.username) {
+        const existing = this.db.users.find(u => u.username === me.username);
+        const recovered = {
+          ...(existing || {}),
+          ...me,
+          timezone: me.timezone || (existing && existing.timezone) || DEFAULT_TIMEZONE,
+          following: me.following || (existing && existing.following) || [],
+          followers: me.followers || (existing && existing.followers) || [],
+          bio: me.bio || (existing && existing.bio) || "",
+          badges: me.badges || (existing && existing.badges) || []
+        };
+        if (existing) Object.assign(existing, recovered);
+        else this.db.users.push(recovered);
+        this.db.currentUser = me.username;
+        setCurrentUserCookie(me.username);
+        savedCurrent = this.getCurrentUser();
+      }
+    }
 
     // ── Phase 1: load posts first so the feed renders ASAP ──────────────────
     // Posts are the only thing the feed needs to render. Users and notifications
@@ -730,6 +785,7 @@ const Progress = {
         if (existing) Object.assign(existing, user);
         else this.db.users.push(user);
         this.db.currentUser = user.username;
+        setCurrentUserCookie(user.username);
         setAuthToken(token);
         this.persist();
         return { ok: true, user };
@@ -745,6 +801,7 @@ const Progress = {
     const localUser = this.db.users.find(u => u.username.toLowerCase() === normalizedUsername);
     if (!localUser || localUser.password !== passwordValue) return { ok: false, error: "That username and password don't match." };
     this.db.currentUser = localUser.username;
+    setCurrentUserCookie(localUser.username);
     this.persist();
     return { ok: true, user: localUser };
   },
@@ -788,6 +845,7 @@ const Progress = {
         if (existing) Object.assign(existing, user);
         else this.db.users.push(user);
         this.db.currentUser = user.username;
+        setCurrentUserCookie(user.username);
         setAuthToken(token);
         this.persist();
         return { ok: true, user };
@@ -802,6 +860,7 @@ const Progress = {
     const user = { id: "u" + Date.now(), username: normalizedUsername, name: trimmedName, password: passwordValue, avatar: null, joined: new Date().toISOString().slice(0, 10), timezone: DEFAULT_TIMEZONE, following: [], followers: [], bio: "", badges };
     this.db.users.push(user);
     this.db.currentUser = user.username;
+    setCurrentUserCookie(user.username);
     this.persist();
     return { ok: true, user };
   },
