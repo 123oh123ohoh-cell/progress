@@ -123,7 +123,8 @@ const EMOTICON_NAMES = [
   "cow", "dead", "dexterity", "dolphinhead", "fishhead", "hamster", "hi", "jason",
   "kiss", "lion", "mwa", "pancake", "penguin", "poodle", "raincoat", "raindeer",
   "romantic", "shark", "shark2", "sharkcat", "squish", "squuish",
-  "starbucks", "turtle_lazy", "two", "windy", "wonder"
+  "starbucks", "turtle_lazy", "two", "windy", "wonder",
+  "icecream", "donut_couch", "donut_sit"
 ];
 const EMOTICON_NAME_SET = new Set(EMOTICON_NAMES);
 
@@ -134,7 +135,11 @@ function initials(name) {
 
 function avatarHTML(user, size) {
   if (user && user.avatar) return `<img src="${user.avatar}" alt="Avatar">`;
-  if (!user) return `<img src="images/default.jpg" alt="Avatar">`;
+  if (!user) {
+    const hasSession = typeof getAuthToken === "function" && !!getAuthToken();
+    if (hasSession) return `<span class="avatar-loading" aria-hidden="true"></span>`;
+    return `<img src="images/default.jpg" alt="Avatar">`;
+  }
   const label = initials(user.name);
   return `<span class="initials" style="font-size:${size ? size * 0.4 + 'px' : ''}">${label}</span>`;
 }
@@ -1701,6 +1706,14 @@ function initShell(activePage) {
   setDeviceMode();
   window.addEventListener("resize", setDeviceMode);
   initPWA();
+
+  const hasSession = typeof getAuthToken === "function" && !!getAuthToken();
+  const shouldWarmCurrentUser = hasSession && (!authUserBeforeLoad || !authAvatarBeforeLoad);
+  const warmCurrentUser = shouldWarmCurrentUser && typeof Progress.hydrateCurrentUserFromApi === "function"
+    ? Progress.hydrateCurrentUserFromApi(1800).catch(() => {})
+    : Promise.resolve();
+
+  return warmCurrentUser.then(() => {
   renderNav(activePage);
   mountModals();
   bindAuthExpiryHandler();
@@ -1745,6 +1758,7 @@ function initShell(activePage) {
         renderNotifDropdown();
       }
     });
+  });
 }
 /* ============================================================
    MENTION AUTOCOMPLETE

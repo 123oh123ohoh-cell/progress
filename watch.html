@@ -550,10 +550,47 @@ let ignoreStateChange = false;
 let ignoreTimer    = null;
 let reconnecting   = false;
 
+// Drift correction: track what the server last told us about playback
+// so we can periodically check if we've drifted and silently correct.
+let lastKnownServerTime  = null; // Date.now() when the state was received
+let lastKnownCurrentTime = 0;    // video seconds the server reported
+let lastKnownIsPlaying   = false;
+let driftTimer           = null;
+const DRIFT_THRESHOLD    = 2.5;  // seconds — resync if further than this
+const DRIFT_INTERVAL     = 5000; // ms — how often to check
+
 function setIgnore(ms = 2500) {
   ignoreStateChange = true;
   clearTimeout(ignoreTimer);
   ignoreTimer = setTimeout(() => { ignoreStateChange = false; }, ms);
+}
+
+function recordServerState(currentTime, isPlaying, serverTime) {
+  lastKnownCurrentTime = currentTime;
+  lastKnownIsPlaying   = isPlaying;
+  lastKnownServerTime  = serverTime || Date.now();
+}
+
+function startDriftCorrection() {
+  clearInterval(driftTimer);
+  driftTimer = setInterval(() => {
+    // Only viewers need correction; leader controls their own player
+    if (isLeader || !playerReady || !lastKnownServerTime || !lastKnownIsPlaying) return;
+    const elapsed = (Date.now() - lastKnownServerTime) / 1000;
+    const expected = lastKnownCurrentTime + elapsed;
+    const actual   = player.getCurrentTime();
+    const drift    = Math.abs(actual - expected);
+    if (drift > DRIFT_THRESHOLD) {
+      setIgnore(2000);
+      player.seekTo(expected, true);
+      // Don't wpToast — silent correction
+    }
+  }, DRIFT_INTERVAL);
+}
+
+function stopDriftCorrection() {
+  clearInterval(driftTimer);
+  driftTimer = null;
 }
 
 // ── YouTube IFrame API ────────────────────────────────────────────────────────
@@ -573,9 +610,11 @@ window.onYouTubeIframeAPIReady = function() {
       onReady: () => {
         playerReady = true;
         if (window._pendingState) {
-          applyServerState(window._pendingState);
+          // forceSync=true so a viewer who joins mid-video snaps to the right time
+          applyServerState(window._pendingState, true);
           window._pendingState = null;
         }
+        if (!isLeader) startDriftCorrection();
       },
       onStateChange: (event) => {
         if (ignoreStateChange || !isLeader || !ws || ws.readyState !== WebSocket.OPEN) return;
@@ -589,10 +628,16 @@ window.onYouTubeIframeAPIReady = function() {
   });
 };
 
-function applyServerState({ videoId, isPlaying, currentTime, serverTime }) {
-  if (!playerReady) { window._pendingState = { videoId, isPlaying, currentTime, serverTime }; return; }
-  const latency = serverTime ? Math.min((Date.now() - serverTime) / 1000, 8) : 0;
+function applyServerState({ videoId, isPlaying, currentTime, serverTime }, forceSync = false) {
+  if (!playerReady) {
+    // Buffer the state — will be applied in onReady
+    window._pendingState = { videoId, isPlaying, currentTime, serverTime };
+    return;
+  }
+  // Always compensate for round-trip latency so viewers land at the right spot
+  const latency = serverTime ? Math.min((Date.now() - serverTime) / 1000, 10) : 0;
   const target  = Math.max(0, currentTime + (isPlaying ? latency : 0));
+  recordServerState(currentTime, isPlaying, serverTime);
   setIgnore(3000);
   if (videoId && videoId !== currentVideoId) {
     currentVideoId = videoId;
@@ -600,7 +645,11 @@ function applyServerState({ videoId, isPlaying, currentTime, serverTime }) {
     if (isPlaying) player.loadVideoById({ videoId, startSeconds: target });
     else           player.cueVideoById({ videoId, startSeconds: target });
   } else if (videoId) {
-    player.seekTo(target, true);
+    const drift = Math.abs(player.getCurrentTime() - target);
+    // Always seek if forced (e.g. on join) or if drift is noticeable
+    if (forceSync || drift > 1) {
+      player.seekTo(target, true);
+    }
     if (isPlaying) player.playVideo(); else player.pauseVideo();
   }
 }
@@ -629,6 +678,7 @@ function connectWs(rid) {
   ws.onopen = () => { reconnecting = false; updateSyncBadge(true); };
   ws.onclose = () => {
     updateSyncBadge(false);
+    stopDriftCorrection();
     if (roomId && !reconnecting) {
       reconnecting = true;
       setTimeout(() => connectWs(roomId), 4000);
@@ -645,41 +695,43 @@ function connectWs(rid) {
         members       = data.members || [];
         renderControls();
         renderMembers();
-        if (data.videoId) applyServerState(data);
+        // forceSync=true so the viewer snaps to the exact current position
+        if (data.videoId) applyServerState(data, true);
+        if (!isLeader && playerReady) startDriftCorrection();
         appendChatMsg({ body: `🪵 You joined the watch party`, isSystem: true });
         break;
       case "play":
-        if (!isLeader && playerReady) {
+        if (!isLeader) {
           const lat = data.serverTime ? Math.min((Date.now() - data.serverTime) / 1000, 6) : 0;
-          setIgnore();
-          player.seekTo(data.time + lat, true);
-          player.playVideo();
+          const t = data.time + lat;
+          recordServerState(data.time, true, data.serverTime);
+          if (playerReady) { setIgnore(); player.seekTo(t, true); player.playVideo(); }
         }
         logActivity(data.from === myUsername ? "▶ You played" : `▶ <strong>@${escapeHTML(data.from)}</strong> played`);
         break;
       case "pause":
-        if (!isLeader && playerReady) {
-          setIgnore();
-          player.seekTo(data.time, true);
-          player.pauseVideo();
+        if (!isLeader) {
+          recordServerState(data.time, false, Date.now());
+          if (playerReady) { setIgnore(); player.seekTo(data.time, true); player.pauseVideo(); }
         }
         logActivity(data.from === myUsername ? "⏸ You paused" : `⏸ <strong>@${escapeHTML(data.from)}</strong> paused`);
         break;
       case "seek":
-        if (!isLeader && playerReady) {
+        if (!isLeader) {
           const lat = data.serverTime ? Math.min((Date.now() - data.serverTime) / 1000, 5) : 0;
-          setIgnore();
-          player.seekTo(data.time + (data.isPlaying ? lat : 0), true);
-          if (data.isPlaying) player.playVideo(); else player.pauseVideo();
+          const t = data.time + (data.isPlaying ? lat : 0);
+          recordServerState(data.time, data.isPlaying, data.serverTime);
+          if (playerReady) { setIgnore(); player.seekTo(t, true); if (data.isPlaying) player.playVideo(); else player.pauseVideo(); }
         }
         break;
       case "change-video":
+        recordServerState(0, false, Date.now());
         loadVideo(data.videoId, 0, false);
         logActivity(data.from === myUsername
           ? "📺 You changed the video"
           : `📺 <strong>@${escapeHTML(data.from)}</strong> changed the video`);
-        const urlInput = document.getElementById("wpUrlInput");
-        if (urlInput) urlInput.value = `https://youtu.be/${data.videoId}`;
+        { const urlInput = document.getElementById("wpUrlInput");
+          if (urlInput) urlInput.value = `https://youtu.be/${data.videoId}`; }
         break;
       case "leader-changed":
         currentLeader = data.leader;
@@ -688,7 +740,8 @@ function connectWs(rid) {
         renderControls();
         renderMembers();
         logActivity(isLeader ? "👑 You're now the host!" : `👑 <strong>@${escapeHTML(data.leader)}</strong> is now the host`);
-        if (isLeader) wpToast("You're now the host — you control playback.");
+        if (isLeader) { wpToast("You're now the host — you control playback."); stopDriftCorrection(); }
+        else if (playerReady) startDriftCorrection();
         break;
       case "members":
         members = data.members || [];
@@ -698,7 +751,11 @@ function connectWs(rid) {
         showFloatingReaction(data.emoji, data.from);
         break;
       case "state":
-        if (!isLeader) applyServerState(data);
+        // Periodic heartbeat from leader — use to drift-correct
+        if (!isLeader) {
+          recordServerState(data.currentTime, data.isPlaying, data.serverTime);
+          applyServerState(data);
+        }
         break;
       case "chat":
         if (data.from === "system") {
@@ -823,7 +880,16 @@ function showFloatingReaction(emoji, from) {
   if (!layer) return;
   const el = document.createElement("div");
   el.className = "wp-float-emoji";
-  el.textContent = emoji;
+  // If it's an emoticon name (no special chars), render as image
+  if (/^[a-z0-9_]+$/.test(emoji)) {
+    const img = document.createElement("img");
+    img.src = `images/emoticons/${emoji}.png`;
+    img.alt = emoji;
+    img.style.cssText = "width:40px;height:40px;object-fit:contain;";
+    el.appendChild(img);
+  } else {
+    el.textContent = emoji;
+  }
   el.style.left = (12 + Math.random() * 68) + "%";
   el.title = "@" + escapeHTML(from);
   layer.appendChild(el);
@@ -915,6 +981,11 @@ function renderLobby() {
     <div style="max-width:900px; margin:0 auto; padding:0 20px; width:100%;">
       <div class="wp-lobby">
         <div>
+          <div style="display:flex; gap:12px; align-items:flex-end; margin-bottom:6px;">
+            <img src="images/emoticons/donut_couch.png" alt="" style="width:52px; height:52px; object-fit:contain;" draggable="false">
+            <img src="images/emoticons/icecream.png"    alt="" style="width:44px; height:44px; object-fit:contain;" draggable="false">
+            <img src="images/emoticons/donut_sit.png"   alt="" style="width:48px; height:48px; object-fit:contain;" draggable="false">
+          </div>
           <div class="wp-lobby-title">🪵 Watch Party</div>
           <p class="wp-lobby-sub">Start a room, share the link, watch YouTube together — paused when your host pauses, playing when they play.</p>
         </div>

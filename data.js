@@ -537,6 +537,41 @@ const Progress = {
     saveDB(this.db);
   },
 
+  async hydrateCurrentUserFromApi(timeoutMs = 1800) {
+    if (!API_ENABLED || !getAuthToken()) return this.getCurrentUser();
+    const current = this.getCurrentUser();
+    if (current && current.avatar) return current;
+
+    const res = await apiFetchAuth("/api/me", { method: "GET" }, timeoutMs);
+    if (res && res.status === 401) {
+      expireLocalSession();
+      return null;
+    }
+    if (!res || !res.ok || !res.data || !res.data.username) {
+      return this.getCurrentUser();
+    }
+
+    const me = res.data;
+    const existing = this.db.users.find(u => u.username === me.username);
+    const merged = {
+      ...(existing || {}),
+      ...me,
+      timezone: me.timezone || (existing && existing.timezone) || DEFAULT_TIMEZONE,
+      following: me.following || (existing && existing.following) || [],
+      followers: me.followers || (existing && existing.followers) || [],
+      bio: me.bio || (existing && existing.bio) || "",
+      badges: me.badges || (existing && existing.badges) || []
+    };
+
+    if (existing) Object.assign(existing, merged);
+    else this.db.users.push(merged);
+
+    this.db.currentUser = me.username;
+    setCurrentUserCookie(me.username);
+    this.persist();
+    return this.getCurrentUser();
+  },
+
   async loadFromApi() {
     if (!API_ENABLED) return this.db;
     // If a fetch is already in flight, return the same promise
