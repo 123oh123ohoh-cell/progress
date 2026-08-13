@@ -549,7 +549,9 @@ refreshNowPlaying();
           const confirm = document.getElementById("confirmPassField").value;
           if (!current || !next) { showToast("Fill in both password fields."); return; }
           if (next !== confirm) { showToast("New passwords don't match."); return; }
-          if (next.length < 6) { showToast("Password must be at least 6 characters."); return; }
+          if (next === current) { showToast("Your new password must be different from your current one."); return; }
+          const passwordError = Progress.validatePassword ? Progress.validatePassword(next) : null;
+          if (passwordError) { showToast(passwordError); return; }
           const btn = document.getElementById("changePassBtn");
           btn.disabled = true; btn.textContent = "Saving…";
           try {
@@ -970,7 +972,7 @@ refreshNowPlaying();
         // Server confirmed — apply its authoritative response to local state
         const localUser = Progress.db.users.find(u => u.username === user.username);
         if (localUser) {
-          const preserved = { password: localUser.password, email: localUser.email };
+          const preserved = { email: localUser.email };
           Object.assign(localUser, payload, preserved);
           Progress.persist();
         }

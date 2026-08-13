@@ -6,7 +6,7 @@
 
 const DB_KEY = "progress:db:v1";
 const DEFAULT_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-const BACKEND_RENDER_URL = "https://progress-351h.onrender.com";
+const BACKEND_RENDER_URL = "https://progress-p7ko.onrender.com";
 const BACKEND_LOCAL_URL = "http://127.0.0.1:3000";
 const ALLOWED_CREATOR_USERNAMES = new Set(["mara", "own", "progresstesting1"]);
 // Badges awarded automatically based on username. The server independently
@@ -48,29 +48,59 @@ const WS_BASE = (() => {
 })();
 
 const AUTH_TOKEN_KEY = "progress:authToken";
-const SESSION_COOKIE = "progress_session"; // cookie name for cross-context persistence
-const SESSION_COOKIE_DAYS = 90;            // stay logged in for 90 days
+const SESSION_COOKIE = "progress_session";
+const SESSION_COOKIE_DAYS = 90;
+const USERNAME_RE = /^[a-z0-9_.]{3,20}$/;
+const DISPLAY_NAME_MIN_LEN = 2;
+const DISPLAY_NAME_MAX_LEN = 50;
+const PASSWORD_MIN_LEN = 8;
+const PASSWORD_MAX_LEN = 128;
+
+function normalizeUsername(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function validateUsernameInput(username) {
+  if (!username) return "Username is required.";
+  if (!USERNAME_RE.test(username)) {
+    return "Username must be 3-20 characters using lowercase letters, numbers, underscores, or periods.";
+  }
+  return null;
+}
+
+function validateDisplayNameInput(name) {
+  if (!name) return "Display name is required.";
+  if (name.length < DISPLAY_NAME_MIN_LEN || name.length > DISPLAY_NAME_MAX_LEN) {
+    return `Display name must be ${DISPLAY_NAME_MIN_LEN}-${DISPLAY_NAME_MAX_LEN} characters.`;
+  }
+  if (/[\u0000-\u001f\u007f]/.test(name)) {
+    return "Display name contains invalid characters.";
+  }
+  return null;
+}
+
+function validatePasswordInput(password) {
+  if (typeof password !== "string") return "Password is required.";
+  if (password.trim() !== password) return "Password cannot start or end with spaces.";
+  if (password.length < PASSWORD_MIN_LEN || password.length > PASSWORD_MAX_LEN) {
+    return `Password must be ${PASSWORD_MIN_LEN}-${PASSWORD_MAX_LEN} characters.`;
+  }
+  if (!/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {
+    return "Password must include at least one letter and one number.";
+  }
+  return null;
+}
 
 // ── Cookie helpers ──────────────────────────────────────────────────────────
-// Cookies are used as a durable backup alongside localStorage. This matters
-// for two real situations users hit:
-//
-//   1. Safari ITP clears localStorage after 7 days without a visit.
-//      Cookies with an explicit Max-Age are NOT subject to the same rule.
-//
-//   2. iOS "Add to Home Screen" (standalone mode) has its OWN localStorage,
-//      completely separate from the Safari browser. Cookies, however, ARE
-//      shared between standalone mode and Safari on the same device, so a
-//      session started in the browser survives opening from the home screen.
-//
-// We never send credentials in the cookie to the server - it's purely a
-// client-side store that getAuthToken() falls back to when localStorage is
-// empty or unavailable.
+// Cookies are only used for remembering the last known username so the app can
+// gently restore context across browser storage quirks. Auth tokens are kept in
+// localStorage (plus in-memory fallback) and no longer persisted in cookies.
 
 function setCookie(name, value, days) {
   try {
     const expires = new Date(Date.now() + days * 864e5).toUTCString();
-    document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Lax`;
+    const secure = (typeof window !== "undefined" && window.location && window.location.protocol === "https:") ? "; Secure" : "";
+    document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Lax${secure}`;
   } catch (e) {}
 }
 
@@ -82,35 +112,56 @@ function _getCookie(name) {
 }
 
 function deleteCookie(name) {
-  try { document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; SameSite=Lax`; } catch (e) {}
+  try {
+    const secure = (typeof window !== "undefined" && window.location && window.location.protocol === "https:") ? "; Secure" : "";
+    document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; SameSite=Lax${secure}`;
+  } catch (e) {}
 }
 
 // ── Auth token ───────────────────────────────────────────────────────────────
-// The JWT proving who's actually logged in. Stored in both localStorage (fast,
-// first choice) and a long-lived cookie (fallback for Safari ITP + standalone
-// mode). apiFetch/apiFetchAuth attach it automatically to every request.
+// The JWT proving who's logged in. Stored in localStorage and mirrored in
+// memory for environments where localStorage is unavailable.
+
+let _authTokenMemory = null;
+let _authExpiryEventSent = false;
+let _progressRef = null;
 
 function getAuthToken() {
+  let token = null;
   try {
-    return localStorage.getItem(AUTH_TOKEN_KEY) || _getCookie(SESSION_COOKIE + "_token") || null;
+    token = localStorage.getItem(AUTH_TOKEN_KEY) || null;
   } catch (e) {
-    return _getCookie(SESSION_COOKIE + "_token") || null;
+    token = _authTokenMemory;
   }
+  if (token) {
+    _authTokenMemory = token;
+    return token;
+  }
+
+  // Backward-compatible one-time migration for old cookie-based token storage.
+  const legacyCookieToken = _getCookie(SESSION_COOKIE + "_token");
+  if (legacyCookieToken) {
+    _authTokenMemory = legacyCookieToken;
+    try { localStorage.setItem(AUTH_TOKEN_KEY, legacyCookieToken); } catch (e) {}
+    deleteCookie(SESSION_COOKIE + "_token");
+    return legacyCookieToken;
+  }
+  return _authTokenMemory;
 }
 
 function setAuthToken(token) {
+  _authTokenMemory = token || null;
   try {
     if (token) {
       localStorage.setItem(AUTH_TOKEN_KEY, token);
-      setCookie(SESSION_COOKIE + "_token", token, SESSION_COOKIE_DAYS);
     } else {
       localStorage.removeItem(AUTH_TOKEN_KEY);
-      deleteCookie(SESSION_COOKIE + "_token");
     }
   } catch (e) {
-    if (token) setCookie(SESSION_COOKIE + "_token", token, SESSION_COOKIE_DAYS);
-    else deleteCookie(SESSION_COOKIE + "_token");
+    // no-op: in-memory token fallback remains available for this runtime
   }
+  // Cleanup for legacy cookie-based token storage.
+  deleteCookie(SESSION_COOKIE + "_token");
 }
 
 // ── Current-user cookie backup ───────────────────────────────────────────────
@@ -127,60 +178,29 @@ function getCurrentUserCookie() {
   return _getCookie(SESSION_COOKIE + "_user");
 }
 
-// ── Silent re-login ──────────────────────────────────────────────────────────
-// When the server rejects our token (e.g. Render free-tier restarted and
-// regenerated its JWT secret, or the token simply expired), we try to get a
-// fresh token automatically using the stored password rather than forcing the
-// user to type their credentials again.
-//
-// This is safe: passwords are already persisted locally (the login response
-// merges `password` into the user object that goes into localStorage/the DB).
-// All we're doing is reusing them for a silent re-auth in the background.
-
-let _silentReloginInProgress = false;
-
-async function silentRelogin() {
-  if (_silentReloginInProgress) return false;
-  _silentReloginInProgress = true;
+function expireLocalSession() {
+  if (_progressRef && _progressRef.db) {
+    _progressRef.db.currentUser = null;
+    try { _progressRef.persist(); } catch (e) {}
+  }
+  setAuthToken(null);
+  setCurrentUserCookie(null);
   try {
-    // Read credentials directly from localStorage so this function works even
-    // before the Progress object is fully initialised.
-    let username = null;
-    let password = null;
-    try {
-      const raw = localStorage.getItem(DB_KEY);
-      if (raw) {
-        const db = JSON.parse(raw);
-        username = db.currentUser || getCurrentUserCookie();
-        if (username && db.users) {
-          const u = db.users.find(x => x.username === username);
-          password = u && u.password;
-        }
-      }
-    } catch (e) {
-      username = getCurrentUserCookie();
+    const raw = localStorage.getItem(DB_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      parsed.currentUser = null;
+      localStorage.setItem(DB_KEY, JSON.stringify(parsed));
     }
-
-    if (!username || !password) return false;
-
-    const result = await apiFetchAuth("/api/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password })
-    });
-
-    if (result.ok && result.data && result.data.token) {
-      setAuthToken(result.data.token);
-      setCurrentUserCookie(username);
-      return true;
-    }
-    return false;
-  } finally {
-    _silentReloginInProgress = false;
+  } catch (e) {}
+  if (typeof window !== "undefined" && !_authExpiryEventSent) {
+    _authExpiryEventSent = true;
+    window.dispatchEvent(new CustomEvent("progress:auth-expired"));
+    setTimeout(() => { _authExpiryEventSent = false; }, 1000);
   }
 }
 
-async function apiFetch(path, options = {}, _retry = false) {
+async function apiFetch(path, options = {}) {
   try {
     let url = path;
     if (path.startsWith("/api/")) {
@@ -196,13 +216,10 @@ async function apiFetch(path, options = {}, _retry = false) {
     const res = await fetch(url, { ...options, headers, signal: controller.signal });
     clearTimeout(timeout);
 
-    // 401 = server rejected our token (expired, or Render restarted and
-    // regenerated its JWT secret). Try a silent re-login once; if that gets
-    // us a fresh token, replay the original request transparently.
-    if (res.status === 401 && !_retry) {
-      const refreshed = await silentRelogin();
-      if (refreshed) return apiFetch(path, options, true);
-      // Couldn't get a fresh token - the user will need to log in manually.
+    // If the server rejects our token, clear local session state immediately
+    // so the UI can redirect to login instead of continuing with a stale user.
+    if (res.status === 401) {
+      expireLocalSession();
       return null;
     }
 
@@ -297,15 +314,20 @@ function loadDB() {
   try { raw = localStorage.getItem(DB_KEY); } catch (e) {}
 
   if (!raw) {
-    // localStorage is empty or unavailable (Safari ITP cleared it, or the user is
-    // in a standalone home-screen context with separate storage). Check if we have
-    // a cookie that says who was logged in - if so, start from SEED but with that
-    // username set as currentUser so the app shows them as "logged in" immediately.
-    // silentRelogin() will fire on the first authenticated request and get a fresh
-    // JWT, completing the session restore invisibly.
+    // localStorage may be empty or unavailable. Only restore currentUser from the
+    // cookie if we also still have an auth token; otherwise we'd create a
+    // misleading "logged in" state without a valid session.
     const cookieUser = getCurrentUserCookie();
+    const token = getAuthToken();
     const base = JSON.parse(JSON.stringify(SEED));
-    if (cookieUser) base.currentUser = cookieUser;
+    if (API_ENABLED) {
+      base.users = (base.users || []).map(u => {
+        const copy = { ...u };
+        delete copy.password;
+        return copy;
+      });
+    }
+    if (cookieUser && token) base.currentUser = cookieUser;
     try { localStorage.setItem(DB_KEY, JSON.stringify(base)); } catch (e) {}
     return base;
   }
@@ -315,10 +337,10 @@ function loadDB() {
     const seedUsernames = new Set(SEED.users.map(u => u.username));
     const existingMap = new Map((parsed.users || []).map(u => [u.username, u]));
     
-    // Add or refresh seed users to ensure they have correct passwords and data
+    // Add or refresh seed users to ensure baseline data exists.
     for (const seedUser of SEED.users) {
-      if (!existingMap.has(seedUser.username) || !existingMap.get(seedUser.username).password) {
-        // Either user doesn't exist or is corrupted (missing password), so use seed data
+      if (!existingMap.has(seedUser.username) || (!API_ENABLED && !existingMap.get(seedUser.username).password)) {
+        // In API mode we intentionally avoid re-inserting local password fields.
         existingMap.set(seedUser.username, { ...seedUser });
       }
     }
@@ -326,18 +348,27 @@ function loadDB() {
     parsed.users = Array.from(existingMap.values());
     
     // Normalize old saved DB shapes so missing arrays don't break the app.
-    parsed.users = (parsed.users || []).map(u => ({
-      ...u,
-      timezone: u.timezone || DEFAULT_TIMEZONE,
-      joined: u.joined || new Date().toISOString().slice(0, 10),
-      following: u.following || [],
-      followers: u.followers || [],
-      bio: u.bio || ""
-    }));
+    parsed.users = (parsed.users || []).map(u => {
+      const normalized = {
+        ...u,
+        timezone: u.timezone || DEFAULT_TIMEZONE,
+        joined: u.joined || new Date().toISOString().slice(0, 10),
+        following: u.following || [],
+        followers: u.followers || [],
+        bio: u.bio || ""
+      };
+      if (API_ENABLED && Object.prototype.hasOwnProperty.call(normalized, "password")) {
+        delete normalized.password;
+      }
+      return normalized;
+    });
     parsed.posts = parsed.posts || [];
     parsed.notifications = parsed.notifications || [];
     parsed.comments = parsed.comments || [];
     parsed.currentUser = parsed.currentUser || null;
+    if (API_ENABLED && !getAuthToken()) {
+      parsed.currentUser = null;
+    }
     parsed.users = (parsed.users || []).map(u => ({
       ...u,
       badges: u.badges || [],
@@ -383,17 +414,31 @@ function loadDB() {
 
     return parsed;
   } catch (e) {
-    localStorage.setItem(DB_KEY, JSON.stringify(SEED));
-    return JSON.parse(JSON.stringify(SEED));
+    const fallback = JSON.parse(JSON.stringify(SEED));
+    if (API_ENABLED) {
+      fallback.users = (fallback.users || []).map(u => {
+        const copy = { ...u };
+        delete copy.password;
+        return copy;
+      });
+    }
+    localStorage.setItem(DB_KEY, JSON.stringify(fallback));
+    return fallback;
   }
 }
 
 function saveDB(db) {
   // Only save minimal data locally: currentUser and user list.
   // Posts/comments/notifications come from API to avoid localStorage quota issues.
+  const users = (db.users || []).map(u => {
+    if (!API_ENABLED) return u;
+    const copy = { ...u };
+    delete copy.password;
+    return copy;
+  });
   const minimalDb = {
     currentUser: db.currentUser,
-    users: db.users,
+    users,
     posts: [],
     comments: [],
     notifications: []
@@ -410,6 +455,26 @@ const Progress = {
   // Optimistic until we know otherwise; loadFromApi() flips this to false if
   // the backend request fails outright (likely a free-tier cold boot).
   apiOnline: true,
+  authRules: {
+    usernamePattern: "3-20 lowercase letters, numbers, underscores, or periods",
+    passwordPattern: "8-128 chars with at least one letter and one number"
+  },
+
+  normalizeUsername(value) {
+    return normalizeUsername(value);
+  },
+
+  validateUsername(value) {
+    return validateUsernameInput(normalizeUsername(value));
+  },
+
+  validateDisplayName(value) {
+    return validateDisplayNameInput(String(value || "").trim());
+  },
+
+  validatePassword(value) {
+    return validatePasswordInput(value);
+  },
 
   refresh() { this.db = loadDB(); return this.db; },
   persist() {
@@ -473,18 +538,12 @@ const Progress = {
           if (existing.displayBadge && !normalized.displayBadge) normalized.displayBadge = existing.displayBadge;
           if (existing.email) normalized.email = existing.email;
           if (typeof existing.emailNotifications !== "undefined") normalized.emailNotifications = existing.emailNotifications;
-          if (existing.password) normalized.password = existing.password;
         }
         return normalized;
       });
       if (savedCurrent && !this.db.users.some(u => u.username === savedCurrent.username)) {
         this.db.users.push(savedCurrent);
       }
-    } else if (savedCurrent && savedCurrent.password) {
-      this.syncLocalUserToApi(savedCurrent);
-    }
-    if (users && users.length && savedCurrent && !users.some(u => u.username === savedCurrent.username) && savedCurrent.password) {
-      this.syncLocalUserToApi(savedCurrent);
     }
     if (notifications && notifications.length) this.db.notifications = notifications;
 
@@ -504,26 +563,6 @@ const Progress = {
 
     this.persist();
     return this.db;
-  },
-
-  async syncLocalUserToApi(user) {
-    if (this._syncingUser === user.username) return;
-    this._syncingUser = user.username;
-    try {
-      const payload = await apiFetch("/api/users", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: user.username, name: user.name, password: user.password, timezone: user.timezone })
-      });
-      if (payload && !payload.error) {
-        const existing = this.db.users.find(u => u.username === user.username);
-        if (existing) Object.assign(existing, payload, { password: user.password });
-        else this.db.users.push({ ...payload, password: user.password });
-        this.persist();
-      }
-    } finally {
-      this._syncingUser = null;
-    }
   },
 
   async loadComments(postId) {
@@ -665,11 +704,15 @@ const Progress = {
   },
 
   async login(username, password) {
-    username = username.trim();
-    if (!username || !password) return { ok: false, error: "Enter your username and password." };
+    const normalizedUsername = normalizeUsername(username);
+    const passwordValue = typeof password === "string" ? password : "";
+    if (!normalizedUsername || !passwordValue) return { ok: false, error: "Enter your username and password." };
+    if (passwordValue.length > PASSWORD_MAX_LEN) {
+      return { ok: false, error: `Password must be ${PASSWORD_MIN_LEN}-${PASSWORD_MAX_LEN} characters.` };
+    }
 
     if (API_ENABLED) {
-      const loginBody = JSON.stringify({ username, password });
+      const loginBody = JSON.stringify({ username: normalizedUsername, password: passwordValue });
       const headers = { "Content-Type": "application/json" };
       let result = await apiFetchAuth("/api/login", { method: "POST", headers, body: loginBody });
       if (result.status === 0) {
@@ -679,7 +722,7 @@ const Progress = {
       }
       if (result.ok) {
         const { token, ...userData } = result.data;
-        const user = { ...userData, password };
+        const user = { ...userData };
         const existing = this.db.users.find(u => u.username === user.username);
         if (existing) Object.assign(existing, user);
         else this.db.users.push(user);
@@ -689,15 +732,6 @@ const Progress = {
         return { ok: true, user };
       }
       if (result.status === 0) {
-        // The server was genuinely unreachable (offline, or no local dev
-        // backend running) - fall back to a locally cached account instead
-        // of incorrectly telling the user their password is wrong.
-        const localUser = this.db.users.find(u => u.username.toLowerCase() === username.toLowerCase());
-        if (localUser && localUser.password === password) {
-          this.db.currentUser = localUser.username;
-          this.persist();
-          return { ok: true, user: localUser };
-        }
         return { ok: false, error: "Couldn't reach the server. Check your connection and try again in a moment." };
       }
       // The server responded definitively (e.g. 401 invalid credentials) -
@@ -705,32 +739,45 @@ const Progress = {
       return { ok: false, error: result.error || "That username and password don't match." };
     }
 
-    const localUser = this.db.users.find(u => u.username.toLowerCase() === username.toLowerCase());
-    if (!localUser || localUser.password !== password) return { ok: false, error: "That username and password don't match." };
+    const localUser = this.db.users.find(u => u.username.toLowerCase() === normalizedUsername);
+    if (!localUser || localUser.password !== passwordValue) return { ok: false, error: "That username and password don't match." };
     this.db.currentUser = localUser.username;
     this.persist();
     return { ok: true, user: localUser };
   },
 
   async signup(username, name, password) {
-    username = username.trim().toLowerCase();
-    const trimmedName = name.trim();
-    if (!username || !trimmedName || !password) return { ok: false, error: "Fill in every field to continue." };
-    if (this.db.users.some(u => u.username.toLowerCase() === username)) {
+    const normalizedUsername = normalizeUsername(username);
+    const trimmedName = String(name || "").trim();
+    const passwordValue = typeof password === "string" ? password : "";
+
+    if (!normalizedUsername || !trimmedName || !passwordValue) {
+      return { ok: false, error: "Fill in every field to continue." };
+    }
+
+    const usernameError = validateUsernameInput(normalizedUsername);
+    if (usernameError) return { ok: false, error: usernameError };
+    const nameError = validateDisplayNameInput(trimmedName);
+    if (nameError) return { ok: false, error: nameError };
+    const passwordError = validatePasswordInput(passwordValue);
+    if (passwordError) return { ok: false, error: passwordError };
+
+    if (this.db.users.some(u => u.username.toLowerCase() === normalizedUsername)) {
       return { ok: false, error: "That username is already taken." };
     }
-    const badges = SIGNUP_BADGE_AWARDS[username] || [];
+
+    const badges = SIGNUP_BADGE_AWARDS[normalizedUsername] || [];
 
     if (API_ENABLED) {
-      const signupBody = JSON.stringify({ username, name: trimmedName, password, timezone: DEFAULT_TIMEZONE, badges });
+      const signupBody = JSON.stringify({ username: normalizedUsername, name: trimmedName, password: passwordValue, timezone: DEFAULT_TIMEZONE });
       const headers = { "Content-Type": "application/json" };
-      let result = await apiFetchAuth("/api/users", { method: "POST", headers, body: signupBody });
+      let result = await apiFetchAuth("/api/signup", { method: "POST", headers, body: signupBody });
       if (result.status === 0) {
-        result = await apiFetchAuth("/api/users", { method: "POST", headers, body: signupBody }, 20000);
+        result = await apiFetchAuth("/api/signup", { method: "POST", headers, body: signupBody }, 20000);
       }
       if (result.ok) {
         const { token, ...userData } = result.data;
-        const user = { ...userData, password };
+        const user = { ...userData };
         const existing = this.db.users.find(u => u.username === user.username);
         if (existing) Object.assign(existing, user);
         else this.db.users.push(user);
@@ -740,20 +787,13 @@ const Progress = {
         return { ok: true, user };
       }
       if (result.status === 0) {
-        // The server was genuinely unreachable (offline, or no local dev
-        // backend running) - keep the demo usable with a local-only account
-        // instead of silently pretending it exists server-side.
-        const user = { id: "u" + Date.now(), username, name: trimmedName, password, avatar: null, joined: new Date().toISOString().slice(0, 10), timezone: DEFAULT_TIMEZONE, following: [], followers: [], bio: "", badges };
-        this.db.users.push(user);
-        this.db.currentUser = user.username;
-        this.persist();
-        return { ok: true, user, offline: true };
+        return { ok: false, error: "Couldn't reach the server. Please try again in a moment." };
       }
       // The server responded definitively (e.g. 409 username already taken).
       return { ok: false, error: result.error || "That username is already taken." };
     }
 
-    const user = { id: "u" + Date.now(), username, name: trimmedName, password, avatar: null, joined: new Date().toISOString().slice(0, 10), timezone: DEFAULT_TIMEZONE, following: [], followers: [], bio: "", badges };
+    const user = { id: "u" + Date.now(), username: normalizedUsername, name: trimmedName, password: passwordValue, avatar: null, joined: new Date().toISOString().slice(0, 10), timezone: DEFAULT_TIMEZONE, following: [], followers: [], bio: "", badges };
     this.db.users.push(user);
     this.db.currentUser = user.username;
     this.persist();
@@ -786,7 +826,7 @@ const Progress = {
       // undo whatever the user just changed (badge, name, bio, etc.).
       const localUser = this.db.users.find(u => u.username === (payload.username || user.username));
       if (localUser) {
-        const preserved = { password: localUser.password, email: localUser.email };
+        const preserved = { email: localUser.email };
         Object.assign(localUser, payload, preserved);
       }
       this.persist();
@@ -1026,3 +1066,5 @@ const Progress = {
     return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }).toUpperCase();
   }
 };
+
+_progressRef = Progress;

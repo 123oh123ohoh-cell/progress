@@ -907,6 +907,7 @@ function mountModals() {
             <label for="signupPassword">Password</label>
             <input id="signupPassword" type="password" autocomplete="new-password" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" autocapitalize="none" spellcheck="false">
           </div>
+          <p class="sub" style="margin-top:-2px; margin-bottom:10px; font-size:11.5px;">Use 8+ characters with at least one letter and one number.</p>
           <button class="modal-submit" id="signupSubmit">Create account</button>
           <p class="modal-switch">Already have one? <button id="toLogin">Log in</button></p>
         </div>
@@ -965,6 +966,26 @@ function mountModals() {
     const errEl = document.getElementById("signupError");
     errEl.classList.remove("show");
     errEl.textContent = "";
+
+    const usernameError = Progress.validateUsername ? Progress.validateUsername(username) : null;
+    if (usernameError) {
+      errEl.textContent = usernameError;
+      errEl.classList.add("show");
+      return;
+    }
+    const nameError = Progress.validateDisplayName ? Progress.validateDisplayName(name) : null;
+    if (nameError) {
+      errEl.textContent = nameError;
+      errEl.classList.add("show");
+      return;
+    }
+    const passwordError = Progress.validatePassword ? Progress.validatePassword(password) : null;
+    if (passwordError) {
+      errEl.textContent = passwordError;
+      errEl.classList.add("show");
+      return;
+    }
+
     setModalButtonState(signupSubmit, false, "Creating...");
     const stopWaking = withWakingLabel(signupSubmit, "Waking up server\u2026");
     const res = await Progress.signup(username, name, password);
@@ -976,9 +997,7 @@ function mountModals() {
       return;
     }
     hideModal();
-    showToast(res.offline
-      ? "Account created locally. It'll finish syncing once the server's reachable."
-      : `Account created. Welcome, ${res.user.name.split(" ")[0]}.`);
+    showToast(`Account created. Welcome, ${res.user.name.split(" ")[0]}.`);
     setTimeout(() => location.reload(), 500);
   });
 
@@ -1016,6 +1035,24 @@ function showToast(msg) {
   t.textContent = msg;
   t.classList.add("show");
   setTimeout(() => t.classList.remove("show"), 2600);
+}
+
+let _authExpiryHandlerBound = false;
+function bindAuthExpiryHandler() {
+  if (_authExpiryHandlerBound || typeof window === "undefined") return;
+  _authExpiryHandlerBound = true;
+  window.addEventListener("progress:auth-expired", () => {
+    showToast("Your session expired. Please log in again.");
+    const overlay = document.getElementById("modalOverlay");
+    if (overlay) {
+      showModal("login");
+      return;
+    }
+    const path = (location.pathname || "").toLowerCase();
+    if (!path.endsWith("signup.html")) {
+      location.href = "signup.html";
+    }
+  });
 }
 
 const THEME_STORAGE_KEY = "progressTheme";
@@ -1658,6 +1695,7 @@ function initShell(activePage) {
   initPWA();
   renderNav(activePage);
   mountModals();
+  bindAuthExpiryHandler();
   attachNavScrollWatcher();
   openPresenceSocket(activePage);
   // Track page view (fire-and-forget, no auth required)

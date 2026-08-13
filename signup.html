@@ -55,6 +55,7 @@
         <label for="signupPassword">Password</label>
         <input id="signupPassword" type="password" autocomplete="new-password" placeholder="••••••••" autocapitalize="none">
       </div>
+      <p class="signup-sub" style="margin-top:-4px;margin-bottom:12px;font-size:11.5px;">Use 8+ characters with at least one letter and one number.</p>
       <button class="signup-submit" id="signupSubmit">Create account</button>
       <p class="signup-switch">Already have an account? <button id="toLogin">Log in</button></p>
     </div>
@@ -222,8 +223,19 @@
       showErr("signupError", "Fill in every field to continue.");
       return;
     }
-    if (password.length < 6) {
-      showErr("signupError", "Password must be at least 6 characters.");
+    const usernameError = Progress.validateUsername ? Progress.validateUsername(username) : null;
+    if (usernameError) {
+      showErr("signupError", usernameError);
+      return;
+    }
+    const nameError = Progress.validateDisplayName ? Progress.validateDisplayName(name) : null;
+    if (nameError) {
+      showErr("signupError", nameError);
+      return;
+    }
+    const passwordError = Progress.validatePassword ? Progress.validatePassword(password) : null;
+    if (passwordError) {
+      showErr("signupError", passwordError);
       return;
     }
     setBtn("signupSubmit", false, "Creating account…");

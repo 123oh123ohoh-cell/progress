@@ -1,5 +1,5 @@
 {
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "https://progress-351h.onrender.com/api/$1" }
+    { "source": "/api/(.*)", "destination": "https://progress-p7ko.onrender.com/api/$1" }
   ]
 }

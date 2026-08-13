@@ -225,6 +225,58 @@ function isLegacyPassword(stored) {
   return typeof stored === "string" && !stored.startsWith("scrypt:");
 }
 
+const USERNAME_RE = /^[a-z0-9_.]{3,20}$/;
+const DISPLAY_NAME_MIN_LEN = 2;
+const DISPLAY_NAME_MAX_LEN = 50;
+const PASSWORD_MIN_LEN = 8;
+const PASSWORD_MAX_LEN = 128;
+const AUTH_LOCK_THRESHOLD = 8;
+const AUTH_LOCK_WINDOW_MS = 15 * 60 * 1000;
+
+function normalizeUsernameInput(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function validateUsernameInput(username) {
+  if (!username) return "Username is required.";
+  if (!USERNAME_RE.test(username)) {
+    return "Username must be 3-20 characters using lowercase letters, numbers, underscores, or periods.";
+  }
+  return null;
+}
+
+function validateDisplayNameInput(name) {
+  if (!name) return "Display name is required.";
+  if (name.length < DISPLAY_NAME_MIN_LEN || name.length > DISPLAY_NAME_MAX_LEN) {
+    return `Display name must be ${DISPLAY_NAME_MIN_LEN}-${DISPLAY_NAME_MAX_LEN} characters.`;
+  }
+  if (/[\u0000-\u001f\u007f]/.test(name)) {
+    return "Display name contains invalid characters.";
+  }
+  return null;
+}
+
+function validatePasswordInput(password) {
+  if (typeof password !== "string") {
+    return "Password is required.";
+  }
+  if (password.trim() !== password) {
+    return "Password cannot start or end with spaces.";
+  }
+  if (password.length < PASSWORD_MIN_LEN || password.length > PASSWORD_MAX_LEN) {
+    return `Password must be ${PASSWORD_MIN_LEN}-${PASSWORD_MAX_LEN} characters.`;
+  }
+  if (!/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {
+    return "Password must include at least one letter and one number.";
+  }
+  return null;
+}
+
+function formatLockDuration(lockMs) {
+  const mins = Math.max(1, Math.ceil(lockMs / 60000));
+  return mins === 1 ? "1 minute" : `${mins} minutes`;
+}
+
 async function notifyBadgesAwarded(username, badgeIds) {
   if (!badgeIds.length) return;
   for (const badgeId of badgeIds) {
@@ -1347,7 +1399,7 @@ const CSP_HEADER = [
   "img-src 'self' data: https:",
   "media-src 'self' https:",
   "frame-src https://open.spotify.com https://www.youtube-nocookie.com https://www.youtube.com",
-  "connect-src 'self' https://progress-351h.onrender.com wss://progress-351h.onrender.com"
+  "connect-src 'self' https://progress-p7ko.onrender.com wss://progress-p7ko.onrender.com"
 ].join("; ");
 
 app.use((req, res, next) => {
@@ -1431,8 +1483,8 @@ app.use("/api", generalApiRateLimit);
 //   • the maintenance status check itself
 app.use("/api", (req, res, next) => {
   if (!_maintenanceMode) return next();
-  const exempt = ["/login", "/signup", "/forgot", "/reset-password"];
-  const isExempt = exempt.includes(req.path) ||
+  const isAuthWrite = req.method === "POST" && ["/login", "/signup", "/users", "/forgot", "/reset-password"].includes(req.path);
+  const isExempt = isAuthWrite ||
                    req.path.startsWith("/admin/") ||
                    req.path === "/admin/maintenance";
   if (isExempt) return next();
@@ -1530,33 +1582,49 @@ app.get("/api/users/:id/stats", asyncHandler(async (req, res) => {
   });
 }));
 
-app.post("/api/users", signupRateLimit, asyncHandler(async (req, res) => {
-  const { username, name, password, timezone } = req.body;
-  if (!username || !name || !password) return res.status(400).json({ error: "username, name, and password are required" });
-  const normalizedUsername = username.trim().toLowerCase();
-  if (!normalizedUsername) return res.status(400).json({ error: "username, name, and password are required" });
-  const existing = await db.collection("users").findOne({ username: { $regex: `^${escapeRegex(normalizedUsername)}$`, $options: "i" } });
+const createUserRouteHandler = asyncHandler(async (req, res) => {
+  const username = normalizeUsernameInput(req.body && req.body.username);
+  const displayName = String((req.body && req.body.name) || "").trim();
+  const password = typeof (req.body && req.body.password) === "string" ? req.body.password : "";
+  const timezone = typeof (req.body && req.body.timezone) === "string" ? req.body.timezone : "";
+
+  const usernameError = validateUsernameInput(username);
+  if (usernameError) return res.status(400).json({ error: usernameError });
+  const nameError = validateDisplayNameInput(displayName);
+  if (nameError) return res.status(400).json({ error: nameError });
+  const passwordError = validatePasswordInput(password);
+  if (passwordError) return res.status(400).json({ error: passwordError });
+
+  const existing = await db.collection("users").findOne({ username: { $regex: `^${escapeRegex(username)}$`, $options: "i" } });
   if (existing) return res.status(409).json({ error: "Username already taken" });
+
+  const nowIso = new Date().toISOString();
   const user = {
     _id: generateId("u"),
-    username: normalizedUsername,
-    name,
+    username,
+    name: displayName,
     password: hashPassword(password),
     avatar: null,
-    joined: new Date().toISOString().slice(0, 10),
+    joined: nowIso.slice(0, 10),
     timezone: timezone || DEFAULT_TIMEZONE,
     following: [],
     followers: [],
     bio: "",
     spotify: "",
-    badges: SIGNUP_BADGE_AWARDS[normalizedUsername] || []
+    badges: SIGNUP_BADGE_AWARDS[username] || [],
+    failedLoginAttempts: 0,
+    lockUntil: null,
+    passwordChangedAt: nowIso
   };
   await db.collection("users").insertOne(user);
-  await notifyBadgesAwarded(normalizedUsername, user.badges);
+  await notifyBadgesAwarded(username, user.badges);
   const adminRole = ALLOWED_CREATOR_USERNAMES.has(user.username) ? "owner" : (user.adminRole || null);
   const token = signJWT({ username: user.username, id: user._id, adminRole });
   res.status(201).json({ ...publicUser(normalizeUser(user)), token });
-}));
+});
+
+app.post("/api/signup", signupRateLimit, createUserRouteHandler);
+app.post("/api/users", signupRateLimit, createUserRouteHandler);
 
 app.patch("/api/users/:id", requireAuth, asyncHandler(async (req, res) => {
   const users = db.collection("users");
@@ -3222,27 +3290,74 @@ async function computeAndSaveStreak(user) {
 }
 
 app.post("/api/account/password", requireAuth, asyncHandler(async (req, res) => {
-  const { currentPassword, newPassword } = req.body;
+  const currentPassword = typeof (req.body && req.body.currentPassword) === "string" ? req.body.currentPassword : "";
+  const newPassword = typeof (req.body && req.body.newPassword) === "string" ? req.body.newPassword : "";
   if (!currentPassword || !newPassword) return res.status(400).json({ error: "Both current and new password are required." });
-  if (newPassword.length < 6) return res.status(400).json({ error: "New password must be at least 6 characters." });
+  if (newPassword === currentPassword) return res.status(400).json({ error: "Your new password must be different from your current one." });
+  const passwordError = validatePasswordInput(newPassword);
+  if (passwordError) return res.status(400).json({ error: passwordError });
   const users = db.collection("users");
   const user = await users.findOne({ _id: req.user.id });
   if (!user) return res.status(404).json({ error: "User not found." });
   if (!verifyPassword(currentPassword, user.password)) return res.status(401).json({ error: "Current password is incorrect." });
   const hashed = hashPassword(newPassword);
-  await users.updateOne({ _id: user._id }, { $set: { password: hashed } });
+  await users.updateOne(
+    { _id: user._id },
+    {
+      $set: {
+        password: hashed,
+        passwordChangedAt: new Date().toISOString(),
+        failedLoginAttempts: 0,
+        lockUntil: null
+      }
+    }
+  );
   res.json({ ok: true });
 }));
 
 app.post("/api/login", loginRateLimit, asyncHandler(async (req, res) => {
-  const { username, password } = req.body;
+  const username = normalizeUsernameInput(req.body && req.body.username);
+  const password = typeof (req.body && req.body.password) === "string" ? req.body.password : "";
   if (!username || !password) return res.status(400).json({ error: "username and password are required" });
-  let user = await db.collection("users").findOne({ username: { $regex: `^${escapeRegex(username)}$`, $options: "i" } });
-  if (!user || !verifyPassword(password, user.password)) return res.status(401).json({ error: "Invalid credentials" });
+
+  const users = db.collection("users");
+  let user = await users.findOne({ username: { $regex: `^${escapeRegex(username)}$`, $options: "i" } });
+  if (!user) return res.status(401).json({ error: "Invalid credentials" });
+
+  const now = Date.now();
+  if (typeof user.lockUntil === "number" && user.lockUntil > now) {
+    const retryAfterSeconds = Math.max(1, Math.ceil((user.lockUntil - now) / 1000));
+    res.setHeader("Retry-After", String(retryAfterSeconds));
+    return res.status(429).json({ error: `Too many failed attempts. Try again in ${formatLockDuration(user.lockUntil - now)}.` });
+  }
+
+  if (!verifyPassword(password, user.password)) {
+    const failedAttempts = (typeof user.failedLoginAttempts === "number" ? user.failedLoginAttempts : 0) + 1;
+    const shouldLock = failedAttempts >= AUTH_LOCK_THRESHOLD;
+    const lockUntil = shouldLock ? now + AUTH_LOCK_WINDOW_MS : null;
+    await users.updateOne(
+      { _id: user._id },
+      { $set: { failedLoginAttempts: shouldLock ? 0 : failedAttempts, lockUntil } }
+    );
+    if (shouldLock) {
+      const retryAfterSeconds = Math.max(1, Math.ceil(AUTH_LOCK_WINDOW_MS / 1000));
+      res.setHeader("Retry-After", String(retryAfterSeconds));
+      return res.status(429).json({ error: `Too many failed attempts. Account locked for ${formatLockDuration(AUTH_LOCK_WINDOW_MS)}.` });
+    }
+    return res.status(401).json({ error: "Invalid credentials" });
+  }
+
+  const loginUpdate = {
+    failedLoginAttempts: 0,
+    lockUntil: null,
+    lastAuthSuccessAt: new Date().toISOString()
+  };
   if (isLegacyPassword(user.password)) {
     user.password = hashPassword(password);
-    await db.collection("users").updateOne({ _id: user._id }, { $set: { password: user.password } });
+    loginUpdate.password = user.password;
   }
+  await users.updateOne({ _id: user._id }, { $set: loginUpdate });
+
   await ensureUsernameBadges(user);
   user = await computeAndSaveStreak(user);
   const adminRole = ALLOWED_CREATOR_USERNAMES.has(user.username) ? "owner" : (user.adminRole || null);
