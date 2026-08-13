@@ -643,6 +643,7 @@ function renderNav(activePage) {
         <img class="nav-logo-image" src="images/nearheader.png" alt="" loading="lazy">
       </a>
       <div class="nav-right">
+        <a href="watch.html" class="nav-new nav-watch-link" title="Watch Party"><img src="images/emoticons/icecream.png" alt="" style="width:18px;height:18px;object-fit:contain;vertical-align:middle;margin-right:4px;">watch</a>
         <a href="chat.html" class="nav-new nav-chat-link">chat</a>
         ${user ? `<a href="write.html" class="nav-new">+ new entry</a>` : ""}
         <div class="bell-wrap">

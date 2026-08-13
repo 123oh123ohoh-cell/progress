@@ -407,47 +407,90 @@
     to   { opacity: 1; transform: translateY(0); }
   }
   /* ── Create / join lobby ───────────────────────────────────────────────── */
-  .wp-lobby {
-    max-width: 480px;
-    margin: 0 auto;
-    padding: 60px 24px 40px;
+  .wp-lobby-page {
+    min-height: calc(100vh - 60px);
     display: flex;
     flex-direction: column;
-    gap: 24px;
+    align-items: center;
+    padding: 0 20px 60px;
+  }
+  .wp-lobby-hero {
+    width: 100%;
+    max-width: 700px;
+    text-align: center;
+    padding: 64px 0 48px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
+  .wp-lobby-hero-img {
+    width: 72px;
+    height: 72px;
+    object-fit: contain;
+    filter: drop-shadow(0 4px 12px rgba(0,0,0,.12));
   }
   .wp-lobby-title {
     font-family: var(--font-display);
-    font-size: 28px;
-    font-weight: 600;
+    font-size: 36px;
+    font-weight: 700;
     color: var(--ink);
-    line-height: 1.2;
+    line-height: 1.1;
+    letter-spacing: -.5px;
   }
   .wp-lobby-sub {
     font-size: 15px;
     color: var(--muted);
-    line-height: 1.6;
-    margin-top: -8px;
+    line-height: 1.65;
+    max-width: 420px;
+  }
+  .wp-lobby-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    width: 100%;
+    max-width: 700px;
+  }
+  @media (max-width: 560px) {
+    .wp-lobby-cards { grid-template-columns: 1fr; }
+    .wp-lobby-title { font-size: 28px; }
   }
   .wp-lobby-card {
     background: var(--paper);
     border: 1px solid var(--mocha-light);
-    border-radius: 12px;
-    padding: 20px;
+    border-radius: 16px;
+    padding: 24px;
     display: flex;
     flex-direction: column;
     gap: 14px;
+    transition: box-shadow .15s, border-color .15s;
+  }
+  .wp-lobby-card:hover {
+    box-shadow: 0 4px 20px rgba(0,0,0,.07);
+    border-color: var(--mocha);
+  }
+  .wp-lobby-card-icon {
+    font-size: 22px;
+    line-height: 1;
   }
   .wp-lobby-card-label {
-    font-size: 13px;
+    font-family: var(--font-display);
+    font-size: 16px;
     font-weight: 600;
     color: var(--ink);
+  }
+  .wp-lobby-card-desc {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.55;
+    margin-top: -6px;
   }
   .wp-lobby-input {
     width: 100%;
     padding: 10px 14px;
     border-radius: 8px;
     border: 1px solid var(--mocha-light);
-    background: var(--mocha-wash);
+    background: var(--cream);
     color: var(--ink);
     font-family: var(--font-body);
     font-size: 14px;
@@ -457,18 +500,18 @@
   }
   .wp-lobby-input::placeholder { color: var(--muted); }
   .wp-lobby-input:focus { border-color: var(--mocha); }
-  .wp-lobby-divider {
+  .wp-lobby-pills {
     display: flex;
-    align-items: center;
-    gap: 12px;
-    color: var(--muted);
-    font-size: 13px;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: -4px;
   }
-  .wp-lobby-divider::before, .wp-lobby-divider::after {
-    content: "";
-    flex: 1;
-    height: 1px;
-    background: var(--mocha-light);
+  .wp-lobby-pill {
+    font-size: 11.5px;
+    color: var(--muted);
+    background: var(--mocha-wash);
+    border-radius: 20px;
+    padding: 3px 10px;
   }
   /* toast */
   .wp-toast {
@@ -642,11 +685,20 @@ function applyServerState({ videoId, isPlaying, currentTime, serverTime }, force
   if (videoId && videoId !== currentVideoId) {
     currentVideoId = videoId;
     hidePlaceholder();
-    // On forceSync (viewer joining), always load so the video appears at the right frame;
-    // then immediately pause if the host isn't playing.
     if (isPlaying || forceSync) {
+      // Mute first so browsers never block autoplay; viewer can unmute via player controls
+      player.mute();
       player.loadVideoById({ videoId, startSeconds: target });
-      if (!isPlaying) setTimeout(() => { try { player.pauseVideo(); } catch(e){} }, 800);
+      // After the video starts, do a precise seek and restore play/pause state
+      setTimeout(() => {
+        try {
+          player.seekTo(target, true);
+          if (isPlaying) { player.playVideo(); }
+          else           { player.pauseVideo(); }
+          // Auto-unmute after a beat so the seek lands first
+          setTimeout(() => { try { player.unMute(); } catch(e){} }, 600);
+        } catch(e) {}
+      }, 800);
     } else {
       player.cueVideoById({ videoId, startSeconds: target });
     }
@@ -923,7 +975,7 @@ function renderWatchShell() {
   const root = document.getElementById("wpRoot");
   root.innerHTML = `
     <div class="wp-topbar">
-      <div class="wp-topbar-title" style="display:flex;align-items:center;gap:8px;"><img src="images/emoticons/icecream.png" alt="" style="width:22px;height:22px;object-fit:contain;flex-shrink:0;"> <span>Watch Party <span style="color:var(--muted);font-weight:400;">· ${escapeHTML(roomId)}</span></span></div>
+      <div class="wp-topbar-title" style="display:flex;align-items:center;gap:8px;color:#000;"><img src="images/emoticons/icecream.png" alt="" style="width:22px;height:22px;object-fit:contain;flex-shrink:0;"> <span>Watch Party <span style="color:#888;font-weight:400;">· ${escapeHTML(roomId)}</span></span></div>
       <button class="wp-room-code" id="wpShareBtn" title="Copy invite link">🔗 share</button>
       <span class="wp-sync-badge off" id="wpSyncBadge">● connecting…</span>
     </div>
@@ -981,32 +1033,30 @@ function renderWatchShell() {
 function renderLobby() {
   const root = document.getElementById("wpRoot");
   root.innerHTML = `
-    <div style="max-width:900px; margin:0 auto; padding:0 20px; width:100%;">
-      <div class="wp-lobby">
-        <div>
-          <div class="wp-lobby-title" style="display:flex;align-items:center;gap:12px;">
-            <img src="images/emoticons/icecream.png" alt="" style="width:44px;height:44px;object-fit:contain;flex-shrink:0;" draggable="false">
-            <span>Watch Party</span>
-          </div>
-          <p class="wp-lobby-sub">Start a room, share the link, watch YouTube together — paused when your host pauses, playing when they play.</p>
-        </div>
+    <div class="wp-lobby-page">
+      <div class="wp-lobby-hero">
+        <img class="wp-lobby-hero-img" src="images/emoticons/icecream.png" alt="" draggable="false">
+        <div class="wp-lobby-title">Watch Party</div>
+        <p class="wp-lobby-sub">Start a room, paste a YouTube link, and watch together — perfectly in sync.</p>
+      </div>
+      <div class="wp-lobby-cards">
         <div class="wp-lobby-card">
-          <div class="wp-lobby-card-label">Start a new room</div>
+          <div class="wp-lobby-card-icon">✨</div>
+          <div class="wp-lobby-card-label">Start a room</div>
+          <p class="wp-lobby-card-desc">You're the host — you control play, pause, and what's on screen.</p>
           <input class="wp-lobby-input" id="lobbyUrlInput" type="text"
-            placeholder="Paste a YouTube link (optional — you can add one later)"
+            placeholder="YouTube link (optional)"
             autocomplete="off" autocorrect="off" spellcheck="false">
-          <button class="wp-ctrl-btn primary" id="lobbyCreateBtn" style="align-self:flex-start; padding:10px 22px;">Create room</button>
+          <button class="wp-ctrl-btn primary" id="lobbyCreateBtn" style="align-self:flex-start;">Create room</button>
         </div>
-        <div class="wp-lobby-divider">or join an existing room</div>
         <div class="wp-lobby-card">
-          <div class="wp-lobby-card-label">Join with a room code</div>
-          <div style="display:flex; gap:8px;">
-            <input class="wp-lobby-input" id="lobbyJoinInput" type="text"
-              placeholder="Room code (6 characters)"
-              autocomplete="off" autocorrect="off" spellcheck="false"
-              style="max-width:220px;">
-            <button class="wp-ctrl-btn" id="lobbyJoinBtn">Join</button>
-          </div>
+          <div class="wp-lobby-card-icon">🔗</div>
+          <div class="wp-lobby-card-label">Join a room</div>
+          <p class="wp-lobby-card-desc">Got an invite code? Drop it in and you'll sync right up.</p>
+          <input class="wp-lobby-input" id="lobbyJoinInput" type="text"
+            placeholder="Room code"
+            autocomplete="off" autocorrect="off" spellcheck="false">
+          <button class="wp-ctrl-btn" id="lobbyJoinBtn" style="align-self:flex-start;">Join room</button>
         </div>
       </div>
     </div>`;
@@ -1131,15 +1181,6 @@ function leaveRoom() {
 
 window.addEventListener("beforeunload", leaveRoom);
 
-// Also leave if tab becomes hidden for good (mobile background kill, etc.)
-document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "hidden" && ws) {
-    // Give it a moment — if the tab comes back quickly we reconnect anyway
-    setTimeout(() => {
-      if (document.visibilityState === "hidden") leaveRoom();
-    }, 15000);
-  }
-});
 </script>
 </body>
 </html>
