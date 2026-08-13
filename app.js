@@ -1693,7 +1693,9 @@ async function _subscribeToPush(reg) {
 }
 
 function initShell(activePage) {
-  const authUserBeforeLoad = (Progress.getCurrentUser() && Progress.getCurrentUser().username) || null;
+  const _userBefore = Progress.getCurrentUser();
+  const authUserBeforeLoad = (_userBefore && _userBefore.username) || null;
+  const authAvatarBeforeLoad = (_userBefore && _userBefore.avatar) || null;
   applyTheme(getStoredTheme());
   applyCandy();
   setDeviceMode();
@@ -1719,8 +1721,11 @@ function initShell(activePage) {
   return Progress.loadFromApi()
     .catch(() => {})
     .then(async () => {
-      const authUserAfterLoad = (Progress.getCurrentUser() && Progress.getCurrentUser().username) || null;
-      if (authUserAfterLoad !== authUserBeforeLoad) {
+      const _userAfter = Progress.getCurrentUser();
+      const authUserAfterLoad = (_userAfter && _userAfter.username) || null;
+      const authAvatarAfterLoad = (_userAfter && _userAfter.avatar) || null;
+      // Re-render if login state changed OR if avatar was freshly loaded from API
+      if (authUserAfterLoad !== authUserBeforeLoad || authAvatarAfterLoad !== authAvatarBeforeLoad) {
         renderNav(activePage);
       }
       const banned = await applyBannedOverlayIfNeeded();

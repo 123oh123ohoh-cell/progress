@@ -313,22 +313,95 @@
     transition: color .12s, border-color .12s;
   }
   .wp-transfer-btn:hover { color: var(--ink); border-color: var(--mocha); }
-  /* Sidebar activity log */
-  .wp-activity {
+  /* ── Sidebar chat ──────────────────────────────────────────────────────── */
+  .wp-chat {
     flex: 1;
-    overflow-y: auto;
-    padding: 12px 16px;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    overflow: hidden;
+    min-height: 0;
   }
-  .wp-activity-item {
-    font-size: 12.5px;
+  .wp-chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    scroll-behavior: smooth;
+  }
+  .wp-chat-msg {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    animation: fadeInUp .18s ease;
+  }
+  .wp-chat-msg.is-system .wp-chat-body {
     color: var(--muted);
-    line-height: 1.5;
-    animation: fadeInUp .25s ease;
+    font-style: italic;
+    font-size: 11.5px;
   }
-  .wp-activity-item strong { color: var(--ink); font-weight: 500; }
+  .wp-chat-meta {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+  }
+  .wp-chat-author {
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--mocha);
+    line-height: 1;
+  }
+  .wp-chat-time {
+    font-size: 10px;
+    color: var(--muted);
+    font-family: var(--font-mono);
+  }
+  .wp-chat-body {
+    font-size: 13px;
+    color: var(--ink);
+    line-height: 1.45;
+    word-break: break-word;
+  }
+  .wp-chat-input-row {
+    display: flex;
+    gap: 6px;
+    padding: 10px 12px;
+    border-top: 1px solid var(--mocha-light);
+    flex-shrink: 0;
+    background: var(--paper);
+  }
+  .wp-chat-input {
+    flex: 1;
+    min-width: 0;
+    padding: 7px 11px;
+    border-radius: 8px;
+    border: 1px solid var(--mocha-light);
+    background: var(--mocha-wash);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 13px;
+    outline: none;
+    transition: border-color .15s;
+    resize: none;
+  }
+  .wp-chat-input::placeholder { color: var(--muted); }
+  .wp-chat-input:focus { border-color: var(--mocha); }
+  .wp-chat-send {
+    padding: 7px 13px;
+    border-radius: 8px;
+    border: 1px solid var(--mocha-light);
+    background: var(--mocha);
+    color: var(--paper);
+    font-family: var(--font-body);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: filter .12s;
+  }
+  .wp-chat-send:hover { filter: brightness(1.1); }
+  .wp-chat-send:disabled { opacity: .4; cursor: not-allowed; }
   @keyframes fadeInUp {
     from { opacity: 0; transform: translateY(4px); }
     to   { opacity: 1; transform: translateY(0); }
@@ -573,7 +646,7 @@ function connectWs(rid) {
         renderControls();
         renderMembers();
         if (data.videoId) applyServerState(data);
-        logActivity("🪵 You joined the watch party");
+        appendChatMsg({ body: `🪵 You joined the watch party`, isSystem: true });
         break;
       case "play":
         if (!isLeader && playerReady) {
@@ -626,6 +699,13 @@ function connectWs(rid) {
         break;
       case "state":
         if (!isLeader) applyServerState(data);
+        break;
+      case "chat":
+        if (data.from === "system") {
+          appendChatMsg({ body: data.body, isSystem: true, ts: data.ts });
+        } else {
+          appendChatMsg({ author: data.from, body: data.body, ts: data.ts });
+        }
         break;
     }
   };
@@ -710,15 +790,32 @@ function renderMembers() {
   });
 }
 
-function logActivity(html) {
-  const container = document.getElementById("wpActivity");
+function appendChatMsg({ author, body, isSystem = false, ts }) {
+  const container = document.getElementById("wpChatMessages");
   if (!container) return;
-  const item = document.createElement("div");
-  item.className = "wp-activity-item";
-  item.innerHTML = html;
-  container.appendChild(item);
-  while (container.children.length > 30) container.removeChild(container.firstChild);
+  const msg = document.createElement("div");
+  msg.className = "wp-chat-msg" + (isSystem ? " is-system" : "");
+  const timeStr = ts ? new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
+  if (isSystem) {
+    msg.innerHTML = `<div class="wp-chat-body">${body}</div>`;
+  } else {
+    msg.innerHTML = `
+      <div class="wp-chat-meta">
+        <span class="wp-chat-author">@${escapeHTML(author)}</span>
+        ${timeStr ? `<span class="wp-chat-time">${timeStr}</span>` : ""}
+      </div>
+      <div class="wp-chat-body">${escapeHTML(body)}</div>`;
+  }
+  container.appendChild(msg);
+  while (container.children.length > 120) container.removeChild(container.firstChild);
   container.scrollTop = container.scrollHeight;
+}
+
+function logActivity(html) {
+  // Kept for backward compat — route playback events into chat as system msgs
+  const tmp = document.createElement("div");
+  tmp.innerHTML = html;
+  appendChatMsg({ body: tmp.innerHTML, isSystem: true });
 }
 
 function showFloatingReaction(emoji, from) {
@@ -731,6 +828,25 @@ function showFloatingReaction(emoji, from) {
   el.title = "@" + escapeHTML(from);
   layer.appendChild(el);
   setTimeout(() => el.remove(), 2600);
+}
+
+// ── Chat input wiring ─────────────────────────────────────────────────────────
+function wireChatInput() {
+  const input = document.getElementById("wpChatInput");
+  const btn   = document.getElementById("wpChatSend");
+  if (!input || !btn) return;
+
+  function sendChat() {
+    const body = input.value.trim();
+    if (!body || !ws || ws.readyState !== WebSocket.OPEN) return;
+    ws.send(JSON.stringify({ type: "chat", body }));
+    input.value = "";
+  }
+
+  btn.addEventListener("click", sendChat);
+  input.addEventListener("keydown", e => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChat(); }
+  });
 }
 
 // ── Room watch shell ──────────────────────────────────────────────────────────
@@ -761,8 +877,19 @@ function renderWatchShell() {
             <p style="color:var(--muted);font-size:13px;">Connecting…</p>
           </div>
         </div>
-        <div class="wp-activity" id="wpActivity">
-          <div class="wp-activity-item" style="color:var(--muted);">The party just started 🎉</div>
+        <div class="wp-chat">
+          <div class="wp-sidebar-label" style="padding:10px 14px 0; flex-shrink:0;">Chat</div>
+          <div class="wp-chat-messages" id="wpChatMessages">
+            <div class="wp-chat-msg is-system">
+              <div class="wp-chat-body">The party just started 🎉</div>
+            </div>
+          </div>
+          <div class="wp-chat-input-row">
+            <input class="wp-chat-input" id="wpChatInput" type="text"
+              placeholder="Say something…" autocomplete="off" autocorrect="off"
+              spellcheck="false" maxlength="500">
+            <button class="wp-chat-send" id="wpChatSend">Send</button>
+          </div>
         </div>
       </aside>
     </div>`;
@@ -772,6 +899,8 @@ function renderWatchShell() {
     try { await navigator.clipboard.writeText(link); wpToast("Invite link copied!"); }
     catch { wpToast("Share: " + link); }
   });
+
+  wireChatInput();
 
   // Re-init YouTube player after DOM is ready
   if (window.YT && window.YT.Player) {

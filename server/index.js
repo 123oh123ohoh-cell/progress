@@ -4626,6 +4626,48 @@ app.get("/api/users/:id/roblox/presence", asyncHandler(async (req, res) => {
   } catch(e) { return res.json({ connected: true, presence: null }); }
 }));
 
+// ── Watch Party ───────────────────────────────────────────────────────────────
+const watchRooms = new Map(); // roomId → { videoId, isPlaying, currentTime, updatedAt, leader, members }
+
+function generateWatchRoomId() {
+  return Math.random().toString(36).slice(2, 8).toUpperCase();
+}
+
+function broadcastToWatchRoom(roomId, msg) {
+  const room = watchRooms.get(roomId);
+  if (!room) return;
+  const payload = JSON.stringify(msg);
+  for (const [ws] of room.members) {
+    if (ws.readyState === ws.OPEN) ws.send(payload);
+  }
+}
+
+app.post("/api/watch/rooms", requireAuth, asyncHandler(async (req, res) => {
+  const { videoId } = req.body || {};
+  let roomId;
+  do { roomId = generateWatchRoomId(); } while (watchRooms.has(roomId));
+  watchRooms.set(roomId, {
+    videoId: videoId ? String(videoId).slice(0, 30) : null,
+    isPlaying: false,
+    currentTime: 0,
+    updatedAt: Date.now(),
+    leader: req.user.username,
+    members: new Map(),
+  });
+  // Prune rooms older than 24h
+  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+  for (const [id, room] of watchRooms) {
+    if (room.updatedAt < cutoff) watchRooms.delete(id);
+  }
+  res.json({ roomId });
+}));
+
+app.get("/api/watch/rooms/:id", requireAuth, asyncHandler(async (req, res) => {
+  const room = watchRooms.get(req.params.id.toUpperCase());
+  if (!room) return res.status(404).json({ error: "Room not found" });
+  res.json({ roomId: req.params.id, videoId: room.videoId, isPlaying: room.isPlaying, currentTime: room.currentTime, leader: room.leader });
+}));
+
 app.use((req, res) => {
   res.status(404).json({ error: "Not found" });
 });
@@ -4641,6 +4683,101 @@ connect()
     const server = http.createServer(app);
 
     const wss = new WebSocketServer({ noServer: true });
+    const watchWss = new WebSocketServer({ noServer: true });
+
+    watchWss.on("connection", (ws, req, { roomId, username }) => {
+      const room = watchRooms.get(roomId);
+      if (!room) { ws.close(); return; }
+      room.members.set(ws, username);
+      room.updatedAt = Date.now();
+
+      function membersList(r) {
+        const arr = [];
+        for (const [, uname] of r.members) {
+          arr.push({ username: uname, isLeader: uname === r.leader });
+        }
+        return arr;
+      }
+
+      ws.send(JSON.stringify({
+        type: "joined",
+        isLeader: room.leader === username,
+        leader: room.leader,
+        videoId: room.videoId,
+        isPlaying: room.isPlaying,
+        currentTime: room.currentTime,
+        serverTime: Date.now(),
+        members: membersList(room),
+      }));
+      broadcastToWatchRoom(roomId, { type: "members", members: membersList(room) });
+
+      ws.on("message", raw => {
+        let data;
+        try { data = JSON.parse(raw.toString()); } catch { return; }
+        const r = watchRooms.get(roomId);
+        if (!r) return;
+
+        // Anyone can react or chat
+        if (data.type === "reaction") {
+          broadcastToWatchRoom(roomId, { type: "reaction", emoji: String(data.emoji || "").slice(0, 10), from: username });
+          return;
+        }
+        if (data.type === "chat") {
+          const body = String(data.body || "").trim().slice(0, 500);
+          if (!body) return;
+          broadcastToWatchRoom(roomId, { type: "chat", from: username, body, ts: Date.now() });
+          return;
+        }
+
+        // Everything else is leader-only
+        if (r.leader !== username) return;
+        if (data.type === "play") {
+          r.isPlaying = true;
+          if (typeof data.time === "number") r.currentTime = Math.max(0, data.time);
+          r.updatedAt = Date.now();
+          broadcastToWatchRoom(roomId, { type: "play", time: r.currentTime, serverTime: Date.now(), from: username });
+        } else if (data.type === "pause") {
+          r.isPlaying = false;
+          if (typeof data.time === "number") r.currentTime = Math.max(0, data.time);
+          r.updatedAt = Date.now();
+          broadcastToWatchRoom(roomId, { type: "pause", time: r.currentTime, from: username });
+        } else if (data.type === "seek") {
+          if (typeof data.time === "number") r.currentTime = Math.max(0, data.time);
+          r.updatedAt = Date.now();
+          broadcastToWatchRoom(roomId, { type: "seek", time: r.currentTime, isPlaying: r.isPlaying, serverTime: Date.now(), from: username });
+        } else if (data.type === "change-video") {
+          const vid = String(data.videoId || "").slice(0, 30);
+          if (!vid) return;
+          r.videoId = vid; r.isPlaying = false; r.currentTime = 0; r.updatedAt = Date.now();
+          broadcastToWatchRoom(roomId, { type: "change-video", videoId: vid, from: username });
+        } else if (data.type === "transfer-leader") {
+          const to = String(data.to || "");
+          if (![...r.members.values()].includes(to)) return;
+          r.leader = to; r.updatedAt = Date.now();
+          broadcastToWatchRoom(roomId, { type: "leader-changed", leader: to, members: membersList(r) });
+        } else if (data.type === "state") {
+          if (typeof data.videoId === "string")     r.videoId     = data.videoId.slice(0, 30);
+          if (typeof data.isPlaying === "boolean")  r.isPlaying   = data.isPlaying;
+          if (typeof data.currentTime === "number") r.currentTime = Math.max(0, data.currentTime);
+          r.updatedAt = Date.now();
+          broadcastToWatchRoom(roomId, { type: "state", videoId: r.videoId, isPlaying: r.isPlaying, currentTime: r.currentTime, serverTime: Date.now() });
+        }
+      });
+
+      ws.on("close", () => {
+        const r = watchRooms.get(roomId);
+        if (!r) return;
+        r.members.delete(ws);
+        if (r.members.size === 0) { watchRooms.delete(roomId); return; }
+        if (r.leader === username) {
+          r.leader = [...r.members.values()][0];
+          broadcastToWatchRoom(roomId, { type: "leader-changed", leader: r.leader, members: membersList(r) });
+        } else {
+          broadcastToWatchRoom(roomId, { type: "members", members: membersList(r) });
+        }
+        broadcastToWatchRoom(roomId, { type: "chat", from: "system", body: `@${username} left the party`, ts: Date.now() });
+      });
+    });
 
     wss.on("connection", (ws, req, { room, username }) => {
       ws.room = room;
@@ -4724,6 +4861,22 @@ connect()
         socket.destroy();
         return;
       }
+
+      if (url.pathname === "/ws/watch") {
+        const token = url.searchParams.get("token") || "";
+        const payload = verifyJWT(token);
+        const username = payload && payload.username ? payload.username : null;
+        const roomId = (url.searchParams.get("room") || "").trim().toUpperCase().slice(0, 10);
+        if (!username || !roomId || !watchRooms.has(roomId)) {
+          socket.destroy();
+          return;
+        }
+        watchWss.handleUpgrade(req, socket, head, ws => {
+          watchWss.emit("connection", ws, req, { roomId, username });
+        });
+        return;
+      }
+
       if (url.pathname !== "/ws/chat") {
         socket.destroy();
         return;
