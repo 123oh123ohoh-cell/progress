@@ -4706,6 +4706,7 @@ connect()
         videoId: room.videoId,
         isPlaying: room.isPlaying,
         currentTime: room.currentTime,
+        updatedAt: room.updatedAt || room.createdAt || Date.now(),
         serverTime: Date.now(),
         members: membersList(room),
       }));

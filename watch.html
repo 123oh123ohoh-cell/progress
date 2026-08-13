@@ -671,15 +671,21 @@ window.onYouTubeIframeAPIReady = function() {
   });
 };
 
-function applyServerState({ videoId, isPlaying, currentTime, serverTime }, forceSync = false) {
+function applyServerState({ videoId, isPlaying, currentTime, updatedAt, serverTime }, forceSync = false) {
   if (!playerReady) {
-    // Buffer the state — will be applied in onReady
-    window._pendingState = { videoId, isPlaying, currentTime, serverTime };
+    window._pendingState = { videoId, isPlaying, currentTime, updatedAt, serverTime };
     return;
   }
-  // Always compensate for round-trip latency so viewers land at the right spot
-  const latency = serverTime ? Math.min((Date.now() - serverTime) / 1000, 10) : 0;
-  const target  = Math.max(0, currentTime + (isPlaying ? latency : 0));
+  // Use updatedAt (when the server last recorded currentTime) to compute true position.
+  // If not available, fall back to serverTime network latency compensation.
+  let target;
+  if (updatedAt) {
+    const elapsed = Math.max(0, (Date.now() - updatedAt) / 1000);
+    target = Math.max(0, currentTime + (isPlaying ? elapsed : 0));
+  } else {
+    const latency = serverTime ? Math.min((Date.now() - serverTime) / 1000, 10) : 0;
+    target = Math.max(0, currentTime + (isPlaying ? latency : 0));
+  }
   recordServerState(currentTime, isPlaying, serverTime);
   setIgnore(3000);
   if (videoId && videoId !== currentVideoId) {
