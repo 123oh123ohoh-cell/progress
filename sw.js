@@ -1,4 +1,4 @@
-const CACHE = 'progress-v3';
+const CACHE = 'progress-v4';
 
 const PRECACHE = [
   '/',
@@ -42,6 +42,7 @@ self.addEventListener('fetch', e => {
   if (request.method !== 'GET') return;
   const isSameOrigin = url.origin === self.location.origin;
   const isFont = url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com';
+  const isCriticalScript = isSameOrigin && (url.pathname === '/app.js' || url.pathname === '/data.js');
   if (!isSameOrigin && !isFont) return;
 
   e.respondWith(
@@ -57,6 +58,11 @@ self.addEventListener('fetch', e => {
             if (request.mode === 'navigate') return cache.match('/offline.html');
             return new Response('Offline', { status: 503 });
           });
+
+        // Auth/session logic lives in these files - always prefer network to
+        // avoid stale cached login code after deploys.
+        if (isCriticalScript) return networkFetch;
+
         return cached || networkFetch;
       })
     )

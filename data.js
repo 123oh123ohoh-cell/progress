@@ -120,7 +120,8 @@ function deleteCookie(name) {
 
 // ── Auth token ───────────────────────────────────────────────────────────────
 // The JWT proving who's logged in. Stored in localStorage and mirrored in
-// memory for environments where localStorage is unavailable.
+// memory for environments where localStorage is unavailable. A SameSite=Lax
+// cookie backup keeps sessions stable in storage-fragile contexts.
 
 let _authTokenMemory = null;
 let _authExpiryEventSent = false;
@@ -138,13 +139,11 @@ function getAuthToken() {
     return token;
   }
 
-  // Backward-compatible one-time migration for old cookie-based token storage.
-  const legacyCookieToken = _getCookie(SESSION_COOKIE + "_token");
-  if (legacyCookieToken) {
-    _authTokenMemory = legacyCookieToken;
-    try { localStorage.setItem(AUTH_TOKEN_KEY, legacyCookieToken); } catch (e) {}
-    deleteCookie(SESSION_COOKIE + "_token");
-    return legacyCookieToken;
+  const cookieToken = _getCookie(SESSION_COOKIE + "_token");
+  if (cookieToken) {
+    _authTokenMemory = cookieToken;
+    try { localStorage.setItem(AUTH_TOKEN_KEY, cookieToken); } catch (e) {}
+    return cookieToken;
   }
   return _authTokenMemory;
 }
@@ -154,14 +153,15 @@ function setAuthToken(token) {
   try {
     if (token) {
       localStorage.setItem(AUTH_TOKEN_KEY, token);
+      setCookie(SESSION_COOKIE + "_token", token, SESSION_COOKIE_DAYS);
     } else {
       localStorage.removeItem(AUTH_TOKEN_KEY);
+      deleteCookie(SESSION_COOKIE + "_token");
     }
   } catch (e) {
-    // no-op: in-memory token fallback remains available for this runtime
+    if (token) setCookie(SESSION_COOKIE + "_token", token, SESSION_COOKIE_DAYS);
+    else deleteCookie(SESSION_COOKIE + "_token");
   }
-  // Cleanup for legacy cookie-based token storage.
-  deleteCookie(SESSION_COOKIE + "_token");
 }
 
 // ── Current-user cookie backup ───────────────────────────────────────────────
@@ -721,6 +721,9 @@ const Progress = {
         result = await apiFetchAuth("/api/login", { method: "POST", headers, body: loginBody }, 20000);
       }
       if (result.ok) {
+        if (!result.data || typeof result.data.token !== "string" || !result.data.token) {
+          return { ok: false, error: "Login failed to create a session. Please try again." };
+        }
         const { token, ...userData } = result.data;
         const user = { ...userData };
         const existing = this.db.users.find(u => u.username === user.username);
@@ -776,6 +779,9 @@ const Progress = {
         result = await apiFetchAuth("/api/signup", { method: "POST", headers, body: signupBody }, 20000);
       }
       if (result.ok) {
+        if (!result.data || typeof result.data.token !== "string" || !result.data.token) {
+          return { ok: false, error: "Account created but session failed. Please log in once." };
+        }
         const { token, ...userData } = result.data;
         const user = { ...userData };
         const existing = this.db.users.find(u => u.username === user.username);
