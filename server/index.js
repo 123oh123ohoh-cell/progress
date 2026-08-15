@@ -4543,7 +4543,7 @@ app.put("/api/ticker", requireAuth, asyncHandler(async (req, res) => {
       text: String(text || "").slice(0, 500),
       color: String(color || "#ffffff").slice(0, 20),
       bgColor: String(bgColor || "#1c1917").slice(0, 20),
-      speed: ["slow", "normal", "fast"].includes(speed) ? speed : "normal",
+      speed: (typeof speed === "number" && speed >= 1 && speed <= 300) ? speed : 30,
       updatedAt: new Date().toISOString(),
       updatedBy: req.user.username
     }},

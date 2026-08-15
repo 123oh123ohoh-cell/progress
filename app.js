@@ -636,8 +636,8 @@ function bootingUpHTML(opts) {
    doesn't fire a fresh request on every page navigation.                    */
 async function renderTickerIfEnabled() {
   try {
-    // Remove any existing ticker so we don't double-up on re-renders
     document.getElementById("site-ticker")?.remove();
+    document.getElementById("ticker-kf")?.remove();
 
     let data;
     const cached = sessionStorage.getItem("progress:ticker");
@@ -652,26 +652,54 @@ async function renderTickerIfEnabled() {
 
     if (!data || !data.enabled || !data.text) return;
 
-    const speedMap = { slow: "55s", normal: "30s", fast: "15s" };
-    const duration = speedMap[data.speed] || "30s";
-
-    // Duplicate text so the scroll loops seamlessly
+    const duration = `${Number(data.speed) || 30}s`;
     const chunk = `<span class="site-ticker-text">${escapeHTML(data.text)}</span><span class="site-ticker-sep">◆</span>`;
-    const inner = chunk.repeat(6); // enough copies to fill any width
 
+    // Build ticker shell first so we can measure the track width
     const ticker = document.createElement("div");
     ticker.id = "site-ticker";
     ticker.className = "site-ticker";
-    ticker.style.cssText = `background:${data.bgColor};color:${data.color};--ticker-duration:${duration};`;
+    ticker.style.cssText = `background:${data.bgColor};color:${data.color};`;
     ticker.innerHTML = `
       <div class="site-ticker-label">LIVE</div>
       <div class="site-ticker-track">
-        <div class="site-ticker-inner">${inner}</div>
+        <div class="site-ticker-inner" id="tickerInnerEl"></div>
       </div>`;
 
     const navRoot = document.getElementById("nav-root");
     if (navRoot) navRoot.before(ticker);
     else document.body.prepend(ticker);
+    document.body.classList.add("has-ticker");
+
+    const inner = document.getElementById("tickerInnerEl");
+    const track = ticker.querySelector(".site-ticker-track");
+
+    // Measure one chunk to find its rendered width
+    inner.innerHTML = chunk;
+    await new Promise(r => requestAnimationFrame(r));
+    const chunkW = inner.scrollWidth || 200;
+    const trackW = track.offsetWidth || window.innerWidth;
+
+    // We need enough copies so that ONE SET fills the full track width.
+    // We then double it — animation moves exactly one set (−50% of total),
+    // which is seamless because both halves are identical.
+    const perSet = Math.ceil(trackW / chunkW) + 1;
+    const total  = perSet * 2;
+    inner.innerHTML = chunk.repeat(total);
+
+    // Wait for layout then inject a keyframe using the exact pixel distance
+    await new Promise(r => requestAnimationFrame(r));
+    const scrollDist = inner.scrollWidth / 2;
+
+    const kf = document.createElement("style");
+    kf.id = "ticker-kf";
+    kf.textContent = `@keyframes ticker-roll{from{transform:translateX(0)}to{transform:translateX(-${scrollDist}px)}}`;
+    document.head.appendChild(kf);
+
+    inner.style.animation = `ticker-roll ${duration} linear infinite`;
+    inner.addEventListener("mouseenter", () => inner.style.animationPlayState = "paused");
+    inner.addEventListener("mouseleave", () => inner.style.animationPlayState = "running");
+
   } catch (e) { /* fail silently */ }
 }
 

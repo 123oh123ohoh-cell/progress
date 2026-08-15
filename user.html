@@ -55,8 +55,6 @@
 
     const viewer = Progress.getCurrentUser();
     const isOwnProfile = viewer && viewer.username === user.username;
-
-    const viewer = Progress.getCurrentUser();
     const viewerHasBeta = !!(viewer && (
       (Array.isArray(viewer.badges) && viewer.badges.includes("tester")) ||
       viewer.adminRole === "owner"

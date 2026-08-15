@@ -1079,12 +1079,10 @@
               <input type="color" id="tickerBgInput" value="#1c1917" style="width:48px;height:36px;border:1px solid var(--mocha-light);border-radius:8px;cursor:pointer;padding:2px;background:var(--paper);">
             </div>
             <div>
-              <label style="display:block;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">Scroll speed</label>
-              <select id="tickerSpeedInput" style="padding:8px 12px;border:1px solid var(--mocha-light);border-radius:8px;background:var(--paper);color:var(--ink);font-size:14px;">
-                <option value="slow">Slow</option>
-                <option value="normal" selected>Normal</option>
-                <option value="fast">Fast</option>
-              </select>
+              <label style="display:block;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">Duration (seconds)</label>
+              <input type="number" id="tickerSpeedInput" value="30" min="1" max="300"
+                style="padding:8px 12px;border:1px solid var(--mocha-light);border-radius:8px;background:var(--paper);color:var(--ink);font-size:14px;width:90px;">
+              <div style="font-size:11px;color:var(--muted);margin-top:4px;">Lower = faster</div>
             </div>
           </div>
 
@@ -1220,27 +1218,42 @@
         const bgEl = document.getElementById("tickerBgInput");
         if (bgEl && data.bgColor) bgEl.value = data.bgColor;
         const speedEl = document.getElementById("tickerSpeedInput");
-        if (speedEl && data.speed) speedEl.value = data.speed;
+        if (speedEl && data.speed != null) speedEl.value = data.speed;
         if (data.enabled) updateTickerPreview();
       }
     } catch (e) {}
 
     function escHTML(s) { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
 
-    function updateTickerPreview() {
+    async function updateTickerPreview() {
       const text = document.getElementById("tickerTextInput")?.value.trim();
       const color = document.getElementById("tickerColorInput")?.value || "#ffffff";
       const bg = document.getElementById("tickerBgInput")?.value || "#1c1917";
-      const speed = document.getElementById("tickerSpeedInput")?.value || "normal";
-      const speedMap = { slow: "55s", normal: "30s", fast: "15s" };
+      const speed = parseInt(document.getElementById("tickerSpeedInput")?.value, 10) || 30;
+      const duration = `${speed}s`;
       const preview = document.getElementById("tickerPreview");
       const wrap = document.getElementById("tickerPreviewWrap");
       const inner = document.getElementById("tickerPreviewInner");
       if (!text || !preview || !inner) { if (wrap) wrap.style.display = "none"; return; }
       const chunk = `<span class="site-ticker-text">${escHTML(text)}</span><span class="site-ticker-sep">◆</span>`;
-      inner.innerHTML = chunk.repeat(6);
-      preview.style.cssText = `background:${bg};color:${color};--ticker-duration:${speedMap[speed]||"30s"};`;
+      preview.style.cssText = `background:${bg};color:${color};`;
       if (wrap) wrap.style.display = "block";
+
+      // Measure + fill (same logic as renderTickerIfEnabled in app.js)
+      inner.style.animation = "none";
+      inner.innerHTML = chunk;
+      await new Promise(r => requestAnimationFrame(r));
+      const chunkW = inner.scrollWidth || 200;
+      const trackW = preview.querySelector(".site-ticker-track")?.offsetWidth || 600;
+      const perSet = Math.ceil(trackW / chunkW) + 1;
+      inner.innerHTML = chunk.repeat(perSet * 2);
+      await new Promise(r => requestAnimationFrame(r));
+      const dist = inner.scrollWidth / 2;
+      // Inject/update keyframe for preview
+      let kfEl = document.getElementById("ticker-preview-kf");
+      if (!kfEl) { kfEl = document.createElement("style"); kfEl.id = "ticker-preview-kf"; document.head.appendChild(kfEl); }
+      kfEl.textContent = `@keyframes ticker-preview-roll{from{transform:translateX(0)}to{transform:translateX(-${dist}px)}}`;
+      inner.style.animation = `ticker-preview-roll ${duration} linear infinite`;
     }
 
     // Live preview on input
@@ -1277,7 +1290,7 @@
         text: document.getElementById("tickerTextInput")?.value.trim() || "",
         color: document.getElementById("tickerColorInput")?.value || "#ffffff",
         bgColor: document.getElementById("tickerBgInput")?.value || "#1c1917",
-        speed: document.getElementById("tickerSpeedInput")?.value || "normal"
+        speed: parseInt(document.getElementById("tickerSpeedInput")?.value, 10) || 30
       };
       const res = await apiFetch("/api/ticker", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       btn.disabled = false; btn.textContent = "Save & publish";
