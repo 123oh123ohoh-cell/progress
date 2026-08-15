@@ -25,6 +25,7 @@
 <script>
   const wrap = document.getElementById("settingsWrap");
   const params = new URLSearchParams(location.search);
+  const isBetaMode = () => localStorage.getItem("progress:betaMode") === "true";
   // If Spotify just redirected back here (spotify=connected / spotify=error),
   // force the settings tab open so the user lands on the section that matters.
   let activeTab = (params.get("tab") === "settings" || params.get("spotify")) ? "settings" : params.get("tab") === "stats" ? "stats" : "profile";
@@ -89,9 +90,12 @@
   async function refreshNowPlaying() {
     const slot = document.getElementById("nowPlayingSlot");
     if (!slot || !user) return;
-    if (!user.spotifyAccount || !user.spotifyAccount.connected) { slot.innerHTML = ""; return; }
-    const data = await fetchSpotifyNowPlaying(user.id);
-    slot.innerHTML = renderNowPlayingWidget(data);
+    // Always attempt — cached spotifyAccount.connected can be stale
+    // (e.g. user connected Spotify after the local cache was populated).
+    const data = await fetchSpotifyNowPlaying(user.id).catch(() => null);
+    const html = renderNowPlayingWidget(data);
+    slot.innerHTML = html;
+    slot.style.display = html ? "" : "none";
   }
 
   async function start() {
@@ -128,20 +132,24 @@
   function render() {
     const myPosts = Progress.getPosts().filter(p => p.author === user.username);
 
+    const hasBanner = isBetaMode() && user.bannerImage;
     wrap.innerHTML = `
       <h1>Your account</h1>
-      <div class="settings-avatar-row">
-        ${user.avatar ? `<img src="${user.avatar}" alt="">` : `<div class="initials-lg">${initials(user.name)}</div>`}
-        <div>
-          <div style="font-family:var(--font-display); font-size:19px; margin-bottom:4px;">${user.name}${renderDisplayBadge(user)}</div>
-          <div style="color:var(--muted); font-size:13.5px; margin-bottom:8px;">@${user.username}</div>
-          <div style="display:flex; gap:16px; font-size:13px; color:var(--muted); margin-bottom:10px;">
-            <span>${user.followers?.length || 0} followers</span>
-            <span>${user.following?.length || 0} following</span>
-          </div>
-          <div style="display:flex; gap:10px; flex-wrap:wrap;">
-            <button class="upload-btn" id="changeAvatarBtn">Change photo</button>
-            <a class="upload-btn" href="user.html?id=${user.id}" style="text-decoration:none;">View profile</a>
+      <div class="${hasBanner ? "has-banner" : ""}">
+        ${hasBanner ? `<img class="profile-banner" src="${escapeHTML(user.bannerImage)}" alt="" draggable="false">` : ""}
+        <div class="settings-avatar-row">
+          ${user.avatar ? `<img src="${user.avatar}" alt="">` : `<div class="initials-lg">${initials(user.name)}</div>`}
+          <div>
+            <div style="font-family:var(--font-display); font-size:19px; margin-bottom:4px;">${user.name}${renderDisplayBadge(user)}</div>
+            <div style="color:var(--muted); font-size:13.5px; margin-bottom:8px;">@${user.username}</div>
+            <div style="display:flex; gap:16px; font-size:13px; color:var(--muted); margin-bottom:10px;">
+              <span>${user.followers?.length || 0} followers</span>
+              <span>${user.following?.length || 0} following</span>
+            </div>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+              <button class="upload-btn" id="changeAvatarBtn">Change photo</button>
+              <a class="upload-btn" href="user.html?id=${user.id}" style="text-decoration:none;">View profile</a>
+            </div>
           </div>
         </div>
       </div>
@@ -342,6 +350,7 @@ refreshNowPlaying();
         { id: "appearance",    label: "Appearance",    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8L6 18M18 6l1.8-1.8"/></svg>` },
         { id: "privacy",       label: "Privacy",       icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>` },
         { id: "integrations",  label: "Integrations",  icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>` },
+        { id: "beta",          label: "Beta",          icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2v-4M9 21H5a2 2 0 0 1-2-2v-4m0 0h18"/></svg>` },
       ];
 
       content.innerHTML = `
@@ -378,6 +387,7 @@ refreshNowPlaying();
           case "appearance":    renderSubAppearance(panel); break;
           case "privacy":       renderSubPrivacy(panel); break;
           case "integrations":  renderSubIntegrations(panel); break;
+          case "beta":          renderSubBeta(panel); break;
 
           default:              renderSubProfile(panel);
         }
@@ -385,8 +395,21 @@ refreshNowPlaying();
 
       // ── Profile ──────────────────────────────────────────────────────────
       function renderSubProfile(panel) {
+        const betaOn = isBetaMode();
         panel.innerHTML = `
           <h2 class="sett-panel-title">Profile</h2>
+          ${betaOn ? `
+          <div class="sett-section" style="margin-bottom:20px;">
+            <div class="sett-section-title" style="display:flex;align-items:center;gap:6px;">Profile Banner <span class="beta-badge">Beta</span></div>
+            <p style="font-size:13.5px;color:var(--muted);margin-bottom:12px;">A cover image shown at the top of your public profile.</p>
+            <div id="bannerPreviewWrap" style="margin-bottom:12px;">${user.bannerImage ? `<img src="${escapeHTML(user.bannerImage)}" style="width:100%;max-height:160px;object-fit:cover;border-radius:10px;display:block;">` : `<div style="width:100%;height:100px;background:var(--mocha-wash);border:1px dashed var(--mocha-light);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;">No banner set</div>`}</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button class="upload-btn" id="changeBannerBtn">Upload banner</button>
+              ${user.bannerImage ? `<button class="upload-btn" id="removeBannerBtn" style="color:var(--danger);">Remove</button>` : ""}
+            </div>
+            <input type="file" id="bannerInput" accept="image/*" style="display:none;">
+          </div>
+          ` : ""}
           <div class="sett-field-group">
             <div class="sett-field">
               <label class="sett-label">Display name</label>
@@ -474,6 +497,99 @@ refreshNowPlaying();
           if (updated) { user = Progress.getCurrentUser() || user; showToast("Saved."); }
           else showToast("Could not save. Try again.");
         });
+
+        // ── Banner upload (beta only) ────────────────────────────────────
+        const changeBannerBtn = document.getElementById("changeBannerBtn");
+        const bannerInput = document.getElementById("bannerInput");
+        const removeBannerBtn = document.getElementById("removeBannerBtn");
+
+        if (changeBannerBtn && bannerInput) {
+          changeBannerBtn.addEventListener("click", () => bannerInput.click());
+          bannerInput.addEventListener("change", async () => {
+            const file = bannerInput.files[0];
+            if (!file) return;
+            if (file.size > 6 * 1024 * 1024) { showToast("Banner image must be under 6 MB."); return; }
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+              const base64 = e.target.result;
+              // Preview immediately
+              const preview = document.getElementById("bannerPreviewWrap");
+              if (preview) preview.innerHTML = `<img src="${base64}" style="width:100%;max-height:160px;object-fit:cover;border-radius:10px;display:block;">`;
+              changeBannerBtn.disabled = true;
+              changeBannerBtn.textContent = "Uploading…";
+              const updated = await Progress.updateProfile({ bannerImage: base64 });
+              changeBannerBtn.disabled = false;
+              changeBannerBtn.textContent = "Upload banner";
+              if (updated) {
+                user = Progress.getCurrentUser() || user;
+                showToast("Banner updated.");
+                render(); // re-render so banner shows in profile header too
+              } else {
+                showToast("Could not upload banner. Try again.");
+              }
+            };
+            reader.readAsDataURL(file);
+          });
+        }
+
+        if (removeBannerBtn) {
+          removeBannerBtn.addEventListener("click", async () => {
+            removeBannerBtn.disabled = true; removeBannerBtn.textContent = "Removing…";
+            const updated = await Progress.updateProfile({ bannerImage: null });
+            if (updated) {
+              user = Progress.getCurrentUser() || user;
+              showToast("Banner removed.");
+              render();
+            } else {
+              removeBannerBtn.disabled = false; removeBannerBtn.textContent = "Remove";
+              showToast("Could not remove banner.");
+            }
+          });
+        }
+      }
+
+      // ── Beta ─────────────────────────────────────────────────────────────
+      function renderSubBeta(panel) {
+        const on = isBetaMode();
+        panel.innerHTML = `
+          <h2 class="sett-panel-title">Beta <span class="beta-badge">Preview</span></h2>
+          <div class="sett-section">
+            <div class="sett-section-title">Beta features</div>
+            <p style="font-size:13.5px;color:var(--muted);margin-bottom:16px;">
+              These are experimental features that aren't quite ready for everyone yet. Expect rough edges — and feel free to break things.
+            </p>
+            <label class="sett-toggle-row" style="cursor:pointer;">
+              <span class="theme-toggle-switch${on ? " on" : ""}" id="betaToggle" data-on="${on ? "1" : "0"}">
+                <span class="theme-toggle-knob"></span>
+              </span>
+              <span style="font-weight:500;">Enable beta mode</span>
+            </label>
+            <p class="field-note">Turning this on gives you access to features still in development.</p>
+          </div>
+          ${on ? `
+          <div class="sett-section" style="margin-top:20px;">
+            <div class="sett-section-title">Active beta features</div>
+            <div style="display:flex;flex-direction:column;gap:10px;margin-top:10px;">
+              <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--mocha-wash);border-radius:10px;font-size:14px;">
+                <span style="font-size:20px;">🖼️</span>
+                <div>
+                  <div style="font-weight:600;">Profile banner image</div>
+                  <div style="font-size:12.5px;color:var(--muted);">Add a header photo to your profile. Upload in Settings → Profile.</div>
+                </div>
+              </div>
+            </div>
+          </div>` : ""}
+        `;
+
+        const toggle = document.getElementById("betaToggle");
+        if (toggle) {
+          toggle.addEventListener("click", () => {
+            const nowOn = toggle.dataset.on !== "1";
+            localStorage.setItem("progress:betaMode", nowOn ? "true" : "false");
+            showToast(nowOn ? "Beta mode on. Welcome, tester! 🧪" : "Beta mode off.");
+            renderSubBeta(panel); // re-render this panel
+          });
+        }
       }
 
       // ── Account ──────────────────────────────────────────────────────────

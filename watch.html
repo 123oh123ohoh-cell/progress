@@ -543,6 +543,9 @@
 <div class="wp-toast" id="wpToast"></div>
 <script src="data.js"></script>
 <script src="app.js"></script>
+<!-- Multi-source player SDKs -->
+<script src="https://player.vimeo.com/api/player.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.4.10/hls.min.js"></script>
 <script>
 // ── Utilities ─────────────────────────────────────────────────────────────────
 function escapeHTML(str) {
@@ -559,15 +562,134 @@ function wpToast(msg, dur = 2800) {
   clearTimeout(el._t);
   el._t = setTimeout(() => el.classList.remove("show"), dur);
 }
-function extractYouTubeId(input) {
+// ── Universal URL parser ──────────────────────────────────────────────────────
+// Returns { type, id, url, isLive } or null
+function parseVideoUrl(input) {
   if (!input) return null;
   input = input.trim();
-  if (/^[a-zA-Z0-9_-]{11}$/.test(input)) return input;
+
   try {
-    const url = new URL(input.includes("://") ? input : "https://" + input);
-    if (url.hostname === "youtu.be") return url.pathname.slice(1, 12);
-    return url.searchParams.get("v")?.slice(0, 11) || null;
-  } catch { return null; }
+    const u = new URL(input.includes("://") ? input : "https://" + input);
+    const host = u.hostname.replace(/^www\./, "");
+
+    // YouTube
+    if (host === "youtube.com" || host === "youtu.be" || host === "m.youtube.com") {
+      let vid = null;
+      if (host === "youtu.be") vid = u.pathname.slice(1, 12);
+      else vid = u.searchParams.get("v")?.slice(0, 11) || null;
+      // Live channel URL: youtube.com/live/VIDEO_ID
+      if (!vid && u.pathname.startsWith("/live/")) vid = u.pathname.split("/")[2]?.slice(0, 11) || null;
+      if (!vid && /^[a-zA-Z0-9_-]{11}$/.test(input)) vid = input;
+      if (!vid) return null;
+      const isLive = u.pathname.includes("/live") || u.searchParams.get("live") === "1";
+      return { type: "youtube", id: vid, url: null, isLive };
+    }
+
+    // Vimeo
+    if (host === "vimeo.com" || host === "player.vimeo.com") {
+      const vid = u.pathname.match(/\d+/)?.[0];
+      if (!vid) return null;
+      return { type: "vimeo", id: vid, url: null, isLive: false };
+    }
+
+    // Twitch
+    if (host === "twitch.tv" || host === "clips.twitch.tv") {
+      const parts = u.pathname.split("/").filter(Boolean);
+      if (!parts.length) return null;
+      const isClip = host === "clips.twitch.tv" || parts[1] === "clip";
+      return { type: "twitch", id: parts[0], url: input, isLive: !isClip };
+    }
+
+    // YouTube Live shortcut e.g. youtube.com/@channel/live
+    if (host === "youtube.com" && u.pathname.includes("/live")) {
+      return { type: "youtube-live-channel", id: null, url: input, isLive: true };
+    }
+
+    // Direct video file or HLS stream
+    if (/\.(mp4|webm|ogg|ogv)(\?|$)/i.test(u.pathname)) {
+      return { type: "html5", id: null, url: input, isLive: false };
+    }
+    if (/\.m3u8(\?|$)/i.test(u.pathname)) {
+      return { type: "html5", id: null, url: input, isLive: true };
+    }
+
+    // Fallback: try to embed as direct video
+    return { type: "html5", id: null, url: input, isLive: false };
+
+  } catch {
+    // Bare YouTube ID?
+    if (/^[a-zA-Z0-9_-]{11}$/.test(input)) return { type: "youtube", id: input, url: null, isLive: false };
+    return null;
+  }
+}
+
+// Kept for back-compat
+function extractYouTubeId(input) {
+  const p = parseVideoUrl(input);
+  return (p && p.type === "youtube") ? p.id : null;
+}
+
+// ── Unified player interface ───────────────────────────────────────────────────
+// All sync logic calls these instead of player.xxx() directly.
+let activePlayerType = null; // 'youtube' | 'vimeo' | 'html5' | 'twitch'
+let ytPlayer  = null;   // YouTube IFrame player instance
+let vmPlayer  = null;   // Vimeo player instance
+let h5El      = null;   // HTML5 <video> element
+let hlsInst   = null;   // HLS.js instance (for m3u8)
+let twEmbed   = null;   // Twitch embed instance
+let twPlayer2 = null;   // Twitch player from embed
+
+function pReady()   { return playerReady; }
+function pPlay()    {
+  if (activePlayerType === "youtube") ytPlayer?.playVideo();
+  else if (activePlayerType === "vimeo") vmPlayer?.play();
+  else if (activePlayerType === "html5") h5El?.play().catch(()=>{});
+  else if (activePlayerType === "twitch") twPlayer2?.play();
+}
+function pPause()   {
+  if (activePlayerType === "youtube") ytPlayer?.pauseVideo();
+  else if (activePlayerType === "vimeo") vmPlayer?.pause();
+  else if (activePlayerType === "html5") h5El?.pause();
+  else if (activePlayerType === "twitch") twPlayer2?.pause();
+}
+function pSeekTo(t) {
+  if (activePlayerType === "youtube") ytPlayer?.seekTo(t, true);
+  else if (activePlayerType === "vimeo") vmPlayer?.setCurrentTime(t);
+  else if (activePlayerType === "html5" && h5El) h5El.currentTime = t;
+  // Twitch live — no seeking
+}
+function pGetTime() {
+  if (activePlayerType === "youtube") return ytPlayer?.getCurrentTime() || 0;
+  // Vimeo getCurrentTime is async — we cache it
+  if (activePlayerType === "html5") return h5El?.currentTime || 0;
+  return 0;
+}
+function pMute()   {
+  if (activePlayerType === "youtube") ytPlayer?.mute();
+  else if (activePlayerType === "vimeo") vmPlayer?.setVolume(0);
+  else if (activePlayerType === "html5" && h5El) h5El.muted = true;
+}
+function pUnmute() {
+  if (activePlayerType === "youtube") ytPlayer?.unMute();
+  else if (activePlayerType === "vimeo") vmPlayer?.setVolume(1);
+  else if (activePlayerType === "html5" && h5El) h5El.muted = false;
+}
+function pIsStatePlaying() {
+  if (activePlayerType === "youtube") return ytPlayer?.getPlayerState() === YT.PlayerState.PLAYING;
+  if (activePlayerType === "html5") return h5El && !h5El.paused;
+  return false;
+}
+
+function pDestroy() {
+  try {
+    if (activePlayerType === "youtube" && ytPlayer) { ytPlayer.destroy(); ytPlayer = null; }
+    if (activePlayerType === "vimeo"   && vmPlayer) { vmPlayer.destroy(); vmPlayer = null; }
+    if (activePlayerType === "html5"   && h5El)     { h5El.pause(); h5El.src = ""; h5El.remove(); h5El = null; }
+    if (hlsInst) { hlsInst.destroy(); hlsInst = null; }
+    if (activePlayerType === "twitch"  && twEmbed)  { const f = document.getElementById("twEmbed"); if(f) f.remove(); twEmbed = null; twPlayer2 = null; }
+  } catch(e) {}
+  playerReady = false;
+  activePlayerType = null;
 }
 function getWsBase() {
   // WS_BASE is defined in data.js and already handles local vs production correctly
@@ -585,10 +707,13 @@ let myUsername     = null;
 let isLeader       = false;
 let currentLeader  = null;
 let members        = [];
-let ws             = null;
-let player         = null;
-let playerReady    = false;
-let currentVideoId = null;
+let ws               = null;
+let player           = null; // alias kept for legacy refs → ytPlayer
+let playerReady      = false;
+let currentVideoId   = null;
+let currentVideoType = null;
+let currentVideoUrl  = null;
+let currentIsLive    = false;
 let ignoreStateChange = false;
 let ignoreTimer    = null;
 let reconnecting   = false;
@@ -599,8 +724,8 @@ let lastKnownServerTime  = null; // Date.now() when the state was received
 let lastKnownCurrentTime = 0;    // video seconds the server reported
 let lastKnownIsPlaying   = false;
 let driftTimer           = null;
-const DRIFT_THRESHOLD    = 2.5;  // seconds — resync if further than this
-const DRIFT_INTERVAL     = 5000; // ms — how often to check
+const DRIFT_THRESHOLD    = 1.0;  // seconds — resync if further than this
+const DRIFT_INTERVAL     = 2000; // ms — how often to check
 
 function setIgnore(ms = 2500) {
   ignoreStateChange = true;
@@ -619,13 +744,14 @@ function startDriftCorrection() {
   driftTimer = setInterval(() => {
     // Only viewers need correction; leader controls their own player
     if (isLeader || !playerReady || !lastKnownServerTime || !lastKnownIsPlaying) return;
+    if (currentIsLive) return; // live streams don't need drift correction
     const elapsed = (Date.now() - lastKnownServerTime) / 1000;
     const expected = lastKnownCurrentTime + elapsed;
-    const actual   = player.getCurrentTime();
+    const actual   = pGetTime();
     const drift    = Math.abs(actual - expected);
     if (drift > DRIFT_THRESHOLD) {
       setIgnore(2000);
-      player.seekTo(expected, true);
+      pSeekTo(expected);
       // Don't wpToast — silent correction
     }
   }, DRIFT_INTERVAL);
@@ -641,87 +767,302 @@ const ytScript = document.createElement("script");
 ytScript.src = "https://www.youtube.com/iframe_api";
 document.head.appendChild(ytScript);
 
-window.onYouTubeIframeAPIReady = function() {
-  const el = document.getElementById("ytPlayer");
-  if (!el) return; // lobby view — player not in DOM yet
-  player = new YT.Player("ytPlayer", {
-    height: "100%",
-    width: "100%",
-    videoId: "",
-    playerVars: { autoplay: 0, rel: 0, modestbranding: 1, iv_load_policy: 3, fs: 1 },
+// ── Multi-source player loaders ───────────────────────────────────────────────
+function ensurePlayerContainer() {
+  // Make sure the ytPlayer div exists (may have been replaced by another player)
+  let el = document.getElementById("ytPlayer");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "ytPlayer";
+    el.style.cssText = "width:100%;height:100%;";
+    const wrap = document.getElementById("wpVideoWrap");
+    if (wrap) wrap.prepend(el);
+  }
+  return el;
+}
+
+function loadYouTubeVideo(id, startSeconds, autoplay, isLive) {
+  pDestroy();
+  activePlayerType = "youtube";
+  currentIsLive = !!isLive;
+  const el = ensurePlayerContainer();
+  ytPlayer = new YT.Player(el, {
+    height: "100%", width: "100%", videoId: "",
+    playerVars: { autoplay: 1, rel: 0, modestbranding: 1, iv_load_policy: 3, fs: 1 },
     events: {
       onReady: () => {
+        player = ytPlayer; // keep alias
         playerReady = true;
         if (window._pendingState) {
-          // forceSync=true so a viewer who joins mid-video snaps to the right time
           applyServerState(window._pendingState, true);
           window._pendingState = null;
         }
-        if (!isLeader) startDriftCorrection();
+        if (isLeader) startLeaderHeartbeat();
+        else startDriftCorrection();
+        // Now actually load the video
+        ytLoadVideoNow(id, startSeconds, autoplay);
       },
       onStateChange: (event) => {
+        if (_pendingSeekTarget !== null && event.data === YT.PlayerState.PLAYING) {
+          const t = _pendingSeekTarget, playing = _pendingSeekPlaying;
+          _pendingSeekTarget = null; _pendingSeekPlaying = false;
+          setIgnore(3000); ytPlayer.seekTo(t, true);
+          if (!playing) setTimeout(() => { try { ytPlayer.pauseVideo(); } catch(e){} }, 300);
+          setTimeout(() => { try { ytPlayer.unMute(); } catch(e){} }, 500);
+          return;
+        }
         if (ignoreStateChange || !isLeader || !ws || ws.readyState !== WebSocket.OPEN) return;
         if (event.data === YT.PlayerState.PLAYING) {
-          ws.send(JSON.stringify({ type: "play", time: player.getCurrentTime() }));
+          ws.send(JSON.stringify({ type: "play", time: ytPlayer.getCurrentTime(), serverTime: Date.now() }));
         } else if (event.data === YT.PlayerState.PAUSED) {
-          ws.send(JSON.stringify({ type: "pause", time: player.getCurrentTime() }));
+          ws.send(JSON.stringify({ type: "pause", time: ytPlayer.getCurrentTime() }));
         }
       }
     }
   });
+}
+
+function ytLoadVideoNow(id, startSeconds, autoplay) {
+  if (!ytPlayer) return;
+  if (autoplay) ytPlayer.loadVideoById({ videoId: id, startSeconds: startSeconds || 0 });
+  else          ytPlayer.cueVideoById({ videoId: id, startSeconds: startSeconds || 0 });
+}
+
+function loadVimeoVideo(id, startSeconds, autoplay) {
+  pDestroy();
+  activePlayerType = "vimeo";
+  currentIsLive = false;
+  // Recreate iframe in video wrap
+  const wrap = document.getElementById("wpVideoWrap");
+  const iframe = document.createElement("iframe");
+  iframe.id = "vmPlayer";
+  iframe.src = `https://player.vimeo.com/video/${id}?autoplay=${autoplay?1:0}&autopause=0`;
+  iframe.style.cssText = "width:100%;height:100%;border:none;";
+  iframe.allow = "autoplay; fullscreen; picture-in-picture";
+  // Remove ytPlayer div first
+  document.getElementById("ytPlayer")?.remove();
+  wrap.prepend(iframe);
+
+  vmPlayer = new Vimeo.Player(iframe);
+  playerReady = true;
+
+  if (startSeconds && startSeconds > 1) {
+    vmPlayer.setCurrentTime(startSeconds).catch(()=>{});
+  }
+  if (autoplay) vmPlayer.play().catch(()=>{});
+
+  // Wire events for leader
+  vmPlayer.on("play",  () => {
+    if (ignoreStateChange || !isLeader || !ws || ws.readyState !== WebSocket.OPEN) return;
+    vmPlayer.getCurrentTime().then(t => {
+      ws.send(JSON.stringify({ type: "play", time: t, serverTime: Date.now() }));
+    });
+  });
+  vmPlayer.on("pause", () => {
+    if (ignoreStateChange || !isLeader || !ws || ws.readyState !== WebSocket.OPEN) return;
+    vmPlayer.getCurrentTime().then(t => {
+      ws.send(JSON.stringify({ type: "pause", time: t }));
+    });
+  });
+  vmPlayer.on("seeked", () => {
+    if (ignoreStateChange || !isLeader || !ws || ws.readyState !== WebSocket.OPEN) return;
+    vmPlayer.getCurrentTime().then(t => {
+      ws.send(JSON.stringify({ type: "seek", time: t, serverTime: Date.now() }));
+    });
+  });
+
+  if (isLeader) startLeaderHeartbeat();
+  else startDriftCorrection();
+}
+
+function loadHtml5Video(url, startSeconds, autoplay) {
+  pDestroy();
+  activePlayerType = "html5";
+  document.getElementById("ytPlayer")?.remove();
+  const wrap = document.getElementById("wpVideoWrap");
+  h5El = document.createElement("video");
+  h5El.id = "h5Player";
+  h5El.style.cssText = "width:100%;height:100%;background:#000;";
+  h5El.controls = true;
+  h5El.playsInline = true;
+  wrap.prepend(h5El);
+
+  const isM3U8 = /\.m3u8(\?|$)/i.test(url);
+  if (isM3U8 && window.Hls && Hls.isSupported()) {
+    hlsInst = new Hls();
+    hlsInst.loadSource(url);
+    hlsInst.attachMedia(h5El);
+    hlsInst.on(Hls.Events.MANIFEST_PARSED, () => {
+      if (startSeconds) h5El.currentTime = startSeconds;
+      if (autoplay) h5El.play().catch(()=>{});
+    });
+  } else {
+    h5El.src = url;
+    if (startSeconds) h5El.currentTime = startSeconds;
+    if (autoplay) h5El.play().catch(()=>{});
+  }
+
+  playerReady = true;
+  currentIsLive = isM3U8;
+
+  // Leader events
+  h5El.addEventListener("play",  () => {
+    if (ignoreStateChange || !isLeader || !ws || ws.readyState !== WebSocket.OPEN) return;
+    ws.send(JSON.stringify({ type: "play", time: h5El.currentTime, serverTime: Date.now() }));
+  });
+  h5El.addEventListener("pause", () => {
+    if (ignoreStateChange || !isLeader || !ws || ws.readyState !== WebSocket.OPEN) return;
+    ws.send(JSON.stringify({ type: "pause", time: h5El.currentTime }));
+  });
+  h5El.addEventListener("seeked", () => {
+    if (ignoreStateChange || !isLeader || !ws || ws.readyState !== WebSocket.OPEN) return;
+    ws.send(JSON.stringify({ type: "seek", time: h5El.currentTime, serverTime: Date.now() }));
+  });
+
+  if (isLeader) startLeaderHeartbeat();
+  else startDriftCorrection();
+}
+
+function loadTwitchStream(channel) {
+  pDestroy();
+  activePlayerType = "twitch";
+  currentIsLive = true;
+  document.getElementById("ytPlayer")?.remove();
+  const wrap = document.getElementById("wpVideoWrap");
+
+  // Twitch requires the parent domain
+  const parent = location.hostname === "localhost" ? "localhost" : location.hostname;
+  const iframe = document.createElement("iframe");
+  iframe.id = "twEmbed";
+  iframe.src = `https://player.twitch.tv/?channel=${encodeURIComponent(channel)}&parent=${parent}&autoplay=true`;
+  iframe.style.cssText = "width:100%;height:100%;border:none;";
+  iframe.allow = "autoplay; fullscreen";
+  wrap.prepend(iframe);
+
+  playerReady = true;
+  // Twitch live: no sync needed — everyone just watches live
+  // Show LIVE badge
+  const badge = document.getElementById("wpSyncBadge");
+  if (badge) { badge.textContent = "● LIVE"; badge.style.color = "#e53"; }
+
+  if (isLeader) startLeaderHeartbeat();
+}
+
+// ── Leader heartbeat — keeps server position fresh so joining viewers sync ────
+let leaderHeartbeatTimer = null;
+function startLeaderHeartbeat() {
+  clearInterval(leaderHeartbeatTimer);
+  leaderHeartbeatTimer = setInterval(() => {
+    if (!isLeader || !playerReady || !ws || ws.readyState !== WebSocket.OPEN) return;
+    ws.send(JSON.stringify({
+      type: "state",
+      videoId:   currentVideoId,
+      videoType: currentVideoType,
+      videoUrl:  currentVideoUrl,
+      isPlaying: pIsStatePlaying(),
+      currentTime: pGetTime(),
+    }));
+  }, 2000);
+}
+function stopLeaderHeartbeat() {
+  clearInterval(leaderHeartbeatTimer);
+  leaderHeartbeatTimer = null;
+}
+
+// Pending seek target for the viewer join flow (YouTube only)
+let _pendingSeekTarget  = null;
+let _pendingSeekPlaying = false;
+
+// YouTube IFrame API ready — don't load a player yet; loadYouTubeVideo() does it on demand
+window.onYouTubeIframeAPIReady = function() {
+  window._ytApiReady = true;
+  // If there's a pending state waiting for YouTube, apply it now
+  if (window._pendingState && (!currentVideoType || currentVideoType === "youtube")) {
+    applyServerState(window._pendingState, true);
+    window._pendingState = null;
+  }
 };
 
-function applyServerState({ videoId, isPlaying, currentTime, updatedAt, serverTime }, forceSync = false) {
-  if (!playerReady) {
-    window._pendingState = { videoId, isPlaying, currentTime, updatedAt, serverTime };
+function applyServerState({ videoId, videoType, videoUrl, isPlaying, currentTime, serverTime }, forceSync = false) {
+  const type = videoType || "youtube";
+  const src  = videoUrl || videoId;
+
+  // If YouTube API not ready yet, buffer and wait
+  if ((type === "youtube") && !window._ytApiReady && !playerReady) {
+    window._pendingState = { videoId, videoType, videoUrl, isPlaying, currentTime, serverTime };
     return;
   }
-  // Use updatedAt (when the server last recorded currentTime) to compute true position.
-  // If not available, fall back to serverTime network latency compensation.
-  let target;
-  if (updatedAt) {
-    const elapsed = Math.max(0, (Date.now() - updatedAt) / 1000);
-    target = Math.max(0, currentTime + (isPlaying ? elapsed : 0));
-  } else {
-    const latency = serverTime ? Math.min((Date.now() - serverTime) / 1000, 10) : 0;
-    target = Math.max(0, currentTime + (isPlaying ? latency : 0));
+  if (!playerReady && type !== "youtube") {
+    window._pendingState = { videoId, videoType, videoUrl, isPlaying, currentTime, serverTime };
+    // Non-YT players init synchronously, so just load now
   }
-  recordServerState(currentTime, isPlaying, serverTime);
-  setIgnore(3000);
-  if (videoId && videoId !== currentVideoId) {
-    currentVideoId = videoId;
+
+  const netLatency = serverTime ? Math.min((Date.now() - serverTime) / 1000, 5) : 0;
+  const target = Math.max(0, currentTime + (isPlaying && !currentIsLive ? netLatency : 0));
+  recordServerState(target, isPlaying, Date.now());
+
+  const isNewSource = (videoId !== currentVideoId) || (type !== currentVideoType) || (videoUrl !== currentVideoUrl);
+
+  if (src && isNewSource) {
+    currentVideoId   = videoId;
+    currentVideoType = type;
+    currentVideoUrl  = videoUrl;
     hidePlaceholder();
-    if (isPlaying || forceSync) {
-      // Mute first so browsers never block autoplay; viewer can unmute via player controls
-      player.mute();
-      player.loadVideoById({ videoId, startSeconds: target });
-      // After the video starts, do a precise seek and restore play/pause state
-      setTimeout(() => {
-        try {
-          player.seekTo(target, true);
-          if (isPlaying) { player.playVideo(); }
-          else           { player.pauseVideo(); }
-          // Auto-unmute after a beat so the seek lands first
-          setTimeout(() => { try { player.unMute(); } catch(e){} }, 600);
-        } catch(e) {}
-      }, 800);
-    } else {
-      player.cueVideoById({ videoId, startSeconds: target });
+    window._pendingState = null;
+
+    if (type === "youtube") {
+      if (!window._ytApiReady) {
+        // YT script still loading — buffer
+        window._pendingState = { videoId, videoType, videoUrl, isPlaying, currentTime, serverTime };
+        return;
+      }
+      if (!ytPlayer || activePlayerType !== "youtube") {
+        // First load or switching from another type
+        loadYouTubeVideo(videoId, target, true);
+        if (!isLeader) {
+          _pendingSeekTarget  = target;
+          _pendingSeekPlaying = isPlaying;
+        }
+      } else {
+        setIgnore(3000);
+        if (!isLeader) {
+          _pendingSeekTarget  = target;
+          _pendingSeekPlaying = isPlaying;
+          pMute();
+          ytPlayer.loadVideoById({ videoId, startSeconds: 0 });
+        } else {
+          if (isPlaying) ytPlayer.loadVideoById({ videoId, startSeconds: target });
+          else           ytPlayer.cueVideoById({ videoId, startSeconds: target });
+        }
+      }
+    } else if (type === "vimeo") {
+      if (!window.Vimeo) { wpToast("Vimeo SDK not ready yet, try again."); return; }
+      loadVimeoVideo(videoId, target, isPlaying);
+    } else if (type === "twitch") {
+      loadTwitchStream(videoId);
+    } else if (type === "html5") {
+      loadHtml5Video(videoUrl, target, isPlaying);
     }
-  } else if (videoId) {
-    const drift = Math.abs(player.getCurrentTime() - target);
-    if (forceSync || drift > 1) player.seekTo(target, true);
-    if (isPlaying) player.playVideo(); else player.pauseVideo();
+
+  } else if (src && !currentIsLive) {
+    // Same source — seek/play/pause
+    setIgnore(2000);
+    const drift = Math.abs(pGetTime() - target);
+    if (forceSync || drift > 1) pSeekTo(target);
+    if (isPlaying) pPlay(); else pPause();
   }
 }
 
 function loadVideo(videoId, startSeconds, autoplay) {
+  // Called when leader changes video via URL input
+  // The change-video WS message already carries type/url, so this is just a fallback
   if (!playerReady) return;
-  currentVideoId = videoId;
   setIgnore(3000);
   hidePlaceholder();
-  if (autoplay) player.loadVideoById({ videoId, startSeconds: startSeconds || 0 });
-  else          player.cueVideoById({ videoId, startSeconds: startSeconds || 0 });
+  if (activePlayerType === "youtube" && ytPlayer) {
+    if (autoplay) ytPlayer.loadVideoById({ videoId, startSeconds: startSeconds || 0 });
+    else          ytPlayer.cueVideoById({ videoId, startSeconds: startSeconds || 0 });
+  }
 }
 
 function hidePlaceholder() {
@@ -740,6 +1081,7 @@ function connectWs(rid) {
   ws.onclose = () => {
     updateSyncBadge(false);
     stopDriftCorrection();
+    stopLeaderHeartbeat();
     if (roomId && !reconnecting) {
       reconnecting = true;
       setTimeout(() => connectWs(roomId), 4000);
@@ -756,38 +1098,35 @@ function connectWs(rid) {
         members       = data.members || [];
         renderControls();
         renderMembers();
-        // forceSync=true so the viewer snaps to the exact current position
         if (data.videoId) applyServerState(data, true);
-        if (!isLeader && playerReady) startDriftCorrection();
+        if (isLeader) { if (playerReady) startLeaderHeartbeat(); }
+        else          { if (playerReady) startDriftCorrection(); }
         appendChatMsg({ body: `You joined the watch party 🍦`, isSystem: true });
         break;
-      case "play":
-        if (!isLeader) {
-          const lat = data.serverTime ? Math.min((Date.now() - data.serverTime) / 1000, 6) : 0;
-          const t = data.time + lat;
-          recordServerState(data.time, true, data.serverTime);
-          if (playerReady) { setIgnore(); player.seekTo(t, true); player.playVideo(); }
-        }
+      case "play": {
+        const lat = data.serverTime ? Math.min((Date.now() - data.serverTime) / 1000, 3) : 0;
+        const t = data.time + lat;
+        recordServerState(t, true, Date.now());
+        if (!isLeader && playerReady && !currentIsLive) { setIgnore(2000); pSeekTo(t); pPlay(); }
         logActivity(data.from === myUsername ? "▶ You played" : `▶ <strong>@${escapeHTML(data.from)}</strong> played`);
         break;
-      case "pause":
-        if (!isLeader) {
-          recordServerState(data.time, false, Date.now());
-          if (playerReady) { setIgnore(); player.seekTo(data.time, true); player.pauseVideo(); }
-        }
+      }
+      case "pause": {
+        recordServerState(data.time, false, Date.now());
+        if (!isLeader && playerReady && !currentIsLive) { setIgnore(2000); pSeekTo(data.time); pPause(); }
         logActivity(data.from === myUsername ? "⏸ You paused" : `⏸ <strong>@${escapeHTML(data.from)}</strong> paused`);
         break;
-      case "seek":
-        if (!isLeader) {
-          const lat = data.serverTime ? Math.min((Date.now() - data.serverTime) / 1000, 5) : 0;
-          const t = data.time + (data.isPlaying ? lat : 0);
-          recordServerState(data.time, data.isPlaying, data.serverTime);
-          if (playerReady) { setIgnore(); player.seekTo(t, true); if (data.isPlaying) player.playVideo(); else player.pauseVideo(); }
-        }
+      }
+      case "seek": {
+        const lat2 = data.serverTime ? Math.min((Date.now() - data.serverTime) / 1000, 3) : 0;
+        const t2 = data.time + (data.isPlaying ? lat2 : 0);
+        recordServerState(t2, data.isPlaying, Date.now());
+        if (!isLeader && playerReady && !currentIsLive) { setIgnore(2000); pSeekTo(t2); if (data.isPlaying) pPlay(); else pPause(); }
         break;
+      }
       case "change-video":
         recordServerState(0, false, Date.now());
-        loadVideo(data.videoId, 0, false);
+        applyServerState({ videoId: data.videoId, videoType: data.videoType, videoUrl: data.videoUrl, isPlaying: false, currentTime: 0, serverTime: Date.now() }, true);
         logActivity(data.from === myUsername
           ? "📺 You changed the video"
           : `📺 <strong>@${escapeHTML(data.from)}</strong> changed the video`);
@@ -801,8 +1140,8 @@ function connectWs(rid) {
         renderControls();
         renderMembers();
         logActivity(isLeader ? "👑 You're now the host!" : `👑 <strong>@${escapeHTML(data.leader)}</strong> is now the host`);
-        if (isLeader) { wpToast("You're now the host — you control playback."); stopDriftCorrection(); }
-        else if (playerReady) startDriftCorrection();
+        if (isLeader) { wpToast("You're now the host — you control playback."); stopDriftCorrection(); if (playerReady) startLeaderHeartbeat(); }
+        else          { stopLeaderHeartbeat(); if (playerReady) startDriftCorrection(); }
         break;
       case "members":
         members = data.members || [];
@@ -812,10 +1151,14 @@ function connectWs(rid) {
         showFloatingReaction(data.emoji, data.from);
         break;
       case "state":
-        // Periodic heartbeat from leader — use to drift-correct
-        if (!isLeader) {
-          recordServerState(data.currentTime, data.isPlaying, data.serverTime);
-          applyServerState(data);
+        // 2s heartbeat from leader — keeps viewers in sync passively
+        if (!isLeader && data.currentTime !== undefined) {
+          recordServerState(data.currentTime, data.isPlaying, Date.now());
+          // Only force-apply if genuinely drifted; drift correction handles minor gaps
+          if (playerReady) {
+            const drift = Math.abs(player.getCurrentTime() - data.currentTime);
+            if (drift > 3) applyServerState({ videoId: data.videoId, isPlaying: data.isPlaying, currentTime: data.currentTime, serverTime: Date.now() });
+          }
         }
         break;
       case "chat":
@@ -848,21 +1191,29 @@ function renderControls() {
     area.innerHTML = `
       <form class="wp-video-url-form" id="wpVideoForm">
         <input class="wp-video-url-input" id="wpUrlInput" type="text"
-          placeholder="YouTube URL or video ID…" autocomplete="off" autocorrect="off" spellcheck="false">
+          placeholder="YouTube, Vimeo, Twitch, or direct .mp4/.m3u8 URL…"
+          autocomplete="off" autocorrect="off" spellcheck="false">
         <button type="submit" class="wp-ctrl-btn primary">Load</button>
       </form>
       <div class="wp-reaction-picker">${reactionBtns}</div>`;
     document.getElementById("wpVideoForm").addEventListener("submit", e => {
       e.preventDefault();
-      const vid = extractYouTubeId(document.getElementById("wpUrlInput").value);
-      if (!vid) { wpToast("Couldn't find a YouTube video ID in that link."); return; }
+      const raw = document.getElementById("wpUrlInput").value.trim();
+      const parsed = parseVideoUrl(raw);
+      if (!parsed) { wpToast("Couldn't recognise that URL. Try YouTube, Vimeo, Twitch, or a direct video link."); return; }
       if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: "change-video", videoId: vid }));
+        ws.send(JSON.stringify({
+          type: "change-video",
+          videoId:   parsed.id   || parsed.url || "",
+          videoType: parsed.type,
+          videoUrl:  parsed.url  || null,
+        }));
       }
     });
   } else {
+    const liveTag = currentIsLive ? ` <span style="background:#e53;color:#fff;font-size:10px;padding:1px 5px;border-radius:4px;vertical-align:middle;">LIVE</span>` : "";
     area.innerHTML = `
-      <p class="wp-viewer-note">🍿 Synced to <strong>@${escapeHTML(currentLeader || "host")}</strong> — sit back and enjoy</p>
+      <p class="wp-viewer-note">🍿 Synced to <strong>@${escapeHTML(currentLeader || "host")}</strong>${liveTag} — sit back and enjoy</p>
       <div class="wp-reaction-picker">${reactionBtns}</div>`;
   }
 
@@ -1079,8 +1430,11 @@ function renderLobby() {
 
 async function createRoom() {
   const urlVal  = document.getElementById("lobbyUrlInput").value.trim();
-  const videoId = urlVal ? extractYouTubeId(urlVal) : null;
-  if (urlVal && !videoId) { wpToast("Couldn't find a YouTube video ID in that link."); return; }
+  const parsed  = urlVal ? parseVideoUrl(urlVal) : null;
+  if (urlVal && !parsed) { wpToast("Couldn't recognise that URL. Try YouTube, Vimeo, Twitch, or a direct video link."); return; }
+  const videoId = parsed?.id || parsed?.url || null;
+  const videoType = parsed?.type || null;
+  const videoUrl  = parsed?.url  || null;
   const btn = document.getElementById("lobbyCreateBtn");
   btn.disabled = true;
   btn.textContent = "Creating…";
@@ -1092,7 +1446,7 @@ async function createRoom() {
     return fetch("/api/watch/rooms", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-      body: JSON.stringify({ videoId: videoId || undefined })
+      body: JSON.stringify({ videoId: videoId || undefined, videoType: videoType || undefined, videoUrl: videoUrl || undefined })
     }).then(res => {
       if (res.status === 401) throw Object.assign(new Error("auth"), { code: "auth" });
       if (!res.ok) throw Object.assign(new Error("http:" + res.status), { code: "server", status: res.status });

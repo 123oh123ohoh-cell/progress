@@ -354,7 +354,8 @@ function publicUser(user) {
     streak: typeof user.streak === "number" ? user.streak : 0,
     adminRole: ALLOWED_CREATOR_USERNAMES.has(user.username) ? "owner" : (user.adminRole || null),
     steamAccount: user.steamAccount?.connected ? { connected: true, steamId: user.steamAccount.steamId } : { connected: false },
-    robloxAccount: user.robloxAccount?.connected ? { connected: true, robloxId: user.robloxAccount.robloxId, robloxUsername: user.robloxAccount.robloxUsername } : { connected: false }
+    robloxAccount: user.robloxAccount?.connected ? { connected: true, robloxId: user.robloxAccount.robloxId, robloxUsername: user.robloxAccount.robloxUsername } : { connected: false },
+    bannerImage: user.bannerImage || null
   };
 }
 
@@ -1631,12 +1632,21 @@ app.patch("/api/users/:id", requireAuth, asyncHandler(async (req, res) => {
   const doc = await users.findOne({ _id: req.params.id });
   if (!doc) return res.status(404).json({ error: "User not found" });
   if (req.user.id !== doc._id) return res.status(403).json({ error: "You can only edit your own profile." });
-  const { name, timezone, avatar, bio, displayBadge, spotify, email, emailNotifications } = req.body;
+  const { name, timezone, avatar, bio, displayBadge, spotify, email, emailNotifications, bannerImage } = req.body;
   const update = {};
   if (typeof name === "string") update.name = name;
   if (typeof timezone === "string") update.timezone = timezone;
   if (typeof avatar !== "undefined") update.avatar = avatar;
   if (typeof bio === "string") update.bio = bio;
+  if (typeof bannerImage !== "undefined") {
+    if (bannerImage === null || bannerImage === "") {
+      update.bannerImage = null;
+    } else if (typeof bannerImage === "string" && bannerImage.startsWith("data:")) {
+      try { update.bannerImage = await uploadToSupabase(bannerImage); } catch (e) { update.bannerImage = bannerImage; }
+    } else if (typeof bannerImage === "string") {
+      update.bannerImage = bannerImage;
+    }
+  }
   if (typeof email !== "undefined") {
     if (email === null || email === "") {
       update.email = null;
@@ -2312,6 +2322,17 @@ app.get("/api/posts", asyncHandler(async (req, res) => {
   res.json(posts);
 }));
 
+// Check if the viewer can post today (used by write.html on load)
+// MUST be before GET /api/posts/:id so "can-post" isn't caught as a post ID
+app.get("/api/posts/can-post", requireAuth, asyncHandler(async (req, res) => {
+  const author = req.user.username;
+  const today = new Date().toISOString().slice(0, 10);
+  const count = await db.collection("posts").countDocuments({ author, date: today });
+  const midnight = new Date();
+  midnight.setUTCHours(24, 0, 0, 0);
+  res.json({ canPost: count === 0, resetAt: midnight.getTime() });
+}));
+
 app.get("/api/posts/:id", asyncHandler(async (req, res) => {
   const doc = await db.collection("posts").findOne({ _id: req.params.id });
   if (!doc) return res.status(404).json({ error: "Post not found" });
@@ -2324,6 +2345,15 @@ app.post("/api/posts", requireAuth, asyncHandler(async (req, res) => {
   const content = sanitizePostContent(req.body.content);
   if (!title || !content) return res.status(400).json({ error: "title and content are required" });
   if (await isUsernameBanned(author)) return res.status(403).json({ error: "This account has been banned." });
+
+  // 1 post per day limit
+  const today = new Date().toISOString().slice(0, 10);
+  const todayCount = await db.collection("posts").countDocuments({ author, date: today });
+  if (todayCount > 0) {
+    const midnight = new Date();
+    midnight.setUTCHours(24, 0, 0, 0);
+    return res.status(429).json({ error: "You can only publish one entry per day. Come back tomorrow!", resetAt: midnight.getTime() });
+  }
 
   // Upload base64 cover + embedded images to Supabase so they're stored as URLs
   let coverUrl = cover || null;
@@ -2352,6 +2382,8 @@ app.post("/api/posts", requireAuth, asyncHandler(async (req, res) => {
     author,
     context: { postId: post._id, postTitle: post.title, via: "post" }
   });
+  // Update streak fire-and-forget
+  db.collection("users").findOne({ username: author }).then(u => { if (u) computeAndSaveStreak(u).catch(() => {}); }).catch(() => {});
   res.status(201).json(toClient(post));
 }));
 
@@ -2437,6 +2469,8 @@ app.post("/api/posts/:id/comments", requireAuth, asyncHandler(async (req, res) =
     skipUsernames: [post.author.toLowerCase()],
     context: { postId: post._id, postTitle: post.title, via: "comment" }
   });
+  // Update streak fire-and-forget
+  db.collection("users").findOne({ username: author }).then(u => { if (u) computeAndSaveStreak(u).catch(() => {}); }).catch(() => {});
   res.status(201).json(toClient(comment));
 }));
 
@@ -2483,6 +2517,10 @@ app.post("/api/posts/:id/like", requireAuth, asyncHandler(async (req, res) => {
   }
   await posts.updateOne({ _id: post._id }, { $set: { likedBy, likes } });
   const updated = await posts.findOne({ _id: post._id });
+  // Update streak fire-and-forget (only on like, not unlike)
+  if (idx === -1) {
+    db.collection("users").findOne({ username }).then(u => { if (u) computeAndSaveStreak(u).catch(() => {}); }).catch(() => {});
+  }
   res.json(normalizePost(updated));
 }));
 
@@ -3669,34 +3707,75 @@ app.get("/api/explore", asyncHandler(async (req, res) => {
   const cached = cacheGet(cacheKey);
   if (cached) return res.json(cached);
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const now = Date.now();
 
-  // Trending: most liked posts in the last 30 days
+  // Trending: posts from last 30 days, scored by likes + recency
   const trendingDocs = await db.collection("posts")
     .find({ createdAt: { $gte: thirtyDaysAgo } }, { projection: { content: 0 } })
-    .sort({ likes: -1 })
-    .limit(20)
+    .limit(100)
     .toArray();
 
-  // Suggested users: most followers, excluding the viewer and anyone they follow
+  // Score = likes + recency bonus (posts in last 3 days get +5, last 7 days +2)
+  trendingDocs.forEach(p => {
+    const ageDays = (now - new Date(p.createdAt || p.date).getTime()) / 86400000;
+    const recencyBonus = ageDays < 3 ? 5 : ageDays < 7 ? 2 : 0;
+    p._score = (p.likes || 0) + recencyBonus;
+  });
+  trendingDocs.sort((a, b) => b._score - a._score);
+  const trending = trendingDocs.slice(0, 20);
+
+  // Resolve viewer's following list
+  let viewerFollowing = [];
   let excludeUsernames = viewerUsername ? [viewerUsername] : [];
   if (viewerUsername) {
     const viewer = await db.collection("users").findOne({ username: viewerUsername });
     if (viewer && Array.isArray(viewer.following)) {
-      excludeUsernames = excludeUsernames.concat(viewer.following);
+      viewerFollowing = viewer.following;
+      excludeUsernames = excludeUsernames.concat(viewerFollowing);
     }
   }
+
+  // Suggested users: most followers, excluding viewer + already-following
   const suggestedDocs = await db.collection("users")
     .find({ username: { $nin: excludeUsernames }, banned: { $ne: true } })
-    .sort({ "followers.0": -1 })
-    .limit(10)
+    .limit(50)
     .toArray();
-
-  // Sort suggested by follower count
   suggestedDocs.sort((a, b) => (b.followers?.length || 0) - (a.followers?.length || 0));
+  const suggested = suggestedDocs.slice(0, 8).map(d => publicUser(normalizeUser(d)));
+
+  // People you might know: users followed by people you follow (2nd-degree), not already following
+  let mightKnow = [];
+  if (viewerFollowing.length > 0) {
+    const followingUsers = await db.collection("users")
+      .find({ username: { $in: viewerFollowing } }, { projection: { following: 1, username: 1 } })
+      .toArray();
+    // Collect 2nd-degree usernames with a frequency count
+    const freq = {};
+    for (const fu of followingUsers) {
+      for (const u of (fu.following || [])) {
+        if (!excludeUsernames.includes(u)) {
+          freq[u] = (freq[u] || 0) + 1;
+        }
+      }
+    }
+    const mightKnowUsernames = Object.entries(freq)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([u]) => u);
+    if (mightKnowUsernames.length > 0) {
+      const mkDocs = await db.collection("users")
+        .find({ username: { $in: mightKnowUsernames }, banned: { $ne: true } })
+        .toArray();
+      // Sort by freq
+      mkDocs.sort((a, b) => (freq[b.username] || 0) - (freq[a.username] || 0));
+      mightKnow = mkDocs.slice(0, 6).map(d => publicUser(normalizeUser(d)));
+    }
+  }
 
   const result = {
-    trending: trendingDocs.map(normalizePost),
-    suggested: suggestedDocs.map(d => publicUser(normalizeUser(d)))
+    trending: trending.map(normalizePost),
+    suggested,
+    mightKnow
   };
   cacheSet(cacheKey, result, 60000); // 60 seconds
   res.json(result);
@@ -4643,11 +4722,13 @@ function broadcastToWatchRoom(roomId, msg) {
 }
 
 app.post("/api/watch/rooms", requireAuth, asyncHandler(async (req, res) => {
-  const { videoId } = req.body || {};
+  const { videoId, videoType, videoUrl } = req.body || {};
   let roomId;
   do { roomId = generateWatchRoomId(); } while (watchRooms.has(roomId));
   watchRooms.set(roomId, {
-    videoId: videoId ? String(videoId).slice(0, 30) : null,
+    videoId:   videoId   ? String(videoId).slice(0, 100)   : null,
+    videoType: videoType ? String(videoType).slice(0, 20)  : null,
+    videoUrl:  videoUrl  ? String(videoUrl).slice(0, 2000) : null,
     isPlaying: false,
     currentTime: 0,
     updatedAt: Date.now(),
@@ -4699,15 +4780,23 @@ connect()
         return arr;
       }
 
+      // Compute the live playback position so the joining viewer lands exactly
+      // where the host currently is, not where they were when play was pressed.
+      const now = Date.now();
+      const liveTime = (room.isPlaying && room.updatedAt)
+        ? Math.max(0, (room.currentTime || 0) + (now - room.updatedAt) / 1000)
+        : (room.currentTime || 0);
+
       ws.send(JSON.stringify({
         type: "joined",
         isLeader: room.leader === username,
         leader: room.leader,
-        videoId: room.videoId,
+        videoId:   room.videoId,
+        videoType: room.videoType,
+        videoUrl:  room.videoUrl,
         isPlaying: room.isPlaying,
-        currentTime: room.currentTime,
-        updatedAt: room.updatedAt || room.createdAt || Date.now(),
-        serverTime: Date.now(),
+        currentTime: liveTime,
+        serverTime: now,
         members: membersList(room),
       }));
       broadcastToWatchRoom(roomId, { type: "members", members: membersList(room) });
@@ -4747,21 +4836,26 @@ connect()
           r.updatedAt = Date.now();
           broadcastToWatchRoom(roomId, { type: "seek", time: r.currentTime, isPlaying: r.isPlaying, serverTime: Date.now(), from: username });
         } else if (data.type === "change-video") {
-          const vid = String(data.videoId || "").slice(0, 30);
-          if (!vid) return;
-          r.videoId = vid; r.isPlaying = false; r.currentTime = 0; r.updatedAt = Date.now();
-          broadcastToWatchRoom(roomId, { type: "change-video", videoId: vid, from: username });
+          const vid  = String(data.videoId  || "").slice(0, 100);
+          const vtyp = String(data.videoType || "youtube").slice(0, 20);
+          const vurl = String(data.videoUrl  || "").slice(0, 2000);
+          if (!vid && !vurl) return;
+          r.videoId = vid; r.videoType = vtyp; r.videoUrl = vurl;
+          r.isPlaying = false; r.currentTime = 0; r.updatedAt = Date.now();
+          broadcastToWatchRoom(roomId, { type: "change-video", videoId: vid, videoType: vtyp, videoUrl: vurl, from: username });
         } else if (data.type === "transfer-leader") {
           const to = String(data.to || "");
           if (![...r.members.values()].includes(to)) return;
           r.leader = to; r.updatedAt = Date.now();
           broadcastToWatchRoom(roomId, { type: "leader-changed", leader: to, members: membersList(r) });
         } else if (data.type === "state") {
-          if (typeof data.videoId === "string")     r.videoId     = data.videoId.slice(0, 30);
-          if (typeof data.isPlaying === "boolean")  r.isPlaying   = data.isPlaying;
+          if (typeof data.videoId    === "string")  r.videoId    = data.videoId.slice(0, 100);
+          if (typeof data.videoType  === "string")  r.videoType  = data.videoType.slice(0, 20);
+          if (typeof data.videoUrl   === "string")  r.videoUrl   = data.videoUrl.slice(0, 2000);
+          if (typeof data.isPlaying  === "boolean") r.isPlaying  = data.isPlaying;
           if (typeof data.currentTime === "number") r.currentTime = Math.max(0, data.currentTime);
           r.updatedAt = Date.now();
-          broadcastToWatchRoom(roomId, { type: "state", videoId: r.videoId, isPlaying: r.isPlaying, currentTime: r.currentTime, serverTime: Date.now() });
+          broadcastToWatchRoom(roomId, { type: "state", videoId: r.videoId, videoType: r.videoType, videoUrl: r.videoUrl, isPlaying: r.isPlaying, currentTime: r.currentTime, serverTime: Date.now() });
         }
       });
 

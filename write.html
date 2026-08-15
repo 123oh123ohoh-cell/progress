@@ -101,6 +101,56 @@
       return;
     }
 
+    // ── Daily post limit check ──────────────────────────────────────────────
+    let _dailyResetAt = null;
+    let _countdownTimer = null;
+
+    function formatCountdown(ms) {
+      if (ms <= 0) return "now";
+      const totalSec = Math.ceil(ms / 1000);
+      const h = Math.floor(totalSec / 3600);
+      const m = Math.floor((totalSec % 3600) / 60);
+      const s = totalSec % 60;
+      if (h > 0) return `${h}h ${m}m`;
+      if (m > 0) return `${m}m ${s}s`;
+      return `${s}s`;
+    }
+
+    function showDailyLimitBanner(resetAt) {
+      _dailyResetAt = resetAt;
+      let banner = document.getElementById("dailyLimitBanner");
+      if (!banner) {
+        banner = document.createElement("div");
+        banner.id = "dailyLimitBanner";
+        banner.style.cssText = "background:var(--mocha-wash);border:1px solid var(--mocha-light);border-radius:10px;padding:14px 18px;margin-bottom:20px;font-size:14px;color:var(--ink);display:flex;align-items:center;gap:10px;";
+        banner.innerHTML = `<span style="font-size:20px;">📅</span><span id="dailyLimitText"></span>`;
+        wrap.prepend(banner);
+      }
+      function tick() {
+        const remaining = _dailyResetAt - Date.now();
+        const el = document.getElementById("dailyLimitText");
+        if (el) {
+          if (remaining <= 0) {
+            el.textContent = "You can post again now — refresh the page!";
+            clearInterval(_countdownTimer);
+          } else {
+            el.textContent = `You've already posted today. Next entry unlocks in ${formatCountdown(remaining)}.`;
+          }
+        }
+      }
+      clearInterval(_countdownTimer);
+      tick();
+      _countdownTimer = setInterval(tick, 1000);
+      // Disable publish button
+      const pb = document.getElementById("publishBtn");
+      if (pb) { pb.disabled = true; pb.title = "One entry per day"; }
+    }
+
+    // Fire off a quiet check in the background — don't block render
+    apiFetch("/api/posts/can-post").then(r => {
+      if (r && !r.canPost) showDailyLimitBanner(r.resetAt);
+    }).catch(() => {});
+
     // ── Render editor HTML ──────────────────────────────────────────────────
     wrap.innerHTML = `
       ${isMobile ? `
@@ -403,10 +453,30 @@
 
       const plain   = document.getElementById("canvas").innerText.trim();
       const excerpt = plain.slice(0, 140) + (plain.length > 140 ? "…" : "");
-      const post    = await Progress.createPost({
-        title, content, cover: coverData, excerpt,
-        category: selectedCategory || null
-      });
+
+      // Call API directly so we can detect 429 (daily limit)
+      let post = null;
+      try {
+        const token = getAuthToken();
+        const res = await fetch(API_BASE + "/api/posts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          body: JSON.stringify({ title, content, cover: coverData, excerpt, category: selectedCategory || null })
+        });
+        if (res.status === 429) {
+          const err = await res.json().catch(() => ({}));
+          publishBtn.disabled = false;
+          publishBtn.textContent = "Publish";
+          showDailyLimitBanner(err.resetAt || (Date.now() + 86400000));
+          return;
+        }
+        if (res.ok) {
+          post = await res.json();
+          await Progress.loadFromApi().catch(() => {});
+        }
+      } catch (e) {
+        // network error — fall through to show error toast
+      }
 
       publishBtn.disabled = false;
       publishBtn.textContent = "Publish";
