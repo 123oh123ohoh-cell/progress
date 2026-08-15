@@ -556,6 +556,9 @@
       <button class="admin-tab" data-tab="prompts" role="tab">
         <span class="admin-tab-icon">✏️</span> Prompts
       </button>
+      <button class="admin-tab" data-tab="ticker" role="tab">
+        <span class="admin-tab-icon">📡</span> Ticker
+      </button>
     </nav>
 
     <!-- ── OVERVIEW tab ─────────────────────────────────────────────── -->
@@ -1034,6 +1037,66 @@
       </div>
     </div><!-- /tab-prompts -->
 
+    <!-- ── TICKER tab ─────────────────────────────────────────────────── -->
+    <div id="tab-ticker" class="admin-tab-content" style="display:none;">
+      <div class="control-card">
+        <h4>📡 News Ticker / Crawler</h4>
+        <p>A scrolling announcement bar shown at the top of every page. Enable it to push live updates, announcements, or alerts site-wide.</p>
+
+        <!-- Live preview -->
+        <div id="tickerPreviewWrap" style="margin-bottom:20px;border-radius:10px;overflow:hidden;display:none;">
+          <div id="tickerPreview" class="site-ticker" style="--ticker-duration:30s;">
+            <div class="site-ticker-label">LIVE</div>
+            <div class="site-ticker-track">
+              <div class="site-ticker-inner" id="tickerPreviewInner"></div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:grid;gap:14px;">
+          <!-- Enable toggle -->
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;font-weight:600;">
+            <span class="theme-toggle-switch" id="tickerEnabledToggle" data-on="0"><span class="theme-toggle-knob"></span></span>
+            Enable ticker
+          </label>
+
+          <!-- Text -->
+          <div>
+            <label style="display:block;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">Ticker text</label>
+            <textarea id="tickerTextInput" rows="2" maxlength="500" placeholder="Breaking: something exciting is happening on Progress…"
+              style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--mocha-light);border-radius:10px;background:var(--paper);color:var(--ink);font-size:14px;font-family:var(--font-body);resize:vertical;"></textarea>
+            <div style="font-size:11px;color:var(--muted);margin-top:4px;text-align:right;"><span id="tickerCharCount">0</span>/500</div>
+          </div>
+
+          <!-- Colors + Speed row -->
+          <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;">
+            <div>
+              <label style="display:block;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">Text color</label>
+              <input type="color" id="tickerColorInput" value="#ffffff" style="width:48px;height:36px;border:1px solid var(--mocha-light);border-radius:8px;cursor:pointer;padding:2px;background:var(--paper);">
+            </div>
+            <div>
+              <label style="display:block;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">Background</label>
+              <input type="color" id="tickerBgInput" value="#1c1917" style="width:48px;height:36px;border:1px solid var(--mocha-light);border-radius:8px;cursor:pointer;padding:2px;background:var(--paper);">
+            </div>
+            <div>
+              <label style="display:block;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">Scroll speed</label>
+              <select id="tickerSpeedInput" style="padding:8px 12px;border:1px solid var(--mocha-light);border-radius:8px;background:var(--paper);color:var(--ink);font-size:14px;">
+                <option value="slow">Slow</option>
+                <option value="normal" selected>Normal</option>
+                <option value="fast">Fast</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:10px;align-items:center;">
+            <button class="btn primary" id="saveTickerBtn">Save &amp; publish</button>
+            <button class="btn" id="disableTickerBtn">Disable ticker</button>
+            <span id="tickerSaveStatus" style="font-size:13px;color:var(--muted);"></span>
+          </div>
+        </div>
+      </div>
+    </div><!-- /tab-ticker -->
+
     </div>
 
   </div>
@@ -1118,6 +1181,9 @@
       if (tab === "prompts") {
         loadDailyPrompt();
       }
+      if (tab === "ticker") {
+        loadTicker();
+      }
     });
   });
 
@@ -1133,6 +1199,102 @@
     if (h > 0) return `${h}h ${m}m left`;
     if (m > 0) return `${m}m ${s}s left`;
     return `${s}s left`;
+  }
+
+  // ── Ticker ────────────────────────────────────────────────────────────────
+  let tickerLoaded = false;
+  async function loadTicker() {
+    if (tickerLoaded) return;
+    tickerLoaded = true;
+
+    // Fetch current state
+    try {
+      const data = await apiFetch("/api/ticker");
+      if (data) {
+        const toggle = document.getElementById("tickerEnabledToggle");
+        if (data.enabled && toggle) { toggle.classList.add("on"); toggle.dataset.on = "1"; }
+        const textEl = document.getElementById("tickerTextInput");
+        if (textEl && data.text) { textEl.value = data.text; updateTickerPreview(); }
+        const colorEl = document.getElementById("tickerColorInput");
+        if (colorEl && data.color) colorEl.value = data.color;
+        const bgEl = document.getElementById("tickerBgInput");
+        if (bgEl && data.bgColor) bgEl.value = data.bgColor;
+        const speedEl = document.getElementById("tickerSpeedInput");
+        if (speedEl && data.speed) speedEl.value = data.speed;
+        if (data.enabled) updateTickerPreview();
+      }
+    } catch (e) {}
+
+    function escHTML(s) { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+    function updateTickerPreview() {
+      const text = document.getElementById("tickerTextInput")?.value.trim();
+      const color = document.getElementById("tickerColorInput")?.value || "#ffffff";
+      const bg = document.getElementById("tickerBgInput")?.value || "#1c1917";
+      const speed = document.getElementById("tickerSpeedInput")?.value || "normal";
+      const speedMap = { slow: "55s", normal: "30s", fast: "15s" };
+      const preview = document.getElementById("tickerPreview");
+      const wrap = document.getElementById("tickerPreviewWrap");
+      const inner = document.getElementById("tickerPreviewInner");
+      if (!text || !preview || !inner) { if (wrap) wrap.style.display = "none"; return; }
+      const chunk = `<span class="site-ticker-text">${escHTML(text)}</span><span class="site-ticker-sep">◆</span>`;
+      inner.innerHTML = chunk.repeat(6);
+      preview.style.cssText = `background:${bg};color:${color};--ticker-duration:${speedMap[speed]||"30s"};`;
+      if (wrap) wrap.style.display = "block";
+    }
+
+    // Live preview on input
+    ["tickerTextInput","tickerColorInput","tickerBgInput","tickerSpeedInput"].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener("input", updateTickerPreview);
+    });
+
+    // Char count
+    const textArea = document.getElementById("tickerTextInput");
+    const charCount = document.getElementById("tickerCharCount");
+    if (textArea && charCount) {
+      charCount.textContent = textArea.value.length;
+      textArea.addEventListener("input", () => { charCount.textContent = textArea.value.length; });
+    }
+
+    // Enable toggle
+    const toggle = document.getElementById("tickerEnabledToggle");
+    if (toggle) {
+      toggle.addEventListener("click", () => {
+        const nowOn = toggle.dataset.on !== "1";
+        toggle.dataset.on = nowOn ? "1" : "0";
+        toggle.classList.toggle("on", nowOn);
+      });
+    }
+
+    // Save
+    document.getElementById("saveTickerBtn")?.addEventListener("click", async () => {
+      const btn = document.getElementById("saveTickerBtn");
+      const status = document.getElementById("tickerSaveStatus");
+      btn.disabled = true; btn.textContent = "Saving…";
+      const payload = {
+        enabled: document.getElementById("tickerEnabledToggle")?.dataset.on === "1",
+        text: document.getElementById("tickerTextInput")?.value.trim() || "",
+        color: document.getElementById("tickerColorInput")?.value || "#ffffff",
+        bgColor: document.getElementById("tickerBgInput")?.value || "#1c1917",
+        speed: document.getElementById("tickerSpeedInput")?.value || "normal"
+      };
+      const res = await apiFetch("/api/ticker", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      btn.disabled = false; btn.textContent = "Save & publish";
+      if (res && res.ok) {
+        if (status) { status.textContent = "Saved ✓"; setTimeout(() => { status.textContent = ""; }, 3000); }
+        sessionStorage.removeItem("progress:ticker"); // bust client cache
+      } else {
+        if (status) { status.textContent = "Error saving"; }
+      }
+    });
+
+    // Disable shortcut
+    document.getElementById("disableTickerBtn")?.addEventListener("click", async () => {
+      const toggle = document.getElementById("tickerEnabledToggle");
+      if (toggle) { toggle.dataset.on = "0"; toggle.classList.remove("on"); }
+      document.getElementById("saveTickerBtn")?.click();
+    });
   }
 
   async function loadDailyPrompt() {

@@ -25,7 +25,10 @@
 <script>
   const wrap = document.getElementById("settingsWrap");
   const params = new URLSearchParams(location.search);
-  const isBetaMode = () => localStorage.getItem("progress:betaMode") === "true";
+  const isBetaMode = () => !!(user && (
+    (Array.isArray(user.badges) && user.badges.includes("tester")) ||
+    user.adminRole === "owner"
+  ));
   // If Spotify just redirected back here (spotify=connected / spotify=error),
   // force the settings tab open so the user lands on the section that matters.
   let activeTab = (params.get("tab") === "settings" || params.get("spotify")) ? "settings" : params.get("tab") === "stats" ? "stats" : "profile";
@@ -550,24 +553,18 @@ refreshNowPlaying();
 
       // ── Beta ─────────────────────────────────────────────────────────────
       function renderSubBeta(panel) {
-        const on = isBetaMode();
+        const hasAccess = isBetaMode();
         panel.innerHTML = `
           <h2 class="sett-panel-title">Beta <span class="beta-badge">Preview</span></h2>
+          ${hasAccess ? `
           <div class="sett-section">
-            <div class="sett-section-title">Beta features</div>
-            <p style="font-size:13.5px;color:var(--muted);margin-bottom:16px;">
-              These are experimental features that aren't quite ready for everyone yet. Expect rough edges — and feel free to break things.
-            </p>
-            <label class="sett-toggle-row" style="cursor:pointer;">
-              <span class="theme-toggle-switch${on ? " on" : ""}" id="betaToggle" data-on="${on ? "1" : "0"}">
-                <span class="theme-toggle-knob"></span>
-              </span>
-              <span style="font-weight:500;">Enable beta mode</span>
-            </label>
-            <p class="field-note">Turning this on gives you access to features still in development.</p>
-          </div>
-          ${on ? `
-          <div class="sett-section" style="margin-top:20px;">
+            <div style="display:flex;align-items:center;gap:10px;padding:14px 16px;background:linear-gradient(135deg,rgba(167,139,250,.12),rgba(96,165,250,.10));border:1px solid rgba(167,139,250,.3);border-radius:12px;margin-bottom:20px;">
+              <span style="font-size:22px;">🧪</span>
+              <div>
+                <div style="font-weight:600;font-size:14px;">Early tester access</div>
+                <div style="font-size:12.5px;color:var(--muted);">You have the <strong>tester</strong> badge — beta features are enabled for you.</div>
+              </div>
+            </div>
             <div class="sett-section-title">Active beta features</div>
             <div style="display:flex;flex-direction:column;gap:10px;margin-top:10px;">
               <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--mocha-wash);border-radius:10px;font-size:14px;">
@@ -578,18 +575,17 @@ refreshNowPlaying();
                 </div>
               </div>
             </div>
-          </div>` : ""}
+          </div>` : `
+          <div class="sett-section">
+            <div style="display:flex;align-items:center;gap:10px;padding:14px 16px;background:var(--mocha-wash);border:1px solid var(--mocha-light);border-radius:12px;">
+              <span style="font-size:22px;">🔒</span>
+              <div>
+                <div style="font-weight:600;font-size:14px;">Beta access is invite-only</div>
+                <div style="font-size:12.5px;color:var(--muted);">You need the <strong>early tester</strong> badge to access beta features.</div>
+              </div>
+            </div>
+          </div>`}
         `;
-
-        const toggle = document.getElementById("betaToggle");
-        if (toggle) {
-          toggle.addEventListener("click", () => {
-            const nowOn = toggle.dataset.on !== "1";
-            localStorage.setItem("progress:betaMode", nowOn ? "true" : "false");
-            showToast(nowOn ? "Beta mode on. Welcome, tester! 🧪" : "Beta mode off.");
-            renderSubBeta(panel); // re-render this panel
-          });
-        }
       }
 
       // ── Account ──────────────────────────────────────────────────────────

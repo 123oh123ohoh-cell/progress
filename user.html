@@ -56,7 +56,12 @@
     const viewer = Progress.getCurrentUser();
     const isOwnProfile = viewer && viewer.username === user.username;
 
-    const hasPubBanner = !!user.bannerImage && localStorage.getItem("progress:betaMode") === "true";
+    const viewer = Progress.getCurrentUser();
+    const viewerHasBeta = !!(viewer && (
+      (Array.isArray(viewer.badges) && viewer.badges.includes("tester")) ||
+      viewer.adminRole === "owner"
+    ));
+    const hasPubBanner = !!user.bannerImage && viewerHasBeta;
 
     root.innerHTML = `
       <div class="${hasPubBanner ? "has-pub-banner" : ""}" style="margin-top:40px;">

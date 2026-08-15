@@ -4144,7 +4144,7 @@ app.patch("/api/admin/users/:username/role", requireAuth, requireRole("owner"), 
 // ── Admin: assign badge ───────────────────────────────────────────────────────
 app.patch("/api/admin/users/:username/badge", requireAuth, requireRole("moderator"), asyncHandler(async (req, res) => {
   const { badge } = req.body || {};  // badge = string or null to remove
-  const VALID_BADGES = ["creator", "verified", "mod", "og", "supporter", "writer", null];
+  const VALID_BADGES = ["creator", "verified", "mod", "og", "supporter", "writer", "tester", null];
   if (!VALID_BADGES.includes(badge ?? null)) return res.status(400).json({ error: "Invalid badge." });
 
   const target = await db.collection("users").findOne({ username: req.params.username.toLowerCase() });
@@ -4513,6 +4513,43 @@ app.get("/api/admin/data/pageviews", requireAuth, requireRole("analyst"), asyncH
   res.json({ total, page, limit, pageviews: docs.map(p => ({
     page: p.page, username: p.username, timestamp: p.timestamp, date: p.date,
   })) });
+}));
+
+// ── News Ticker ───────────────────────────────────────────────────────────────
+app.get("/api/ticker", asyncHandler(async (req, res) => {
+  res.setHeader("Cache-Control", "public, s-maxage=10, stale-while-revalidate=30");
+  const doc = await db.collection("config").findOne({ _id: "ticker" });
+  if (!doc || !doc.enabled) return res.json({ enabled: false });
+  res.json({
+    enabled: true,
+    text: doc.text || "",
+    color: doc.color || "#ffffff",
+    bgColor: doc.bgColor || "#1c1917",
+    speed: doc.speed || "normal"
+  });
+}));
+
+app.put("/api/ticker", requireAuth, asyncHandler(async (req, res) => {
+  if (!ALLOWED_CREATOR_USERNAMES.has(req.user.username.toLowerCase())) {
+    const user = await db.collection("users").findOne({ username: req.user.username });
+    const role = user?.adminRole;
+    if (role !== "moderator" && role !== "owner") return res.status(403).json({ error: "Admin only." });
+  }
+  const { enabled, text, color, bgColor, speed } = req.body;
+  await db.collection("config").updateOne(
+    { _id: "ticker" },
+    { $set: {
+      enabled: !!enabled,
+      text: String(text || "").slice(0, 500),
+      color: String(color || "#ffffff").slice(0, 20),
+      bgColor: String(bgColor || "#1c1917").slice(0, 20),
+      speed: ["slow", "normal", "fast"].includes(speed) ? speed : "normal",
+      updatedAt: new Date().toISOString(),
+      updatedBy: req.user.username
+    }},
+    { upsert: true }
+  );
+  res.json({ ok: true });
 }));
 
 // ── Daily Prompts ─────────────────────────────────────────────────────────────

@@ -630,6 +630,51 @@ function bootingUpHTML(opts) {
     </div>`;
 }
 
+/* ── News ticker ─────────────────────────────────────────────────────────────
+   Fetches ticker config once per session and injects the crawler bar above
+   the nav if the admin has it enabled. Cached in sessionStorage so it
+   doesn't fire a fresh request on every page navigation.                    */
+async function renderTickerIfEnabled() {
+  try {
+    // Remove any existing ticker so we don't double-up on re-renders
+    document.getElementById("site-ticker")?.remove();
+
+    let data;
+    const cached = sessionStorage.getItem("progress:ticker");
+    if (cached) {
+      data = JSON.parse(cached);
+    } else {
+      const res = await fetch(`${API_BASE}/api/ticker`);
+      if (!res.ok) return;
+      data = await res.json();
+      sessionStorage.setItem("progress:ticker", JSON.stringify(data));
+    }
+
+    if (!data || !data.enabled || !data.text) return;
+
+    const speedMap = { slow: "55s", normal: "30s", fast: "15s" };
+    const duration = speedMap[data.speed] || "30s";
+
+    // Duplicate text so the scroll loops seamlessly
+    const chunk = `<span class="site-ticker-text">${escapeHTML(data.text)}</span><span class="site-ticker-sep">◆</span>`;
+    const inner = chunk.repeat(6); // enough copies to fill any width
+
+    const ticker = document.createElement("div");
+    ticker.id = "site-ticker";
+    ticker.className = "site-ticker";
+    ticker.style.cssText = `background:${data.bgColor};color:${data.color};--ticker-duration:${duration};`;
+    ticker.innerHTML = `
+      <div class="site-ticker-label">LIVE</div>
+      <div class="site-ticker-track">
+        <div class="site-ticker-inner">${inner}</div>
+      </div>`;
+
+    const navRoot = document.getElementById("nav-root");
+    if (navRoot) navRoot.before(ticker);
+    else document.body.prepend(ticker);
+  } catch (e) { /* fail silently */ }
+}
+
 function renderNav(activePage) {
   const root = document.getElementById("nav-root");
   if (!root) return;
@@ -1720,6 +1765,7 @@ function initShell(activePage) {
   bindAuthExpiryHandler();
   attachNavScrollWatcher();
   openPresenceSocket(activePage);
+  renderTickerIfEnabled();
   // Track page view (fire-and-forget, no auth required)
   if (activePage && typeof API_BASE !== "undefined") {
     fetch(`${API_BASE}/api/track/pageview`, {
