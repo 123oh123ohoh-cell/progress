@@ -1,0 +1,486 @@
+extends layout
+
+block title
+	| Write — Progress
+
+block meta
+	meta(property="og:site_name", content="Progress")
+	meta(property="og:type", content="website")
+	meta(property="og:url", content="https://progressing.online/write.html")
+	meta(property="og:title", content="Write — Progress")
+	meta(property="og:description", content="Start a new entry on Progress.")
+	meta(property="og:image", content="https://progressing.online/images/nearheader.png")
+	meta(name="twitter:card", content="summary_large_image")
+	meta(name="twitter:title", content="Write — Progress")
+	meta(name="twitter:description", content="Start a new entry on Progress.")
+	meta(name="twitter:image", content="https://progressing.online/images/nearheader.png")
+
+block content
+	//  URL input overlay — replaces prompt() on mobile for link/Spotify/YouTube 
+	.editor-url-overlay#urlOverlay(aria-modal='true' role='dialog')
+		.editor-url-overlay-label#urlOverlayLabel Enter URL
+		.editor-url-overlay-row
+			input#urlOverlayInput(type='url' placeholder='https://…' autocomplete='off' autocorrect='off' autocapitalize='none' spellcheck='false')
+			button.editor-url-overlay-confirm#urlOverlayConfirm Insert
+			button.editor-url-overlay-cancel#urlOverlayCancel Cancel
+	main.container
+		.editor-wrap#editorWrap
+	input#coverInput(type='file' accept='image/*' style='display:none;')
+	input#imageInput(type='file' accept='image/*' style='display:none;')
+	input#videoInput(type='file' accept='video/*' style='display:none;')
+	
+
+block scripts
+		script.
+			
+			  // ── URL overlay (replaces prompt() on mobile) ─────────────────────────────
+			  // Returns a Promise<string|null> — resolves with the URL or null on cancel.
+			  let _urlResolve = null;
+			  const urlOverlay     = document.getElementById("urlOverlay");
+			  const urlOverlayInput = document.getElementById("urlOverlayInput");
+			  const urlOverlayLabel = document.getElementById("urlOverlayLabel");
+			
+			  function askForUrl(label, placeholder) {
+			    return new Promise(resolve => {
+			      _urlResolve = resolve;
+			      urlOverlayLabel.textContent = label;
+			      urlOverlayInput.placeholder = placeholder || "https://…";
+			      urlOverlayInput.value = "";
+			      urlOverlay.classList.add("open");
+			      setTimeout(() => urlOverlayInput.focus(), 60);
+			    });
+			  }
+			
+			  function closeUrlOverlay(value) {
+			    urlOverlay.classList.remove("open");
+			    urlOverlayInput.blur();
+			    if (_urlResolve) { _urlResolve(value || null); _urlResolve = null; }
+			  }
+			
+			  document.getElementById("urlOverlayConfirm").addEventListener("click", () =>
+			    closeUrlOverlay(urlOverlayInput.value.trim())
+			  );
+			  document.getElementById("urlOverlayCancel").addEventListener("click", () =>
+			    closeUrlOverlay(null)
+			  );
+			  urlOverlayInput.addEventListener("keydown", e => {
+			    if (e.key === "Enter") closeUrlOverlay(urlOverlayInput.value.trim());
+			    if (e.key === "Escape") closeUrlOverlay(null);
+			  });
+			
+			  // ── Main editor ───────────────────────────────────────────────────────────
+			  async function start() {
+			    document.body.classList.add("page-write");
+			    initShell("write");
+			    const wrap = document.getElementById("editorWrap");
+			    Progress.loadFromApi().catch(() => {});
+			    const user = Progress.getCurrentUser();
+			    let coverData = null;
+			    let pendingImageUploads = 0;
+			    let selectedCategory = "";
+			    const isMobile = document.body.classList.contains("mobile");
+			
+			    if (!user) {
+			      wrap.innerHTML = `
+			        <div class="feed-empty" style="padding-top:80px;">
+			          <h3>Log in to write an entry</h3>
+			          <p>Use the account menu in the top right to log in or create an account.</p>
+			        </div>`;
+			      return;
+			    }
+			
+			    // ── Daily post limit check ──────────────────────────────────────────────
+			    let _dailyResetAt = null;
+			    let _countdownTimer = null;
+			
+			    function formatCountdown(ms) {
+			      if (ms <= 0) return "now";
+			      const totalSec = Math.ceil(ms / 1000);
+			      const h = Math.floor(totalSec / 3600);
+			      const m = Math.floor((totalSec % 3600) / 60);
+			      const s = totalSec % 60;
+			      if (h > 0) return `${h}h ${m}m`;
+			      if (m > 0) return `${m}m ${s}s`;
+			      return `${s}s`;
+			    }
+			
+			    function showDailyLimitBanner(resetAt) {
+			      _dailyResetAt = resetAt;
+			      let banner = document.getElementById("dailyLimitBanner");
+			      if (!banner) {
+			        banner = document.createElement("div");
+			        banner.id = "dailyLimitBanner";
+			        banner.style.cssText = "background:var(--mocha-wash);border:1px solid var(--mocha-light);border-radius:10px;padding:14px 18px;margin-bottom:20px;font-size:14px;color:var(--ink);display:flex;align-items:center;gap:10px;";
+			        banner.innerHTML = `<span style="font-size:20px;">📅</span><span id="dailyLimitText"></span>`;
+			        wrap.prepend(banner);
+			      }
+			      function tick() {
+			        const remaining = _dailyResetAt - Date.now();
+			        const el = document.getElementById("dailyLimitText");
+			        if (el) {
+			          if (remaining <= 0) {
+			            el.textContent = "You can post again now — refresh the page!";
+			            clearInterval(_countdownTimer);
+			          } else {
+			            el.textContent = `You've already posted today. Next entry unlocks in ${formatCountdown(remaining)}.`;
+			          }
+			        }
+			      }
+			      clearInterval(_countdownTimer);
+			      tick();
+			      _countdownTimer = setInterval(tick, 1000);
+			      // Disable publish button
+			      const pb = document.getElementById("publishBtn");
+			      if (pb) { pb.disabled = true; pb.title = "One entry per day"; }
+			    }
+			
+			    // Fire off a quiet check in the background — don't block render
+			    apiFetch("/api/posts/can-post").then(r => {
+			      if (r && !r.canPost) showDailyLimitBanner(r.resetAt);
+			    }).catch(() => {});
+			
+			    // ── Render editor HTML ──────────────────────────────────────────────────
+			    wrap.innerHTML = `
+			      ${isMobile ? `
+			      <div class="editor-mobile-bar">
+			        <span class="editor-mobile-label">New entry</span>
+			        <button class="editor-mobile-cancel" id="cancelBtn">Discard</button>
+			        <button class="editor-mobile-publish" id="publishBtn">Publish</button>
+			      </div>` : ""}
+			
+			      <div class="editor-cover-drop" id="coverDrop">
+			        <div class="cover-hint">${isMobile ? "Tap to add a cover photo" : "Click to add a cover image (optional)"}</div>
+			      </div>
+			
+			      <input class="editor-title-input" id="titleInput" placeholder="Give this entry a title"
+			        ${isMobile ? 'inputmode="text" autocapitalize="sentences"' : ""}>
+			
+			      <div class="editor-category-row" id="categoryRow">
+			        <span class="editor-category-label">Category</span>
+			        <button type="button" class="editor-cat-btn active" data-cat="">None</button>
+			        <button type="button" class="editor-cat-btn" data-cat="development">Development</button>
+			        <button type="button" class="editor-cat-btn" data-cat="creative">Creative</button>
+			        <button type="button" class="editor-cat-btn" data-cat="random">Random</button>
+			      </div>
+			
+			      <div class="toolbar" id="toolbar">
+			        <button class="tb-btn" data-cmd="bold" title="Bold"><strong>B</strong></button>
+			        <button class="tb-btn" data-cmd="italic" title="Italic"><em>I</em></button>
+			        <button class="tb-btn" data-cmd="underline" title="Underline"><u>U</u></button>
+			        <div class="tb-sep"></div>
+			        <button class="tb-btn" data-cmd="formatBlock" data-value="H2" title="Heading">H2</button>
+			        <button class="tb-btn" data-cmd="formatBlock" data-value="BLOCKQUOTE" title="Quote">&ldquo;</button>
+			        <button class="tb-btn" data-cmd="formatBlock" data-value="P" title="Paragraph">&para;</button>
+			        <div class="tb-sep"></div>
+			        <button class="tb-btn" data-cmd="insertUnorderedList" title="Bulleted list">&bull;&equiv;</button>
+			        <button class="tb-btn" id="insertLinkBtn" title="Link">
+			          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1.5 1.5"/><path d="M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1.5-1.5"/></svg>
+			        </button>
+			        <button class="tb-btn" id="insertImageBtn" title="Insert image">
+			          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5-9 9"/></svg>
+			        </button>
+			        <button class="tb-btn" id="insertSpotifyBtn" title="Insert Spotify embed">
+			          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+			        </button>
+			        <button class="tb-btn" id="insertYoutubeBtn" title="Insert YouTube video">
+			          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2.5" y="5" width="19" height="14" rx="4"/><path d="M10.5 9.5l5 2.5-5 2.5z" fill="currentColor" stroke="none"/></svg>
+			        </button>
+			        <button class="tb-btn" id="insertVideoBtn" title="Upload a video file">
+			          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 10l4.553-2.276A1 1 0 0 1 21 8.618v6.764a1 1 0 0 1-1.447.894L15 14"/><rect x="2" y="6" width="13" height="12" rx="2"/></svg>
+			        </button>
+			      </div>
+			
+			      <div class="editor-canvas" id="canvas" contenteditable="true"
+			           data-placeholder="Start writing…"
+			           ${isMobile ? 'inputmode="text"' : ""}></div>
+			
+			      ${!isMobile ? `
+			      <div class="editor-actions">
+			        <button class="btn" id="cancelBtn">Cancel</button>
+			        <button class="btn primary" id="publishBtn">Publish</button>
+			      </div>` : ""}
+			    `;
+			
+			    // ── Keyboard-aware toolbar on mobile ────────────────────────────────────
+			    // When the software keyboard opens, window.visualViewport.height shrinks.
+			    // We track the difference and push the bottom toolbar up by that amount
+			    // via a CSS custom property, so it always sits just above the keyboard.
+			    if (isMobile && window.visualViewport) {
+			      const toolbar = document.getElementById("toolbar");
+			      const syncToolbar = () => {
+			        const vv = window.visualViewport;
+			        // offsetTop accounts for pinch-zoom; the gap between viewport bottom
+			        // and visual viewport bottom is roughly the keyboard height.
+			        const kbHeight = Math.max(
+			          0,
+			          window.innerHeight - vv.height - vv.offsetTop
+			        );
+			        document.documentElement.style.setProperty("--kb-offset", kbHeight + "px");
+			      };
+			      window.visualViewport.addEventListener("resize", syncToolbar, { passive: true });
+			      window.visualViewport.addEventListener("scroll", syncToolbar, { passive: true });
+			      // Reset when the canvas blurs (keyboard dismissed)
+			      document.getElementById("canvas").addEventListener("blur", () => {
+			        document.documentElement.style.setProperty("--kb-offset", "0px");
+			      });
+			    }
+			
+			    // ── Category chips ──────────────────────────────────────────────────────
+			    document.getElementById("categoryRow").querySelectorAll(".editor-cat-btn").forEach(btn => {
+			      btn.addEventListener("click", () => {
+			        document.querySelectorAll(".editor-cat-btn").forEach(b => b.classList.remove("active"));
+			        btn.classList.add("active");
+			        selectedCategory = btn.dataset.cat || "";
+			      });
+			    });
+			
+			    // ── Cover image ─────────────────────────────────────────────────────────
+			    const coverDrop  = document.getElementById("coverDrop");
+			    const coverInput = document.getElementById("coverInput");
+			    coverDrop.addEventListener("click", () => coverInput.click());
+			    coverInput.addEventListener("change", () => {
+			      const file = coverInput.files[0];
+			      if (!file) return;
+			      const reader = new FileReader();
+			      reader.onload = async () => {
+			        const localPreview = reader.result;
+			        coverDrop.innerHTML = `<img src="${localPreview}" alt=""><div style="font-size:12px;color:var(--muted);margin-top:8px;">Uploading&hellip;</div>`;
+			        pendingImageUploads++;
+			        const uploaded = await apiFetch("/api/upload-image", {
+			          method: "POST",
+			          headers: { "Content-Type": "application/json" },
+			          body: JSON.stringify({ image: localPreview })
+			        });
+			        pendingImageUploads--;
+			        if (uploaded && uploaded.url) {
+			          coverData = uploaded.url;
+			          coverDrop.innerHTML = `<img src="${uploaded.url}" alt="">`;
+			        } else {
+			          showToast("Could not upload cover image. Try again.");
+			          coverData = null;
+			          coverDrop.innerHTML = `<div class="cover-hint">${isMobile ? "Tap to add a cover photo" : "Click to add a cover image (optional)"}</div>`;
+			        }
+			      };
+			      reader.readAsDataURL(file);
+			    });
+			
+			    // ── Toolbar: formatting commands ────────────────────────────────────────
+			    document.getElementById("toolbar").addEventListener("click", e => {
+			      const btn = e.target.closest(".tb-btn[data-cmd]");
+			      if (!btn) return;
+			      document.getElementById("canvas").focus();
+			      const cmd = btn.dataset.cmd;
+			      if (cmd === "formatBlock") {
+			        document.execCommand(cmd, false, btn.dataset.value);
+			      } else {
+			        document.execCommand(cmd, false, null);
+			      }
+			      updateToolbarState();
+			    });
+			
+			    // ── Link button — uses overlay on mobile, prompt() on desktop ──────────
+			    document.getElementById("insertLinkBtn").addEventListener("click", async () => {
+			      // Save selection before the overlay steals focus
+			      const sel = window.getSelection();
+			      const savedRange = sel && sel.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
+			      const url = isMobile
+			        ? await askForUrl("Link URL", "https://example.com")
+			        : prompt("Link URL:");
+			      if (!url) return;
+			      document.getElementById("canvas").focus();
+			      if (savedRange) {
+			        const s = window.getSelection();
+			        s.removeAllRanges();
+			        s.addRange(savedRange);
+			      }
+			      document.execCommand("createLink", false, url);
+			    });
+			
+			    // ── Inline image ────────────────────────────────────────────────────────
+			    const imageInput = document.getElementById("imageInput");
+			    document.getElementById("insertImageBtn").addEventListener("click", () => imageInput.click());
+			    imageInput.addEventListener("change", () => {
+			      const file = imageInput.files[0];
+			      if (!file) return;
+			      const reader = new FileReader();
+			      reader.onload = async () => {
+			        document.getElementById("canvas").focus();
+			        const pid = "img-upload-" + Date.now() + Math.random().toString(36).slice(2, 7);
+			        document.execCommand("insertHTML", false, `<img id="${pid}" src="${reader.result}" style="opacity:.5;">`);
+			        pendingImageUploads++;
+			        const uploaded = await apiFetch("/api/upload-image", {
+			          method: "POST",
+			          headers: { "Content-Type": "application/json" },
+			          body: JSON.stringify({ image: reader.result })
+			        });
+			        pendingImageUploads--;
+			        const placeholder = document.getElementById(pid);
+			        if (uploaded && uploaded.url && placeholder) {
+			          placeholder.src = uploaded.url;
+			          placeholder.style.opacity = "";
+			          placeholder.removeAttribute("id");
+			        } else if (placeholder) {
+			          showToast("Could not upload that image. Try again.");
+			          placeholder.remove();
+			        }
+			      };
+			      reader.readAsDataURL(file);
+			      imageInput.value = "";
+			    });
+			
+			    // ── Video upload — direct browser to Supabase via signed URL ──────────────
+			    const videoInput = document.getElementById("videoInput");
+			    document.getElementById("insertVideoBtn").addEventListener("click", () => videoInput.click());
+			    videoInput.addEventListener("change", async () => {
+			      const file = videoInput.files[0];
+			      if (!file) return;
+			      videoInput.value = "";
+			
+			      if (file.size > 50 * 1024 * 1024) {
+			        showToast("Video over 50 MB — compress it or use the YouTube button.");
+			        return;
+			      }
+			
+			      document.getElementById("canvas").focus();
+			      const pid = "vid-" + Date.now();
+			      document.execCommand("insertHTML", false,
+			        '<div id="' + pid + '" class="post-video-uploading" contenteditable="false">' +
+			        '<span class="post-video-spinner"></span><span>Uploading video…</span></div><p><br></p>'
+			      );
+			      pendingImageUploads++;
+			
+			      let videoUrl = null;
+			      try {
+			        // Step 1: get a signed URL from the server (tiny request)
+			        const urlData = await apiFetch("/api/storage-upload-url", {
+			          method: "POST",
+			          headers: { "Content-Type": "application/json" },
+			          body: JSON.stringify({ filename: file.name, mimeType: file.type })
+			        });
+			        if (urlData && urlData.uploadUrl) {
+			          // Step 2: upload directly to Supabase — never touches Render
+			          const up = await fetch(urlData.uploadUrl, {
+			            method: "PUT",
+			            headers: { "Content-Type": file.type },
+			            body: file
+			          });
+			          if (up.ok) videoUrl = urlData.publicUrl;
+			        }
+			      } catch (e) {}
+			
+			      pendingImageUploads--;
+			      const ph = document.getElementById(pid);
+			      if (videoUrl && ph) {
+			        const fig = document.createElement("figure");
+			        fig.className = "post-video-wrap";
+			        fig.contentEditable = "false";
+			        fig.innerHTML = '<video class="post-video" controls preload="metadata" src="' + videoUrl + '"></video>';
+			        ph.replaceWith(fig);
+			      } else {
+			        if (ph) ph.remove();
+			        showToast("Could not upload that video. Try again.");
+			      }
+			    });
+			
+			    // ── Spotify embed ───────────────────────────────────────────────────────
+			    document.getElementById("insertSpotifyBtn").addEventListener("click", async () => {
+			      const url = isMobile
+			        ? await askForUrl("Spotify link", "https://open.spotify.com/track/…")
+			        : prompt("Paste a Spotify track, album, playlist, or artist link:");
+			      if (!url) return;
+			      const embed = renderSpotifyEmbed({ spotify: url.trim() });
+			      if (!embed) { showToast("That doesn't look like a Spotify link."); return; }
+			      document.getElementById("canvas").focus();
+			      document.execCommand("insertHTML", false, `<div class="spotify-post-embed" contenteditable="false">${embed}</div><p><br></p>`);
+			    });
+			
+			    // ── YouTube embed ───────────────────────────────────────────────────────
+			    document.getElementById("insertYoutubeBtn").addEventListener("click", async () => {
+			      const url = isMobile
+			        ? await askForUrl("YouTube link", "https://youtube.com/watch?v=…")
+			        : prompt("Paste a YouTube video link:");
+			      if (!url) return;
+			      const embed = renderYouTubeEmbed(url);
+			      if (!embed) { showToast("That doesn't look like a YouTube link."); return; }
+			      document.getElementById("canvas").focus();
+			      document.execCommand("insertHTML", false, embed + "<p><br></p>");
+			    });
+			
+			    // ── Toolbar active state ────────────────────────────────────────────────
+			    function updateToolbarState() {
+			      ["bold","italic","underline"].forEach(cmd => {
+			        const btn = document.querySelector(`.tb-btn[data-cmd="${cmd}"]`);
+			        if (btn) btn.classList.toggle("active", document.queryCommandState(cmd));
+			      });
+			    }
+			    document.getElementById("canvas").addEventListener("keyup",   updateToolbarState);
+			    document.getElementById("canvas").addEventListener("mouseup", updateToolbarState);
+			    document.getElementById("canvas").addEventListener("touchend", updateToolbarState);
+			
+			    // ── Cancel ──────────────────────────────────────────────────────────────
+			    document.getElementById("cancelBtn").addEventListener("click", () => {
+			      const hasContent = document.getElementById("canvas").innerText.trim() ||
+			                         document.getElementById("titleInput").value.trim();
+			      if (!hasContent || confirm("Discard this entry?")) location.href = "index.html";
+			    });
+			
+			    // ── Publish ─────────────────────────────────────────────────────────────
+			    async function doPublish() {
+			      if (pendingImageUploads > 0) {
+			        showToast("Still uploading an image — one sec, then try again.");
+			        return;
+			      }
+			      const title   = document.getElementById("titleInput").value.trim();
+			      const content = document.getElementById("canvas").innerHTML.trim();
+			      if (!title)   { showToast("Give your entry a title first."); return; }
+			      if (!content) { showToast("Write something before publishing."); return; }
+			
+			      const publishBtn = document.getElementById("publishBtn");
+			      publishBtn.disabled = true;
+			      publishBtn.textContent = "Publishing…";
+			
+			      const plain   = document.getElementById("canvas").innerText.trim();
+			      const excerpt = plain.slice(0, 140) + (plain.length > 140 ? "…" : "");
+			
+			      // Call API directly so we can detect 429 (daily limit)
+			      let post = null;
+			      try {
+			        const token = getAuthToken();
+			        const res = await fetch(API_BASE + "/api/posts", {
+			          method: "POST",
+			          headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+			          body: JSON.stringify({ title, content, cover: coverData, excerpt, category: selectedCategory || null })
+			        });
+			        if (res.status === 429) {
+			          const err = await res.json().catch(() => ({}));
+			          publishBtn.disabled = false;
+			          publishBtn.textContent = "Publish";
+			          showDailyLimitBanner(err.resetAt || (Date.now() + 86400000));
+			          return;
+			        }
+			        if (res.ok) {
+			          post = await res.json();
+			          await Progress.loadFromApi().catch(() => {});
+			        }
+			      } catch (e) {
+			        // network error — fall through to show error toast
+			      }
+			
+			      publishBtn.disabled = false;
+			      publishBtn.textContent = "Publish";
+			
+			      if (!post) { showToast("Could not publish. Try again."); return; }
+			      showToast("Published.");
+			      setTimeout(() => location.href = "post.html?id=" + post.id, 500);
+			    }
+			
+			    document.getElementById("publishBtn").addEventListener("click", doPublish);
+			
+			    // ── Auto-focus canvas on desktop (not mobile — keyboard is annoying) ───
+			    if (!isMobile) {
+			      // Small delay so the page paint is done first
+			      setTimeout(() => document.getElementById("canvas").focus(), 80);
+			    }
+			  }
+			
+			  start();

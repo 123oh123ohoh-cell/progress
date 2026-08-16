@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chat — Progress</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500;1,9..144,600&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script>(function(){try{var t=localStorage.getItem("progressTheme");var dark=(t==="dark")||(t!=="light"&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);if(dark)document.documentElement.setAttribute("data-theme","dark");}catch(e){}})();</script>
+<link rel="stylesheet" href="v2-compat.css">
+<link rel="stylesheet" href="style.css">
+<style>
+#nav-root { display:none !important; }
+body { background: var(--v2-bg); }
+
+/* Full-height chat layout */
+.v2-chat-page {
+  display: flex; flex-direction: column;
+  height: calc(100dvh - var(--v2-nav-h));
+}
+
+.v2-chat-layout {
+  display: flex; flex: 1; overflow: hidden;
+  max-width: 100%; margin: 0 auto;
+}
+
+/* Sidebar */
+.v2-chat-sidebar {
+  width: 280px; flex-shrink: 0;
+  background: var(--v2-paper); border-right: 1px solid var(--v2-border);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+@media (max-width: 740px) { .v2-chat-sidebar { display: none; } }
+
+.v2-chat-sidebar-header {
+  padding: 16px; border-bottom: 1px solid var(--v2-border); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.v2-chat-sidebar-title { font-weight: 700; font-size: 14px; color: var(--v2-ink); }
+
+/* Override v1 chat sidebar elements */
+.sidebar-tabs { border-bottom: 1px solid var(--v2-border) !important; padding: 0 12px !important; flex-shrink: 0 !important; }
+.sidebar-tab {
+  font-size: 12px !important; font-weight: 600 !important; padding: 10px 8px !important;
+  color: var(--v2-muted) !important; border-bottom: 2px solid transparent !important;
+  font-family: var(--v2-font-b) !important; letter-spacing: 0 !important; text-transform: none !important;
+}
+.sidebar-tab.active { color: var(--v2-ink) !important; border-bottom-color: var(--v2-ink) !important; }
+.sidebar-panel { flex: 1 !important; min-height: 0 !important; }
+
+.community-search { border-radius: var(--r-md) !important; border-color: var(--v2-border) !important; background: var(--v2-paper-2) !important; color: var(--v2-ink) !important; font-size: 13px !important; }
+.community-search:focus { border-color: var(--v2-accent) !important; box-shadow: 0 0 0 3px var(--v2-accent-dim) !important; }
+
+.community-item { border-radius: var(--r-md) !important; }
+.community-item:hover, .community-item.active { background: var(--v2-paper-2) !important; }
+.community-name { color: var(--v2-ink) !important; }
+.community-topic { color: var(--v2-muted) !important; }
+
+.community-create-btn { border-color: var(--v2-border) !important; color: var(--v2-muted) !important; border-radius: var(--r-md) !important; }
+.community-create-btn:hover { border-color: var(--v2-ink) !important; color: var(--v2-ink) !important; background: var(--v2-paper-2) !important; }
+
+.community-explore-btn { background: var(--v2-ink) !important; color: var(--v2-bg) !important; border-radius: var(--r-md) !important; }
+
+/* Chat main area */
+.v2-chat-main {
+  flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0;
+}
+
+/* Override v1 chat-area styles */
+.chat-area { flex: 1 !important; overflow-y: auto !important; }
+.chat-header { background: var(--v2-paper) !important; border-bottom: 1px solid var(--v2-border) !important; padding: 14px 20px !important; }
+.chat-room-name { font-size: 15px !important; font-weight: 700 !important; color: var(--v2-ink) !important; }
+.chat-room-topic { font-size: 12.5px !important; color: var(--v2-muted) !important; }
+
+/* Messages */
+.chat-message { padding: 8px 20px !important; }
+.chat-message:hover { background: var(--v2-paper-2) !important; border-radius: 0 !important; }
+.chat-avatar { border: 1.5px solid var(--v2-border) !important; }
+.chat-author { color: var(--v2-ink) !important; font-weight: 600 !important; font-size: 14px !important; }
+.chat-timestamp { color: var(--v2-muted) !important; font-family: var(--v2-font-m) !important; font-size: 11px !important; }
+.chat-text { color: var(--v2-ink) !important; font-size: 14.5px !important; }
+
+/* Input bar */
+.chat-input-wrap {
+  background: var(--v2-paper) !important; border-top: 1px solid var(--v2-border) !important;
+  padding: 14px 20px !important;
+}
+.chat-input {
+  background: var(--v2-paper-2) !important;
+  border: 1.5px solid var(--v2-border) !important;
+  border-radius: var(--r-lg) !important;
+  color: var(--v2-ink) !important;
+  font-family: var(--v2-font-b) !important;
+  font-size: 15px !important;
+  padding: 11px 16px !important;
+}
+.chat-input:focus { border-color: var(--v2-accent) !important; box-shadow: 0 0 0 3px var(--v2-accent-dim) !important; outline: none !important; }
+.chat-send-btn {
+  background: var(--v2-ink) !important; color: var(--v2-bg) !important;
+  border: none !important; border-radius: var(--r-md) !important;
+  font-weight: 600 !important;
+}
+.chat-send-btn:hover { opacity: .9 !important; }
+</style>
+</head>
+<body class="v2 mobile">
+
+<div id="nav-root" aria-hidden="true"></div>
+<div id="modal-root"></div>
+
+<!-- ── V2 Nav ─────────────────────────────────────────────── -->
+<nav class="v2-nav" id="v2Nav">
+  <div class="v2-nav-inner">
+    <a href="index.html" class="v2-logo">
+      <img src="../images/etc1.png" alt="Progress" class="v2-logo-img">
+      <span class="v2-logo-text">Progress</span>
+    </a>
+    <div class="v2-nav-right" id="v2NavRight">
+      <a href="write.html" class="v2-btn v2-btn--dark" style="font-size:13px;padding:7px 15px;">Write</a>
+    </div>
+  </div>
+</nav>
+
+<!-- Chat page body — v1 chat JS will inject into #chatRoot -->
+<div class="v2-chat-page">
+  <div id="chatRoot" style="display:flex;flex:1;overflow:hidden;"></div>
+</div>
+
+<!-- Mobile bottom nav -->
+<nav class="v2-mob-nav" aria-label="Mobile navigation">
+  <a href="index.html" class="v2-mob-tab" aria-label="Feed">
+    <svg viewBox="0 0 22 22" fill="none" width="21" height="21"><path d="M2.5 10 11 3l8.5 7V19a.8.8 0 0 1-.8.8H3.3a.8.8 0 0 1-.8-.8V10Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+    <span>Feed</span>
+  </a>
+  <a href="explore.html" class="v2-mob-tab" aria-label="Explore">
+    <svg viewBox="0 0 22 22" fill="none" width="21" height="21"><circle cx="10" cy="10" r="7.5" stroke="currentColor" stroke-width="1.7"/><path d="m16 16 3.5 3.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+    <span>Explore</span>
+  </a>
+  <a href="write.html" class="v2-mob-tab v2-mob-tab--write" aria-label="Write">
+    <svg viewBox="0 0 22 22" fill="none" width="21" height="21"><path d="M16.5 3 19 5.5l-13 13L3 20l.5-3.5 13-13Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+    <span>Write</span>
+  </a>
+  <a href="chat.html" class="v2-mob-tab v2-mob-tab--active" aria-label="Chat">
+    <svg viewBox="0 0 22 22" fill="none" width="21" height="21"><path d="M19.5 11c0 4.14-3.36 7.5-7.5 7.5A7.48 7.48 0 0 1 7.3 17.4L3 18.5l1.1-4.3A7.48 7.48 0 0 1 4.5 11C4.5 6.86 7.86 3.5 12 3.5s7.5 3.36 7.5 7.5Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+    <span>Chat</span>
+  </a>
+  <a href="profile.html" class="v2-mob-tab" id="v2MobProfile" aria-label="Profile">
+    <svg viewBox="0 0 22 22" fill="none" width="21" height="21"><circle cx="11" cy="7.5" r="3.5" stroke="currentColor" stroke-width="1.7"/><path d="M4 19.5c0-3.87 3.13-7 7-7h.5c3.87 0 7 3.13 7 7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+    <span>Profile</span>
+  </a>
+</nav>
+
+<script src="../data.js"></script>
+<script src="../app.js"></script>
+<script src="v2-nav.js"></script>
+<script>
+  async function start() {
+    const ready = initShell("chat");
+    v2BootNav(ready);
+  }
+  start();
+</script>
+</body>
+</html>

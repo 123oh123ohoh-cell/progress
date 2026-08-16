@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>User profile — Progress</title>
+<meta property="og:site_name" content="Progress">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500;1,9..144,600&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script>(function(){try{var t=localStorage.getItem("progressTheme");var dark=(t==="dark")||(t!=="light"&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);if(dark)document.documentElement.setAttribute("data-theme","dark");}catch(e){}})();</script>
+<link rel="stylesheet" href="v2-compat.css">
+<link rel="stylesheet" href="style.css">
+<style>
+#nav-root { display:none !important; }
+body { background: var(--v2-bg); }
+
+.v2-user-layout {
+  max-width: 860px; margin: 0 auto; padding: 0 24px 100px;
+}
+@media (max-width: 740px) { .v2-user-layout { padding: 0 0 88px; } }
+
+/* Profile header */
+.v2-profile-header {
+  text-align: center; padding: 48px 24px 32px;
+  border-bottom: 1px solid var(--v2-border);
+  margin-bottom: 32px;
+}
+
+.v2-profile-av {
+  width: 80px; height: 80px; border-radius: 50%; overflow: hidden;
+  border: 3px solid var(--v2-border); background: var(--v2-paper-2);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--v2-font-d); font-style: italic; font-size: 28px;
+  color: var(--v2-mocha-dark); margin: 0 auto 14px;
+}
+.v2-profile-av img { width: 100%; height: 100%; object-fit: cover; }
+
+.v2-profile-banner {
+  width: 100%; height: 160px; object-fit: cover;
+  border-radius: var(--r-lg); margin-bottom: 0;
+  border: 1px solid var(--v2-border);
+}
+
+.v2-has-banner .v2-profile-av {
+  margin-top: -40px; border: 3px solid var(--v2-paper);
+  box-shadow: var(--sh-sm);
+}
+
+.v2-profile-name {
+  font-family: var(--v2-font-d); font-style: italic; font-weight: 600;
+  font-size: 28px; color: var(--v2-ink); margin: 0 0 4px;
+}
+.v2-profile-handle { font-size: 14px; color: var(--v2-muted); font-family: var(--v2-font-m); margin-bottom: 10px; }
+.v2-profile-bio { font-size: 15px; color: var(--v2-muted); line-height: 1.6; max-width: 460px; margin: 0 auto 16px; }
+
+/* Badges row */
+.v2-profile-badges { display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+.v2-profile-badges .profile-badge,
+.v2-profile-badges .profile-badge-image { width: 24px; height: 24px; border-radius: 4px; }
+
+/* Stats row */
+.v2-profile-stats {
+  display: flex; align-items: center; justify-content: center; gap: 32px;
+  flex-wrap: wrap; margin-bottom: 20px;
+}
+.v2-stat { text-align: center; }
+.v2-stat-num { font-size: 22px; font-weight: 700; color: var(--v2-ink); font-family: var(--v2-font-d); display: block; }
+.v2-stat-label { font-size: 12px; color: var(--v2-muted); font-family: var(--v2-font-m); text-transform: uppercase; letter-spacing: .06em; }
+
+/* Action buttons */
+.v2-profile-actions { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; }
+
+/* Posts grid */
+.v2-user-posts-label {
+  font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--v2-muted); font-family: var(--v2-font-m); margin-bottom: 14px;
+}
+@media (max-width: 740px) { .v2-user-posts-label { padding: 0 16px; } }
+</style>
+</head>
+<body class="v2 mobile">
+
+<div id="nav-root" aria-hidden="true"></div>
+<div id="modal-root"></div>
+
+<!-- ── V2 Nav ─────────────────────────────────────────────── -->
+<nav class="v2-nav" id="v2Nav">
+  <div class="v2-nav-inner">
+    <a href="index.html" class="v2-logo">
+      <img src="../images/etc1.png" alt="Progress" class="v2-logo-img">
+      <span class="v2-logo-text">Progress</span>
+    </a>
+    <div class="v2-nav-right" id="v2NavRight">
+      <a href="write.html" class="v2-btn v2-btn--dark" style="font-size:13px;padding:7px 15px;">Write</a>
+    </div>
+  </div>
+</nav>
+
+<div class="v2-user-layout">
+  <div id="publicProfile">
+    <!-- Loading skeleton -->
+    <div style="text-align:center;padding:48px 24px 32px;">
+      <div class="v2-skel" style="width:80px;height:80px;border-radius:50%;margin:0 auto 14px;"></div>
+      <div class="v2-skel" style="height:28px;width:160px;margin:0 auto 8px;border-radius:6px;"></div>
+      <div class="v2-skel" style="height:14px;width:100px;margin:0 auto 14px;border-radius:4px;"></div>
+      <div class="v2-skel" style="height:14px;width:240px;margin:0 auto;border-radius:4px;"></div>
+    </div>
+    <div class="v2-grid" style="margin-top:24px;">
+      <div class="v2-skel v2-skel-card"></div>
+      <div class="v2-skel v2-skel-card"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Mobile bottom nav -->
+<nav class="v2-mob-nav" aria-label="Mobile navigation">
+  <a href="index.html" class="v2-mob-tab" aria-label="Feed">
+    <svg viewBox="0 0 22 22" fill="none" width="21" height="21"><path d="M2.5 10 11 3l8.5 7V19a.8.8 0 0 1-.8.8H3.3a.8.8 0 0 1-.8-.8V10Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+    <span>Feed</span>
+  </a>
+  <a href="explore.html" class="v2-mob-tab" aria-label="Explore">
+    <svg viewBox="0 0 22 22" fill="none" width="21" height="21"><circle cx="10" cy="10" r="7.5" stroke="currentColor" stroke-width="1.7"/><path d="m16 16 3.5 3.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+    <span>Explore</span>
+  </a>
+  <a href="write.html" class="v2-mob-tab v2-mob-tab--write" aria-label="Write">
+    <svg viewBox="0 0 22 22" fill="none" width="21" height="21"><path d="M16.5 3 19 5.5l-13 13L3 20l.5-3.5 13-13Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+    <span>Write</span>
+  </a>
+  <a href="chat.html" class="v2-mob-tab" aria-label="Chat">
+    <svg viewBox="0 0 22 22" fill="none" width="21" height="21"><path d="M19.5 11c0 4.14-3.36 7.5-7.5 7.5A7.48 7.48 0 0 1 7.3 17.4L3 18.5l1.1-4.3A7.48 7.48 0 0 1 4.5 11C4.5 6.86 7.86 3.5 12 3.5s7.5 3.36 7.5 7.5Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+    <span>Chat</span>
+  </a>
+  <a href="profile.html" class="v2-mob-tab" id="v2MobProfile" aria-label="Profile">
+    <svg viewBox="0 0 22 22" fill="none" width="21" height="21"><circle cx="11" cy="7.5" r="3.5" stroke="currentColor" stroke-width="1.7"/><path d="M4 19.5c0-3.87 3.13-7 7-7h.5c3.87 0 7 3.13 7 7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+    <span>Profile</span>
+  </a>
+</nav>
+
+<script src="../data.js"></script>
+<script src="../app.js"></script>
+<script src="v2-nav.js"></script>
+<script>
+const params   = new URLSearchParams(location.search);
+const userId   = params.get("id");
+const username = params.get("username");
+const root     = document.getElementById("publicProfile");
+
+function _esc(s) { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+function ini(name) {
+  return (name || "?").split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
+}
+
+function renderPublicProfile(user) {
+  if (!user) {
+    root.innerHTML = `<div style="text-align:center;padding:80px 0;">
+      <img src="../images/404page.png" alt="" style="max-width:260px;margin:0 auto 20px;">
+      <h3 style="font-family:var(--v2-font-d);font-style:italic;font-size:24px;color:var(--v2-ink);margin-bottom:8px;">User not found</h3>
+      <p><a href="index.html" style="color:var(--v2-accent);text-decoration:underline;">Back to home</a></p>
+    </div>`;
+    return;
+  }
+
+  const viewer = Progress.getCurrentUser();
+  const isOwn  = viewer && viewer.username === user.username;
+  const following = Progress.isFollowing(user.username);
+  const posts  = Progress.getPosts().filter(p => p.author === user.username);
+
+  document.title = `@${user.username} — Progress`;
+
+  const avHTML = user.avatar
+    ? `<img src="${_esc(user.avatar)}" alt="@${_esc(user.username)}" loading="lazy">`
+    : ini(user.name || user.username);
+
+  const hasBanner = !!user.bannerImage;
+
+  root.innerHTML = `
+    ${hasBanner ? `<img class="v2-profile-banner" src="${_esc(user.bannerImage)}" alt="">` : ""}
+    <div class="v2-profile-header${hasBanner ? " v2-has-banner" : ""}">
+      <div class="v2-profile-av">${avHTML}</div>
+      <h1 class="v2-profile-name">${_esc(user.name || user.username)}</h1>
+      <p class="v2-profile-handle">@${_esc(user.username)}</p>
+      ${user.bio ? `<p class="v2-profile-bio">${_esc(user.bio)}</p>` : ""}
+      ${user.badges?.length ? `<div class="v2-profile-badges">${(typeof renderBadges==="function" ? renderBadges(user) : "")}</div>` : ""}
+      <div class="v2-profile-stats">
+        <div class="v2-stat">
+          <span class="v2-stat-num">${posts.length}</span>
+          <span class="v2-stat-label">Posts</span>
+        </div>
+        <div class="v2-stat">
+          <span class="v2-stat-num">${user.followers?.length || 0}</span>
+          <span class="v2-stat-label">Followers</span>
+        </div>
+        <div class="v2-stat">
+          <span class="v2-stat-num">${user.following?.length || 0}</span>
+          <span class="v2-stat-label">Following</span>
+        </div>
+        ${user.streak >= 2 ? `<div class="v2-stat"><span class="v2-stat-num">🔥${user.streak}</span><span class="v2-stat-label">Streak</span></div>` : ""}
+      </div>
+      <div class="v2-profile-actions">
+        ${isOwn
+          ? `<a href="profile.html" class="v2-btn v2-btn--ghost" style="font-size:13.5px;">Edit profile</a>
+             <a href="write.html" class="v2-btn v2-btn--dark" style="font-size:13.5px;">Write</a>`
+          : viewer
+            ? `<button class="v2-btn v2-btn--dark" id="v2FollowBtn" style="font-size:13.5px;">${following ? "Following" : "Follow"}</button>`
+            : `<a href="signup.html" class="v2-btn v2-btn--dark" style="font-size:13.5px;">Follow</a>`}
+      </div>
+    </div>
+
+    <p class="v2-user-posts-label">Journal entries</p>
+    ${posts.length ? `
+      <div class="v2-card v2-card--feat" style="cursor:pointer;" onclick="location.href='post.html?id=${_esc(posts[0].id)}'">
+        ${posts[0].cover ? `<div class="v2-feat-img-wrap"><img class="v2-card-cover" src="${_esc(posts[0].cover)}" alt="" loading="lazy"></div>` : `<div class="v2-feat-img-wrap"><div class="v2-feat-gradient">${posts[0].emoji||"✍️"}</div></div>`}
+        <div class="v2-card-body">
+          <div class="v2-feat-eyebrow">Latest</div>
+          <div class="v2-card-meta"><span class="v2-card-date">${Progress.formatDateShort(posts[0].date)}</span></div>
+          <h2 class="v2-card-title">${_esc(posts[0].title)}</h2>
+          <p class="v2-card-excerpt">${_esc(posts[0].excerpt||"")}</p>
+          <div class="v2-card-footer">
+            <span class="v2-card-likes">
+              <svg viewBox="0 0 12 12" fill="none"><path d="M6 10.5S1 7.2 1 4.2C1 2.4 2.4 1 4.2 1c.9 0 1.8.5 2.8 1.6C8-.5 9.4 1 9.8 1c1.8 0 3.2 1.4 1.2 3.2C9 7.2 6 10.5 6 10.5Z" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg>
+              ${posts[0].likes||0}
+            </span>
+          </div>
+        </div>
+      </div>
+      ${posts.length > 1 ? `<div class="v2-grid" style="margin-top:14px;">${posts.slice(1).map(p => `
+        <article class="v2-card" onclick="location.href='post.html?id=${_esc(p.id)}'" style="cursor:pointer;">
+          ${p.cover ? `<img class="v2-card-cover" src="${_esc(p.cover)}" alt="" loading="lazy">` : ""}
+          <div class="v2-card-body">
+            <div class="v2-card-meta">
+              ${p.category ? `<span class="v2-card-cat cat-${p.category.toLowerCase()}">${_esc(p.category)}</span>` : ""}
+              <span class="v2-card-date">${Progress.formatDateShort(p.date)}</span>
+            </div>
+            <h2 class="v2-card-title">${_esc(p.title)}</h2>
+            <p class="v2-card-excerpt">${_esc(p.excerpt||"")}</p>
+            <div class="v2-card-footer">
+              <span class="v2-card-likes">
+                <svg viewBox="0 0 12 12" fill="none"><path d="M6 10.5S1 7.2 1 4.2C1 2.4 2.4 1 4.2 1c.9 0 1.8.5 2.8 1.6C8-.5 9.4 1 9.8 1c1.8 0 3.2 1.4 1.2 3.2C9 7.2 6 10.5 6 10.5Z" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg>
+                ${p.likes||0}
+              </span>
+            </div>
+          </div>
+        </article>`).join("")}</div>` : ""}
+    ` : `<p style="color:var(--v2-muted);font-size:14px;padding:20px ${window.innerWidth<740?"16px":"0"};">No entries yet.</p>`}`;
+
+  /* Follow button */
+  document.getElementById("v2FollowBtn")?.addEventListener("click", async () => {
+    if (!viewer) { if(typeof showModal==="function") showModal("login"); return; }
+    const btn = document.getElementById("v2FollowBtn");
+    btn.disabled = true;
+    const r = await Progress.toggleFollow(user.username);
+    btn.disabled = false;
+    if (r) {
+      btn.textContent = Progress.isFollowing(user.username) ? "Following" : "Follow";
+      if(typeof showToast==="function") showToast(Progress.isFollowing(user.username) ? `Following @${user.username}` : "Unfollowed.");
+    }
+  });
+}
+
+async function start() {
+  const ready = initShell("user");
+  v2BootNav(ready);
+  Progress.loadFromApi().catch(() => {});
+
+  ready.then(async () => {
+    let user;
+    if (userId) {
+      user = await apiFetch(`/api/users/${encodeURIComponent(userId)}`).catch(() => null);
+    } else if (username) {
+      user = await apiFetch(`/api/users/by-username/${encodeURIComponent(username)}`).catch(() => null);
+    }
+    renderPublicProfile(user || null);
+  }).catch(() => renderPublicProfile(null));
+}
+start();
+</script>
+</body>
+</html>

@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Progress</title>
+<meta property="og:site_name" content="Progress">
+<meta property="og:type" content="article">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500;1,9..144,600&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script>(function(){try{var t=localStorage.getItem("progressTheme");var dark=(t==="dark")||(t!=="light"&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);if(dark)document.documentElement.setAttribute("data-theme","dark");}catch(e){}})();</script>
+<link rel="stylesheet" href="v2-compat.css">
+<link rel="stylesheet" href="style.css">
+<style>
+#nav-root { display:none !important; }
+body { background: var(--v2-bg); }
+
+/* Reading progress bar */
+.v2-read-bar { position: fixed; top: 0; left: 0; right: 0; z-index: 500; height: 3px; background: var(--v2-border); }
+.v2-read-fill { height: 100%; width: 0%; background: var(--v2-accent); transition: width .1s linear; border-radius: 0 2px 2px 0; }
+
+/* Post layout */
+.v2-post-layout {
+  max-width: 1200px; margin: 0 auto; padding: 0 24px 100px;
+  display: grid;
+  grid-template-columns: 1fr minmax(0,680px) 280px;
+  grid-template-areas: "back content aside";
+  gap: 0 32px;
+  align-items: start;
+}
+@media (max-width: 1100px) {
+  .v2-post-layout { grid-template-columns: 1fr minmax(0,720px); grid-template-areas: "back content"; }
+  .v2-post-aside { display: none; }
+}
+@media (max-width: 740px) {
+  .v2-post-layout { grid-template-columns: 1fr; grid-template-areas: "content"; padding: 0 0 88px; }
+  .v2-post-back-col { display: none; }
+}
+
+.v2-post-back-col { grid-area: back; padding-top: 40px; position: sticky; top: calc(var(--v2-nav-h) + 20px); }
+.v2-post-content  { grid-area: content; padding-top: 40px; min-width: 0; }
+.v2-post-aside    { grid-area: aside; padding-top: 40px; position: sticky; top: calc(var(--v2-nav-h) + 20px); }
+
+/* Back button */
+.v2-back-btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 13px; font-weight: 500; color: var(--v2-muted);
+  text-decoration: none; padding: 8px 12px;
+  border-radius: var(--r-md); border: 1.5px solid transparent;
+  transition: all .15s; white-space: nowrap;
+}
+.v2-back-btn:hover { background: var(--v2-paper); color: var(--v2-ink); border-color: var(--v2-border); }
+.v2-back-btn svg { flex-shrink: 0; }
+
+/* Post head */
+.v2-post-head { margin-bottom: 28px; }
+.v2-post-eyebrow { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+.v2-post-cat {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700;
+  text-transform: capitalize;
+}
+.v2-post-cat.cat-development { background: var(--cat-dev-bg); color: var(--cat-dev); }
+.v2-post-cat.cat-creative    { background: var(--cat-creative-bg); color: var(--cat-creative); }
+.v2-post-cat.cat-random      { background: var(--cat-random-bg); color: var(--cat-random); }
+.v2-post-datestr { font-size: 12.5px; color: var(--v2-muted); font-family: var(--v2-font-m); }
+
+.v2-post-title {
+  font-family: var(--v2-font-d); font-style: italic; font-weight: 600;
+  font-size: clamp(26px, 4vw, 38px); line-height: 1.2;
+  color: var(--v2-ink); margin: 0 0 20px;
+}
+
+.v2-post-byline {
+  display: flex; align-items: center; gap: 10px;
+  padding-bottom: 20px; border-bottom: 1px solid var(--v2-border);
+}
+.v2-post-byline-av {
+  width: 34px; height: 34px; border-radius: 50%; overflow: hidden;
+  border: 2px solid var(--v2-border); flex-shrink: 0; background: var(--v2-paper-2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-style: italic; font-family: var(--v2-font-d); color: var(--v2-mocha-dark);
+}
+.v2-post-byline-av img { width: 100%; height: 100%; object-fit: cover; }
+.v2-post-byline-text { font-size: 14px; color: var(--v2-muted); }
+.v2-post-byline-text strong { color: var(--v2-ink); font-weight: 600; }
+.v2-post-byline-text a { color: inherit; }
+
+/* Cover */
+.v2-post-cover {
+  width: 100%; max-height: 420px; object-fit: cover;
+  border-radius: var(--r-lg); margin-bottom: 32px;
+  border: 1px solid var(--v2-border);
+}
+
+/* Article typography */
+.v2-article {
+  font-size: 17px; line-height: 1.78; color: var(--v2-ink);
+  margin-bottom: 32px;
+}
+.v2-article h1, .v2-article h2, .v2-article h3 {
+  font-family: var(--v2-font-d); font-style: italic;
+  line-height: 1.3; margin: 1.8em 0 .6em; color: var(--v2-ink);
+}
+.v2-article h1 { font-size: 2em; }
+.v2-article h2 { font-size: 1.5em; }
+.v2-article h3 { font-size: 1.2em; }
+.v2-article p  { margin: 0 0 1.2em; }
+.v2-article a  { color: var(--v2-accent); text-decoration: underline; text-underline-offset: 3px; }
+.v2-article blockquote {
+  border-left: 3px solid var(--v2-mocha); padding-left: 20px;
+  margin: 1.5em 0; color: var(--v2-muted); font-style: italic;
+}
+.v2-article code {
+  font-family: var(--v2-font-m); font-size: .88em;
+  background: var(--v2-paper-2); border: 1px solid var(--v2-border);
+  border-radius: 4px; padding: 2px 6px;
+}
+.v2-article pre {
+  background: var(--v2-paper-2); border: 1px solid var(--v2-border);
+  border-radius: var(--r-md); padding: 16px; overflow-x: auto;
+  font-family: var(--v2-font-m); font-size: .88em; margin: 1.5em 0;
+}
+.v2-article pre code { background: none; border: none; padding: 0; }
+.v2-article img { max-width: 100%; border-radius: var(--r-md); margin: 1em 0; }
+.v2-article hr { border: none; border-top: 1px solid var(--v2-border); margin: 2em 0; }
+
+/* Action bar */
+.v2-post-actions {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 16px 0; border-top: 1px solid var(--v2-border); border-bottom: 1px solid var(--v2-border);
+  margin-bottom: 40px;
+}
+.v2-action-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 16px; border-radius: 22px; font-size: 13.5px; font-weight: 500;
+  border: 1.5px solid var(--v2-border); background: var(--v2-paper);
+  color: var(--v2-muted); cursor: pointer; transition: all .15s;
+  font-family: var(--v2-font-b);
+}
+.v2-action-btn:hover { border-color: var(--v2-border-2); color: var(--v2-ink); background: var(--v2-paper-2); }
+.v2-action-btn.liked { background: #fff0f0; border-color: #fca5a5; color: #dc2626; }
+[data-theme="dark"] .v2-action-btn.liked { background: rgba(220,38,38,.15); border-color: rgba(220,38,38,.4); color: #f87171; }
+.v2-action-btn.danger:hover { border-color: var(--v2-danger); color: var(--v2-danger); }
+.v2-action-btn svg { width: 14px; height: 14px; }
+
+/* Comments */
+.v2-comments-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 20px; }
+.v2-comments-title { font-family: var(--v2-font-d); font-style: italic; font-size: 22px; font-weight: 600; color: var(--v2-ink); margin: 0; }
+.v2-comments-count { font-size: 13px; color: var(--v2-muted); font-family: var(--v2-font-m); }
+
+.v2-comment {
+  display: flex; gap: 12px; padding: 16px 0;
+  border-bottom: 1px solid var(--v2-border);
+}
+.v2-comment:last-of-type { border-bottom: none; }
+.v2-comment-av {
+  width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+  overflow: hidden; background: var(--v2-paper-2); border: 1.5px solid var(--v2-border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-style: italic; font-family: var(--v2-font-d); color: var(--v2-mocha-dark);
+}
+.v2-comment-av img { width: 100%; height: 100%; object-fit: cover; }
+.v2-comment-body { flex: 1; min-width: 0; }
+.v2-comment-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; flex-wrap: wrap; }
+.v2-comment-author { font-size: 13.5px; font-weight: 600; color: var(--v2-ink); }
+.v2-comment-time { font-size: 11.5px; color: var(--v2-muted); font-family: var(--v2-font-m); }
+.v2-comment-text { font-size: 14.5px; line-height: 1.6; color: var(--v2-ink); margin: 0; }
+.v2-comment-img { max-width: 280px; border-radius: var(--r-md); margin-top: 10px; border: 1px solid var(--v2-border); }
+
+/* Reply form */
+.v2-reply-form {
+  margin-top: 24px; background: var(--v2-paper); border: 1.5px solid var(--v2-border);
+  border-radius: var(--r-lg); padding: 16px; display: flex; flex-direction: column; gap: 12px;
+}
+.v2-reply-textarea {
+  width: 100%; min-height: 90px; resize: vertical;
+  border: none; background: transparent; font-family: var(--v2-font-b);
+  font-size: 15px; color: var(--v2-ink); line-height: 1.6; outline: none;
+}
+.v2-reply-textarea::placeholder { color: var(--v2-muted); }
+.v2-reply-row { display: flex; align-items: center; gap: 8px; justify-content: space-between; flex-wrap: wrap; }
+.v2-reply-tools { display: flex; gap: 6px; }
+
+/* Sidebar cards */
+.v2-aside-card {
+  background: var(--v2-paper); border: 1px solid var(--v2-border);
+  border-radius: var(--r-lg); padding: 18px; margin-bottom: 16px;
+  box-shadow: var(--sh-xs);
+}
+.v2-aside-label { font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--v2-muted); font-family: var(--v2-font-m); margin-bottom: 12px; }
+.v2-aside-author-av { width: 44px; height: 44px; border-radius: 50%; overflow: hidden; background: var(--v2-paper-2); border: 2px solid var(--v2-border); display: flex; align-items: center; justify-content: center; font-family: var(--v2-font-d); font-style: italic; font-size: 15px; color: var(--v2-mocha-dark); margin: 0 auto 10px; }
+.v2-aside-author-av img { width: 100%; height: 100%; object-fit: cover; }
+.v2-live-readers { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-top: 8px; }
+.v2-live-av { width: 24px; height: 24px; border-radius: 50%; overflow: hidden; border: 2px solid var(--v2-paper); background: var(--v2-paper-2); display: inline-flex; align-items: center; justify-content: center; font-size: 9px; color: var(--v2-mocha-dark); }
+.v2-live-av img { width: 100%; height: 100%; object-fit: cover; }
+</style>
+</head>
+<body class="v2 mobile">
+
+<div id="nav-root" aria-hidden="true"></div>
+<div id="modal-root"></div>
+
+<!-- Reading progress bar -->
+<div class="v2-read-bar"><div class="v2-read-fill" id="v2ReadFill"></div></div>
+
+<!-- ── V2 Nav ─────────────────────────────────────────────── -->
+<nav class="v2-nav" id="v2Nav">
+  <div class="v2-nav-inner">
+    <a href="index.html" class="v2-logo">
+      <img src="../images/etc1.png" alt="Progress" class="v2-logo-img">
+      <span class="v2-logo-text">Progress</span>
+    </a>
+    <div class="v2-nav-right" id="v2NavRight">
+      <a href="write.html" class="v2-btn v2-btn--dark" style="font-size:13px;padding:7px 15px;">Write</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ── Post layout ─────────────────────────────────────────── -->
+<div class="v2-post-layout">
+
+  <!-- Back button column -->
+  <div class="v2-post-back-col">
+    <a href="index.html" class="v2-back-btn">
+      <svg viewBox="0 0 16 16" fill="none" width="14" height="14"><path d="M10 3 5 8l5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Back
+    </a>
+  </div>
+
+  <!-- Main content -->
+  <div class="v2-post-content" id="postRoot">
+    <!-- Loading state -->
+    <div id="v2PostLoading" style="padding-top:20px;">
+      <div class="v2-skel" style="height:32px;width:60%;margin-bottom:16px;border-radius:6px;"></div>
+      <div class="v2-skel" style="height:48px;width:90%;margin-bottom:12px;border-radius:6px;"></div>
+      <div class="v2-skel" style="height:48px;width:75%;margin-bottom:24px;border-radius:6px;"></div>
+      <div class="v2-skel" style="height:280px;margin-bottom:24px;border-radius:var(--r-lg);"></div>
+      <div class="v2-skel" style="height:18px;width:100%;margin-bottom:10px;border-radius:4px;"></div>
+      <div class="v2-skel" style="height:18px;width:88%;margin-bottom:10px;border-radius:4px;"></div>
+      <div class="v2-skel" style="height:18px;width:94%;margin-bottom:10px;border-radius:4px;"></div>
+    </div>
+  </div>
+
+  <!-- Aside -->
+  <aside class="v2-post-aside" id="v2PostAside"></aside>
+
+</div>
+
+<!-- Mobile back nav (replaces bottom nav on post page) -->
+<div style="display:none;" id="v2PostMobBack">
+  <nav class="v2-mob-nav" style="justify-content:flex-start;padding:0 16px;gap:16px;">
+    <a href="index.html" class="v2-mob-tab v2-mob-tab--active" style="flex:unset;max-width:unset;">
+      <svg viewBox="0 0 22 22" fill="none" width="18" height="18"><path d="M10 3 3 10l7 7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>Feed</span>
+    </a>
+  </nav>
+</div>
+
+<script src="../data.js"></script>
+<script src="../app.js"></script>
+<script src="v2-nav.js"></script>
+<script>
+const params  = new URLSearchParams(location.search);
+const postId  = params.get("id");
+const postRoot = document.getElementById("postRoot");
+
+/* reading progress */
+window.addEventListener("scroll", () => {
+  const h = document.documentElement;
+  const pct = (scrollY / (h.scrollHeight - h.clientHeight)) * 100;
+  const fill = document.getElementById("v2ReadFill");
+  if (fill) fill.style.width = Math.min(100, pct) + "%";
+}, { passive: true });
+
+function _esc(s) { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+function renderNotFound() {
+  document.getElementById("v2PostLoading")?.remove();
+  postRoot.innerHTML = `
+    <div style="text-align:center;padding:80px 0;">
+      <img src="../images/404page.png" alt="" style="max-width:280px;margin:0 auto 24px;">
+      <h2 style="font-family:var(--v2-font-d);font-style:italic;font-size:26px;color:var(--v2-ink);margin:0 0 8px;">Entry not found</h2>
+      <p style="color:var(--v2-muted);"><a href="index.html" style="color:var(--v2-accent);text-decoration:underline;">Back to the feed</a></p>
+    </div>`;
+}
+
+async function renderPost() {
+  let post = Progress.getPost(postId);
+  const comments = await Progress.loadComments(postId).catch(() => []);
+
+  if (!post) {
+    await Progress.loadFromApi().catch(() => {});
+    post = Progress.getPost(postId);
+    if (!post) { renderNotFound(); return; }
+  }
+
+  if (!post.content) {
+    const full = await apiFetch(`/api/posts/${postId}`).catch(() => null);
+    if (full?.content) post = { ...post, content: full.content };
+  }
+
+  const user   = Progress.getCurrentUser();
+  const author = Progress.getUser(post.author);
+  const likedByMe = post.likedBy?.includes(user ? user.username : "guest");
+  const catSlug = (post.category || "").toLowerCase();
+  const catLabel = catSlug ? catSlug.charAt(0).toUpperCase() + catSlug.slice(1) : "";
+
+  /* page meta */
+  document.title = `${post.title} — Progress`;
+  const ogDesc = (post.excerpt || "").replace(/<[^>]+>/g,"").slice(0,200);
+  [["og:title",post.title],["og:description",ogDesc],["twitter:title",post.title],["twitter:description",ogDesc]].forEach(([n,v]) => {
+    const el = document.querySelector(`meta[property="${n}"],meta[name="${n}"]`);
+    if (el) el.setAttribute("content", v);
+  });
+
+  const ini = author ? (author.name || author.username).split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase() : "?";
+  const avHTML = author?.avatar ? `<img src="${_esc(author.avatar)}" alt="" loading="lazy">` : ini;
+
+  const titleHTML = typeof renderEmoticonsText === "function"
+    ? renderEmoticonsText(post.title, "inline-emoticon")
+    : _esc(post.title);
+  const contentHTML = typeof renderEmoticonsInHTML === "function"
+    ? renderMentionsInHTML(renderEmoticonsInHTML(post.content || "", "inline-emoticon"), "post-mention-link")
+    : (post.content || "");
+
+  /* build post HTML */
+  document.getElementById("v2PostLoading")?.remove();
+  postRoot.innerHTML = `
+    <div class="v2-post-head">
+      <div class="v2-post-eyebrow">
+        <a href="index.html" class="v2-back-btn" style="display:inline-flex;font-size:12px;padding:5px 10px;">
+          <svg viewBox="0 0 16 16" fill="none" width="13" height="13"><path d="M10 3 5 8l5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Feed
+        </a>
+        ${catLabel ? `<span class="v2-post-cat cat-${catSlug}">${catLabel}</span>` : ""}
+        <span class="v2-post-datestr">${Progress.formatDateTime ? Progress.formatDateTime(post.createdAt || post.date + "T00:00:00") : Progress.formatDateShort(post.date)}</span>
+      </div>
+      <h1 class="v2-post-title">${titleHTML}</h1>
+      <div class="v2-post-byline">
+        <a href="user.html?id=${author ? _esc(author.id) : ""}" class="v2-post-byline-av">${avHTML}</a>
+        <span class="v2-post-byline-text">Written by <strong><a href="user.html?id=${author ? _esc(author.id) : ""}">@${_esc(post.author)}</a></strong></span>
+      </div>
+    </div>
+
+    ${post.cover ? `<img class="v2-post-cover" src="${_esc(post.cover)}" alt="">` : ""}
+
+    <article class="v2-article post-content">${contentHTML}</article>
+
+    <div class="v2-post-actions">
+      <button class="v2-action-btn${likedByMe ? " liked" : ""}" id="v2LikeBtn">
+        <svg viewBox="0 0 16 16" fill="none"><path d="M8 13.5S1.5 9.8 1.5 5.7C1.5 3.3 3.3 1.5 5.7 1.5c1 0 2 .6 2.3 1 .3-.4 1.3-1 2.3-1 2.4 0 4.2 1.8 2.2 4.2C10.5 9.8 8 13.5 8 13.5Z" stroke="currentColor" stroke-width="1.4" fill="${likedByMe?"currentColor":"none"}" stroke-linejoin="round"/></svg>
+        <span id="v2LikeCount">${post.likes || 0}</span>
+      </button>
+      <button class="v2-action-btn" id="v2ReplyBtn">
+        <svg viewBox="0 0 16 16" fill="none"><path d="M3 9l4-4v2.5c5.5 0 8 2.5 8.5 6.5-2.5-2.5-4.5-3-8.5-3V13L3 9Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+        Reply
+      </button>
+      ${user ? `<button class="v2-action-btn" id="v2BookmarkBtn" title="Bookmark">
+        <svg viewBox="0 0 16 16" fill="none"><path d="M13 13.5l-5-3.5-5 3.5V3a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v10.5Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+        Save
+      </button>` : ""}
+      <button class="v2-action-btn" id="v2ShareBtn" title="Share">
+        <svg viewBox="0 0 16 16" fill="none"><circle cx="13" cy="3" r="1.8" stroke="currentColor" stroke-width="1.3"/><circle cx="3" cy="8" r="1.8" stroke="currentColor" stroke-width="1.3"/><circle cx="13" cy="13" r="1.8" stroke="currentColor" stroke-width="1.3"/><line x1="4.7" y1="9" x2="11.3" y2="12" stroke="currentColor" stroke-width="1.3"/><line x1="11.3" y1="4" x2="4.7" y2="7" stroke="currentColor" stroke-width="1.3"/></svg>
+        Share
+      </button>
+      ${user && user.username !== post.author ? `<button class="v2-action-btn" id="v2FollowBtn">${Progress.isFollowing(post.author) ? "Following" : "Follow author"}</button>` : ""}
+      ${user && user.username === post.author ? `<button class="v2-action-btn danger" id="v2DeleteBtn">Delete</button>` : ""}
+    </div>
+
+    <!-- Comments -->
+    <section>
+      <div class="v2-comments-head">
+        <h2 class="v2-comments-title">Replies</h2>
+        <span class="v2-comments-count">${comments.length}</span>
+      </div>
+      <div id="v2Replies">
+        ${comments.length ? comments.map(c => {
+          const ca = Progress.getUser(c.author);
+          const cini = (ca ? (ca.name || ca.username) : c.author).split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
+          const cav = ca?.avatar ? `<img src="${_esc(ca.avatar)}" alt="" loading="lazy">` : cini;
+          return `
+          <div class="v2-comment">
+            <a href="user.html?id=${ca ? _esc(ca.id) : ""}" class="v2-comment-av">${cav}</a>
+            <div class="v2-comment-body">
+              <div class="v2-comment-meta">
+                <span class="v2-comment-author"><a href="user.html?id=${ca ? _esc(ca.id) : ""}">@${_esc(c.author)}</a></span>
+                <time class="v2-comment-time">${typeof Progress.formatDateTime==="function" ? Progress.formatDateTime(c.time) : c.time}</time>
+              </div>
+              <p class="v2-comment-text">${typeof renderEmoticonsText==="function" ? renderEmoticonsText(c.body,"reply-emoticon") : _esc(c.body)}</p>
+              ${c.image ? `<img class="v2-comment-img" src="${_esc(c.image)}" alt="">` : ""}
+            </div>
+          </div>`;
+        }).join("") : `<p style="color:var(--v2-muted);font-size:14px;padding:16px 0;">No replies yet. Be the first!</p>`}
+      </div>
+
+      ${user ? `
+      <form class="v2-reply-form" id="v2ReplyForm">
+        <textarea class="v2-reply-textarea" id="v2ReplyInput" placeholder="Leave a reply…" rows="3"></textarea>
+        <div id="v2ReplyImagePreview"></div>
+        <div class="v2-reply-row">
+          <div class="v2-reply-tools">
+            <button type="button" class="v2-btn v2-btn--ghost" id="v2AttachImg" style="padding:6px 12px;font-size:12.5px;">
+              <svg viewBox="0 0 16 16" fill="none" width="13" height="13"><rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.3"/><circle cx="5.5" cy="5.5" r="1" fill="currentColor"/><path d="M2 11l3-3 3 3 2-2 4 4" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+              Photo
+            </button>
+          </div>
+          <button type="submit" class="v2-btn v2-btn--dark" style="font-size:13.5px;padding:8px 18px;">Post reply</button>
+        </div>
+      </form>
+      <input type="file" id="v2ReplyImgInput" accept="image/*" style="display:none;">
+      ` : `<p style="color:var(--v2-muted);font-size:14px;padding:16px 0;"><a href="signup.html" style="color:var(--v2-accent);text-decoration:underline;">Log in</a> to leave a reply.</p>`}
+    </section>`;
+
+  /* ── wire actions ─────────────────────────────────────── */
+  document.getElementById("v2LikeBtn")?.addEventListener("click", async () => {
+    if (!user) { if(typeof showModal==="function") showModal("login"); return; }
+    const up = await Progress.toggleLike(post.id);
+    if (!up) return;
+    document.getElementById("v2LikeCount").textContent = up.likes;
+    document.getElementById("v2LikeBtn").classList.toggle("liked", up.likedBy.includes(user.username));
+  });
+
+  document.getElementById("v2ReplyBtn")?.addEventListener("click", () => {
+    if (!user) { if(typeof showModal==="function") showModal("login"); return; }
+    document.getElementById("v2ReplyForm")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    document.getElementById("v2ReplyInput")?.focus();
+  });
+
+  const bookmarkBtn = document.getElementById("v2BookmarkBtn");
+  if (bookmarkBtn && user) {
+    apiFetch(`/api/bookmarks/${post.id}/status`).then(r => { if (r?.bookmarked) bookmarkBtn.classList.add("liked"); });
+    bookmarkBtn.addEventListener("click", async () => {
+      bookmarkBtn.disabled = true;
+      const r = await apiFetch(`/api/bookmarks/${post.id}`, { method:"POST" });
+      bookmarkBtn.disabled = false;
+      if (r) { bookmarkBtn.classList.toggle("liked", r.bookmarked); if(typeof showToast==="function") showToast(r.bookmarked ? "Saved!" : "Removed from bookmarks."); }
+    });
+  }
+
+  document.getElementById("v2ShareBtn")?.addEventListener("click", async () => {
+    const url = `${location.origin}/og/${post.id}`;
+    if (navigator.share) { navigator.share({ title: post.title, url }).catch(()=>{}); }
+    else { try { await navigator.clipboard.writeText(url); if(typeof showToast==="function") showToast("Link copied!"); } catch {} }
+  });
+
+  document.getElementById("v2FollowBtn")?.addEventListener("click", async () => {
+    if (!user) { if(typeof showModal==="function") showModal("login"); return; }
+    const r = await Progress.toggleFollow(post.author);
+    if (r) {
+      const btn = document.getElementById("v2FollowBtn");
+      btn.textContent = Progress.isFollowing(post.author) ? "Following" : "Follow author";
+      if(typeof showToast==="function") showToast(Progress.isFollowing(post.author) ? "Following!" : "Unfollowed.");
+    }
+  });
+
+  document.getElementById("v2DeleteBtn")?.addEventListener("click", async () => {
+    if (!confirm("Delete this entry? This can't be undone.")) return;
+    const ok = await Progress.deletePost(post.id);
+    if (ok) { if(typeof showToast==="function") showToast("Deleted."); setTimeout(() => location.href = "index.html", 400); }
+  });
+
+  /* image attach in reply */
+  let replyImgData = null;
+  const attachBtn = document.getElementById("v2AttachImg");
+  const imgInput  = document.getElementById("v2ReplyImgInput");
+  const imgPreview= document.getElementById("v2ReplyImagePreview");
+  if (attachBtn && imgInput) {
+    attachBtn.addEventListener("click", () => imgInput.click());
+    imgInput.addEventListener("change", () => {
+      const file = imgInput.files?.[0]; if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        replyImgData = reader.result;
+        if (imgPreview) imgPreview.innerHTML = `<div style="position:relative;display:inline-block;margin-top:8px;"><img src="${reader.result}" style="max-width:200px;border-radius:var(--r-md);border:1px solid var(--v2-border);" alt=""><button type="button" onclick="replyImgData=null;document.getElementById('v2ReplyImagePreview').innerHTML=''" style="position:absolute;top:-6px;right:-6px;background:var(--v2-ink);color:var(--v2-bg);border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;">×</button></div>`;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  /* reply form submit */
+  document.getElementById("v2ReplyForm")?.addEventListener("submit", async e => {
+    e.preventDefault();
+    const input = document.getElementById("v2ReplyInput");
+    const body  = input?.value?.trim();
+    if (!body && !replyImgData) return;
+    const submitBtn = e.target.querySelector("button[type=submit]");
+    if (submitBtn) submitBtn.disabled = true;
+    const comment = await Progress.addComment(post.id, body, replyImgData).catch(()=>null);
+    if (submitBtn) submitBtn.disabled = false;
+    if (!comment) { if(typeof showToast==="function") showToast("Could not post reply."); return; }
+    if (input) input.value = "";
+    replyImgData = null;
+    if (imgPreview) imgPreview.innerHTML = "";
+    const repliesEl = document.getElementById("v2Replies");
+    if (repliesEl) {
+      const div = document.createElement("div");
+      div.className = "v2-comment";
+      const ua = (user.name || user.username).split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
+      div.innerHTML = `
+        <div class="v2-comment-av">${user.avatar ? `<img src="${_esc(user.avatar)}" alt="">` : ua}</div>
+        <div class="v2-comment-body">
+          <div class="v2-comment-meta"><span class="v2-comment-author">@${_esc(user.username)}</span><time class="v2-comment-time">just now</time></div>
+          <p class="v2-comment-text">${_esc(body)}</p>
+          ${replyImgData ? `<img class="v2-comment-img" src="${replyImgData}" alt="">` : ""}
+        </div>`;
+      repliesEl.appendChild(div);
+    }
+    if(typeof showToast==="function") showToast("Reply posted!");
+  });
+
+  /* aside — author card + live readers */
+  const aside = document.getElementById("v2PostAside");
+  if (aside) {
+    aside.innerHTML = `
+      <div class="v2-aside-card">
+        <div class="v2-aside-label">About the author</div>
+        <div class="v2-aside-author-av">${author?.avatar ? `<img src="${_esc(author.avatar)}" alt="">` : ini}</div>
+        <div style="text-align:center;">
+          <div style="font-weight:600;font-size:15px;color:var(--v2-ink);margin-bottom:2px;">${_esc(author?.name || post.author)}</div>
+          <div style="font-size:12px;color:var(--v2-muted);font-family:var(--v2-font-m);margin-bottom:10px;">@${_esc(post.author)}</div>
+          ${author?.bio ? `<p style="font-size:13px;color:var(--v2-muted);line-height:1.55;margin:0 0 12px;">${_esc(author.bio)}</p>` : ""}
+          ${user && user.username !== post.author ? `<button class="v2-btn v2-btn--ghost" id="v2AsideFollow" style="font-size:13px;width:100%;justify-content:center;">${Progress.isFollowing(post.author) ? "Following" : "Follow"}</button>` : ""}
+        </div>
+      </div>
+      <div class="v2-aside-card" id="v2LiveCard" style="display:none;">
+        <div class="v2-aside-label">Also reading</div>
+        <div class="v2-live-readers" id="v2LiveReaders"></div>
+      </div>`;
+
+    document.getElementById("v2AsideFollow")?.addEventListener("click", async () => {
+      if (!user) { if(typeof showModal==="function") showModal("login"); return; }
+      const r = await Progress.toggleFollow(post.author);
+      if (r) {
+        const btn = document.getElementById("v2AsideFollow");
+        btn.textContent = Progress.isFollowing(post.author) ? "Following" : "Follow";
+        const mainBtn = document.getElementById("v2FollowBtn");
+        if (mainBtn) mainBtn.textContent = btn.textContent + (btn.textContent === "Follow" ? " author" : "");
+      }
+    });
+  }
+
+  /* live readers */
+  document.addEventListener("post-viewers", e => {
+    const { postId: pid, viewers } = e.detail;
+    if (pid !== postId) return;
+    const el = document.getElementById("v2LiveReaders");
+    const card = document.getElementById("v2LiveCard");
+    if (!el || !card) return;
+    const me2 = Progress.getCurrentUser();
+    const others = viewers.filter(v => v.username !== me2?.username);
+    if (!others.length) { card.style.display = "none"; return; }
+    card.style.display = "";
+    el.innerHTML = others.slice(0,5).map(v =>
+      v.avatar ? `<div class="v2-live-av"><img src="${_esc(v.avatar)}" title="@${_esc(v.username)}" alt=""></div>`
+               : `<div class="v2-live-av">${(v.name||v.username)[0].toUpperCase()}</div>`
+    ).join("") + (others.length > 5 ? `<span style="font-size:11px;color:var(--v2-muted);margin-left:4px;">+${others.length-5}</span>` : "");
+  });
+
+  /* announce viewing */
+  if (typeof announceViewingPost === "function") announceViewingPost(postId);
+  else setTimeout(() => { if(typeof announceViewingPost==="function") announceViewingPost(postId); }, 1500);
+  window.addEventListener("beforeunload", () => { if(typeof announceLeftPost==="function") announceLeftPost(); });
+}
+
+async function start() {
+  const ready = initShell("post");
+  v2BootNav(ready);
+  await renderPost();
+}
+
+start();
+</script>
+</body>
+</html>

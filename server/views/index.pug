@@ -1,0 +1,431 @@
+extends layout
+
+block title
+	| Progress — a journal for what you're building
+
+block meta
+	meta(property="og:site_name", content="Progress")
+	meta(property="og:type", content="website")
+	meta(property="og:url", content="https://progressing.online/index.html")
+	meta(property="og:title", content="Progress — a journal for what you're building")
+	meta(property="og:description", content="A running record of things made, fixed, rebuilt, and understood a little better than yesterday.")
+	meta(property="og:image", content="https://progressing.online/images/nearheader.png")
+	meta(name="twitter:card", content="summary_large_image")
+	meta(name="twitter:title", content="Progress — a journal for what you're building")
+	meta(name="twitter:description", content="A running record of things made, fixed, rebuilt, and understood a little better than yesterday.")
+	meta(name="twitter:image", content="https://progressing.online/images/nearheader.png")
+
+block head
+	style.
+		
+		/* ── Event feed card — compact single pill ────────────────────── */
+		.event-feed-card {
+		  display: block; border-radius: 20px;
+		  padding: 14px 16px;
+		  margin-bottom: 20px; position: relative; overflow: hidden;
+		  text-decoration: none; color: #fff;
+		  background-size: 300% 300%;
+		  animation: efc-grad 8s ease infinite;
+		  transition: transform .18s cubic-bezier(.34,1.56,.64,1), box-shadow .18s;
+		  box-shadow: 0 6px 24px rgba(0,0,0,.18);
+		  -webkit-tap-highlight-color: transparent;
+		}
+		@keyframes efc-grad {
+		  0%,100% { background-position: 0% 60%; }
+		  50%      { background-position: 100% 40%; }
+		}
+		@media (hover:hover) {
+		  .event-feed-card:hover { transform: translateY(-3px) scale(1.01); box-shadow: 0 14px 36px rgba(0,0,0,.24); }
+		}
+		.event-feed-card:active { transform: scale(.98); }
+		/* shimmer */
+		.event-feed-card::after {
+		  content: ""; position: absolute; inset: 0; z-index: 0;
+		  background: linear-gradient(108deg, transparent 30%, rgba(255,255,255,.13) 50%, transparent 70%);
+		  animation: efc-shimmer 4s ease-in-out infinite; pointer-events: none;
+		}
+		@keyframes efc-shimmer { 0%{transform:translateX(-130%)} 100%{transform:translateX(230%)} }
+		/* scrim */
+		.daily-prompt-card {
+		  background: var(--paper); border: 1px solid var(--mocha-light);
+		  border-left: 3px solid var(--accent, #6366f1);
+		  border-radius: 12px; padding: 13px 16px; margin-bottom: 12px;
+		}
+		.daily-prompt-label { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--accent, #6366f1); display: block; margin-bottom: 5px; }
+		.daily-prompt-text { margin: 0; font-size: 15px; color: var(--ink); line-height: 1.5; }
+		.event-feed-card::before {
+		  content: ""; position: absolute; inset: 0; z-index: 0;
+		  background: rgba(0,0,0,.18); pointer-events: none;
+		}
+		.efc-inner { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 10px; }
+		/* row 1: live · emoji · title */
+		.efc-row1 { display: flex; align-items: center; gap: 9px; min-width: 0; }
+		.efc-live {
+		  display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0;
+		  background: rgba(255,255,255,.2); backdrop-filter: blur(8px);
+		  border: 1px solid rgba(255,255,255,.28); border-radius: 20px;
+		  padding: 3px 9px; font-size: 9.5px; font-weight: 800;
+		  text-transform: uppercase; letter-spacing: .12em;
+		}
+		.efc-live-dot {
+		  width: 6px; height: 6px; border-radius: 50%; background: #fff; flex-shrink: 0;
+		  animation: efc-pulse 1.4s ease-in-out infinite;
+		}
+		@keyframes efc-pulse {
+		  0%   { box-shadow: 0 0 0 0 rgba(255,255,255,.7); }
+		  70%  { box-shadow: 0 0 0 5px rgba(255,255,255,0); }
+		  100% { box-shadow: 0 0 0 0 rgba(255,255,255,0); }
+		}
+		.efc-emoji { font-size: 26px; line-height: 1; flex-shrink: 0; }
+		.efc-title {
+		  font-family: var(--font-display); font-size: clamp(17px,3.5vw,22px);
+		  font-style: italic; font-weight: 600; color: #fff;
+		  margin: 0; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+		}
+		/* row 2: countdown + play */
+		.efc-row2 { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+		.efc-countdown { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+		.efc-unit {
+		  background: rgba(0,0,0,.28); border-radius: 8px; padding: 4px 8px;
+		  text-align: center; min-width: 38px;
+		}
+		.efc-unit-num {
+		  display: block; font-family: var(--font-mono);
+		  font-size: 15px; font-weight: 700; line-height: 1; color: #fff;
+		}
+		.efc-unit-label {
+		  display: block; font-size: 7.5px; text-transform: uppercase;
+		  letter-spacing: .08em; color: rgba(255,255,255,.55); margin-top: 2px;
+		}
+		.efc-sep { font-size: 13px; font-weight: 700; color: rgba(255,255,255,.35); }
+		.efc-cta {
+		  display: inline-flex; align-items: center; gap: 6px;
+		  background: #fff; color: #1a1a1a; border-radius: 30px;
+		  padding: 8px 18px; font-size: 13px; font-weight: 800;
+		  white-space: nowrap; flex-shrink: 0;
+		  box-shadow: 0 3px 10px rgba(0,0,0,.14);
+		  transition: transform .15s cubic-bezier(.34,1.56,.64,1);
+		}
+		@media (hover:hover) { .efc-cta:hover { transform: scale(1.06); } }
+
+block content
+	main.container
+		header.feed-header
+			h1
+				img.header-icon(src='images/etc1.png' alt='Progress icon')
+				|  Progress
+			p A running record of things made, fixed, rebuilt, and understood a little better than yesterday.
+		//  Category tabs — only rendered when the feature is enabled in settings 
+		#feedTabsWrap(style='display:none;')
+			.feed-tabs#feedTabs(role='tablist' aria-label='Filter posts by category')
+				button.feed-tab-btn.active(data-cat='all' role='tab' aria-selected='true') All
+				button.feed-tab-btn(data-cat='following' role='tab' aria-selected='false') Following
+				button.feed-tab-btn(data-cat='development' role='tab' aria-selected='false')
+					span.feed-tab-dot
+					| Development
+				button.feed-tab-btn(data-cat='creative' role='tab' aria-selected='false')
+					span.feed-tab-dot
+					| Creative
+				button.feed-tab-btn(data-cat='random' role='tab' aria-selected='false')
+					span.feed-tab-dot
+					| Random
+		#streakBanner(style='display:none;')
+		#eventBanner(style='display:none;')
+		#dailyPromptBanner(style='display:none;')
+		.timeline#timeline
+			.feed-loading-state#feedLoading
+				img.feed-loading-img(src='images/emoticons/sharkcat.png' alt)
+				p.feed-loading-text fetching posts…
+	
+
+block scripts
+		script.
+			
+			  const CATEGORY_COLORS = { development: "cat-development", creative: "cat-creative", random: "cat-random" };
+			  const READ_KEY = "progress:readPosts";
+			
+			  function getReadSet() {
+			    try { return new Set(JSON.parse(localStorage.getItem(READ_KEY) || "[]")); } catch(e) { return new Set(); }
+			  }
+			  function markRead(postId) {
+			    try {
+			      const s = getReadSet();
+			      s.add(postId);
+			      // Keep only the last 500 to avoid unbounded growth
+			      const arr = Array.from(s).slice(-500);
+			      localStorage.setItem(READ_KEY, JSON.stringify(arr));
+			    } catch(e) {}
+			  }
+			
+			  let activeCategory = getActiveCategory(); // from app.js helper
+			
+			  // ── Category tabs ──────────────────────────────────────────────────────────
+			  function initCategoryTabs() {
+			    const wrap = document.getElementById("feedTabsWrap");
+			    if (!getCategoryTabsEnabled()) { wrap.style.display = "none"; return; }
+			    wrap.style.display = "block";
+			
+			    const tabs = document.querySelectorAll(".feed-tab-btn");
+			    tabs.forEach(btn => {
+			      btn.classList.toggle("active", btn.dataset.cat === activeCategory);
+			      btn.setAttribute("aria-selected", String(btn.dataset.cat === activeCategory));
+			      btn.addEventListener("click", () => {
+			        activeCategory = btn.dataset.cat;
+			        setActiveCategory(activeCategory);
+			        tabs.forEach(t => {
+			          t.classList.toggle("active", t.dataset.cat === activeCategory);
+			          t.setAttribute("aria-selected", String(t.dataset.cat === activeCategory));
+			        });
+			        renderFeed();
+			      });
+			    });
+			  }
+			
+			  // ── Streak banner (mobile) ─────────────────────────────────────────────────
+			  function renderStreakBanner() {
+			    const banner = document.getElementById("streakBanner");
+			    if (!banner) return;
+			    const me = Progress.getCurrentUser();
+			    if (!me || me.streak < 1) { banner.style.display = "none"; return; }
+			    banner.style.display = "block";
+			    banner.innerHTML = `<div style="display:flex; align-items:center; gap:8px; padding:10px 14px; margin-bottom:12px; border-radius:10px; background:var(--mocha-wash); font-size:13.5px; color:var(--muted);">
+			      <span style="font-size:18px;">🔥</span>
+			      <span><strong style="color:var(--ink);">${me.streak}-day streak</strong></span>
+			    </div>`;
+			  }
+			
+			  // ── Feed rendering ─────────────────────────────────────────────────────────
+			  function renderFeed() {
+			    let posts = Progress.getPosts();
+			
+			    // Filter by category / following
+			    if (getCategoryTabsEnabled() && activeCategory && activeCategory !== "all") {
+			      if (activeCategory === "following") {
+			        const me = Progress.getCurrentUser();
+			        const following = (me && me.following) ? me.following : [];
+			        posts = posts.filter(p => following.includes(p.author));
+			      } else {
+			        posts = posts.filter(p => (p.category || "").toLowerCase() === activeCategory);
+			      }
+			    }
+			
+			    const timeline = document.getElementById("timeline");
+			
+			    if (!posts.length) {
+			      timeline.innerHTML = Progress.apiOnline === false
+			        ? bootingUpHTML()
+			        : `<div class="feed-empty">
+			            <h3>${activeCategory === "following" ? "Nothing from people you follow yet" : activeCategory && activeCategory !== "all" ? "Nothing in this category yet" : "Nothing here yet"}</h3>
+			            <p>${activeCategory === "following" ? "Follow some writers and their posts will show up here." : activeCategory && activeCategory !== "all" ? "Be the first to post in this category." : "The first entry is always the hardest one to publish."}</p>
+			          </div>`;
+			      return;
+			    }
+			
+			    const readSet = getReadSet();
+			    timeline.innerHTML = posts.map(p => {
+			      const author = Progress.getUser(p.author);
+			      const catClass = p.category ? (CATEGORY_COLORS[p.category.toLowerCase()] || "") : "";
+			      const catChip  = catClass && getCategoryTabsEnabled()
+			        ? `<span class="entry-category ${catClass}">${escapeHTML(p.category)}</span>`
+			        : "";
+			      const isRead = readSet.has(p.id);
+			      return `
+			      <div class="entry${isRead ? " entry--read" : ""}" data-post-id="${p.id}" data-post-href="post.html?id=${p.id}">
+			        <div class="entry-body">
+			          ${catChip}
+			          <span class="entry-date">${Progress.formatDateShort(p.date)}</span>
+			          <h2 class="entry-title"><a class="entry-link" href="post.html?id=${p.id}"><span class="underline">${renderEmoticonsText(p.title, "inline-emoticon")}</span></a></h2>
+			          <p class="entry-excerpt">${renderEmoticonsText(p.excerpt, "inline-emoticon")}</p>
+			          <div class="entry-meta">
+			            <span>${ICONS.heart.replace('viewBox="0 0 24 24"','viewBox="0 0 24 24" width="13" height="13"')} ${p.likes}</span>
+			            <span class="entry-author">${avatarHTML(author, 22)}<a class="username-link" href="user.html?id=${author ? author.id : ""}" onclick="event.stopPropagation()">@${p.author}</a></span>
+			          </div>
+			          <div class="live-readers" id="lv-${p.id}"></div>
+			        </div>
+			        ${p.cover ? `<div class="entry-thumb"><img src="${p.cover}" alt="" loading="lazy"></div>` : ""}
+			      </div>`;
+			    }).join("");
+			
+			    timeline.querySelectorAll(".entry").forEach(entry => {
+			      entry.addEventListener("click", event => {
+			        if (event.target.closest("a.username-link")) return;
+			        const href = entry.dataset.postHref;
+			        if (href) {
+			          markRead(entry.dataset.postId);
+			          entry.classList.add("entry--read");
+			          location.href = href;
+			        }
+			      });
+			    });
+			  }
+			
+			  // ── New posts button ──────────────────────────────────────────────────────
+			  let _lastPostCount = 0;
+			  let _newPostsAvailable = 0;
+			
+			  function showNewPostsBtn(count) {
+			    let btn = document.getElementById("newPostsBtn");
+			    if (!btn) {
+			      btn = document.createElement("button");
+			      btn.id = "newPostsBtn";
+			      btn.className = "new-posts-btn";
+			      const timeline = document.getElementById("timeline");
+			      timeline.parentNode.insertBefore(btn, timeline);
+			    }
+			    btn.textContent = count === 1 ? "1 new post ↑" : `${count} new posts ↑`;
+			    btn.classList.add("visible");
+			    btn.onclick = () => {
+			      btn.classList.remove("visible");
+			      renderFeed();
+			      window.scrollTo({ top: 0, behavior: "smooth" });
+			      _newPostsAvailable = 0;
+			    };
+			  }
+			
+			  async function checkForNewPosts() {
+			    await Progress.loadFromApi().catch(() => {});
+			    const posts = Progress.getPosts();
+			    if (_lastPostCount === 0) { _lastPostCount = posts.length; return; }
+			    const diff = posts.length - _lastPostCount;
+			    if (diff > 0) {
+			      _newPostsAvailable += diff;
+			      _lastPostCount = posts.length;
+			      showNewPostsBtn(_newPostsAvailable);
+			    }
+			  }
+			
+			  // ── Event banner — compact single box ─────────────────────────────────────
+			  let _efcTimer = null;
+			  async function renderEventBanner() {
+			    const banner = document.getElementById("eventBanner");
+			    if (!banner) return;
+			    try {
+			      const ev = await apiFetch("/api/events/current");
+			      if (!ev || !ev.id) { banner.style.display = "none"; return; }
+			
+			      const gradient = ev.gradient || "linear-gradient(-45deg,#ff6b9d,#ffd93d,#ff6b35,#c471ed)";
+			      banner.style.display = "block";
+			      banner.innerHTML = `
+			        <div class="event-feed-card" onclick="location.href='event.html'" role="link" tabindex="0" style="cursor:pointer;background:${gradient};background-size:300% 300%;">
+			          <div class="efc-inner">
+			            <div class="efc-row1">
+			              <div class="efc-live"><span class="efc-live-dot"></span>Live</div>
+			              <span class="efc-emoji">${ev.emoji || "🎮"}</span>
+			              <div class="efc-title">${escapeHTML(ev.title)}</div>
+			            </div>
+			            <div class="efc-row2">
+			              <div class="efc-countdown" id="efcCountdown"></div>
+			              <a class="efc-cta" href="event.html?play=1" onclick="event.stopPropagation()">▶ Play</a>
+			            </div>
+			          </div>
+			        </div>`;
+			
+			      const endDate = new Date(ev.endDate);
+			      clearInterval(_efcTimer);
+			      function tickCountdown() {
+			        const el = document.getElementById("efcCountdown");
+			        if (!el) { clearInterval(_efcTimer); return; }
+			        const diff = endDate - Date.now();
+			        if (diff <= 0) {
+			          el.innerHTML = `<span style="font-size:11px;color:rgba(255,255,255,.7);font-family:var(--font-mono);">Event ended</span>`;
+			          clearInterval(_efcTimer); return;
+			        }
+			        const d = Math.floor(diff / 86400000);
+			        const h = Math.floor((diff % 86400000) / 3600000);
+			        const m = Math.floor((diff % 3600000) / 60000);
+			        const s = Math.floor((diff % 60000) / 1000);
+			        const u = (n,l) => `<div class="efc-unit"><span class="efc-unit-num">${String(n).padStart(2,"0")}</span><span class="efc-unit-label">${l}</span></div>`;
+			        const sep = `<span class="efc-sep">:</span>`;
+			        el.innerHTML = u(d,"days")+sep+u(h,"hrs")+sep+u(m,"min")+sep+u(s,"sec");
+			      }
+			      tickCountdown();
+			      _efcTimer = setInterval(tickCountdown, 1000);
+			
+			    } catch(e) {
+			      banner.style.display = "none";
+			    }
+			  }
+			
+			  // ── Daily Prompt Banner ────────────────────────────────────────────────────
+			  let _promptExpireTimer = null;
+			  async function renderDailyPromptBanner() {
+			    const banner = document.getElementById("dailyPromptBanner");
+			    if (!banner) return;
+			    try {
+			      const data = await apiFetch("/api/daily-prompt");
+			      if (!data?.prompt) { banner.style.display = "none"; return; }
+			      const expiresAt = data.expiresAt ? new Date(data.expiresAt) : null;
+			      if (expiresAt && expiresAt.getTime() < Date.now()) { banner.style.display = "none"; return; }
+			      banner.style.display = "block";
+			      banner.innerHTML = `<div class="daily-prompt-card">
+			        <span class="daily-prompt-label">✏️ today's prompt${expiresAt ? ` <span id="promptBannerExpiry" style="font-weight:400;opacity:.7;"></span>` : ""}</span>
+			        <p class="daily-prompt-text">${escapeHTML(data.prompt)}</p>
+			      </div>`;
+			      if (expiresAt) {
+			        clearInterval(_promptExpireTimer);
+			        const tick = () => {
+			          const left = expiresAt.getTime() - Date.now();
+			          const el = document.getElementById("promptBannerExpiry");
+			          if (left <= 0) { clearInterval(_promptExpireTimer); banner.style.display = "none"; return; }
+			          const h = Math.floor(left / 3600000), m = Math.floor((left % 3600000) / 60000);
+			          if (el) el.textContent = `· ${h > 0 ? h + "h " : ""}${m}m left`;
+			        };
+			        tick();
+			        _promptExpireTimer = setInterval(tick, 60000);
+			      }
+			    } catch { banner.style.display = "none"; }
+			  }
+			
+			  // ── Start ──────────────────────────────────────────────────────────────────
+			  async function start() {
+			    const ready = initShell("feed");
+			    initCategoryTabs();
+			    renderFeed();
+			    renderStreakBanner();
+			    renderEventBanner();
+			    renderDailyPromptBanner();
+			    // Re-render as soon as posts arrive (before users finish loading)
+			    window.addEventListener("progress:posts-loaded", () => {
+			      renderFeed();
+			      _lastPostCount = Progress.getPosts().length;
+			    }, { once: true });
+			    ready.then(() => {
+			      initCategoryTabs();
+			      renderFeed();
+			      renderStreakBanner();
+			      _lastPostCount = Progress.getPosts().length;
+			      // Poll every 45 seconds for new posts
+			      setInterval(checkForNewPosts, 45000);
+			    }).catch(() => {});
+			
+			    initPullToRefresh(async () => {
+			      await Progress.loadFromApi().catch(() => {});
+			      renderFeed();
+			      _lastPostCount = Progress.getPosts().length;
+			      _newPostsAvailable = 0;
+			      const btn = document.getElementById("newPostsBtn");
+			      if (btn) btn.classList.remove("visible");
+			    });
+			  }
+			
+			  start();
+			
+			  // Live reader avatars — update whenever the server broadcasts viewer changes
+			  document.addEventListener("post-viewers", e => {
+			    const { postId, viewers } = e.detail;
+			    const el = document.getElementById(`lv-${postId}`);
+			    if (!el) return;
+			    const me = Progress.getCurrentUser();
+			    const others = viewers.filter(v => v.username !== me?.username);
+			    if (!others.length) { el.innerHTML = ""; return; }
+			    const MAX = 5;
+			    const shown = others.slice(0, MAX);
+			    const extra = others.length - MAX;
+			    el.innerHTML = shown.map(v => {
+			      if (v.avatar) {
+			        return `<img class="live-av" src="${escapeHTML(v.avatar)}" title="@${escapeHTML(v.username)} is reading" alt="@${escapeHTML(v.username)}">`;
+			      }
+			      const ini = (v.name || v.username).split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+			      return `<div class="live-av live-av-init" title="@${escapeHTML(v.username)} is reading">${ini}</div>`;
+			    }).join("") + (extra > 0 ? `<div class="live-av live-av-more">+${extra}</div>` : "");
+			  });

@@ -1,0 +1,345 @@
+extends layout
+
+block title
+	| User profile — Progress
+
+block meta
+	meta(property="og:site_name", content="Progress")
+	meta(property="og:type", content="website")
+	meta(property="og:url", content="https://progressing.online/user.html")
+	meta(property="og:title", content="User profile — Progress")
+	meta(property="og:description", content="See what this person has been building on Progress.")
+	meta(property="og:image", content="https://progressing.online/images/nearheader.png")
+	meta(name="twitter:card", content="summary_large_image")
+	meta(name="twitter:title", content="User profile — Progress")
+	meta(name="twitter:description", content="See what this person has been building on Progress.")
+	meta(name="twitter:image", content="https://progressing.online/images/nearheader.png")
+
+block content
+	main.container
+		#publicProfile
+	
+
+block scripts
+		script.
+			
+			  const params = new URLSearchParams(location.search);
+			  const userId = params.get('id');
+			  const username = params.get('username');
+			  const root = document.getElementById('publicProfile');
+			
+			  function formatLastActive(ts) {
+			    const diff = Date.now() - new Date(ts).getTime();
+			    const mins  = Math.floor(diff / 60_000);
+			    const hours = Math.floor(diff / 3_600_000);
+			    const days  = Math.floor(diff / 86_400_000);
+			    if (mins < 2)    return "active just now";
+			    if (mins < 60)   return `active ${mins}m ago`;
+			    if (hours < 24)  return `active ${hours}h ago`;
+			    if (days === 1)  return "active yesterday";
+			    return `active ${days}d ago`;
+			  }
+			
+			  function renderPublicProfile(user) {
+			    if (user && user.loading) {
+			      root.innerHTML = bootingUpHTML({ title: "Waking up the server…", padding: "80px 20px" });
+			      return;
+			    }
+			    if (!user) {
+			      root.innerHTML = `
+			        <div class="feed-empty" style="padding-top:80px; text-align:center;">
+			          <div class="error-illustration" style="margin-bottom:28px; max-width:360px; margin-left:auto; margin-right:auto;">
+			            <img src="images/404page.png" alt="User not found illustration">
+			          </div>
+			          <h3>User not found</h3>
+			          <p><a href="index.html">Back to home</a></p>
+			        </div>`;
+			      return;
+			    }
+			
+			    const viewer = Progress.getCurrentUser();
+			    const isOwnProfile = viewer && viewer.username === user.username;
+			    const viewerHasBeta = !!(viewer && (
+			      (Array.isArray(viewer.badges) && viewer.badges.includes("tester")) ||
+			      viewer.adminRole === "owner"
+			    ));
+			    const hasPubBanner = !!user.bannerImage && viewerHasBeta;
+			
+			    root.innerHTML = `
+			      <div class="${hasPubBanner ? "has-pub-banner" : ""}" style="margin-top:40px;">
+			        ${hasPubBanner ? `<img class="pub-profile-banner" src="${escapeHTML(user.bannerImage)}" alt="" draggable="false">` : ""}
+			      <div class="settings-avatar-row" style="${hasPubBanner ? "margin-top:0;padding-top:20px;" : "margin-top:0;"}">
+			        <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
+			          <div class="profile-avatar-wrap">
+			            ${user.avatar ? `<img class="profile-avatar-img" src="${user.avatar}" alt="${user.name}">` : `<div class="initials-lg">${initials(user.name)}</div>`}
+			            <span class="profile-online-badge" id="onlineIndicator"></span>
+			          </div>
+			          <span id="onlineStatusText"></span>
+			        </div>
+			        <div>
+			          <div style="font-family:var(--font-display); font-size:24px; margin-bottom:1px;">
+			            <span>${user.name}${renderDisplayBadge(user)}</span>
+			          </div>
+			          <div style="color:var(--muted); font-size:13.5px; margin-bottom:10px;">@${user.username}</div>
+			          <div style="display:flex; gap:18px; color:var(--muted); font-size:14px; margin-bottom:10px; flex-wrap:wrap;">
+			            <span id="followerCount">${user.followers.length} followers</span>
+			            <span>${user.following.length} following</span>
+			            <span>Joined ${Progress.formatDate(user.joined)}</span>
+			            ${user.streak > 0 ? `<span title="${user.streak}-day login streak">🔥 ${user.streak}</span>` : ""}
+			            ${user.lastActive ? `<span class="last-active-pill" title="Only visible to mutual follows">${formatLastActive(user.lastActive)}</span>` : ""}
+			          </div>
+			          ${viewer && !isOwnProfile ? `<button type="button" class="upload-btn ${Progress.isFollowing(user.username) ? "following" : ""}" id="followBtn">${Progress.isFollowing(user.username) ? "Following" : "Follow"}</button>` : ""}
+			          <div id="profileNowPlayingIndicator" class="profile-now-playing-indicator" style="display:none;"></div>
+			          <div class="bio-text" style="margin-top:12px;">${user.bio ? renderEmoticonsText(user.bio, "bio-emoticon") : `<span style="color:var(--muted);">No bio yet.</span>`}</div>
+			        </div>
+			      </div>
+			      </div>
+			      <div class="profile-activity-grid">
+			        <div id="nowPlayingSlot"></div>
+			        <div id="steamSlot"></div>
+			        <div id="robloxSlot"></div>
+			      </div>
+			${user.spotify ? `
+			<div class="settings-section" style="margin-top:24px;">
+			  <h3>Featured Track</h3>
+			  ${renderSpotifyEmbed(user)}
+			</div>` : ""}
+			      <div class="settings-section" style="margin-top:24px;">
+			        <h3>Latest posts</h3>
+			        <div id="publicPosts"></div>
+			      </div>
+			    `;
+			
+			    const followBtn = document.getElementById('followBtn');
+			    if (followBtn) {
+			      followBtn.addEventListener('click', async () => {
+			        if (!Progress.getCurrentUser()) { showModal("login"); return; }
+			        followBtn.disabled = true;
+			        const result = await Progress.toggleFollow(user.username);
+			        followBtn.disabled = false;
+			        if (!result) return;
+			        const nowFollowing = Progress.isFollowing(user.username);
+			        followBtn.textContent = nowFollowing ? "Following" : "Follow";
+			        followBtn.classList.toggle("following", nowFollowing);
+			        const countEl = document.getElementById('followerCount');
+			        if (countEl) countEl.textContent = `${result.followers.length} followers`;
+			        showToast(nowFollowing ? "You are now following this person." : "Unfollowed.");
+			      });
+			    }
+			
+			    const nowPlayingSlot = document.getElementById("nowPlayingSlot");
+			
+			async function refreshNowPlaying() {
+			  if (!nowPlayingSlot) return;
+			
+			  // Don't trust `user.spotifyAccount` here - it can come from a merge with a
+			  // cached local copy (see the effectiveUser merge in start()) that may
+			  // predate the account connecting Spotify. Always re-check directly against
+			  // the server first, so a stale cache can never hide a live "now playing".
+			  let connected = user.spotifyAccount && user.spotifyAccount.connected;
+			  if (!connected) {
+			    try {
+			      const fresh = await apiFetch(`/api/users/${user.id}`);
+			      if (fresh && fresh.spotifyAccount && fresh.spotifyAccount.connected) {
+			        connected = true;
+			        user.spotifyAccount = fresh.spotifyAccount;
+			      }
+			    } catch (e) {
+			      // leave connected as false; fall through to clearing the slot below
+			    }
+			  }
+			
+			  if (!connected) {
+			    nowPlayingSlot.innerHTML = "";
+			    nowPlayingSlot.style.display = "none";
+			    return;
+			  }
+			
+			  const data = await fetchSpotifyNowPlaying(user.id);
+			  const html = renderNowPlayingWidget(data);
+			  nowPlayingSlot.innerHTML = html;
+			  nowPlayingSlot.style.display = html ? "" : "none";
+			}
+			
+			refreshNowPlaying();
+			setInterval(refreshNowPlaying, 30000);
+			
+			// Shared Roblox cache — both the widget and the pill use the same fetch result
+			let _robloxData = null, _robloxFetchedAt = 0;
+			async function getSharedRobloxPresence() {
+			  if (_robloxData && Date.now() - _robloxFetchedAt < 25000) return _robloxData;
+			  const d = await fetchRobloxPresence(user.id).catch(() => null);
+			  _robloxData = d; _robloxFetchedAt = Date.now();
+			  return d;
+			}
+			
+			async function refreshSteamNowPlaying() {
+			  const slot = document.getElementById("steamSlot");
+			  if (!slot) return;
+			  const data = await fetchSteamNowPlaying(user.id).catch(() => null);
+			  const html = renderSteamWidget(data);
+			  slot.innerHTML = html;
+			  slot.style.display = html ? "" : "none";
+			}
+			async function refreshRobloxPresence() {
+			  const slot = document.getElementById("robloxSlot");
+			  if (!slot) return;
+			  const data = await getSharedRobloxPresence();
+			  const html = renderRobloxWidget(data);
+			  slot.innerHTML = html;
+			  slot.style.display = html ? "" : "none";
+			}
+			refreshSteamNowPlaying();
+			refreshRobloxPresence();
+			setInterval(refreshSteamNowPlaying, 30000);
+			setInterval(refreshRobloxPresence, 30000);
+			
+			async function refreshProfileNowPlayingIndicator() {
+			  const el = document.getElementById("profileNowPlayingIndicator");
+			  if (!el) return;
+			  // Dot indicator comes from CSS ::before — no inline SVG needed
+			
+			  const [robloxData, steamData, npData] = await Promise.all([
+			    getSharedRobloxPresence(),
+			    fetchSteamNowPlaying(user.id).catch(() => null),
+			    user?.spotifyAccount?.connected ? fetchSpotifyNowPlaying(user.id).catch(() => null) : Promise.resolve(null),
+			  ]);
+			
+			  const robloxGame = robloxData?.presence?.inGame ? (robloxData.presence.gameName || "Roblox") : null;
+			  const steamGame  = steamData?.playing?.gameName || null;
+			  const gameName = robloxGame || steamGame;
+			  const np = npData?.playing;
+			  const songName = (np?.isPlaying && np?.trackName) ? np.trackName : null;
+			
+			  const label = gameName || songName;
+			  if (label) {
+			    let artHTML = "";
+			    if (robloxGame) {
+			      const gameIconUrl = robloxData?.presence?.gameIconUrl;
+			      if (gameIconUrl && /^https:\/\//i.test(gameIconUrl)) {
+			        artHTML = `<span class="pnp-art-wrap">
+			          <img class="pnp-game-img" src="${escapeHTML(gameIconUrl)}" alt="" onerror="this.onerror=null;this.src='images/Roblox.png';">
+			          <img class="pnp-platform-badge" src="images/Roblox.png" alt="Roblox">
+			        </span>`;
+			      } else {
+			        artHTML = `<span class="pnp-art-wrap pnp-roblox-solo">
+			          <img class="pnp-game-img pnp-solo-icon" src="images/Roblox.png" alt="Roblox" onerror="this.parentElement.remove()">
+			        </span>`;
+			      }
+			      el.classList.add("has-art");
+			    } else if (steamGame && steamData?.playing?.gameId) {
+			      const steamArt = `https://cdn.akamai.steamstatic.com/steam/apps/${steamData.playing.gameId}/header.jpg`;
+			      artHTML = `<span class="pnp-art-wrap">
+			        <img class="pnp-game-img" src="${steamArt}" alt="" onerror="this.parentElement.remove()">
+			        <span class="pnp-platform-badge steam-badge"><svg viewBox="0 0 24 24" fill="#c6d4df" width="9" height="9"><path d="M11.979 0C5.678 0 .511 4.86.022 11.037l6.432 2.658c.545-.371 1.203-.59 1.912-.59.063 0 .125.004.187.006l2.861-4.142V8.91c0-2.495 2.028-4.524 4.524-4.524 2.494 0 4.524 2.029 4.524 4.524s-2.03 4.525-4.524 4.525h-.105l-4.076 2.911c0 .052.004.105.004.159 0 1.875-1.515 3.396-3.39 3.396-1.635 0-3.016-1.173-3.331-2.718L.436 15.27C1.862 20.307 6.486 24 11.979 24c6.627 0 11.999-5.373 11.999-12S18.606 0 11.979 0z"/></svg></span>
+			      </span>`;
+			      el.classList.add("has-art");
+			    } else {
+			      el.classList.remove("has-art");
+			    }
+			    el.innerHTML = `${artHTML}Now Playing — <strong>${escapeHTML(label)}</strong>`;
+			    el.style.display = "inline-flex";
+			  } else {
+			    el.classList.remove("has-art");
+			    el.innerHTML = "";
+			    el.style.display = "none";
+			  }
+			}
+			refreshProfileNowPlayingIndicator();
+			setInterval(refreshProfileNowPlayingIndicator, 30000);
+			
+			function applyOnlineStatus(statuses) {
+			  const el = document.getElementById("onlineIndicator");
+			  const textEl = document.getElementById("onlineStatusText");
+			  if (!el && !textEl) return;
+			  const status = (statuses && statuses[user.username]) || "offline";
+			  if (el) {
+			    el.classList.toggle("online", status === "online");
+			    el.classList.toggle("idle", status === "idle");
+			  }
+			  if (textEl) {
+			    if (status === "online") {
+			      textEl.innerHTML = `<span class="online-dot online"></span><span class="online-label online">Online</span>`;
+			    } else if (status === "idle") {
+			      textEl.innerHTML = `<span class="online-dot idle"></span><span class="online-label idle">Idle</span>`;
+			    } else {
+			      textEl.innerHTML = "";
+			    }
+			  }
+			}
+			
+			async function refreshOnlineStatus() {
+			  try {
+			    const result = await apiFetch("/api/online-users", { cache: "no-store" });
+			    applyOnlineStatus(result && result.statuses);
+			  } catch (e) {
+			    applyOnlineStatus({});
+			  }
+			}
+			
+			// Real-time: the moment anyone's connection actually changes anywhere on
+			// the site, the server pushes the fresh online list straight to this page
+			// over the presence WebSocket (opened in app.js's initShell) - no need to
+			// wait for the next poll. The poll below still runs as a slower fallback,
+			// in case the WebSocket connection drops for some reason.
+			document.addEventListener("presence-update", (e) => applyOnlineStatus(e.detail));
+			
+			refreshOnlineStatus();
+			setInterval(refreshOnlineStatus, 20000); // Fallback poll, now that push handles the real-time case
+			
+			    (async () => {
+			      const result = await apiFetch(`/api/posts?author=${encodeURIComponent(user.username)}`);
+			      const posts = result || [];
+			      const list = document.getElementById('publicPosts');
+			      if (!posts.length) {
+			        list.innerHTML = '<p style="color:var(--muted);">No posts yet.</p>';
+			        return;
+			      }
+			      list.innerHTML = posts.map(post => `
+			        <a class="entry" href="post.html?id=${post.id}">
+			          <div class="entry-body">
+			            <span class="entry-date">${Progress.formatDateShort(post.date)}</span>
+			            <h2 class="entry-title"><span class="underline">${renderEmoticonsText(post.title, "inline-emoticon")}</span></h2>
+			            <p class="entry-excerpt">${renderEmoticonsText(post.excerpt || '', "inline-emoticon")}</p>
+			          </div>
+			        </a>
+			      `).join('');
+			    })();
+			  }
+			
+			  async function start() {
+			    initShell();
+			    renderPublicProfile({ loading: true });
+			    await Progress.loadFromApi().catch(() => {});
+			    let fetchedUser = null;
+			    try {
+			      if (userId) {
+			        fetchedUser = await apiFetch(`/api/users/${userId}`);
+			      } else if (username) {
+			        const users = await apiFetch(`/api/users?username=${encodeURIComponent(username)}`);
+			        fetchedUser = Array.isArray(users) ? users[0] || null : users;
+			      }
+			    } catch (e) {
+			      fetchedUser = null;
+			    }
+			
+			    const localUser = Progress.db.users.find(u => u.id === userId) || null;
+			    const effectiveUser = localUser ? { ...localUser, ...(fetchedUser || {}) } : fetchedUser;
+			    if (effectiveUser && localUser) {
+			      effectiveUser.bio = (fetchedUser && fetchedUser.bio !== undefined && fetchedUser.bio !== "") ? fetchedUser.bio : localUser.bio || "";
+			      effectiveUser.name = fetchedUser?.name || localUser.name;
+			      effectiveUser.avatar = (fetchedUser && fetchedUser.avatar) ? fetchedUser.avatar : localUser.avatar;
+			      effectiveUser.followers = fetchedUser?.followers || localUser.followers || [];
+			      effectiveUser.following = fetchedUser?.following || localUser.following || [];
+			      effectiveUser.joined = fetchedUser?.joined || localUser.joined;
+			      effectiveUser.timezone = fetchedUser?.timezone || localUser.timezone;
+			      effectiveUser.badges = fetchedUser?.badges || localUser.badges || [];
+			      effectiveUser.displayBadge = fetchedUser?.displayBadge ?? localUser.displayBadge ?? null;
+			      effectiveUser.spotifyAccount = fetchedUser?.spotifyAccount || localUser.spotifyAccount;
+			    }
+			
+			    renderPublicProfile(effectiveUser);
+			    attachBadgeTooltip(root);
+			  }
+			
+			  start();

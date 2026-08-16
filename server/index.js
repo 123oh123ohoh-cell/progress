@@ -37,6 +37,10 @@ async function sendPushToUser(username, payload) {
 const app = express();
 const port = process.env.PORT || 3000;
 const publicPath = path.join(__dirname, "..");
+
+// ── Pug view engine ───────────────────────────────────────────────────────────
+app.set("view engine", "pug");
+app.set("views", path.join(__dirname, "views"));
 const mongoUri = process.env.MONGODB_URI;
 const dbName = process.env.MONGODB_DB || "progress";
 
@@ -1252,6 +1256,11 @@ function requireAuth(req, res, next) {
     return res.status(401).json({ error: "Please log in again." });
   }
   req.user = payload;
+  // Fire-and-forget: stamp lastActive, throttled to once every 2 minutes
+  db.collection("users").updateOne(
+    { username: payload.username, lastActive: { $not: { $gte: new Date(Date.now() - 120_000) } } },
+    { $set: { lastActive: new Date() } }
+  ).catch(() => {});
   next();
 }
 
@@ -1474,6 +1483,35 @@ app.get("/og/:id", asyncHandler(async (req, res) => {
 </head><body><a href="${postUrl}">Read on Progress &rarr;</a></body></html>`);
 }));
 
+// ── Page routes (Pug templates) ───────────────────────────────────────────────
+// These must sit BEFORE express.static so Pug renders instead of the old .html
+const pages = [
+  { path: ["/", "/index.html"],       view: "index"        },
+  { path: ["/profile", "/profile.html"], view: "profile"   },
+  { path: ["/explore", "/explore.html"], view: "explore"   },
+  { path: ["/write", "/write.html"],  view: "write"        },
+  { path: ["/post", "/post.html"],    view: "post"         },
+  { path: ["/user", "/user.html"],    view: "user"         },
+  { path: ["/chat", "/chat.html"],    view: "chat"         },
+  { path: ["/watch", "/watch.html"],  view: "watch"        },
+  { path: ["/admin", "/admin.html"],  view: "admin"        },
+  { path: ["/admin-emails", "/admin-emails.html"], view: "admin-emails" },
+  { path: ["/admin-roles", "/admin-roles.html"],   view: "admin-roles"  },
+  { path: ["/email-editor", "/email-editor.html"], view: "email-editor" },
+  { path: ["/signup", "/signup.html"],view: "signup"       },
+  { path: ["/connect", "/connect.html"], view: "connect"   },
+  { path: ["/users", "/users.html"],  view: "users"        },
+  { path: ["/fun", "/fun.html"],      view: "fun"          },
+  { path: ["/event", "/event.html"],  view: "event"        },
+  { path: ["/typing", "/typing.html"],view: "typing"       },
+  { path: ["/install", "/install.html"], view: "install"   },
+  { path: ["/offline", "/offline.html"], view: "offline"   },
+  { path: ["/404", "/404.html"],      view: "404"          },
+];
+for (const { path: paths, view } of pages) {
+  app.get(paths, (req, res) => res.render(view));
+}
+
 app.use(express.static(publicPath));
 app.use("/api", generalApiRateLimit);
 
@@ -1510,7 +1548,20 @@ app.get("/api/users", asyncHandler(async (req, res) => {
 app.get("/api/users/:id", asyncHandler(async (req, res) => {
   const doc = await db.collection("users").findOne({ _id: req.params.id });
   if (!doc) return res.status(404).json({ error: "User not found" });
-  res.json(publicUser(normalizeUser(doc)));
+  const user = publicUser(normalizeUser(doc));
+
+  // Expose lastActive only to mutual follows (both follow each other)
+  const authHeader = req.headers.authorization || "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  const viewer = verifyJWT(token);
+  if (viewer && viewer.username !== doc.username) {
+    const profileFollowers = Array.isArray(doc.followers) ? doc.followers : [];
+    const profileFollowing = Array.isArray(doc.following) ? doc.following : [];
+    const isMutual = profileFollowers.includes(viewer.username) && profileFollowing.includes(viewer.username);
+    if (isMutual) user.lastActive = doc.lastActive || null;
+  }
+
+  res.json(user);
 }));
 
 app.get("/api/users/:id/stats", asyncHandler(async (req, res) => {
@@ -4543,7 +4594,7 @@ app.put("/api/ticker", requireAuth, asyncHandler(async (req, res) => {
       text: String(text || "").slice(0, 500),
       color: String(color || "#ffffff").slice(0, 20),
       bgColor: String(bgColor || "#1c1917").slice(0, 20),
-      speed: (typeof speed === "number" && speed >= 1 && speed <= 300) ? speed : 30,
+      speed: (typeof speed === "number" && speed !== 0 && Math.abs(speed) <= 300) ? speed : 30,
       updatedAt: new Date().toISOString(),
       updatedBy: req.user.username
     }},

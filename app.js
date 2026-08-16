@@ -652,7 +652,9 @@ async function renderTickerIfEnabled() {
 
     if (!data || !data.enabled || !data.text) return;
 
-    const duration = `${Number(data.speed) || 30}s`;
+    const rawSpeed = Number(data.speed) || 30;
+    const duration = `${Math.abs(rawSpeed)}s`;
+    const reversed = rawSpeed < 0;
     const chunk = `<span class="site-ticker-text">${escapeHTML(data.text)}</span><span class="site-ticker-sep">◆</span>`;
 
     // Build ticker shell first so we can measure the track width
@@ -693,7 +695,10 @@ async function renderTickerIfEnabled() {
 
     const kf = document.createElement("style");
     kf.id = "ticker-kf";
-    kf.textContent = `@keyframes ticker-roll{from{transform:translateX(0)}to{transform:translateX(-${scrollDist}px)}}`;
+    // Positive = left (normal news direction), negative = right (reversed)
+    kf.textContent = reversed
+      ? `@keyframes ticker-roll{from{transform:translateX(-${scrollDist}px)}to{transform:translateX(0)}}`
+      : `@keyframes ticker-roll{from{transform:translateX(0)}to{transform:translateX(-${scrollDist}px)}}`;
     document.head.appendChild(kf);
 
     inner.style.animation = `ticker-roll ${duration} linear infinite`;
@@ -1771,6 +1776,69 @@ async function _subscribeToPush(reg) {
   }
 }
 
+/* ============================================================
+   BETA MODE — v2 preview toggle for eligible users
+   Beta access: usernames in BROWSE_ALLOWED_USERNAMES, or
+   adminRole "owner" or "tester".
+   localStorage "progressV2" = "true" enables v2 (default off).
+   ============================================================ */
+function _isBetaUser(u) {
+  if (!u) return false;
+  if (typeof BROWSE_ALLOWED_USERNAMES !== "undefined" && BROWSE_ALLOWED_USERNAMES.has(u.username)) return true;
+  return !!(u.adminRole && ["owner","tester"].includes(u.adminRole));
+}
+
+function _initBetaToggle(user) {
+  if (!_isBetaUser(user)) return;
+  const isV2Page = location.pathname.includes("/progress-v2/");
+  const v2On    = localStorage.getItem("progressV2") === "true";
+
+  /* If v2 is on and we're still on a v1 page, forward to v2 equivalent */
+  if (v2On && !isV2Page) {
+    const page = location.pathname.split("/").pop() || "index.html";
+    location.replace("progress-v2/" + page + location.search + location.hash);
+    return;
+  }
+
+  /* v2 pages handle their own badge inside v2-nav.js */
+  if (isV2Page) return;
+
+  /* ── Floating pill for v1 pages ── */
+  const s = document.createElement("style");
+  s.textContent = `
+    #v2BetaPill{position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;align-items:center;gap:9px;
+      background:rgba(22,17,13,.92);backdrop-filter:blur(16px) saturate(1.4);
+      color:#fff;font-family:system-ui,-apple-system,sans-serif;font-size:12px;font-weight:500;
+      padding:7px 12px 7px 11px;border-radius:100px;cursor:default;
+      box-shadow:0 4px 20px rgba(0,0,0,.32),0 1px 4px rgba(0,0,0,.18);
+      animation:v2bpIn .3s cubic-bezier(.2,.8,.3,1) both;}
+    @keyframes v2bpIn{from{opacity:0;transform:translateY(8px) scale(.96)}to{opacity:1;transform:none}}
+    .v2bp-lbl{opacity:.72;white-space:nowrap;}
+    .v2bp-sw{width:32px;height:18px;border-radius:100px;background:rgba(255,255,255,.18);
+      border:none;cursor:pointer;position:relative;flex-shrink:0;transition:background .2s;padding:0;}
+    .v2bp-sw.on{background:#6366f1;}
+    .v2bp-knob{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;
+      background:#fff;transition:transform .2s;display:block;pointer-events:none;}
+    .v2bp-sw.on .v2bp-knob{transform:translateX(14px);}
+  `;
+  document.head.appendChild(s);
+
+  const pill = document.createElement("div");
+  pill.id = "v2BetaPill";
+  pill.innerHTML = `
+    <span class="v2bp-lbl">✨ v2 preview</span>
+    <button class="v2bp-sw" id="v2BetaToggleBtn" title="Try the new v2 design" aria-pressed="false">
+      <span class="v2bp-knob"></span>
+    </button>`;
+  document.body.appendChild(pill);
+
+  document.getElementById("v2BetaToggleBtn").addEventListener("click", () => {
+    localStorage.setItem("progressV2", "true");
+    const page = location.pathname.split("/").pop() || "index.html";
+    location.replace("progress-v2/" + page + location.search + location.hash);
+  });
+}
+
 function initShell(activePage) {
   const _userBefore = Progress.getCurrentUser();
   const authUserBeforeLoad = (_userBefore && _userBefore.username) || null;
@@ -1832,6 +1900,7 @@ function initShell(activePage) {
       if (notifDD && notifDD.classList.contains("open")) {
         renderNotifDropdown();
       }
+      _initBetaToggle(_userAfter);
     });
   });
 }

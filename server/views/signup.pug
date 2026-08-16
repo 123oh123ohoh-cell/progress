@@ -1,0 +1,257 @@
+extends layout
+
+block title
+	| Join Progress — a journal for what you're building
+
+block meta
+	meta(property="og:site_name", content="Progress")
+	meta(property="og:type", content="website")
+	meta(property="og:url", content="https://progressing.online/signup.html")
+	meta(property="og:title", content="Join Progress")
+	meta(property="og:description", content="A running record of things made, fixed, rebuilt, and understood a little better than yesterday.")
+	meta(property="og:image", content="https://progressing.online/images/nearheader.png")
+	meta(name="twitter:card", content="summary_large_image")
+	meta(name="twitter:title", content="Join Progress")
+	meta(name="twitter:description", content="A running record of things made, fixed, rebuilt, and understood a little better than yesterday.")
+	meta(name="twitter:image", content="https://progressing.online/images/nearheader.png")
+
+block content
+	#modal-root
+		//  toast lives here even on standalone pages 
+		.toast#toast
+	.signup-hero
+		//  Logo 
+		img.signup-logo(src='images/nearheader.png' alt='Progress')
+		//  Headline 
+		h1
+			| progress
+			span.signup-dot .
+		p.signup-tagline A running record of things made, fixed, rebuilt, and understood a little better than yesterday.
+		//  Auth card — switches between signup / login / notification step 
+		.signup-card#authCard
+			//  ── Signup pane ── 
+			#signupPane
+				h2 Start your journal
+				p.signup-sub It takes a minute. Everyone's welcome.
+				.signup-error#signupError
+				.signup-field
+					label(for='signupName') Display name
+					input#signupName(type='text' placeholder='Mara Studios' autocapitalize='words' spellcheck='false')
+				.signup-field
+					label(for='signupUsername') Username
+					input#signupUsername(type='text' placeholder='mara' autocapitalize='none' spellcheck='false' autocorrect='off')
+				.signup-field
+					label(for='signupPassword') Password
+					input#signupPassword(type='password' autocomplete='new-password' placeholder='••••••••' autocapitalize='none')
+				p.signup-sub(style='margin-top:-4px;margin-bottom:12px;font-size:11.5px;') Use 8+ characters with at least one letter and one number.
+				button.signup-submit#signupSubmit Create account
+				p.signup-switch
+					| Already have an account? 
+					button#toLogin Log in
+			//  ── Login pane ── 
+			#loginPane(style='display:none;')
+				h2 Welcome back
+				p.signup-sub Good to see you again.
+				.signup-error#loginError
+				.signup-field
+					label(for='loginUsername') Username
+					input#loginUsername(type='text' placeholder='mara' autocapitalize='none' spellcheck='false' autocorrect='off' autocomplete='username')
+				.signup-field
+					label(for='loginPassword') Password
+					input#loginPassword(type='password' autocomplete='current-password' placeholder='••••••••' autocapitalize='none')
+				button.signup-submit#loginSubmit Log in
+				p.signup-switch
+					| New here? 
+					button#toSignup Create an account
+				p.signup-switch(style='margin-top:6px; font-size:11.5px;')
+					| Demo account: 
+					strong mara
+					|  / 
+					strong demo1234
+
+			#notifPane(style='display:none;')
+				//  Step 1: notifications 
+				#onboardNotif
+					div(style='text-align:center;margin-bottom:8px;font-size:40px;') 🔔
+					p.sp-pane-title(style='text-align:center;') Stay in the loop
+					p.sp-pane-sub(style='text-align:center;margin-bottom:20px;') Get notified when someone likes your post, replies, or follows you.
+					button.sp-submit#notifAllow Turn on notifications
+					button.sp-notif-skip#notifSkip Skip for now
+					.ob-step-dots
+						span.ob-dot.ob-dot-active
+						span.ob-dot
+				//  Step 2: install prompt 
+				#onboardInstall(style='display:none;')
+					div(style='text-align:center;margin-bottom:12px;')
+						img(src='images/nearheader.png' style='width:64px;height:64px;border-radius:16px;box-shadow:0 4px 16px rgba(28,25,23,.12);')
+					p.sp-pane-title(style='text-align:center;') Add to your home screen
+					p.sp-pane-sub(style='text-align:center;margin-bottom:20px;') Install Progress for the best experience — full screen, works offline, feels like a real app.
+					a.sp-submit(href='install.html' style='display:block;text-align:center;text-decoration:none;') How to install
+					button.sp-notif-skip#installSkip Go to Progress
+					.ob-step-dots
+						span.ob-dot
+						span.ob-dot.ob-dot-active
+		//  Feature highlights 
+		.signup-features
+			.signup-feature
+				.signup-feature-icon ✍️
+				.signup-feature-text Write about what you're building, learning, or figuring out
+			.signup-feature
+				.signup-feature-icon 💬
+				.signup-feature-text Chat live with others and send direct messages
+			.signup-feature
+				.signup-feature-icon 🎵
+				.signup-feature-text Share what you're listening to with Spotify integration
+			.signup-feature
+				.signup-feature-icon 🌙
+				.signup-feature-text Dark mode, custom badges, and a cozy aesthetic
+	//  /.signup-hero 
+	
+
+block scripts
+		script.
+			
+			  // Apply theme (no nav on this page)
+			  applyTheme(getStoredTheme());
+			
+			  // If already logged in, skip straight to the feed
+			  (async () => {
+			    await Progress.loadFromApi().catch(() => {});
+			    if (Progress.getCurrentUser()) {
+			      location.replace("index.html");
+			    }
+			  })();
+			
+			  // ── Panel switching ──────────────────────────────────────────────────────
+			  function showPane(id) {
+			    ["signupPane","loginPane","notifPane"].forEach(p => {
+			      document.getElementById(p).style.display = p === id ? "block" : "none";
+			    });
+			  }
+			
+			  document.getElementById("toLogin").addEventListener("click", () => showPane("loginPane"));
+			  document.getElementById("toSignup").addEventListener("click", () => showPane("signupPane"));
+			
+			  // ── Helpers ──────────────────────────────────────────────────────────────
+			  function showToast(msg) {
+			    const t = document.getElementById("toast");
+			    if (!t) return;
+			    t.textContent = msg;
+			    t.classList.add("show");
+			    setTimeout(() => t.classList.remove("show"), 2600);
+			  }
+			
+			  function setBtn(id, enabled, label) {
+			    const btn = document.getElementById(id);
+			    if (!btn) return;
+			    btn.disabled = !enabled;
+			    if (label) btn.textContent = label;
+			  }
+			
+			  function showErr(id, msg) {
+			    const el = document.getElementById(id);
+			    if (!el) return;
+			    el.textContent = msg;
+			    el.classList.toggle("show", !!msg);
+			  }
+			
+			  function goToFeed() {
+			    location.replace("index.html");
+			  }
+			
+			  // ── Notification permission step ─────────────────────────────────────────
+			  async function offerNotifications() {
+			    if (!("Notification" in window) || Notification.permission === "granted") {
+			      goToFeed();
+			      return;
+			    }
+			    showPane("notifPane");
+			  }
+			
+			  function showInstallStep() {
+			    document.getElementById("onboardNotif").style.display = "none";
+			    document.getElementById("onboardInstall").style.display = "block";
+			  }
+			
+			  document.getElementById("notifAllow").addEventListener("click", async () => {
+			    setBtn("notifAllow", false, "Requesting permission…");
+			    const granted = await requestNotificationPermission();
+			    if (granted) showToast("Notifications enabled!");
+			    else showToast("You can turn them on in Settings later.");
+			    showInstallStep();
+			  });
+			
+			  document.getElementById("notifSkip").addEventListener("click", showInstallStep);
+			  document.getElementById("installSkip").addEventListener("click", goToFeed);
+			
+			  // ── Signup ────────────────────────────────────────────────────────────────
+			  document.getElementById("signupSubmit").addEventListener("click", async () => {
+			    const name     = document.getElementById("signupName").value.trim();
+			    const username = document.getElementById("signupUsername").value.trim();
+			    const password = document.getElementById("signupPassword").value;
+			    showErr("signupError", "");
+			    if (!name || !username || !password) {
+			      showErr("signupError", "Fill in every field to continue.");
+			      return;
+			    }
+			    const usernameError = Progress.validateUsername ? Progress.validateUsername(username) : null;
+			    if (usernameError) {
+			      showErr("signupError", usernameError);
+			      return;
+			    }
+			    const nameError = Progress.validateDisplayName ? Progress.validateDisplayName(name) : null;
+			    if (nameError) {
+			      showErr("signupError", nameError);
+			      return;
+			    }
+			    const passwordError = Progress.validatePassword ? Progress.validatePassword(password) : null;
+			    if (passwordError) {
+			      showErr("signupError", passwordError);
+			      return;
+			    }
+			    setBtn("signupSubmit", false, "Creating account…");
+			    // Give a waking-server hint after 4 s
+			    const wakingTimer = setTimeout(() => setBtn("signupSubmit", false, "Waking up server…"), 4000);
+			    const res = await Progress.signup(username, name, password);
+			    clearTimeout(wakingTimer);
+			    setBtn("signupSubmit", true, "Create account");
+			    if (!res.ok) {
+			      showErr("signupError", res.error || "Something went wrong. Try again.");
+			      return;
+			    }
+			    // Signed up — offer notifications then go to feed
+			    await offerNotifications();
+			  });
+			
+			  // ── Login ─────────────────────────────────────────────────────────────────
+			  document.getElementById("loginSubmit").addEventListener("click", async () => {
+			    const username = document.getElementById("loginUsername").value.trim();
+			    const password = document.getElementById("loginPassword").value;
+			    showErr("loginError", "");
+			    if (!username || !password) {
+			      showErr("loginError", "Enter your username and password.");
+			      return;
+			    }
+			    setBtn("loginSubmit", false, "Logging in…");
+			    const wakingTimer = setTimeout(() => setBtn("loginSubmit", false, "Waking up server…"), 4000);
+			    const res = await Progress.login(username, password);
+			    clearTimeout(wakingTimer);
+			    setBtn("loginSubmit", true, "Log in");
+			    if (!res.ok) {
+			      showErr("loginError", res.error || "That username and password don't match.");
+			      return;
+			    }
+			    goToFeed();
+			  });
+			
+			  // ── Enter key on inputs ───────────────────────────────────────────────────
+			  ["signupName","signupUsername","signupPassword"].forEach(id => {
+			    document.getElementById(id).addEventListener("keydown", e => {
+			      if (e.key === "Enter") document.getElementById("signupSubmit").click();
+			    });
+			  });
+			  ["loginUsername","loginPassword"].forEach(id => {
+			    document.getElementById(id).addEventListener("keydown", e => {
+			      if (e.key === "Enter") document.getElementById("loginSubmit").click();
+			    });
+			  });

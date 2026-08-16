@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Profile — Progress</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500;1,9..144,600&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script>(function(){try{var t=localStorage.getItem("progressTheme");var dark=(t==="dark")||(t!=="light"&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);if(dark)document.documentElement.setAttribute("data-theme","dark");}catch(e){}})();</script>
+<link rel="stylesheet" href="v2-compat.css">
+<link rel="stylesheet" href="style.css">
+<style>
+#nav-root { display:none !important; }
+body { background: var(--v2-bg); }
+
+.v2-profile-page { max-width: 760px; margin: 0 auto; padding: 40px 24px 100px; }
+@media (max-width: 740px) { .v2-profile-page { padding: 24px 0 88px; } }
+
+/* Settings wrapper gets v2 overrides */
+.settings-wrap {
+  background: transparent !important;
+}
+
+/* Tab bar */
+.settings-tabs {
+  display: flex !important;
+  gap: 4px !important;
+  border-bottom: 1px solid var(--v2-border) !important;
+  margin-bottom: 32px !important;
+  overflow-x: auto !important;
+  scrollbar-width: none !important;
+}
+.settings-tabs::-webkit-scrollbar { display: none !important; }
+.settings-tab {
+  padding: 10px 16px !important;
+  border: none !important;
+  border-bottom: 2px solid transparent !important;
+  background: transparent !important;
+  font-family: var(--v2-font-b) !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  color: var(--v2-muted) !important;
+  cursor: pointer !important;
+  white-space: nowrap !important;
+  margin-bottom: -1px !important;
+  transition: color .15s !important;
+}
+.settings-tab:hover { color: var(--v2-ink) !important; }
+.settings-tab.active { color: var(--v2-ink) !important; font-weight: 600 !important; border-bottom-color: var(--v2-ink) !important; }
+
+/* Avatar row */
+.settings-avatar-row {
+  display: flex !important; flex-direction: column !important;
+  align-items: center !important; gap: 12px !important;
+  margin-bottom: 32px !important;
+}
+.settings-avatar {
+  width: 80px !important; height: 80px !important;
+  border-radius: 50% !important; border: 3px solid var(--v2-border) !important;
+  object-fit: cover !important;
+}
+.change-avatar-btn {
+  background: var(--v2-paper) !important; color: var(--v2-ink) !important;
+  border: 1.5px solid var(--v2-border) !important; border-radius: 22px !important;
+  font-family: var(--v2-font-b) !important; font-size: 13px !important;
+  font-weight: 600 !important; padding: 7px 16px !important; cursor: pointer !important;
+  transition: border-color .15s !important;
+}
+.change-avatar-btn:hover { border-color: var(--v2-border-2) !important; }
+
+/* Form fields */
+.sett-field { margin-bottom: 20px !important; }
+.sett-label {
+  display: block !important; font-size: 13px !important; font-weight: 600 !important;
+  color: var(--v2-ink) !important; margin-bottom: 6px !important;
+}
+.sett-input, .sett-textarea, .settings-wrap input[type=text],
+.settings-wrap input[type=email], .settings-wrap input[type=password],
+.settings-wrap textarea, .settings-wrap select {
+  width: 100% !important; padding: 10px 14px !important;
+  border: 1.5px solid var(--v2-border) !important;
+  border-radius: var(--r-md) !important;
+  background: var(--v2-paper) !important;
+  color: var(--v2-ink) !important;
+  font-family: var(--v2-font-b) !important; font-size: 15px !important;
+  outline: none !important; transition: border-color .15s, box-shadow .15s !important;
+  box-sizing: border-box !important;
+}
+.settings-wrap input:focus, .settings-wrap textarea:focus, .settings-wrap select:focus {
+  border-color: var(--v2-accent) !important;
+  box-shadow: 0 0 0 3px var(--v2-accent-dim) !important;
+}
+.settings-wrap input::placeholder, .settings-wrap textarea::placeholder { color: var(--v2-muted) !important; }
+.settings-wrap textarea { min-height: 90px !important; resize: vertical !important; }
+
+/* Buttons */
+.settings-wrap .btn.primary, .settings-wrap button[type=submit],
+.settings-wrap .upload-btn {
+  background: var(--v2-ink) !important; color: var(--v2-bg) !important;
+  border: none !important; border-radius: 22px !important;
+  font-family: var(--v2-font-b) !important; font-size: 14px !important;
+  font-weight: 600 !important; padding: 10px 24px !important; cursor: pointer !important;
+}
+.settings-wrap .btn.primary:hover, .settings-wrap button[type=submit]:hover { opacity: .9 !important; }
+.settings-wrap .btn.secondary {
+  background: var(--v2-paper) !important; color: var(--v2-ink) !important;
+  border: 1.5px solid var(--v2-border) !important; border-radius: 22px !important;
+  font-size: 14px !important; font-weight: 600 !important;
+}
+.settings-wrap .btn.secondary:hover { border-color: var(--v2-border-2) !important; }
+
+/* Toggle rows */
+.sett-toggle-row {
+  display: flex !important; align-items: center !important; justify-content: space-between !important;
+  padding: 14px 0 !important; border-bottom: 1px solid var(--v2-border) !important;
+  gap: 12px !important; cursor: pointer !important;
+}
+.sett-toggle-row:last-child { border-bottom: none !important; }
+.theme-toggle-switch {
+  flex-shrink: 0 !important; width: 40px !important; height: 22px !important;
+  border-radius: 11px !important; background: var(--v2-border) !important;
+  border: none !important; position: relative !important; cursor: pointer !important;
+  transition: background .2s !important;
+}
+.theme-toggle-switch.on { background: var(--v2-ink) !important; }
+.theme-toggle-switch::after {
+  content: "" !important; position: absolute !important;
+  top: 3px !important; left: 3px !important;
+  width: 16px !important; height: 16px !important; border-radius: 50% !important;
+  background: var(--v2-paper) !important; transition: transform .2s !important;
+}
+.theme-toggle-switch.on::after { transform: translateX(18px) !important; }
+
+/* Section headers — v2 invented name + actual v1 name */
+.settings-section-title, .sett-section-title {
+  font-size: 10px !important; font-weight: 700 !important; letter-spacing: .1em !important;
+  text-transform: uppercase !important; color: var(--v2-muted) !important;
+  font-family: var(--v2-font-m) !important; margin: 28px 0 14px !important;
+}
+
+/* Panel title (large heading above each settings panel) */
+.sett-panel-title {
+  font-family: var(--v2-font-d) !important; font-style: italic !important;
+  font-size: 22px !important; font-weight: 600 !important;
+  color: var(--v2-ink) !important; border-bottom-color: var(--v2-border) !important;
+}
+
+/* Settings sidebar nav items */
+.sett-nav-item { border-radius: var(--r-md) !important; color: var(--v2-muted) !important; }
+.sett-nav-item:hover { background: var(--v2-paper-2) !important; color: var(--v2-ink) !important; }
+.sett-nav-item.active { background: var(--v2-accent-dim) !important; color: var(--v2-accent) !important; }
+
+/* Avatar section — covers actual v1 class names */
+.sett-avatar-section {
+  display: flex !important; flex-direction: column !important;
+  align-items: center !important; gap: 12px !important; margin-bottom: 28px !important;
+}
+.sett-avatar-img {
+  width: 80px !important; height: 80px !important; border-radius: 50% !important;
+  border: 3px solid var(--v2-border) !important; object-fit: cover !important;
+}
+.sett-avatar-initials {
+  width: 80px !important; height: 80px !important; border-radius: 50% !important;
+  border: 3px solid var(--v2-border) !important;
+  background: var(--v2-paper-2) !important; color: var(--v2-mocha-dark) !important;
+  font-family: var(--v2-font-d) !important; font-style: italic !important;
+  font-size: 28px !important;
+  display: flex !important; align-items: center !important; justify-content: center !important;
+}
+.sett-avatar-name { font-family: var(--v2-font-d) !important; font-size: 18px !important; color: var(--v2-ink) !important; }
+.sett-avatar-username { color: var(--v2-muted) !important; }
+
+/* Hint text + inline errors */
+.sett-row-note, .sett-hint { font-size: 12px !important; color: var(--v2-muted) !important; }
+.sett-error { color: var(--v2-danger) !important; font-size: 12.5px !important; }
+
+/* Section dividers */
+.sett-section { border-bottom-color: var(--v2-border) !important; }
+
+/* Integration cards */
+.sett-integration-card {
+  border: 1px solid var(--v2-border) !important;
+  border-radius: var(--r-md) !important;
+  background: var(--v2-paper) !important;
+}
+
+/* Now playing widget in settings */
+.now-playing-widget {
+  background: var(--v2-paper) !important;
+  border: 1px solid var(--v2-border) !important;
+  border-radius: var(--r-md) !important;
+}
+
+/* Stats grid */
+.stats-grid-v2 {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(130px,1fr)); gap: 12px; margin-bottom: 24px;
+}
+.stat-card-v2 {
+  background: var(--v2-paper); border: 1px solid var(--v2-border); border-radius: var(--r-md);
+  padding: 16px; box-shadow: var(--sh-xs);
+}
+.stat-card-v2 .stat-num { font-size: 26px; font-weight: 700; color: var(--v2-ink); font-family: var(--v2-font-d); }
+.stat-card-v2 .stat-lbl { font-size: 11px; color: var(--v2-muted); font-family: var(--v2-font-m); text-transform: uppercase; letter-spacing: .06em; margin-top: 3px; }
+
+/* Danger zone */
+.danger-zone {
+  border: 1px solid rgba(220,38,38,.25) !important;
+  border-radius: var(--r-lg) !important;
+  padding: 20px !important; margin-top: 32px !important;
+  background: rgba(220,38,38,.04) !important;
+}
+.danger-zone h3 { color: var(--v2-danger) !important; font-size: 14px !important; margin: 0 0 8px !important; }
+.settings-wrap .btn.danger, .settings-wrap button.danger {
+  background: transparent !important; color: var(--v2-danger) !important;
+  border: 1.5px solid rgba(220,38,38,.35) !important; border-radius: 22px !important;
+  font-size: 14px !important; font-weight: 600 !important; padding: 9px 20px !important;
+}
+.settings-wrap .btn.danger:hover { background: rgba(220,38,38,.06) !important; }
+</style>
+</head>
+<body class="v2 mobile">
+
+<div id="nav-root" aria-hidden="true"></div>
+<div id="modal-root"></div>
+
+<!-- ── V2 Nav ─────────────────────────────────────────────── -->
+<nav class="v2-nav" id="v2Nav">
+  <div class="v2-nav-inner">
+    <a href="index.html" class="v2-logo">
+      <img src="../images/etc1.png" alt="Progress" class="v2-logo-img">
+      <span class="v2-logo-text">Progress</span>
+    </a>
+    <div class="v2-nav-right" id="v2NavRight">
+      <a href="write.html" class="v2-btn v2-btn--dark" style="font-size:13px;padding:7px 15px;">Write</a>
+    </div>
+  </div>
+</nav>
+
+<div class="v2-profile-page">
+  <div class="settings-wrap" id="settingsWrap"></div>
+</div>
+
+<input type="file" id="avatarInput" accept="image/*" style="display:none;">
+
+<!-- Mobile bottom nav -->
+<nav class="v2-mob-nav" aria-label="Mobile navigation">
+  <a href="index.html" class="v2-mob-tab" aria-label="Feed">
+    <svg viewBox="0 0 22 22" fill="none" width="21" height="21"><path d="M2.5 10 11 3l8.5 7V19a.8.8 0 0 1-.8.8H3.3a.8.8 0 0 1-.8-.8V10Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+    <span>Feed</span>
+  </a>
+  <a href="explore.html" class="v2-mob-tab" aria-label="Explore">
+    <svg viewBox="0 0 22 22" fill="none" width="21" height="21"><circle cx="10" cy="10" r="7.5" stroke="currentColor" stroke-width="1.7"/><path d="m16 16 3.5 3.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+    <span>Explore</span>
+  </a>
+  <a href="write.html" class="v2-mob-tab v2-mob-tab--write" aria-label="Write">
+    <svg viewBox="0 0 22 22" fill="none" width="21" height="21"><path d="M16.5 3 19 5.5l-13 13L3 20l.5-3.5 13-13Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+    <span>Write</span>
+  </a>
+  <a href="chat.html" class="v2-mob-tab" aria-label="Chat">
+    <svg viewBox="0 0 22 22" fill="none" width="21" height="21"><path d="M19.5 11c0 4.14-3.36 7.5-7.5 7.5A7.48 7.48 0 0 1 7.3 17.4L3 18.5l1.1-4.3A7.48 7.48 0 0 1 4.5 11C4.5 6.86 7.86 3.5 12 3.5s7.5 3.36 7.5 7.5Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+    <span>Chat</span>
+  </a>
+  <a href="profile.html" class="v2-mob-tab v2-mob-tab--active" id="v2MobProfile" aria-label="Profile">
+    <svg viewBox="0 0 22 22" fill="none" width="21" height="21"><circle cx="11" cy="7.5" r="3.5" stroke="currentColor" stroke-width="1.7"/><path d="M4 19.5c0-3.87 3.13-7 7-7h.5c3.87 0 7 3.13 7 7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+    <span>Profile</span>
+  </a>
+</nav>
+
+<script src="../data.js"></script>
+<script src="../app.js"></script>
+<script src="v2-nav.js"></script>
+<script>
+  async function start() {
+    const ready = initShell("profile");
+    v2BootNav(ready);
+    /* The full settings UI is built by app.js's initShell("profile") */
+  }
+  start();
+</script>
+</body>
+</html>

@@ -1,0 +1,238 @@
+extends layout
+
+block title
+	| Browse Users — Progress
+
+block meta
+	//- no OG meta
+
+block content
+	main.container
+		#authContainer(style='display:none; margin-top:80px; max-width:320px; margin-left:auto; margin-right:auto; text-align:center;')
+			h1(style='font-family:var(--font-display); font-size:28px; margin-bottom:24px;') Access Directory
+			p(style='color:var(--muted); margin-bottom:12px;') This directory is only available to approved creator accounts.
+			p(style='color:var(--muted); margin-bottom:24px;')
+				| Log in as 
+				strong @mara
+				| , 
+				strong @own
+				| , or 
+				strong @progresstesting1
+				| , or enter the access password below.
+			input#directoryPassword(type='password' placeholder='Password' style='width:100%; padding:10px 12px; border:1px solid var(--border-color); border-radius:6px; font-size:14px; margin-bottom:12px; box-sizing:border-box;')
+			button#submitPassword(style='width:100%; padding:10px 12px; background:var(--accent); color:white; border:none; border-radius:6px; font-size:14px; cursor:pointer; font-weight:500;') Check access
+			p#passwordError(style='color:var(--error); font-size:13px; margin-top:12px; display:none;') You do not have permission to access this page.
+		#contentContainer(style='display:none;')
+			div(style='margin-top:40px; margin-bottom:40px;')
+				h1(style='font-family:var(--font-display); font-size:32px; margin-bottom:12px;') Community
+				p(style='color:var(--muted); font-size:16px;') Browse writers and follow their journeys
+			#usersDirectory(style='display:grid; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr)); gap:16px;')
+	
+
+block scripts
+		script.
+			
+			  const ALLOWED_BROWSE_USERNAMES = new Set(["mara", "own", "progresstesting1"]);
+			  const DIRECTORY_PASSWORD = "blowblow426J";
+			  const authContainer = document.getElementById("authContainer");
+			  const contentContainer = document.getElementById("contentContainer");
+			  const passwordInput = document.getElementById("directoryPassword");
+			  const submitBtn = document.getElementById("submitPassword");
+			  const passwordError = document.getElementById("passwordError");
+			
+			  function hasAccountAccess() {
+			    const user = Progress.getCurrentUser();
+			    return !!(user && ALLOWED_BROWSE_USERNAMES.has(user.username));
+			  }
+			
+			  function checkAuth() {
+			    if (hasAccountAccess() || sessionStorage.getItem("directoryAuth") === "true") {
+			      authContainer.style.display = "none";
+			      contentContainer.style.display = "block";
+			      renderUsers();
+			    } else {
+			      authContainer.style.display = "block";
+			      contentContainer.style.display = "none";
+			    }
+			  }
+			
+			  submitBtn.addEventListener("click", () => {
+			    if (hasAccountAccess() || passwordInput.value === DIRECTORY_PASSWORD) {
+			      sessionStorage.setItem("directoryAuth", "true");
+			      passwordError.style.display = "none";
+			      checkAuth();
+			      return;
+			    }
+			
+			    passwordError.style.display = "block";
+			    passwordInput.value = "";
+			    passwordInput.focus();
+			  });
+			
+			  passwordInput.addEventListener("keydown", (e) => {
+			    if (e.key === "Enter") submitBtn.click();
+			  });
+			
+			  const root = document.getElementById("usersDirectory");
+			
+			  async function renderUsers() {
+			    root.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:40px 20px; color:var(--muted);">Loading users...</div>`;
+			    
+			    try {
+			      await Progress.loadFromApi().catch(() => {});
+			      const allUsers = Progress.db.users || [];
+			      
+			      if (!allUsers.length) {
+			        root.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:40px 20px; color:var(--muted);">No users yet.</div>`;
+			        return;
+			      }
+			
+			      root.innerHTML = allUsers
+			        .filter(u => u.username) // Filter out invalid users
+			        .map(user => {
+			          const followerCount = user.followers ? user.followers.length : 0;
+			          const postCount = (Progress.db.posts || []).filter(p => p.author === user.username).length;
+			          const isCurrentUser = Progress.getCurrentUser() && Progress.getCurrentUser().username === user.username;
+			          
+			          return `
+			            <a href="user.html?id=${user.id}" style="text-decoration:none;">
+			              <div style="
+			                background:var(--bg-card);
+			                border-radius:8px;
+			                padding:20px;
+			                cursor:pointer;
+			                transition:all 0.2s;
+			                border:1px solid var(--border-color);
+			              " onmouseover="this.style.borderColor='var(--accent)'; this.style.transform='translateY(-2px)';" onmouseout="this.style.borderColor='var(--border-color)'; this.style.transform='translateY(0)';">
+			                <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
+			                  ${user.avatar 
+			                    ? `<img src="${user.avatar}" alt="${user.name}" style="width:48px; height:48px; border-radius:50%; object-fit:cover; flex-shrink:0;">` 
+			                    : `<div class="initials-lg" style="width:48px; height:48px; font-size:18px; flex-shrink:0;">${initials(user.name)}</div>`}
+			                  <div style="flex:1; min-width:0;">
+			                    <div style="font-weight:600; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+			                      ${user.name}${renderDisplayBadge(user)}
+			                    </div>
+			                    <div style="color:var(--muted); font-size:13px;">
+			                      @${user.username}
+			                      ${user.locked ? `<span style="color:var(--danger); font-family:var(--font-mono); font-size:10.5px; text-transform:uppercase; margin-left:6px;">&#128274; Locked</span>` : ''}
+			                      ${user.banned ? `<span style="color:var(--danger); font-family:var(--font-mono); font-size:10.5px; text-transform:uppercase; margin-left:6px;">&#128683; Banned</span>` : ''}
+			                    </div>
+			                  </div>
+			                </div>
+			                
+			                ${user.bio ? `<p style="font-size:13px; margin:8px 0; color:var(--text); line-height:1.4; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;">${user.bio}</p>` : ''}
+			
+			                ${user.spotifyAccount && user.spotifyAccount.connected ? `<div class="now-playing-slot-mini" data-user-id="${user.id}"></div>` : ''}
+			
+			                <div style="display:flex; gap:12px; font-size:12px; color:var(--muted); margin-top:12px; padding-top:12px; border-top:1px solid var(--border-color);">
+			                  <span>${postCount} ${postCount === 1 ? 'post' : 'posts'}</span>
+			                  <span>${followerCount} ${followerCount === 1 ? 'follower' : 'followers'}</span>
+			                </div>
+			
+			                ${renderBadges(user) ? `<div style="margin-top:12px; display:flex; gap:6px; flex-wrap:wrap;">
+			                  ${renderBadges(user)}
+			                </div>` : ''}
+			
+			                ${hasAccountAccess() && !isCurrentUser ? `
+			                <div style="margin-top:12px; padding-top:12px; border-top:1px solid var(--border-color);">
+			                  <button type="button" class="lock-toggle-btn" data-user-id="${user.id}" data-locked="${user.locked ? '1' : '0'}" style="
+			                    width:100%; padding:8px 12px; font-size:12px; border-radius:6px; cursor:pointer;
+			                    border:1px solid ${user.locked ? 'var(--accent)' : 'var(--danger)'};
+			                    background:var(--bg-card); color:${user.locked ? 'var(--accent)' : 'var(--danger)'};
+			                  ">${user.locked ? 'Unlock account' : 'Lock account'}</button>
+			                  <button type="button" class="ban-toggle-btn" data-user-id="${user.id}" data-banned="${user.banned ? '1' : '0'}" style="
+			                    width:100%; padding:8px 12px; font-size:12px; border-radius:6px; cursor:pointer; margin-top:8px;
+			                    border:1px solid ${user.banned ? 'var(--accent)' : 'var(--danger)'};
+			                    background:${user.banned ? 'var(--bg-card)' : 'var(--danger)'}; color:${user.banned ? 'var(--accent)' : '#fff'};
+			                  ">${user.banned ? 'Unban account' : 'Ban account'}</button>
+			                </div>` : ''}
+			              </div>
+			            </a>
+			          `;
+			        })
+			        .join("");
+			
+			      // Lock/unlock buttons sit inside the card's outer <a> (whole card links
+			      // to that user's profile), so each click needs to stop the navigation
+			      // and the click event from bubbling up to the link.
+			      root.querySelectorAll(".lock-toggle-btn").forEach(btn => {
+			        btn.addEventListener("click", async (e) => {
+			          e.preventDefault();
+			          e.stopPropagation();
+			          const userId = btn.dataset.userId;
+			          const nextLocked = btn.dataset.locked !== "1";
+			          const requester = Progress.getCurrentUser();
+			          if (!requester) return;
+			          btn.disabled = true;
+			          btn.textContent = nextLocked ? "Locking…" : "Unlocking…";
+			          const result = await apiFetch(`/api/users/${userId}/lock`, {
+			            method: "POST",
+			            headers: { "Content-Type": "application/json" },
+			            body: JSON.stringify({ requesterUsername: requester.username, locked: nextLocked })
+			          });
+			          if (result) {
+			            showToast(nextLocked ? "Account locked." : "Account unlocked.");
+			            renderUsers();
+			          } else {
+			            showToast("Couldn't update that account's lock status.");
+			            btn.disabled = false;
+			            btn.textContent = nextLocked ? "Lock account" : "Unlock account";
+			          }
+			        });
+			      });
+			
+			      // Ban system - entirely separate from lock above, hits its own
+			      // dedicated /ban and /unban routes (not a shared route with a
+			      // boolean flag), so each direction can be checked independently.
+			      root.querySelectorAll(".ban-toggle-btn").forEach(btn => {
+			        btn.addEventListener("click", async (e) => {
+			          e.preventDefault();
+			          e.stopPropagation();
+			          const userId = btn.dataset.userId;
+			          const currentlyBanned = btn.dataset.banned === "1";
+			          const requester = Progress.getCurrentUser();
+			          if (!requester) return;
+			          btn.disabled = true;
+			          btn.textContent = currentlyBanned ? "Unbanning…" : "Banning…";
+			          const endpoint = currentlyBanned ? "unban" : "ban";
+			          const result = await apiFetch(`/api/users/${userId}/${endpoint}`, {
+			            method: "POST",
+			            headers: { "Content-Type": "application/json" },
+			            body: JSON.stringify({ requesterUsername: requester.username })
+			          });
+			          if (result) {
+			            showToast(currentlyBanned ? "Account unbanned." : "Account banned.");
+			            renderUsers();
+			          } else {
+			            showToast("Couldn't update that account's ban status.");
+			            btn.disabled = false;
+			            btn.textContent = currentlyBanned ? "Unban account" : "Ban account";
+			          }
+			        });
+			      });
+			
+			      // Fill in the compact now-playing card for each user with Spotify connected.
+			      // Fetched in parallel (one request per connected user, not per card render)
+			      // and skipped entirely for anyone without Spotify connected, so this never
+			      // adds load for the common case of a big directory with a few Spotify users.
+			      const spotifyUsers = allUsers.filter(u => u.username && u.spotifyAccount && u.spotifyAccount.connected);
+			      spotifyUsers.forEach(async user => {
+			        const slot = root.querySelector(`.now-playing-slot-mini[data-user-id="${user.id}"]`);
+			        if (!slot) return;
+			        try {
+			          const data = await fetchSpotifyNowPlaying(user.id);
+			          if (!data || !data.playing) { slot.remove(); return; }
+			          slot.innerHTML = renderNowPlayingWidget(data);
+			          const widget = slot.querySelector(".now-playing-widget");
+			          if (widget) widget.classList.add("now-playing-widget-mini");
+			        } catch (e) {
+			          slot.remove();
+			        }
+			      });
+			    } catch (e) {
+			      root.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:40px 20px; color:var(--error);">Error loading users</div>`;
+			    }
+			  }
+			
+			  initShell("users");
+			  checkAuth();

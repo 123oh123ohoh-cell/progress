@@ -1080,9 +1080,9 @@
             </div>
             <div>
               <label style="display:block;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">Duration (seconds)</label>
-              <input type="number" id="tickerSpeedInput" value="30" min="1" max="300"
-                style="padding:8px 12px;border:1px solid var(--mocha-light);border-radius:8px;background:var(--paper);color:var(--ink);font-size:14px;width:90px;">
-              <div style="font-size:11px;color:var(--muted);margin-top:4px;">Lower = faster</div>
+              <input type="number" id="tickerSpeedInput" value="30" min="-300" max="300" step="5"
+                style="padding:8px 12px;border:1px solid var(--mocha-light);border-radius:8px;background:var(--paper);color:var(--ink);font-size:14px;width:100px;">
+              <div style="font-size:11px;color:var(--muted);margin-top:4px;">Lower = faster · Negative = scrolls right</div>
             </div>
           </div>
 
@@ -1229,8 +1229,9 @@
       const text = document.getElementById("tickerTextInput")?.value.trim();
       const color = document.getElementById("tickerColorInput")?.value || "#ffffff";
       const bg = document.getElementById("tickerBgInput")?.value || "#1c1917";
-      const speed = parseInt(document.getElementById("tickerSpeedInput")?.value, 10) || 30;
-      const duration = `${speed}s`;
+      const rawSpeed = parseInt(document.getElementById("tickerSpeedInput")?.value, 10) || 30;
+      const duration = `${Math.abs(rawSpeed)}s`;
+      const reversed = rawSpeed < 0;
       const preview = document.getElementById("tickerPreview");
       const wrap = document.getElementById("tickerPreviewWrap");
       const inner = document.getElementById("tickerPreviewInner");
@@ -1252,7 +1253,9 @@
       // Inject/update keyframe for preview
       let kfEl = document.getElementById("ticker-preview-kf");
       if (!kfEl) { kfEl = document.createElement("style"); kfEl.id = "ticker-preview-kf"; document.head.appendChild(kfEl); }
-      kfEl.textContent = `@keyframes ticker-preview-roll{from{transform:translateX(0)}to{transform:translateX(-${dist}px)}}`;
+      kfEl.textContent = reversed
+        ? `@keyframes ticker-preview-roll{from{transform:translateX(-${dist}px)}to{transform:translateX(0)}}`
+        : `@keyframes ticker-preview-roll{from{transform:translateX(0)}to{transform:translateX(-${dist}px)}}`;
       inner.style.animation = `ticker-preview-roll ${duration} linear infinite`;
     }
 

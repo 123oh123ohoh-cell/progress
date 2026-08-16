@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Write — Progress</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500;1,9..144,600&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script>(function(){try{var t=localStorage.getItem("progressTheme");var dark=(t==="dark")||(t!=="light"&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);if(dark)document.documentElement.setAttribute("data-theme","dark");}catch(e){}})();</script>
+<link rel="stylesheet" href="v2-compat.css">
+<link rel="stylesheet" href="style.css">
+<style>
+#nav-root { display:none !important; }
+body { background: var(--v2-bg); }
+
+/* Write page layout */
+.v2-write-layout {
+  max-width: 720px; margin: 0 auto; padding: 40px 24px 100px;
+}
+
+@media (max-width: 740px) { .v2-write-layout { padding: 24px 0 88px; } }
+
+/* Editor container overrides — the actual editor is injected by app.js */
+#editorWrap { background: transparent; }
+
+/* Override v1 editor styles to match v2 */
+.editor-wrap .editor-header {
+  border-bottom: 1px solid var(--v2-border) !important;
+  padding-bottom: 20px !important;
+  margin-bottom: 0 !important;
+}
+.editor-wrap .editor-title-input {
+  font-family: var(--v2-font-d) !important;
+  font-style: italic !important;
+  font-size: clamp(26px,4vw,38px) !important;
+  color: var(--v2-ink) !important;
+  border: none !important;
+  background: transparent !important;
+  width: 100% !important;
+  outline: none !important;
+  line-height: 1.2 !important;
+  padding: 0 !important;
+}
+.editor-wrap .editor-title-input::placeholder { color: var(--v2-muted) !important; }
+
+.editor-wrap .toolbar {
+  background: var(--v2-paper) !important;
+  border: 1px solid var(--v2-border) !important;
+  border-radius: var(--r-md) !important;
+  box-shadow: var(--sh-xs) !important;
+}
+.editor-wrap .toolbar button,
+.editor-wrap .tb-btn {
+  border-radius: var(--r-sm) !important;
+  color: var(--v2-muted) !important;
+}
+.editor-wrap .toolbar button:hover,
+.editor-wrap .tb-btn:hover { background: var(--v2-paper-2) !important; color: var(--v2-ink) !important; }
+.editor-wrap .toolbar button.active,
+.editor-wrap .tb-btn.active { background: var(--v2-accent-dim) !important; color: var(--v2-accent) !important; }
+.editor-wrap .tb-sep { background: var(--v2-border) !important; }
+
+.editor-wrap .editor-area, .editor-wrap .ProseMirror,
+.editor-wrap .editor-canvas, .editor-wrap [contenteditable] {
+  font-size: 17px !important;
+  line-height: 1.78 !important;
+  color: var(--v2-ink) !important;
+  background: transparent !important;
+}
+.editor-wrap .editor-canvas:empty::before { color: var(--v2-muted) !important; opacity: .6; }
+.editor-wrap .editor-canvas h2 { font-family: var(--v2-font-d) !important; color: var(--v2-ink) !important; }
+.editor-wrap .editor-canvas blockquote { border-left-color: var(--v2-ink) !important; color: var(--v2-mocha-dark) !important; }
+.editor-wrap .editor-canvas img { border-color: var(--v2-border) !important; border-radius: var(--r-md) !important; }
+
+/* Cover image drop zone — v1 class name */
+.editor-wrap .editor-cover-drop, .editor-wrap .cover-upload-area {
+  border: 2px dashed var(--v2-border) !important;
+  border-radius: var(--r-lg) !important;
+  background: var(--v2-paper-2) !important;
+  color: var(--v2-muted) !important;
+}
+.editor-wrap .editor-cover-drop:hover,
+.editor-wrap .cover-upload-area:hover { border-color: var(--v2-border-2) !important; background: var(--v2-paper) !important; }
+
+.editor-wrap .editor-meta-row,
+.editor-wrap .editor-meta { border-top: 1px solid var(--v2-border) !important; padding-top: 16px !important; }
+
+/* Editor actions — lift above v2 mobile bottom nav */
+.editor-wrap .editor-actions { bottom: 84px !important; right: 20px !important; }
+
+.editor-wrap .editor-submit, .editor-wrap .btn.primary {
+  background: var(--v2-ink) !important;
+  color: var(--v2-bg) !important;
+  border-radius: 22px !important;
+  border: none !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  padding: 10px 24px !important;
+  cursor: pointer !important;
+}
+.editor-wrap .editor-submit:hover, .editor-wrap .btn.primary:hover { opacity: .9 !important; }
+
+.editor-wrap .btn.secondary {
+  background: var(--v2-paper) !important;
+  color: var(--v2-ink) !important;
+  border: 1.5px solid var(--v2-border) !important;
+  border-radius: 22px !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+}
+.editor-wrap .btn.secondary:hover { border-color: var(--v2-border-2) !important; }
+
+/* Category selector */
+.editor-wrap .category-select, .editor-wrap select {
+  border: 1.5px solid var(--v2-border) !important;
+  border-radius: var(--r-md) !important;
+  background: var(--v2-paper) !important;
+  color: var(--v2-ink) !important;
+  font-family: var(--v2-font-b) !important;
+  font-size: 13.5px !important;
+  padding: 8px 12px !important;
+}
+
+/* Daily limit banner */
+.daily-limit-banner {
+  background: var(--v2-paper) !important;
+  border: 1px solid var(--v2-border) !important;
+  border-left: 3px solid var(--v2-mocha) !important;
+  border-radius: var(--r-md) !important;
+  padding: 14px 16px !important;
+}
+
+/* Feed-empty (not logged in) */
+.editor-wrap .feed-empty {
+  text-align: center;
+  padding: 80px 0;
+  color: var(--v2-muted);
+}
+.editor-wrap .feed-empty h3 {
+  font-family: var(--v2-font-d); font-style: italic;
+  font-size: 26px; color: var(--v2-ink); margin-bottom: 8px;
+}
+
+/* URL overlay */
+.editor-url-overlay {
+  background: var(--v2-paper) !important;
+  border: 1px solid var(--v2-border) !important;
+  border-radius: var(--r-lg) !important;
+  box-shadow: var(--sh-lg) !important;
+}
+.editor-url-overlay input {
+  border: 1.5px solid var(--v2-border) !important;
+  border-radius: var(--r-md) !important;
+  background: var(--v2-paper-2) !important;
+  color: var(--v2-ink) !important;
+  font-family: var(--v2-font-b) !important;
+}
+.editor-url-overlay input:focus { border-color: var(--v2-accent) !important; }
+.editor-url-overlay-confirm {
+  background: var(--v2-ink) !important; color: var(--v2-bg) !important;
+  border: none !important; border-radius: var(--r-md) !important;
+}
+.editor-url-overlay-cancel {
+  background: transparent !important; color: var(--v2-muted) !important;
+  border: 1.5px solid var(--v2-border) !important; border-radius: var(--r-md) !important;
+}
+</style>
+</head>
+<body class="v2 mobile page-write">
+
+<div id="nav-root" aria-hidden="true"></div>
+<div id="modal-root"></div>
+
+<!-- URL overlay (pass-through from v1) -->
+<div class="editor-url-overlay" id="urlOverlay" aria-modal="true" role="dialog">
+  <div class="editor-url-overlay-label" id="urlOverlayLabel">Enter URL</div>
+  <div class="editor-url-overlay-row">
+    <input type="url" id="urlOverlayInput" placeholder="https://…" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false">
+    <button class="editor-url-overlay-confirm" id="urlOverlayConfirm">Insert</button>
+    <button class="editor-url-overlay-cancel" id="urlOverlayCancel">Cancel</button>
+  </div>
+</div>
+
+<!-- ── V2 Nav ─────────────────────────────────────────────── -->
+<nav class="v2-nav" id="v2Nav">
+  <div class="v2-nav-inner">
+    <a href="index.html" class="v2-logo">
+      <img src="../images/etc1.png" alt="Progress" class="v2-logo-img">
+      <span class="v2-logo-text">Progress</span>
+    </a>
+    <div style="flex:1;"></div>
+    <div class="v2-nav-right" id="v2NavRight">
+      <a href="index.html" class="v2-btn v2-btn--ghost" style="font-size:13px;padding:7px 15px;">Cancel</a>
+    </div>
+  </div>
+</nav>
+
+<div class="v2-write-layout">
+  <div id="editorWrap"></div>
+</div>
+
+<input type="file" id="coverInput" accept="image/*" style="display:none;">
+<input type="file" id="imageInput" accept="image/*" style="display:none;">
+<input type="file" id="videoInput" accept="video/*" style="display:none;">
+
+<!-- Mobile bottom nav -->
+<nav class="v2-mob-nav" aria-label="Mobile navigation">
+  <a href="index.html" class="v2-mob-tab" aria-label="Feed">
+    <svg viewBox="0 0 22 22" fill="none" width="21" height="21"><path d="M2.5 10 11 3l8.5 7V19a.8.8 0 0 1-.8.8H3.3a.8.8 0 0 1-.8-.8V10Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+    <span>Feed</span>
+  </a>
+  <a href="explore.html" class="v2-mob-tab" aria-label="Explore">
+    <svg viewBox="0 0 22 22" fill="none" width="21" height="21"><circle cx="10" cy="10" r="7.5" stroke="currentColor" stroke-width="1.7"/><path d="m16 16 3.5 3.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+    <span>Explore</span>
+  </a>
+  <a href="write.html" class="v2-mob-tab v2-mob-tab--active v2-mob-tab--write" aria-label="Write">
+    <svg viewBox="0 0 22 22" fill="none" width="21" height="21"><path d="M16.5 3 19 5.5l-13 13L3 20l.5-3.5 13-13Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+    <span>Write</span>
+  </a>
+  <a href="chat.html" class="v2-mob-tab" aria-label="Chat">
+    <svg viewBox="0 0 22 22" fill="none" width="21" height="21"><path d="M19.5 11c0 4.14-3.36 7.5-7.5 7.5A7.48 7.48 0 0 1 7.3 17.4L3 18.5l1.1-4.3A7.48 7.48 0 0 1 4.5 11C4.5 6.86 7.86 3.5 12 3.5s7.5 3.36 7.5 7.5Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+    <span>Chat</span>
+  </a>
+  <a href="profile.html" class="v2-mob-tab" id="v2MobProfile" aria-label="Profile">
+    <svg viewBox="0 0 22 22" fill="none" width="21" height="21"><circle cx="11" cy="7.5" r="3.5" stroke="currentColor" stroke-width="1.7"/><path d="M4 19.5c0-3.87 3.13-7 7-7h.5c3.87 0 7 3.13 7 7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+    <span>Profile</span>
+  </a>
+</nav>
+
+<script src="../data.js"></script>
+<script src="../app.js"></script>
+<script src="v2-nav.js"></script>
+<script>
+  /* URL overlay wiring */
+  let _urlResolve = null;
+  const urlOverlay = document.getElementById("urlOverlay");
+  const urlOverlayInput = document.getElementById("urlOverlayInput");
+  const urlOverlayLabel = document.getElementById("urlOverlayLabel");
+
+  function askForUrl(label, placeholder) {
+    return new Promise(resolve => {
+      _urlResolve = resolve;
+      urlOverlayLabel.textContent = label;
+      urlOverlayInput.placeholder = placeholder || "https://…";
+      urlOverlayInput.value = "";
+      urlOverlay.classList.add("open");
+      setTimeout(() => urlOverlayInput.focus(), 60);
+    });
+  }
+  function closeUrlOverlay(value) {
+    urlOverlay.classList.remove("open");
+    urlOverlayInput.blur();
+    if (_urlResolve) { _urlResolve(value || null); _urlResolve = null; }
+  }
+  document.getElementById("urlOverlayConfirm").addEventListener("click", () => closeUrlOverlay(urlOverlayInput.value.trim()));
+  document.getElementById("urlOverlayCancel").addEventListener("click", () => closeUrlOverlay(null));
+  urlOverlayInput.addEventListener("keydown", e => {
+    if (e.key === "Enter") closeUrlOverlay(urlOverlayInput.value.trim());
+    if (e.key === "Escape") closeUrlOverlay(null);
+  });
+
+  async function start() {
+    const ready = initShell("write");
+    v2BootNav(ready);
+    /* The full editor is built and injected by app.js's initShell("write") */
+  }
+  start();
+</script>
+</body>
+</html>

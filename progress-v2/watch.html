@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Watch Party — Progress</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500;1,9..144,600&family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script>(function(){try{var t=localStorage.getItem("progressTheme");var dark=(t==="dark")||(t!=="light"&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);if(dark)document.documentElement.setAttribute("data-theme","dark");}catch(e){}})();</script>
+<link rel="stylesheet" href="style.css">
+<style>
+html, body { height: 100%; margin: 0; background: var(--v2-bg); }
+
+.v2-watch-shell { display: flex; flex-direction: column; height: 100dvh; }
+
+/* v2 nav */
+.v2-watch-nav {
+  height: var(--v2-nav-h); flex-shrink: 0;
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 16px;
+  background: var(--v2-nav-bg); backdrop-filter: blur(20px) saturate(1.6);
+  border-bottom: 1px solid var(--v2-border);
+  position: relative; z-index: 100;
+}
+.v2-watch-logo { font-family: var(--v2-font-d); font-style: italic; font-size: 17px; font-weight: 600; color: var(--v2-ink); text-decoration: none; }
+.v2-watch-sep { width: 1px; height: 18px; background: var(--v2-border); }
+.v2-watch-title { font-size: 13px; font-weight: 600; color: var(--v2-ink); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2-watch-home { font-size: 13px; font-weight: 500; color: var(--v2-muted); text-decoration: none; font-family: var(--v2-font-b); transition: color .15s; }
+.v2-watch-home:hover { color: var(--v2-ink); }
+
+/* Content iframe */
+.v2-watch-iframe-wrap { flex: 1; overflow: hidden; }
+.v2-watch-iframe { width: 100%; height: 100%; border: none; display: block; background: var(--v2-bg); }
+</style>
+</head>
+<body>
+<div class="v2-watch-shell">
+
+  <!-- V2 nav -->
+  <nav class="v2-watch-nav">
+    <a href="index.html" class="v2-watch-logo">Progress</a>
+    <div class="v2-watch-sep"></div>
+    <span class="v2-watch-title">Watch Party</span>
+    <a href="index.html" class="v2-watch-home">← Feed</a>
+  </nav>
+
+  <div class="v2-watch-iframe-wrap">
+    <iframe
+      src="../watch.html"
+      class="v2-watch-iframe"
+      id="watchFrame"
+      title="Watch Party"
+      sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+    ></iframe>
+  </div>
+
+</div>
+<script>
+const frame = document.getElementById("watchFrame");
+// Pass the URL hash/params through so watch party room codes still work
+if (location.search || location.hash) {
+  frame.src = `../watch.html${location.search}${location.hash}`;
+}
+frame.addEventListener("load", () => {
+  try {
+    const dark = localStorage.getItem("progressTheme") === "dark" ||
+      (localStorage.getItem("progressTheme") !== "light" && window.matchMedia("(prefers-color-scheme:dark)").matches);
+    if (dark) frame.contentDocument.documentElement.setAttribute("data-theme", "dark");
+    // Hide the v1 topbar inside the iframe since we have our own
+    const style = frame.contentDocument.createElement("style");
+    style.textContent = `.wp-topbar { display:none !important; } .wp-root { padding-top:0 !important; }`;
+    frame.contentDocument.head.appendChild(style);
+    // Mirror title from iframe
+    const titleEl = document.querySelector(".v2-watch-title");
+    if (titleEl && frame.contentDocument.title) {
+      titleEl.textContent = frame.contentDocument.title.replace(" — Progress","") || "Watch Party";
+    }
+  } catch(e) {}
+});
+</script>
+</body>
+</html>

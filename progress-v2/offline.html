@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>You're offline — Progress</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500;1,9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>(function(){try{var t=localStorage.getItem("progressTheme");var dark=(t==="dark")||(t!=="light"&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);if(dark)document.documentElement.setAttribute("data-theme","dark");}catch(e){}})();</script>
+<style>
+:root {
+  --v2-bg: #F4EDE5; --v2-ink: #16110D; --v2-muted: #7C6B5D;
+  --v2-paper: #FFFFFF; --v2-border: rgba(28,25,23,.1);
+  --v2-accent: #6366F1;
+  --v2-font-d: 'Fraunces', Georgia, serif;
+  --v2-font-b: 'Inter', system-ui, sans-serif;
+  --r-lg: 16px;
+}
+[data-theme="dark"] {
+  --v2-bg: #0D0906; --v2-ink: #F0E8DF; --v2-muted: #8D7A6E;
+  --v2-paper: #1A1310; --v2-border: rgba(255,255,255,.1);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  min-height: 100dvh; background: var(--v2-bg); color: var(--v2-ink);
+  font-family: var(--v2-font-b); -webkit-font-smoothing: antialiased;
+}
+
+.v2-off-wrap {
+  min-height: 100dvh; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 40px 24px; text-align: center;
+}
+
+.v2-off-logo-wrap {
+  width: 80px; height: 80px; border-radius: 20px; overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0,0,0,.12); margin-bottom: 24px;
+  background: var(--v2-paper); border: 1.5px solid var(--v2-border);
+  display: flex; align-items: center; justify-content: center;
+}
+.v2-off-logo-wrap img { width: 52px; height: 52px; object-fit: contain; }
+
+.v2-off-wordmark {
+  font-family: var(--v2-font-d); font-style: italic; font-size: 28px;
+  font-weight: 600; color: var(--v2-ink); margin-bottom: 40px;
+  letter-spacing: -.5px; opacity: .9;
+}
+
+.v2-off-icon {
+  font-size: 64px; margin-bottom: 24px; display: block;
+  filter: grayscale(1); opacity: .45;
+  animation: v2OffPulse 3s ease-in-out infinite;
+}
+@keyframes v2OffPulse { 0%,100%{opacity:.45} 50%{opacity:.3} }
+
+.v2-off-title {
+  font-family: var(--v2-font-d); font-style: italic; font-size: 26px;
+  font-weight: 600; color: var(--v2-ink); margin-bottom: 12px;
+}
+
+.v2-off-sub {
+  font-size: 15px; color: var(--v2-muted); line-height: 1.65;
+  max-width: 340px; margin: 0 auto 36px;
+}
+
+.v2-off-btn {
+  padding: 13px 32px; background: var(--v2-ink); color: var(--v2-bg);
+  border: none; border-radius: 30px; font-size: 15px; font-weight: 700;
+  font-family: var(--v2-font-b); cursor: pointer;
+  transition: opacity .15s, transform .2s;
+}
+.v2-off-btn:hover { opacity: .88; transform: translateY(-2px); }
+
+.v2-off-status {
+  margin-top: 28px; font-size: 12px; color: var(--v2-muted);
+  font-family: monospace; letter-spacing: .05em; opacity: .7;
+}
+</style>
+</head>
+<body>
+<div class="v2-off-wrap">
+  <div class="v2-off-logo-wrap">
+    <img src="../images/nearheader.png" alt="Progress">
+  </div>
+  <div class="v2-off-wordmark">progress.</div>
+  <span class="v2-off-icon">📡</span>
+  <h1 class="v2-off-title">You're offline</h1>
+  <p class="v2-off-sub">Progress needs a connection to load new posts and messages. Check your connection and try again.</p>
+  <button class="v2-off-btn" onclick="window.location.reload()">Try again</button>
+  <p class="v2-off-status" id="statusLine">checking connection…</p>
+</div>
+<script>
+  function checkConnection() {
+    const el = document.getElementById("statusLine");
+    if (navigator.onLine) {
+      el.textContent = "connection restored — reloading…";
+      setTimeout(() => window.location.reload(), 800);
+    } else {
+      el.textContent = "still offline · checking every 5s";
+    }
+  }
+  window.addEventListener("online", checkConnection);
+  setInterval(checkConnection, 5000);
+  checkConnection();
+</script>
+</body>
+</html>

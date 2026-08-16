@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Email Editor — Progress</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500;1,9..144,600&family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script>(function(){try{var t=localStorage.getItem("progressTheme");var dark=(t==="dark")||(t!=="light"&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);if(dark)document.documentElement.setAttribute("data-theme","dark");}catch(e){}})();</script>
+<link rel="stylesheet" href="style.css">
+<style>
+html, body { height: 100%; margin: 0; background: var(--v2-bg); }
+.v2-ee-shell { display: flex; flex-direction: column; height: 100dvh; }
+
+/* v2-ified top nav for email editor */
+.v2-ee-nav {
+  height: var(--v2-nav-h); flex-shrink: 0;
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 16px;
+  background: var(--v2-ink); /* dark brand bar */
+  border-bottom: 1px solid rgba(255,255,255,.1);
+}
+.v2-ee-logo { font-family: var(--v2-font-d); font-style: italic; font-size: 17px; font-weight: 600; color: rgba(255,255,255,.9); text-decoration: none; }
+.v2-ee-sep { width: 1px; height: 20px; background: rgba(255,255,255,.15); }
+.v2-ee-nav-title { font-family: var(--v2-font-m); font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: rgba(255,255,255,.55); }
+.v2-ee-badge { background: rgba(99,102,241,.3); color: #a5b4fc; border: 1px solid rgba(99,102,241,.4); font-family: var(--v2-font-m); font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; padding: 3px 8px; border-radius: 6px; }
+.v2-ee-spacer { flex: 1; }
+.v2-ee-home { font-size: 13px; font-weight: 600; color: rgba(255,255,255,.65); text-decoration: none; padding: 6px 12px; border: 1px solid rgba(255,255,255,.2); border-radius: var(--r-md); font-family: var(--v2-font-b); transition: all .15s; }
+.v2-ee-home:hover { color: #fff; border-color: rgba(255,255,255,.4); }
+
+.v2-ee-iframe-wrap { flex: 1; overflow: hidden; }
+.v2-ee-iframe { width: 100%; height: 100%; border: none; display: block; }
+</style>
+</head>
+<body>
+<div class="v2-ee-shell">
+  <nav class="v2-ee-nav">
+    <a href="index.html" class="v2-ee-logo">Progress</a>
+    <div class="v2-ee-sep"></div>
+    <span class="v2-ee-nav-title">Email Editor</span>
+    <span class="v2-ee-badge">admin</span>
+    <div class="v2-ee-spacer"></div>
+    <a href="admin.html" class="v2-ee-home">← Admin</a>
+  </nav>
+  <div class="v2-ee-iframe-wrap">
+    <iframe
+      src="../email-editor.html"
+      class="v2-ee-iframe"
+      id="eeFrame"
+      title="Email Editor"
+      sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals"
+    ></iframe>
+  </div>
+</div>
+</body>
+</html>

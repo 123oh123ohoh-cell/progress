@@ -36,6 +36,18 @@
   const username = params.get('username');
   const root = document.getElementById('publicProfile');
 
+  function formatLastActive(ts) {
+    const diff = Date.now() - new Date(ts).getTime();
+    const mins  = Math.floor(diff / 60_000);
+    const hours = Math.floor(diff / 3_600_000);
+    const days  = Math.floor(diff / 86_400_000);
+    if (mins < 2)    return "active just now";
+    if (mins < 60)   return `active ${mins}m ago`;
+    if (hours < 24)  return `active ${hours}h ago`;
+    if (days === 1)  return "active yesterday";
+    return `active ${days}d ago`;
+  }
+
   function renderPublicProfile(user) {
     if (user && user.loading) {
       root.innerHTML = bootingUpHTML({ title: "Waking up the server…", padding: "80px 20px" });
@@ -77,11 +89,12 @@
             <span>${user.name}${renderDisplayBadge(user)}</span>
           </div>
           <div style="color:var(--muted); font-size:13.5px; margin-bottom:10px;">@${user.username}</div>
-          <div style="display:flex; gap:18px; color:var(--muted); font-size:14px; margin-bottom:10px;">
+          <div style="display:flex; gap:18px; color:var(--muted); font-size:14px; margin-bottom:10px; flex-wrap:wrap;">
             <span id="followerCount">${user.followers.length} followers</span>
             <span>${user.following.length} following</span>
             <span>Joined ${Progress.formatDate(user.joined)}</span>
             ${user.streak > 0 ? `<span title="${user.streak}-day login streak">🔥 ${user.streak}</span>` : ""}
+            ${user.lastActive ? `<span class="last-active-pill" title="Only visible to mutual follows">${formatLastActive(user.lastActive)}</span>` : ""}
           </div>
           ${viewer && !isOwnProfile ? `<button type="button" class="upload-btn ${Progress.isFollowing(user.username) ? "following" : ""}" id="followBtn">${Progress.isFollowing(user.username) ? "Following" : "Follow"}</button>` : ""}
           <div id="profileNowPlayingIndicator" class="profile-now-playing-indicator" style="display:none;"></div>

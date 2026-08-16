@@ -1,0 +1,1769 @@
+extends layout
+
+block title
+	| Email Editor — Progress
+
+block meta
+	//- no OG meta
+
+block head
+	style.
+		
+		* { box-sizing: border-box; }
+		
+		/* Full-screen layout */
+		html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; font-family: Inter, sans-serif; }
+		#app { display: flex; flex-direction: column; height: 100vh; background: #F0E8DC; }
+		
+		/* ── Top Bar ── */
+		#topBar {
+		  height: 52px; background: #1C1714; display: flex; align-items: center;
+		  padding: 0 12px; gap: 10px; flex-shrink: 0; z-index: 100;
+		  border-bottom: 1px solid #2a2220;
+		}
+		.tb-logo { font-family: Georgia,'Times New Roman',serif; font-style: italic; font-size: 18px; color: #DEC9AE; letter-spacing: .01em; white-space: nowrap; margin-right: 4px; }
+		.tb-sep { width: 1px; height: 24px; background: #3a3230; flex-shrink: 0; margin: 0 4px; }
+		#projectNameWrap { display: flex; align-items: center; gap: 4px; min-width: 0; }
+		#projectName {
+		  background: none; border: none; color: #f0e8de; font-size: 14px; font-weight: 600;
+		  font-family: Inter,sans-serif; padding: 4px 8px; border-radius: 6px;
+		  max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+		  cursor: pointer; transition: background .15s;
+		}
+		#projectName:hover, #projectName:focus { background: #2a2220; outline: none; }
+		#saveStatus { font-size: 11px; color: #7a6a58; white-space: nowrap; }
+		#saveStatus.saving { color: #A07858; }
+		#saveStatus.saved  { color: #6B7F6E; }
+		#saveStatus.conflict { color: #E07070; }
+		
+		.tb-btn {
+		  height: 32px; padding: 0 12px; border-radius: 7px; border: none; cursor: pointer;
+		  font-size: 13px; font-weight: 600; font-family: Inter,sans-serif;
+		  display: flex; align-items: center; gap: 5px; white-space: nowrap;
+		  transition: background .12s, opacity .12s;
+		}
+		.tb-btn-ghost { background: transparent; color: #b0a090; }
+		.tb-btn-ghost:hover { background: #2a2220; color: #f0e8de; }
+		.tb-btn-ghost:disabled { opacity: .3; cursor: default; }
+		.tb-btn-primary { background: #A07858; color: #fff; }
+		.tb-btn-primary:hover { background: #B08868; }
+		.tb-btn-send { background: #3B2518; color: #DEC9AE; }
+		.tb-btn-send:hover { background: #4a3020; }
+		.tb-spacer { flex: 1; }
+		
+		/* Zoom control */
+		#zoomControl { display: flex; align-items: center; gap: 4px; }
+		.zoom-btn { width: 26px; height: 26px; border-radius: 5px; border: 1px solid #3a3230; background: none; color: #b0a090; cursor: pointer; font-size: 15px; display: flex; align-items: center; justify-content: center; transition: background .12s; }
+		.zoom-btn:hover { background: #2a2220; color: #fff; }
+		#zoomPct { font-size: 12px; color: #b0a090; min-width: 38px; text-align: center; font-family: var(--font-mono,monospace); }
+		
+		/* Collaborators */
+		#collabAvatars { display: flex; align-items: center; gap: -4px; padding: 0 4px; }
+		.collab-avatar {
+		  width: 28px; height: 28px; border-radius: 50%; border: 2px solid #1C1714;
+		  display: flex; align-items: center; justify-content: center;
+		  font-size: 10px; font-weight: 700; color: #fff; margin-left: -6px;
+		  cursor: default; position: relative; transition: transform .15s;
+		}
+		.collab-avatar:first-child { margin-left: 0; }
+		.collab-avatar:hover { transform: translateY(-2px); z-index: 10; }
+		.collab-avatar .ca-tip {
+		  position: absolute; bottom: -26px; left: 50%; transform: translateX(-50%);
+		  background: #1C1714; color: #f0e8de; font-size: 10px; padding: 2px 7px;
+		  border-radius: 5px; white-space: nowrap; pointer-events: none; opacity: 0;
+		  transition: opacity .15s; z-index: 20;
+		}
+		.collab-avatar:hover .ca-tip { opacity: 1; }
+		
+		/* ── Main layout ── */
+		#main { display: flex; flex: 1; min-height: 0; }
+		
+		/* Left panel */
+		#leftPanel {
+		  width: 220px; flex-shrink: 0; background: #211D1A; display: flex; flex-direction: column;
+		  border-right: 1px solid #2a2220; overflow: hidden;
+		}
+		.lp-tabs { display: flex; border-bottom: 1px solid #2a2220; }
+		.lp-tab {
+		  flex: 1; padding: 11px 6px; font-size: 10px; font-weight: 700; letter-spacing: .08em;
+		  text-transform: uppercase; background: none; border: none; color: #5a4a38;
+		  cursor: pointer; border-bottom: 2px solid transparent; transition: color .15s, border-color .15s;
+		}
+		.lp-tab.active { color: #DEC9AE; border-bottom-color: #A07858; }
+		.lp-body { flex: 1; overflow-y: auto; padding: 12px 10px; }
+		.lp-body::-webkit-scrollbar { width: 3px; }
+		.lp-body::-webkit-scrollbar-thumb { background: #3a3228; border-radius: 4px; }
+		
+		.pal-section { margin-bottom: 18px; }
+		.pal-title { font-size: 10px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: #5a4a38; margin: 0 0 8px; }
+		.pal-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; }
+		.pal-item {
+		  background: #2a2420; border: 1px solid #3a3228; border-radius: 8px;
+		  padding: 10px 3px 8px; text-align: center; cursor: pointer; font-size: 10px;
+		  color: #9a8878; transition: all .12s; user-select: none;
+		  display: flex; flex-direction: column; align-items: center; gap: 3px;
+		}
+		.pal-item:hover { background: #382e28; border-color: #A07858; color: #f0e8de; transform: translateY(-1px); }
+		.pal-item:active { transform: translateY(0); }
+		.pal-icon { font-size: 16px; line-height: 1; }
+		
+		.col-opts { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+		.col-opt {
+		  background: #2a2420; border: 1px solid #3a3228; border-radius: 7px;
+		  padding: 7px 5px; cursor: pointer; display: flex; gap: 3px; height: 32px;
+		  align-items: center; transition: border-color .12s;
+		}
+		.col-opt:hover { border-color: #A07858; }
+		.col-c { background: #4a3e34; border-radius: 3px; flex: 1; height: 100%; }
+		
+		.tmpl-card {
+		  background: #2a2420; border: 1px solid #3a3228; border-radius: 9px;
+		  padding: 10px 12px; cursor: pointer; margin-bottom: 5px;
+		  transition: border-color .12s, background .12s;
+		}
+		.tmpl-card:hover { border-color: #A07858; background: #33291f; }
+		.tmpl-name { font-size: 12px; font-weight: 600; color: #c8b8a8; margin-bottom: 2px; }
+		.tmpl-desc { font-size: 10px; color: #5a4a38; }
+		
+		/* Center canvas */
+		#canvasWrap {
+		  flex: 1; overflow: auto; display: flex; align-items: flex-start; justify-content: center;
+		  padding: 32px 24px 60px; position: relative; min-width: 0;
+		}
+		#canvasWrap::-webkit-scrollbar { width: 8px; height: 8px; }
+		#canvasWrap::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
+		#emailCanvas {
+		  background: #FAF5EE; border-radius: 16px;
+		  box-shadow: 0 8px 40px rgba(59,37,24,.18), 0 2px 8px rgba(59,37,24,.08);
+		  width: 560px; min-height: 600px; flex-shrink: 0;
+		  transform-origin: top center; transition: transform .2s ease;
+		  position: relative;
+		}
+		
+		/* Canvas brand header */
+		.ec-header {
+		  padding: 28px 32px 18px; border-bottom: 1px solid #EAD9C4;
+		  display: flex; align-items: flex-end; gap: 8px; justify-content: center;
+		}
+		.ec-brand { font-family: Georgia,'Times New Roman',serif; font-style: italic; font-size: 26px; color: #3B2518; }
+		.ec-brand-sub { font-family: Georgia,serif; font-size: 9px; color: #B89A78; letter-spacing: .32em; text-transform: uppercase; margin-top: 6px; }
+		.ec-header img { width: 46px; height: 46px; object-fit: contain; }
+		
+		/* Sticker area */
+		.ec-sticker { text-align: center; padding: 20px 0 4px; display: none; }
+		.ec-sticker img { width: 72px; height: 72px; object-fit: contain; }
+		.ec-sticker .dividers { font-family: Georgia,serif; font-size: 13px; color: #CDB99A; letter-spacing: .3em; margin-top: 10px; }
+		
+		/* Headline area */
+		.ec-headline { padding: 16px 44px 8px; text-align: center; }
+		.ec-headline h1 { font-family: Georgia,'Times New Roman',serif; font-style: italic; font-size: 22px; color: #3B2518; margin: 0; font-weight: bold; line-height: 1.3; }
+		.ec-headline h1[contenteditable]:focus { outline: 2px solid #A07858; outline-offset: 2px; border-radius: 4px; }
+		
+		/* Botanical */
+		.ec-botanical { text-align: center; padding: 4px 44px 18px; font-family: Georgia,serif; font-size: 13px; color: #D4BBA0; letter-spacing: .36em; }
+		
+		/* Blocks area */
+		.ec-blocks { padding: 0 32px 8px; }
+		.ec-empty {
+		  margin: 12px 0; padding: 32px 20px; text-align: center;
+		  color: #C4A882; font-family: Georgia,serif; font-size: 14px;
+		  border: 2px dashed #DDD0C0; border-radius: 10px;
+		}
+		
+		/* Canvas block wrapper */
+		.ec-block {
+		  position: relative; border-radius: 6px; margin-bottom: 2px;
+		  border: 2px solid transparent; cursor: pointer; transition: border-color .12s;
+		}
+		.ec-block:hover { border-color: rgba(160,120,88,.3); }
+		.ec-block.selected { border-color: #A07858; }
+		.ec-block.drag-over-top::before { content: ''; position: absolute; top: -3px; left: 0; right: 0; height: 4px; background: #A07858; border-radius: 4px; z-index: 10; }
+		.ec-block.drag-over-bot::after  { content: ''; position: absolute; bottom: -3px; left: 0; right: 0; height: 4px; background: #A07858; border-radius: 4px; z-index: 10; }
+		
+		/* Drag handle */
+		.ec-drag-handle {
+		  position: absolute; left: -22px; top: 50%; transform: translateY(-50%);
+		  width: 16px; height: 28px; background: #A07858; border-radius: 4px;
+		  display: none; align-items: center; justify-content: center;
+		  cursor: grab; color: #fff; font-size: 9px; letter-spacing: -.5px; z-index: 5;
+		}
+		.ec-block:hover .ec-drag-handle, .ec-block.selected .ec-drag-handle { display: flex; }
+		
+		/* Block quick-actions */
+		.ec-block-actions {
+		  position: absolute; top: -1px; right: -1px;
+		  background: #A07858; border-radius: 0 4px 0 7px;
+		  display: none; z-index: 5;
+		}
+		.ec-block:hover .ec-block-actions, .ec-block.selected .ec-block-actions { display: flex; }
+		.ec-act {
+		  width: 22px; height: 22px; border: none; background: none; color: #fff;
+		  font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+		  padding: 0;
+		}
+		.ec-act:hover { background: rgba(0,0,0,.2); }
+		
+		/* Block renderings */
+		.b-text { padding: 6px 0; font-family: Georgia,'Times New Roman',serif; color: #4A3728; line-height: 1.85; }
+		.b-text[contenteditable=true]:focus { outline: none; }
+		.b-html { padding: 4px 0; font-size: 13px; color: #4A3728; }
+		.b-image { padding: 6px 0; text-align: center; }
+		.b-image img { max-width: 100%; border-radius: 4px; }
+		.b-img-ph { background: #EDE4D8; border-radius: 8px; height: 110px; display: flex; align-items: center; justify-content: center; color: #B89A78; font-size: 13px; font-family: Georgia,serif; }
+		.b-button { padding: 6px 0; }
+		.b-btn-inner { display: inline-block; padding: 12px 36px; border-radius: 100px; font-family: Georgia,serif; font-size: 13px; font-weight: bold; color: #FAF5EE; letter-spacing: .08em; cursor: default; }
+		.b-divider { padding: 6px 0; }
+		.b-divider hr { border: none; margin: 0; }
+		.b-spacer { display: flex; align-items: center; justify-content: center; font-size: 9px; color: #C4A882; font-family: monospace; letter-spacing: .04em; }
+		.b-2col { padding: 6px 0; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+		.b-3col { padding: 6px 0; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+		.b-col-cell { background: #F0E8DC; border-radius: 6px; padding: 8px; font-family: Georgia,serif; font-size: 12px; color: #6A5040; min-height: 48px; line-height: 1.55; }
+		.b-col-cell[contenteditable=true]:focus { outline: none; background: #EAE0D4; }
+		
+		/* Canvas footer */
+		.ec-footer { padding: 16px 44px 28px; border-top: 1px solid #EAD9C4; margin-top: 8px; text-align: center; }
+		.ec-footer p { font-family: Georgia,serif; font-size: 11px; font-style: italic; color: #B89A78; margin: 0 0 4px; }
+		.ec-footer small { font-family: Georgia,serif; font-size: 10px; color: #C9AE92; }
+		
+		/* Right properties panel */
+		#rightPanel {
+		  width: 268px; flex-shrink: 0; background: #FAF8F5; border-left: 1px solid var(--mocha-light,#DEC9AE);
+		  display: flex; flex-direction: column; overflow: hidden;
+		  transition: width .2s ease;
+		}
+		.rp-header {
+		  padding: 12px 14px; border-bottom: 1px solid var(--mocha-light,#DEC9AE);
+		  display: flex; align-items: center; justify-content: space-between;
+		}
+		.rp-title { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted,#8a7060); }
+		.rp-close { background: none; border: none; color: var(--muted,#8a7060); cursor: pointer; font-size: 16px; padding: 0 2px; line-height: 1; }
+		.rp-body { flex: 1; overflow-y: auto; padding: 14px; }
+		.rp-body::-webkit-scrollbar { width: 4px; }
+		.rp-body::-webkit-scrollbar-thumb { background: #DEC9AE; border-radius: 4px; }
+		
+		.rp-group { margin-bottom: 16px; }
+		.rp-label { font-size: 10px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--muted,#8a7060); margin-bottom: 6px; display: block; }
+		.rp-input, .rp-select, .rp-ta {
+		  width: 100%; padding: 8px 10px; border: 1px solid var(--mocha-light,#DEC9AE);
+		  border-radius: 7px; font-size: 13px; background: var(--paper,#FFF8EF); color: var(--ink,#2A1F14);
+		  font-family: Inter,sans-serif;
+		}
+		.rp-ta { min-height: 80px; resize: vertical; line-height: 1.5; }
+		.rp-input:focus, .rp-select:focus, .rp-ta:focus { outline: none; border-color: #A07858; }
+		.rp-select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; padding-right: 24px; }
+		.rp-color-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+		.rp-chip { width: 24px; height: 24px; border-radius: 50%; cursor: pointer; border: 3px solid transparent; transition: border-color .12s; flex-shrink: 0; }
+		.rp-chip.sel { border-color: #3B2518; }
+		.rp-hint { font-size: 11px; color: var(--muted,#8a7060); margin-top: 4px; line-height: 1.4; }
+		.rp-sep { border: none; border-top: 1px solid var(--mocha-light,#DEC9AE); margin: 14px 0; }
+		
+		.emo-grid-light { display: flex; flex-wrap: wrap; gap: 4px; }
+		.emo-btn-light {
+		  width: 36px; height: 36px; border-radius: 7px; background: var(--mocha-wash,#F5EDE0);
+		  border: 2px solid transparent; cursor: pointer; padding: 2px;
+		  display: flex; align-items: center; justify-content: center;
+		  transition: border-color .12s, background .12s;
+		}
+		.emo-btn-light img { width: 28px; height: 28px; object-fit: contain; }
+		.emo-btn-light:hover { background: var(--mocha-light,#DEC9AE); }
+		.emo-btn-light.sel { border-color: #A07858; }
+		.emo-none-l { font-size: 14px; color: var(--muted,#8a7060); }
+		
+		/* Send modal overlay */
+		#sendModal {
+		  display: none; position: fixed; inset: 0; z-index: 1000;
+		  background: rgba(28,23,20,.55); backdrop-filter: blur(6px);
+		  align-items: center; justify-content: center;
+		}
+		#sendModal.show { display: flex; }
+		.send-modal-inner {
+		  background: var(--paper,#FFF8EF); border-radius: 18px;
+		  box-shadow: 0 24px 80px rgba(0,0,0,.25); padding: 32px 32px 28px;
+		  max-width: 440px; width: 90%; display: flex; flex-direction: column; gap: 14px;
+		}
+		.send-modal-inner h2 { font-family: var(--font-display,Georgia); font-size: 22px; margin: 0; }
+		.send-modal-row { display: flex; gap: 10px; flex-wrap: wrap; }
+		.send-modal-row > * { flex: 1; min-width: 140px; }
+		.sm-input, .sm-select {
+		  width: 100%; padding: 10px 12px; border: 1px solid var(--mocha-light,#DEC9AE);
+		  border-radius: 8px; font-size: 14px; background: var(--paper,#FFF8EF); color: var(--ink,#2A1F14);
+		  font-family: Inter,sans-serif;
+		}
+		.sm-input:focus, .sm-select:focus { outline: none; border-color: #A07858; }
+		.send-modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 4px; }
+		.sm-btn-cancel { padding: 10px 20px; border-radius: 9px; border: 1px solid var(--mocha-light,#DEC9AE); background: none; color: var(--ink,#2A1F14); font-size: 14px; font-weight: 600; cursor: pointer; }
+		.sm-btn-send { padding: 10px 28px; border-radius: 9px; border: none; background: #3B2518; color: #DEC9AE; font-size: 14px; font-weight: 600; cursor: pointer; transition: background .15s; }
+		.sm-btn-send:hover { background: #4a3020; }
+		.sm-status { font-size: 13px; color: var(--muted,#8a7060); text-align: center; }
+		
+		/* Preview modal */
+		#previewModal {
+		  display: none; position: fixed; inset: 0; z-index: 1000;
+		  background: rgba(28,23,20,.65); backdrop-filter: blur(6px);
+		  align-items: center; justify-content: center;
+		}
+		#previewModal.show { display: flex; }
+		.preview-modal-inner {
+		  background: #fff; border-radius: 16px; overflow: hidden;
+		  width: 640px; height: 88vh; max-width: 96vw;
+		  display: flex; flex-direction: column;
+		  box-shadow: 0 24px 80px rgba(0,0,0,.3);
+		}
+		.preview-modal-bar { padding: 14px 18px; background: #1C1714; display: flex; align-items: center; justify-content: space-between; }
+		.preview-modal-bar span { color: #DEC9AE; font-size: 14px; font-weight: 600; }
+		.preview-modal-bar button { background: none; border: 1px solid #3a3230; color: #b0a090; border-radius: 6px; padding: 5px 14px; cursor: pointer; font-size: 13px; }
+		#previewFrame { flex: 1; border: none; width: 100%; }
+		
+		/* Keyboard shortcut hint */
+		.kb-hint { font-size: 10px; color: var(--muted,#8a7060); font-family: monospace; background: var(--mocha-wash,#F5EDE0); padding: 1px 5px; border-radius: 4px; }
+		
+		/* ── Format Toolbar ── */
+		#formatBar {
+		  background: #FAF5EE; border-bottom: 1px solid #E0D4C4;
+		  padding: 4px 12px; display: flex; align-items: center; gap: 2px;
+		  flex-shrink: 0; flex-wrap: wrap; min-height: 38px; z-index: 50;
+		  transition: opacity .15s;
+		}
+		#formatBar.inactive { opacity: .35; pointer-events: none; }
+		.fmt-sep { width: 1px; height: 20px; background: #D4C4B4; margin: 0 4px; flex-shrink: 0; }
+		.fmt-btn {
+		  height: 28px; min-width: 28px; padding: 0 6px; border: none;
+		  background: none; border-radius: 5px; cursor: pointer;
+		  font-size: 13px; font-weight: 600; color: #5A4030;
+		  display: flex; align-items: center; justify-content: center;
+		  gap: 3px; white-space: nowrap; transition: background .1s, color .1s;
+		}
+		.fmt-btn:hover { background: #EAD9C4; color: #2A1F14; }
+		.fmt-btn.active { background: #A07858; color: #fff; }
+		.fmt-select {
+		  height: 28px; padding: 0 6px; border: 1px solid #D4C4B4; border-radius: 5px;
+		  background: #FAF5EE; color: #5A4030; font-size: 12px; cursor: pointer;
+		  font-family: Inter,sans-serif;
+		}
+		.fmt-select:focus { outline: none; border-color: #A07858; }
+		.fmt-color-btn { width: 28px; height: 28px; border-radius: 5px; border: 1.5px solid #D4C4B4; cursor: pointer; padding: 2px; background: none; display: flex; align-items: center; justify-content: center; }
+		.fmt-color-btn:hover { border-color: #A07858; }
+		.fmt-color-swatch { width: 18px; height: 18px; border-radius: 3px; pointer-events: none; }
+		
+		/* Collaborator block tag */
+		.ec-block-collab-tag {
+		  position: absolute; top: -11px; left: 6px;
+		  font-size: 9px; font-weight: 700; padding: 2px 7px;
+		  border-radius: 4px; z-index: 20; pointer-events: none;
+		  white-space: nowrap; color: #fff; line-height: 1.4;
+		}
+		.ec-block-collab-ring { box-shadow: 0 0 0 2px; }
+		
+		/* Block note badge */
+		.ec-block-note-badge {
+		  position: absolute; top: -10px; right: 28px; background: #FEF3C7;
+		  border: 1px solid #FDE68A; border-radius: 4px; font-size: 9px;
+		  padding: 1px 6px; color: #92400E; z-index: 6; pointer-events: none;
+		  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+		  max-width: 120px;
+		}
+		
+		/* Quote block */
+		.b-quote {
+		  padding: 8px 16px; border-left: 4px solid #A07858;
+		  background: rgba(160,120,88,.06); border-radius: 0 6px 6px 0; margin: 4px 0;
+		}
+		.b-quote-text { font-family: Georgia,'Times New Roman',serif; font-style: italic; font-size: 16px; color: #4A3728; line-height: 1.7; }
+		.b-quote-attr { font-size: 11px; color: #9a7a60; margin-top: 5px; font-family: Georgia,serif; }
+		
+		/* Activity feed in right panel */
+		.activity-feed { margin-top: 8px; }
+		.activity-item {
+		  display: flex; align-items: flex-start; gap: 7px;
+		  padding: 6px 0; border-bottom: 1px solid rgba(0,0,0,.06);
+		  font-size: 11px; color: #6A5040;
+		}
+		.activity-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 3px; }
+		.activity-time { font-size: 10px; color: #aaa; white-space: nowrap; }
+		
+		/* Conflict modal */
+		#conflictModal {
+		  display: none; position: fixed; inset: 0; z-index: 2000;
+		  background: rgba(28,23,20,.6); backdrop-filter: blur(4px);
+		  align-items: center; justify-content: center;
+		}
+		#conflictModal.show { display: flex; }
+		.conflict-modal-inner {
+		  background: #FAF5EE; border-radius: 18px; padding: 28px 30px;
+		  max-width: 400px; width: 90%;
+		  box-shadow: 0 24px 80px rgba(0,0,0,.3);
+		}
+		.conflict-modal-inner h3 { margin: 0 0 10px; font-family: Georgia,serif; color: #3B2518; font-size: 18px; }
+		.conflict-modal-inner p  { margin: 0 0 20px; font-size: 13px; color: #6A5040; line-height: 1.5; }
+		.conflict-actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
+		.conflict-btn-mine { padding: 9px 18px; border-radius: 8px; border: 1px solid #DEC9AE; background: none; color: #3B2518; font-size: 13px; font-weight: 600; cursor: pointer; }
+		.conflict-btn-server { padding: 9px 18px; border-radius: 8px; border: none; background: #A07858; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; }
+		.conflict-btn-server:hover { background: #B08868; }
+		
+		/* Word count badge */
+		#wordCount { font-size: 10px; color: #5a4a38; font-family: monospace; padding: 2px 7px; background: #2a2220; border-radius: 5px; white-space: nowrap; }
+		
+		/* Collab panel header in right panel */
+		#rpCollabBar {
+		  padding: 7px 14px; border-bottom: 1px solid var(--mocha-light,#DEC9AE);
+		  background: #F5EDE0; display: none; align-items: center; gap: 6px; flex-wrap: wrap;
+		}
+		#rpCollabBar.has-others { display: flex; }
+		.rp-collab-chip {
+		  font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px;
+		  color: #fff; white-space: nowrap;
+		}
+		
+		/* ── Responsive ── */
+		@media (max-width: 900px) {
+		  #leftPanel { width: 180px; }
+		  #rightPanel { width: 220px; }
+		  .pal-grid { grid-template-columns: 1fr 1fr; }
+		}
+		@media (max-width: 700px) {
+		  #leftPanel { display: none; }
+		  #rightPanel { width: 200px; }
+		  #emailCanvas { width: 100%; min-width: 320px; }
+		  #canvasWrap { padding: 12px 8px 40px; }
+		  #topBar { padding: 0 8px; gap: 6px; }
+		  .tb-logo { display: none; }
+		  .tb-sep:not(:last-of-type) { display: none; }
+		  #zoomControl { display: none; }
+		  #projectName { max-width: 120px; }
+		}
+		@media (max-width: 480px) {
+		  #rightPanel { display: none; }
+		  .tb-btn span { display: none; }
+		}
+
+block content
+	#app
+		//  ── Top Bar ── 
+		#topBar
+			a.tb-btn.tb-btn-ghost(href='admin-emails.html' style='text-decoration:none;') ← Back
+			.tb-logo progress.
+			.tb-sep
+			#projectNameWrap
+				input#projectName(type='text' value='Untitled email' maxlength='100' spellcheck='false' title='Click to rename')
+				span#saveStatus —
+			.tb-sep
+			//  Undo/Redo 
+			button.tb-btn.tb-btn-ghost#undoBtn(title='Undo (Ctrl+Z)' disabled) ↩ Undo
+			button.tb-btn.tb-btn-ghost#redoBtn(title='Redo (Ctrl+Y)' disabled) ↪ Redo
+			.tb-sep
+			//  Zoom 
+			#zoomControl
+				button.zoom-btn#zoomOut(title='Zoom out') −
+				span#zoomPct 100%
+				button.zoom-btn#zoomIn(title='Zoom in') +
+			.tb-sep
+			//  Save 
+			button.tb-btn.tb-btn-primary#saveBtn(title='Save (Ctrl+S)') 💾 Save
+			.tb-spacer
+			//  Word count 
+			span#wordCount 0 words
+			//  Collaborators 
+			#collabAvatars
+			.tb-sep
+			button.tb-btn.tb-btn-ghost#previewBtn 👁 Preview
+			button.tb-btn.tb-btn-send#sendBtn Send ✉
+		//  ── Format Bar ── 
+		#formatBar.inactive
+			//  Font family 
+			select.fmt-select#fmtFont(title='Font family')
+				option(value='Georgia,\'Times New Roman\',serif') Georgia
+				option(value='Inter,sans-serif') Inter
+				option(value='\'IBM Plex Mono\',monospace') Mono
+			//  Font size 
+			select.fmt-select#fmtSize(title='Font size' style='width:62px;')
+				option(value='12') 12
+				option(value='13') 13
+				option(value='15' selected) 15
+				option(value='17') 17
+				option(value='18') 18
+				option(value='20') 20
+				option(value='22') 22
+				option(value='26') 26
+				option(value='32') 32
+			.fmt-sep
+			//  Bold / Italic / Underline 
+			button.fmt-btn#fmtBold(title='Bold (Ctrl+B)')
+				strong B
+			button.fmt-btn#fmtItalic(title='Italic (Ctrl+I)')
+				em I
+			button.fmt-btn#fmtUnderline(title='Underline (Ctrl+U)')
+				u U
+			.fmt-sep
+			//  Alignment 
+			button.fmt-btn#fmtLeft(title='Align left' data-align='left') ⬛◻◻
+			button.fmt-btn#fmtCenter(title='Align center' data-align='center') ◻⬛◻
+			button.fmt-btn#fmtRight(title='Align right' data-align='right') ◻◻⬛
+			.fmt-sep
+			//  Text color 
+			button.fmt-color-btn#fmtColorBtn(title='Text color')
+				span.fmt-color-swatch#fmtColorSwatch(style='background:#4A3728;')
+			input#fmtColorPicker(type='color' value='#4A3728' style='position:absolute;opacity:0;width:0;height:0;pointer-events:none;')
+			.fmt-sep
+			//  Line height 
+			select.fmt-select#fmtLineH(title='Line height' style='width:64px;')
+				option(value='1.4') 1.4×
+				option(value='1.6') 1.6×
+				option(value='1.85' selected) 1.85×
+				option(value='2.1') 2.1×
+				option(value='2.4') 2.4×
+			.fmt-sep
+			//  Letter spacing 
+			select.fmt-select#fmtLetterSpacing(title='Letter spacing' style='width:66px;')
+				option(value='0') Normal
+				option(value='0.03em') Wide
+				option(value='0.08em') Wider
+				option(value='0.15em') Widest
+		//  ── Main ── 
+		#main
+			//  Left panel 
+			#leftPanel
+				.lp-tabs
+					button.lp-tab.active(data-lp='blocks') BLOCKS
+					button.lp-tab(data-lp='templates') TEMPLATES
+				.lp-body#lpBlocks
+					.pal-section
+						.pal-title Content
+						.pal-grid
+							.pal-item(data-add='text')
+								span.pal-icon T
+								| Text
+							.pal-item(data-add='html')
+								span.pal-icon </>
+								| HTML
+							.pal-item(data-add='image')
+								span.pal-icon 🖼
+								| Image
+							.pal-item(data-add='button')
+								span.pal-icon □
+								| Button
+							.pal-item(data-add='quote')
+								span.pal-icon ❝
+								| Quote
+							.pal-item(data-add='divider')
+								span.pal-icon —
+								| Divider
+							.pal-item(data-add='spacer')
+								span.pal-icon ↕
+								| Spacer
+					.pal-section
+						.pal-title Columns
+						.col-opts
+							.col-opt(data-add='2col' title='Two columns')
+								.col-c
+								.col-c
+							.col-opt(data-add='3col' title='Three columns')
+								.col-c
+								.col-c
+								.col-c
+				.lp-body#lpTemplates(style='display:none;')
+					.pal-section
+						.pal-title Start from template
+						.tmpl-card(data-tmpl='announcement')
+							.tmpl-name 📢 Announcement
+							.tmpl-desc Big news with CTA button
+						.tmpl-card(data-tmpl='update')
+							.tmpl-name 📝 Update
+							.tmpl-desc Friendly team update
+						.tmpl-card(data-tmpl='image-text')
+							.tmpl-name 🖼 Visual story
+							.tmpl-desc Image followed by text
+						.tmpl-card(data-tmpl='newsletter')
+							.tmpl-name 📰 Newsletter
+							.tmpl-desc Intro + 2-col highlights
+						.tmpl-card(data-tmpl='welcome')
+							.tmpl-name 👋 Welcome
+							.tmpl-desc Warm welcome email
+						.tmpl-card(data-tmpl='digest')
+							.tmpl-name 📊 Digest
+							.tmpl-desc Weekly stats recap
+			//  Canvas area 
+			#canvasWrap
+				#emailCanvas
+					//  Brand header 
+					.ec-header
+						div
+							.ec-brand progress.
+							.ec-brand-sub a writing community  ✿
+						img(src='/images/nearheader.png' alt)
+					//  Sticker 
+					.ec-sticker#ecSticker
+						img#ecStickerImg(src alt)
+						.dividers ✦    ✦    ✦
+					//  Subject headline 
+					.ec-headline
+						h1#ecHeadline(contenteditable='true' data-placeholder='Email subject line…' spellcheck='false') Email subject line…
+					//  Botanical 
+					.ec-botanical ✿     ✿     ✿
+					//  Blocks 
+					.ec-blocks#ecBlocks
+						.ec-empty#ecEmpty
+							p(style='margin:0 0 6px;font-size:20px;') ✉️
+							p(style='margin:0;') Click blocks on the left to start building
+					//  Footer 
+					.ec-footer
+						p#ecFooterText until next time — progress ✿
+						small email preferences · progressing.online
+			//  Right properties panel 
+			#rightPanel
+				.rp-header
+					span.rp-title#rpTitle Email Settings
+					button.rp-close#rpClose(title='Close panel' style='display:none;') ✕
+				//  Live collaborator bar 
+				#rpCollabBar
+				.rp-body#rpBody
+					//  Filled dynamically 
+	//  Send modal 
+	#sendModal
+		.send-modal-inner
+			h2 Send email
+			.send-modal-row
+				div
+					label(style='font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px;') TO
+					select.sm-select#smRecipient
+						option(value='all') All subscribers
+						option(value='specific') Specific user
+				#smUserWrap(style='display:none;')
+					label(style='font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px;') USERNAME
+					input.sm-input#smUsername(type='text' placeholder='@username')
+			.sm-status#smStatus
+			.send-modal-actions
+				button.sm-btn-cancel#smCancel Cancel
+				button.sm-btn-send#smSend Send email ✉
+	//  Conflict modal 
+	#conflictModal
+		.conflict-modal-inner
+			h3 ✦ Editing conflict
+			p#conflictMsg Someone else saved changes while you were editing. Choose which version to keep.
+			.conflict-actions
+				button.conflict-btn-mine#conflictKeepMine Keep my version
+				button.conflict-btn-server#conflictAcceptServer Use server version
+	//  Preview modal 
+	#previewModal
+		.preview-modal-inner
+			.preview-modal-bar
+				span Email preview
+				button#previewClose Close ✕
+			iframe#previewFrame(title='Email preview')
+	
+
+block scripts
+		script.
+			
+			// ── Constants ─────────────────────────────────────────────────────────────────
+			const SITE = "https://progressing.online";
+			const EMOTICONS = [
+			  "asleep_couch","backpack","banana","banana_hello","bee","bored",
+			  "charles","computer","computer2","computersupport","construction",
+			  "cow","dead","dexterity","dolphinhead","fishhead","hamster","hi","jason",
+			  "kiss","lion","mwa","pancake","penguin","poodle","raincoat","raindeer",
+			  "romantic","shark","shark2","sharkcat","squish","squuish",
+			  "starbucks","turtle_lazy","two","windy","wonder"
+			];
+			const ACCENT_PRESETS = ["#8C6E58","#6B7F6E","#7B6B9A","#C47C5A","#4A7C9E","#2E6B4A","#9E5A5A","#333333"];
+			const EMAIL_ROLES = new Set(["owner","moderator","analyst","email_writer"]);
+			const OWNER_USERNAMES = new Set(["mara","own","progresstesting1"]);
+			
+			// ── State ─────────────────────────────────────────────────────────────────────
+			let _projectId = null;
+			let _version = 0;
+			let _blocks = [];
+			let _selId = null;
+			let _nextId = 1;
+			let _emoticon = "penguin";
+			let _accent = "#8C6E58";
+			let _footerTagline = "until next time";
+			let _zoom = 1;
+			let _history = [];
+			let _historyIdx = -1;
+			let _dirty = false;
+			let _saving = false;
+			let _myColor = ACCENT_PRESETS[Math.floor(Math.random() * ACCENT_PRESETS.length)];
+			let _heartbeatInterval = null;
+			let _syncInterval = null;
+			let _dragSrcId = null;
+			
+			// ── Auth ──────────────────────────────────────────────────────────────────────
+			function isAuthed() {
+			  const u = Progress.getCurrentUser?.();
+			  if (!u) return false;
+			  if (OWNER_USERNAMES.has(u.username)) return true;
+			  return EMAIL_ROLES.has(u.adminRole);
+			}
+			
+			// ── Startup ───────────────────────────────────────────────────────────────────
+			async function start() {
+			  initShell?.("editor");
+			  await Progress.loadFromApi().catch(() => {});
+			
+			  if (!isAuthed()) {
+			    document.getElementById("app").innerHTML = `<div style="text-align:center;padding:80px 20px;font-family:Georgia,serif;color:#4A3728;"><h2>Access denied</h2><p style="color:#8a7060;font-size:15px;">You need the <strong>email_writer</strong> role to access this page.</p><a href="/" style="color:#A07858;">← Back to Progress</a></div>`;
+			    return;
+			  }
+			
+			  const params = new URLSearchParams(location.search);
+			  if (params.get("new")) {
+			    // Create new project
+			    const r = await apiFetch("/api/admin/email-projects", {
+			      method: "POST", headers: { "Content-Type": "application/json" },
+			      body: JSON.stringify({ name: "Untitled email" })
+			    });
+			    if (r && r._id) {
+			      history.replaceState({}, "", `?id=${r._id}`);
+			      loadProject(r);
+			    } else {
+			      alert("Couldn't create project."); location.href = "admin-emails.html";
+			    }
+			  } else if (params.get("id")) {
+			    _projectId = params.get("id");
+			    const r = await apiFetch(`/api/admin/email-projects/${_projectId}`);
+			    if (r && !r.error) {
+			      loadProject(r);
+			    } else {
+			      alert("Project not found."); location.href = "admin-emails.html";
+			    }
+			  } else {
+			    location.href = "admin-emails.html";
+			  }
+			
+			  initUI();
+			  startHeartbeat();
+			  startSync();
+			}
+			
+			function loadProject(p) {
+			  _projectId = p._id;
+			  _version = p.version || 0;
+			  _blocks = p.blocks || [];
+			  _nextId = Math.max(1, ..._blocks.map(b => parseInt(b.id?.replace(/\D/g,""))||0)) + 1;
+			  _emoticon = p.emoticon || "penguin";
+			  _accent = p.accentColor || "#8C6E58";
+			  _footerTagline = p.footerTagline || "until next time";
+			
+			  document.getElementById("projectName").value = p.name || "Untitled email";
+			  document.getElementById("ecHeadline").textContent = p.subject || "Email subject line…";
+			  applyAccent();
+			  renderBlocks();
+			  renderGlobalProps();
+			  updatePresence(p.presence || []);
+			  pushHistory();
+			  setSaveStatus("saved");
+			}
+			
+			// ── UI Init ───────────────────────────────────────────────────────────────────
+			function initUI() {
+			  // Left panel tabs
+			  document.querySelectorAll(".lp-tab").forEach(btn => {
+			    btn.addEventListener("click", () => {
+			      document.querySelectorAll(".lp-tab").forEach(b => b.classList.remove("active"));
+			      btn.classList.add("active");
+			      document.getElementById("lpBlocks").style.display    = btn.dataset.lp === "blocks"    ? "" : "none";
+			      document.getElementById("lpTemplates").style.display = btn.dataset.lp === "templates" ? "" : "none";
+			    });
+			  });
+			
+			  // Palette adds
+			  document.querySelectorAll("[data-add]").forEach(el =>
+			    el.addEventListener("click", () => addBlock(el.dataset.add))
+			  );
+			
+			  // Templates
+			  document.querySelectorAll("[data-tmpl]").forEach(el =>
+			    el.addEventListener("click", () => loadTemplate(el.dataset.tmpl))
+			  );
+			
+			  // Project name
+			  const nameInput = document.getElementById("projectName");
+			  nameInput.addEventListener("input", () => markDirty());
+			  nameInput.addEventListener("blur", () => save());
+			
+			  // Headline (subject) editing
+			  const headline = document.getElementById("ecHeadline");
+			  headline.addEventListener("input", () => markDirty());
+			  headline.addEventListener("blur", () => save());
+			
+			  // Zoom
+			  document.getElementById("zoomIn").addEventListener("click",  () => setZoom(_zoom + .1));
+			  document.getElementById("zoomOut").addEventListener("click", () => setZoom(_zoom - .1));
+			
+			  // Undo/Redo
+			  document.getElementById("undoBtn").addEventListener("click", undo);
+			  document.getElementById("redoBtn").addEventListener("click", redo);
+			
+			  // Preview + Send
+			  document.getElementById("previewBtn").addEventListener("click", showPreview);
+			  document.getElementById("previewClose").addEventListener("click", () => document.getElementById("previewModal").classList.remove("show"));
+			  document.getElementById("sendBtn").addEventListener("click", () => document.getElementById("sendModal").classList.add("show"));
+			  document.getElementById("smCancel").addEventListener("click", () => document.getElementById("sendModal").classList.remove("show"));
+			  document.getElementById("smRecipient").addEventListener("change", e => {
+			    document.getElementById("smUserWrap").style.display = e.target.value === "specific" ? "" : "none";
+			  });
+			  document.getElementById("smSend").addEventListener("click", doSend);
+			
+			  // Save button
+			  document.getElementById("saveBtn").addEventListener("click", () => save(true));
+			
+			  // Conflict modal buttons
+			  document.getElementById("conflictAcceptServer").addEventListener("click", () => {
+			    document.getElementById("conflictModal").classList.remove("show");
+			    if (window._conflictProject) loadProject(window._conflictProject);
+			  });
+			  document.getElementById("conflictKeepMine").addEventListener("click", () => {
+			    document.getElementById("conflictModal").classList.remove("show");
+			    if (window._conflictServerVersion != null) {
+			      _version = window._conflictServerVersion;
+			      _dirty = true;
+			      save(true);
+			    }
+			  });
+			
+			  // Right panel close
+			  document.getElementById("rpClose").addEventListener("click", () => {
+			    _selId = null;
+			    renderBlocks();
+			    renderGlobalProps();
+			    syncFormatBar();
+			    document.getElementById("rpClose").style.display = "none";
+			    document.getElementById("rpTitle").textContent = "Email Settings";
+			  });
+			
+			  // ── Format bar ────────────────────────────────────────────────────────────
+			  initFormatBar();
+			
+			  // Keyboard shortcuts
+			  document.addEventListener("keydown", e => {
+			    const ctrl = e.ctrlKey || e.metaKey;
+			    if (ctrl && e.key === "z" && !e.shiftKey) { e.preventDefault(); undo(); }
+			    if (ctrl && (e.key === "y" || (e.key === "z" && e.shiftKey))) { e.preventDefault(); redo(); }
+			    if (ctrl && e.key === "s") { e.preventDefault(); save(true); }
+			    if (ctrl && e.key === "b") { e.preventDefault(); fmtToggle("bold"); }
+			    if (ctrl && e.key === "i") { e.preventDefault(); fmtToggle("italic"); }
+			    if (ctrl && e.key === "u") { e.preventDefault(); fmtToggle("underline"); }
+			    if (e.key === "Escape") { _selId = null; renderBlocks(); renderGlobalProps(); syncFormatBar(); }
+			    if (e.key === "Delete" && _selId && document.activeElement === document.body) removeBlock(_selId);
+			  });
+			
+			  // Click outside canvas → deselect
+			  document.getElementById("canvasWrap").addEventListener("click", e => {
+			    if (e.target === document.getElementById("canvasWrap") || e.target === document.getElementById("emailCanvas")) {
+			      _selId = null;
+			      renderBlocks();
+			      renderGlobalProps();
+			      syncFormatBar();
+			    }
+			  });
+			
+			  // Initial right panel
+			  renderGlobalProps();
+			}
+			
+			// ── Zoom ──────────────────────────────────────────────────────────────────────
+			function setZoom(z) {
+			  _zoom = Math.max(.4, Math.min(1.6, Math.round(z * 10) / 10));
+			  const canvas = document.getElementById("emailCanvas");
+			  canvas.style.transform = `scale(${_zoom})`;
+			  canvas.style.transformOrigin = "top center";
+			  // requestAnimationFrame ensures offsetHeight is the post-layout (pre-transform) value
+			  requestAnimationFrame(() => {
+			    const h = canvas.offsetHeight;
+			    const w = canvas.offsetWidth;
+			    // Push down everything below by how much the scaled canvas exceeds its DOM height
+			    canvas.style.marginBottom = `${Math.max(0, h * (_zoom - 1))}px`;
+			    // Expand canvas horizontal footprint so the canvasWrap scroll covers it
+			    if (_zoom > 1) {
+			      const extra = Math.ceil(w * (_zoom - 1) / 2);
+			      canvas.style.marginLeft  = extra + "px";
+			      canvas.style.marginRight = extra + "px";
+			    } else {
+			      canvas.style.marginLeft  = "";
+			      canvas.style.marginRight = "";
+			    }
+			  });
+			  document.getElementById("zoomPct").textContent = Math.round(_zoom * 100) + "%";
+			}
+			
+			// Recalculate zoom compensation whenever blocks change
+			function refreshZoom() { if (_zoom !== 1) setZoom(_zoom); }
+			
+			// ── Format Bar ───────────────────────────────────────────────────────────────
+			function initFormatBar() {
+			  const fmtApply = (key, val) => {
+			    const b = _blocks.find(x => x.id === _selId);
+			    if (!b || b.type !== "text") return;
+			    b[key] = val;
+			    renderBlocks(); markDirty(); pushHistory(); syncFormatBar();
+			  };
+			
+			  document.getElementById("fmtFont").addEventListener("change", e => fmtApply("fontFamily", e.target.value));
+			  document.getElementById("fmtSize").addEventListener("change", e => fmtApply("fontSize", parseInt(e.target.value)));
+			  document.getElementById("fmtLineH").addEventListener("change", e => fmtApply("lineHeight", parseFloat(e.target.value)));
+			  document.getElementById("fmtLetterSpacing").addEventListener("change", e => fmtApply("letterSpacing", e.target.value));
+			
+			  document.getElementById("fmtBold").addEventListener("click",      () => fmtToggle("bold"));
+			  document.getElementById("fmtItalic").addEventListener("click",    () => fmtToggle("italic"));
+			  document.getElementById("fmtUnderline").addEventListener("click", () => fmtToggle("underline"));
+			
+			  document.querySelectorAll("[data-align]").forEach(btn =>
+			    btn.addEventListener("click", () => fmtApply("align", btn.dataset.align))
+			  );
+			
+			  // Text color
+			  const colorBtn = document.getElementById("fmtColorBtn");
+			  const colorPicker = document.getElementById("fmtColorPicker");
+			  colorBtn.addEventListener("click", () => colorPicker.click());
+			  colorPicker.addEventListener("input", e => {
+			    document.getElementById("fmtColorSwatch").style.background = e.target.value;
+			    fmtApply("textColor", e.target.value);
+			  });
+			}
+			
+			function fmtToggle(key) {
+			  const b = _blocks.find(x => x.id === _selId);
+			  if (!b || b.type !== "text") return;
+			  b[key] = !b[key];
+			  renderBlocks(); markDirty(); pushHistory(); syncFormatBar();
+			}
+			
+			function syncFormatBar() {
+			  const bar = document.getElementById("formatBar");
+			  const b = _blocks.find(x => x.id === _selId);
+			  const active = b && b.type === "text";
+			  bar.classList.toggle("inactive", !active);
+			  if (!active) return;
+			
+			  const v = (id, val) => { const el = document.getElementById(id); if(el) el.value = val; };
+			  const t = (id, on) => { const el = document.getElementById(id); if(el) el.classList.toggle("active", on); };
+			
+			  v("fmtFont", b.fontFamily || "Georgia,'Times New Roman',serif");
+			  v("fmtSize", String(b.fontSize || 15));
+			  v("fmtLineH", String(b.lineHeight || 1.85));
+			  v("fmtLetterSpacing", b.letterSpacing || "0");
+			  t("fmtBold",      !!b.bold);
+			  t("fmtItalic",    !!b.italic);
+			  t("fmtUnderline", !!b.underline);
+			
+			  // Alignment
+			  ["left","center","right"].forEach(a => {
+			    const el = document.querySelector(`[data-align="${a}"]`);
+			    if (el) el.classList.toggle("active", (b.align||"left") === a);
+			  });
+			
+			  // Color swatch
+			  const swatch = document.getElementById("fmtColorSwatch");
+			  const picker = document.getElementById("fmtColorPicker");
+			  if (swatch) swatch.style.background = b.textColor || "#4A3728";
+			  if (picker) picker.value = b.textColor || "#4A3728";
+			}
+			
+			// ── History (undo/redo) ───────────────────────────────────────────────────────
+			function pushHistory() {
+			  const snap = JSON.stringify({ blocks: _blocks, emoticon: _emoticon, accent: _accent, footer: _footerTagline });
+			  if (_historyIdx >= 0 && _history[_historyIdx] === snap) return;
+			  _history = _history.slice(0, _historyIdx + 1);
+			  _history.push(snap);
+			  if (_history.length > 60) _history.shift();
+			  _historyIdx = _history.length - 1;
+			  syncUndoRedo();
+			}
+			
+			function undo() {
+			  if (_historyIdx <= 0) return;
+			  _historyIdx--;
+			  applyHistory(_history[_historyIdx]);
+			}
+			
+			function redo() {
+			  if (_historyIdx >= _history.length - 1) return;
+			  _historyIdx++;
+			  applyHistory(_history[_historyIdx]);
+			}
+			
+			function applyHistory(snap) {
+			  const s = JSON.parse(snap);
+			  _blocks = s.blocks; _emoticon = s.emoticon; _accent = s.accent; _footerTagline = s.footer;
+			  _selId = null;
+			  applyAccent(); renderBlocks(); renderGlobalProps(); syncFormatBar(); markDirty(); syncUndoRedo();
+			}
+			
+			function syncUndoRedo() {
+			  document.getElementById("undoBtn").disabled = _historyIdx <= 0;
+			  document.getElementById("redoBtn").disabled = _historyIdx >= _history.length - 1;
+			}
+			
+			// ── Blocks ────────────────────────────────────────────────────────────────────
+			function makeBlock(type) {
+			  const id = `b${_nextId++}`;
+			  const D = {
+			    text:    { id, type, content: "Write something beautiful here.", fontSize: 15, textColor: "#4A3728", align: "left", fontFamily: "Georgia,'Times New Roman',serif", lineHeight: 1.85, letterSpacing: "0", bold: false, italic: false, underline: false },
+			    html:    { id, type, content: "<p>Custom HTML content here.</p>" },
+			    image:   { id, type, src: "", alt: "", link: "", width: 100 },
+			    button:  { id, type, text: "Click here", url: SITE, align: "center" },
+			    quote:   { id, type, content: "A beautiful quote goes here. Writing is the painting of the voice.", author: "— Someone wonderful" },
+			    divider: { id, type, lineStyle: "solid", lineColor: "#D4BBA0" },
+			    spacer:  { id, type, height: 24 },
+			    "2col":  { id, type, col1: "First column text.", col2: "Second column text." },
+			    "3col":  { id, type, col1: "Column 1", col2: "Column 2", col3: "Column 3" },
+			  };
+			  return D[type] || { id, type };
+			}
+			
+			function addBlock(type) {
+			  const b = makeBlock(type);
+			  _blocks.push(b);
+			  pushHistory();
+			  renderBlocks();
+			  selectBlock(b.id);
+			  markDirty();
+			  // Scroll canvas to bottom
+			  setTimeout(() => {
+			    const cw = document.getElementById("canvasWrap");
+			    cw.scrollTo({ top: cw.scrollHeight, behavior: "smooth" });
+			  }, 50);
+			}
+			
+			function removeBlock(id) {
+			  _blocks = _blocks.filter(b => b.id !== id);
+			  if (_selId === id) { _selId = null; renderGlobalProps(); document.getElementById("rpClose").style.display = "none"; }
+			  pushHistory(); renderBlocks(); markDirty();
+			}
+			
+			function moveBlock(id, dir) {
+			  const i = _blocks.findIndex(b => b.id === id);
+			  if (i < 0) return;
+			  const j = i + dir;
+			  if (j < 0 || j >= _blocks.length) return;
+			  [_blocks[i], _blocks[j]] = [_blocks[j], _blocks[i]];
+			  pushHistory(); renderBlocks(); markDirty();
+			}
+			
+			function selectBlock(id) {
+			  _selId = id;
+			  renderBlocks();
+			  const b = _blocks.find(x => x.id === id);
+			  if (b) {
+			    renderBlockProps(b);
+			    document.getElementById("rpTitle").textContent = b.type.toUpperCase() + " BLOCK";
+			    document.getElementById("rpClose").style.display = "";
+			  }
+			  syncFormatBar();
+			}
+			
+			// ── Render blocks ─────────────────────────────────────────────────────────────
+			function renderBlocks() {
+			  const container = document.getElementById("ecBlocks");
+			  document.getElementById("ecEmpty").style.display = _blocks.length ? "none" : "block";
+			  container.querySelectorAll(".ec-block").forEach(el => el.remove());
+			
+			  _blocks.forEach((b, idx) => {
+			    const el = document.createElement("div");
+			    el.className = "ec-block" + (b.id === _selId ? " selected" : "");
+			    el.dataset.id = b.id;
+			    el.draggable = true;
+			
+			    el.innerHTML = `
+			      <div class="ec-drag-handle">⠿</div>
+			      <div class="ec-block-actions">
+			        ${idx > 0 ? `<button class="ec-act" title="Move up" onclick="moveBlock('${b.id}',-1)">↑</button>` : ""}
+			        ${idx < _blocks.length-1 ? `<button class="ec-act" title="Move down" onclick="moveBlock('${b.id}',1)">↓</button>` : ""}
+			        <button class="ec-act" title="Duplicate" onclick="dupBlock('${b.id}')">⧉</button>
+			        <button class="ec-act" title="Delete" onclick="removeBlock('${b.id}')">✕</button>
+			      </div>
+			      ${blockHtml(b)}`;
+			
+			    // Select on click
+			    el.addEventListener("click", e => {
+			      if (e.target.closest(".ec-act") || e.target.closest(".ec-drag-handle")) return;
+			      selectBlock(b.id);
+			    });
+			
+			    // Double-click to inline edit text
+			    if (b.type === "text") {
+			      const textEl = el.querySelector(".b-text");
+			      if (textEl) {
+			        textEl.addEventListener("dblclick", () => enableInlineEdit(textEl, b, "content"));
+			        textEl.addEventListener("click", e => e.stopPropagation());
+			      }
+			    }
+			    if (b.type === "2col") {
+			      el.querySelectorAll(".b-col-cell").forEach((cell, ci) => {
+			        cell.addEventListener("dblclick", () => enableInlineEdit(cell, b, ci === 0 ? "col1" : "col2"));
+			      });
+			    }
+			
+			    // Drag-and-drop reordering
+			    el.addEventListener("dragstart", e => {
+			      _dragSrcId = b.id;
+			      e.dataTransfer.effectAllowed = "move";
+			      setTimeout(() => el.style.opacity = ".4", 0);
+			    });
+			    el.addEventListener("dragend", () => { el.style.opacity = ""; cleanDropIndicators(); });
+			    el.addEventListener("dragover", e => {
+			      e.preventDefault(); e.dataTransfer.dropEffect = "move";
+			      cleanDropIndicators();
+			      const rect = el.getBoundingClientRect();
+			      el.classList.add(e.clientY < rect.top + rect.height/2 ? "drag-over-top" : "drag-over-bot");
+			    });
+			    el.addEventListener("dragleave", () => cleanDropIndicators());
+			    el.addEventListener("drop", e => {
+			      e.preventDefault();
+			      cleanDropIndicators();
+			      if (!_dragSrcId || _dragSrcId === b.id) return;
+			      const srcIdx = _blocks.findIndex(x => x.id === _dragSrcId);
+			      const dstIdx = _blocks.findIndex(x => x.id === b.id);
+			      if (srcIdx < 0 || dstIdx < 0) return;
+			      const rect = el.getBoundingClientRect();
+			      const insertBefore = e.clientY < rect.top + rect.height / 2;
+			      const [moved] = _blocks.splice(srcIdx, 1);
+			      const newDst = _blocks.findIndex(x => x.id === b.id);
+			      _blocks.splice(insertBefore ? newDst : newDst + 1, 0, moved);
+			      pushHistory(); renderBlocks(); markDirty();
+			    });
+			
+			    container.appendChild(el);
+			  });
+			
+			  // Refresh zoom margins after blocks change layout
+			  requestAnimationFrame(refreshZoom);
+			
+			  // Word count
+			  const allText = _blocks.map(b => b.content || b.text || b.col1 || "").join(" ");
+			  const wc = allText.trim().split(/\s+/).filter(Boolean).length;
+			  const wcEl = document.getElementById("wordCount");
+			  if (wcEl) wcEl.textContent = `${wc} word${wc !== 1 ? "s" : ""}`;
+			}
+			
+			function cleanDropIndicators() {
+			  document.querySelectorAll(".drag-over-top, .drag-over-bot").forEach(el => {
+			    el.classList.remove("drag-over-top", "drag-over-bot");
+			  });
+			}
+			
+			function blockHtml(b) {
+			  const esc = s => String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+			  const n2b = s => esc(s).replace(/\n/g,"<br>");
+			  switch (b.type) {
+			    case "text": {
+			      const ff = b.fontFamily || "Georgia,'Times New Roman',serif";
+			      const fStyle = `font-size:${b.fontSize||15}px;color:${b.textColor||"#4A3728"};text-align:${b.align||"left"};font-family:${ff};line-height:${b.lineHeight||1.85};letter-spacing:${b.letterSpacing||"0"};${b.bold?"font-weight:bold;":""}${b.italic?"font-style:italic;":""}${b.underline?"text-decoration:underline;":""}`;
+			      return `<div class="b-text" style="${fStyle}">${n2b(b.content||"")}</div>`;
+			    }
+			    case "html":
+			      return `<div class="b-html">${b.content||""}</div>`;
+			    case "image":
+			      return b.src
+			        ? `<div class="b-image"><img src="${b.src}" alt="${esc(b.alt||"")}" style="width:${b.width||100}%;max-width:100%;"></div>`
+			        : `<div class="b-image"><div class="b-img-ph">🖼 Set image URL in the panel →</div></div>`;
+			    case "button": {
+			      const c = b.color || _accent;
+			      return `<div class="b-button" style="text-align:${b.align||"center"};"><span class="b-btn-inner" style="background:${c};">${esc(b.text||"Button")}</span></div>`;
+			    }
+			    case "divider":
+			      return `<div class="b-divider"><hr style="border-top:1px ${b.lineStyle||"solid"} ${b.lineColor||"#D4BBA0"};"></div>`;
+			    case "spacer":
+			      return `<div class="b-spacer" style="height:${b.height||24}px;">[spacer · ${b.height||24}px]</div>`;
+			    case "2col":
+			      return `<div class="b-2col"><div class="b-col-cell">${n2b(b.col1||"")}</div><div class="b-col-cell">${n2b(b.col2||"")}</div></div>`;
+			    case "3col":
+			      return `<div class="b-3col"><div class="b-col-cell">${n2b(b.col1||"")}</div><div class="b-col-cell">${n2b(b.col2||"")}</div><div class="b-col-cell">${n2b(b.col3||"")}</div></div>`;
+			    case "quote":
+			      return `<div class="b-quote" style="border-left-color:${_accent};"><div class="b-quote-text">${n2b(b.content||"")}</div>${b.author ? `<div class="b-quote-attr">${esc(b.author)}</div>` : ""}</div>`;
+			    default: return `<div style="padding:6px;color:#aaa;font-size:12px;">[${b.type}]</div>`;
+			  }
+			}
+			
+			function dupBlock(id) {
+			  const src = _blocks.find(b => b.id === id);
+			  if (!src) return;
+			  const copy = JSON.parse(JSON.stringify(src));
+			  copy.id = `b${_nextId++}`;
+			  const idx = _blocks.findIndex(b => b.id === id);
+			  _blocks.splice(idx + 1, 0, copy);
+			  pushHistory(); renderBlocks(); selectBlock(copy.id); markDirty();
+			}
+			
+			// ── Inline editing ─────────────────────────────────────────────────────────────
+			function enableInlineEdit(el, block, key) {
+			  if (el.contentEditable === "true") return;
+			  el.contentEditable = "true";
+			  el.focus();
+			  // Position cursor at end
+			  const range = document.createRange();
+			  range.selectNodeContents(el);
+			  range.collapse(false);
+			  const sel = window.getSelection();
+			  sel.removeAllRanges();
+			  sel.addRange(range);
+			
+			  const save = () => {
+			    el.contentEditable = "false";
+			    block[key] = el.innerText;
+			    markDirty();
+			    pushHistory();
+			  };
+			  el.addEventListener("blur", save, { once: true });
+			  el.addEventListener("keydown", e => {
+			    if (e.key === "Escape") { el.contentEditable = "false"; renderBlocks(); }
+			  }, { once: true });
+			}
+			
+			// ── Right panel — global settings ─────────────────────────────────────────────
+			function renderGlobalProps() {
+			  const body = document.getElementById("rpBody");
+			  body.innerHTML = `
+			    <div class="rp-group">
+			      <span class="rp-label">Subject / Headline</span>
+			      <input class="rp-input" id="rp_subject" type="text" value="${escapeHTML(document.getElementById("ecHeadline").textContent)}" placeholder="Email subject…" maxlength="200">
+			    </div>
+			
+			    <hr class="rp-sep">
+			
+			    <div class="rp-group">
+			      <span class="rp-label">Sticker</span>
+			      <div class="emo-grid-light" id="rpEmoGrid"></div>
+			    </div>
+			
+			    <div class="rp-group">
+			      <span class="rp-label">Accent color</span>
+			      <div class="rp-color-row" id="rpColorRow">
+			        ${ACCENT_PRESETS.map(c => `<div class="rp-chip${c===_accent?" sel":""}" data-c="${c}" style="background:${c};" title="${c}"></div>`).join("")}
+			        <input type="color" id="rpColorCustom" value="${_accent}" style="width:24px;height:24px;padding:0;border:none;cursor:pointer;border-radius:50%;overflow:hidden;" title="Custom">
+			      </div>
+			    </div>
+			
+			    <div class="rp-group">
+			      <span class="rp-label">Footer sign-off</span>
+			      <input class="rp-input" id="rp_footer" type="text" value="${escapeHTML(_footerTagline)}" maxlength="80" placeholder="until next time">
+			    </div>`;
+			
+			  // Subject sync
+			  document.getElementById("rp_subject").addEventListener("input", e => {
+			    document.getElementById("ecHeadline").textContent = e.target.value || "Email subject line…";
+			    markDirty();
+			  });
+			
+			  // Footer sync
+			  document.getElementById("rp_footer").addEventListener("input", e => {
+			    _footerTagline = e.target.value || "until next time";
+			    document.getElementById("ecFooterText").textContent = `${_footerTagline} — progress ✿`;
+			    markDirty();
+			  });
+			
+			  // Emoticon grid
+			  buildEmoGrid("rpEmoGrid");
+			
+			  // Color chips
+			  document.querySelectorAll("#rpColorRow .rp-chip").forEach(chip => {
+			    chip.addEventListener("click", () => {
+			      document.querySelectorAll("#rpColorRow .rp-chip").forEach(c => c.classList.remove("sel"));
+			      chip.classList.add("sel");
+			      _accent = chip.dataset.c;
+			      applyAccent(); markDirty(); pushHistory();
+			    });
+			  });
+			  document.getElementById("rpColorCustom").addEventListener("input", e => {
+			    document.querySelectorAll("#rpColorRow .rp-chip").forEach(c => c.classList.remove("sel"));
+			    _accent = e.target.value;
+			    applyAccent(); markDirty();
+			  });
+			  document.getElementById("rpColorCustom").addEventListener("change", () => pushHistory());
+			}
+			
+			function applyAccent() {
+			  // Update button blocks + footer link color
+			  document.getElementById("ecFooterText").style.color = _accent;
+			  renderBlocks(); // re-renders buttons with updated accent
+			  // Update sticker
+			  updateStickerCanvas();
+			}
+			
+			function buildEmoGrid(gridId) {
+			  const grid = document.getElementById(gridId);
+			  if (!grid) return;
+			  grid.innerHTML = "";
+			  const noneBtn = document.createElement("button");
+			  noneBtn.type = "button";
+			  noneBtn.className = "emo-btn-light" + (_emoticon === "none" ? " sel" : "");
+			  noneBtn.innerHTML = `<span class="emo-none-l">✕</span>`;
+			  noneBtn.title = "No sticker";
+			  noneBtn.dataset.name = "none";
+			  noneBtn.addEventListener("click", () => { setEmoticon("none"); markDirty(); pushHistory(); });
+			  grid.appendChild(noneBtn);
+			  EMOTICONS.forEach(name => {
+			    const btn = document.createElement("button");
+			    btn.type = "button";
+			    btn.className = "emo-btn-light" + (name === _emoticon ? " sel" : "");
+			    btn.title = name.replace(/_/g," ");
+			    btn.dataset.name = name;
+			    btn.innerHTML = `<img src="/images/emoticons/${name}.png" alt="${name}" loading="lazy">`;
+			    btn.addEventListener("click", () => { setEmoticon(name); markDirty(); pushHistory(); });
+			    grid.appendChild(btn);
+			  });
+			}
+			
+			function setEmoticon(name) {
+			  _emoticon = name;
+			  updateStickerCanvas();
+			  // Re-render emoticon grids
+			  document.querySelectorAll(".emo-btn-light, .emo-btn-dark").forEach(b => {
+			    b.classList.toggle("sel", b.dataset.name === name);
+			  });
+			}
+			
+			function updateStickerCanvas() {
+			  const div = document.getElementById("ecSticker");
+			  const img = document.getElementById("ecStickerImg");
+			  if (_emoticon === "none" || !_emoticon) {
+			    div.style.display = "none";
+			  } else {
+			    img.src = `/images/emoticons/${_emoticon}.png`;
+			    div.style.display = "block";
+			  }
+			}
+			
+			// ── Right panel — block props ──────────────────────────────────────────────────
+			function renderBlockProps(b) {
+			  const body = document.getElementById("rpBody");
+			  const esc = s => String(s||"").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+			
+			  let html = "";
+			  switch (b.type) {
+			    case "text":
+			      html = `
+			        <div class="rp-hint" style="margin-bottom:10px;padding:8px 10px;background:#FFF0E0;border-radius:6px;font-size:11px;color:#8a6040;">
+			          ✦ Use the <strong>format bar above the canvas</strong> for bold, italic, alignment, font, and color.
+			        </div>
+			        <div class="rp-group"><span class="rp-label">Content</span>
+			          <textarea class="rp-ta" data-key="content" rows="7">${esc(b.content||"")}</textarea></div>
+			        <div class="rp-group"><span class="rp-label">Font size (px)</span>
+			          <input class="rp-input" type="number" data-key="fontSize" value="${b.fontSize||15}" min="10" max="72" step="1"></div>
+			        <div class="rp-group"><span class="rp-label">Text color</span>
+			          <input class="rp-input" type="color" data-key="textColor" value="${b.textColor||"#4A3728"}" style="height:36px;padding:3px;cursor:pointer;"></div>
+			        <div class="rp-group" style="display:flex;gap:6px;flex-wrap:wrap;">
+			          <button type="button" class="fmt-btn${b.bold?" active":""}" style="flex:1;" onclick="fmtToggle('bold')"><strong>Bold</strong></button>
+			          <button type="button" class="fmt-btn${b.italic?" active":""}" style="flex:1;" onclick="fmtToggle('italic')"><em>Italic</em></button>
+			          <button type="button" class="fmt-btn${b.underline?" active":""}" style="flex:1;" onclick="fmtToggle('underline')"><u>Underline</u></button>
+			        </div>
+			        <div class="rp-group"><span class="rp-label">Alignment</span>
+			          <div style="display:flex;gap:4px;">
+			            <button type="button" class="fmt-btn${(b.align||"left")==="left"?" active":""}" style="flex:1;" onclick="(()=>{const bl=_blocks.find(x=>x.id===_selId);if(bl){bl.align='left';renderBlocks();markDirty();pushHistory();syncFormatBar();}})()">Left</button>
+			            <button type="button" class="fmt-btn${b.align==="center"?" active":""}" style="flex:1;" onclick="(()=>{const bl=_blocks.find(x=>x.id===_selId);if(bl){bl.align='center';renderBlocks();markDirty();pushHistory();syncFormatBar();}})()">Center</button>
+			            <button type="button" class="fmt-btn${b.align==="right"?" active":""}" style="flex:1;" onclick="(()=>{const bl=_blocks.find(x=>x.id===_selId);if(bl){bl.align='right';renderBlocks();markDirty();pushHistory();syncFormatBar();}})()">Right</button>
+			          </div></div>`;
+			      break;
+			    case "html":
+			      html = `
+			        <div class="rp-group"><span class="rp-label">HTML source</span>
+			          <textarea class="rp-ta" data-key="content" rows="10" style="font-family:monospace;font-size:11px;">${esc(b.content||"")}</textarea>
+			          <div class="rp-hint">Use inline styles. No external CSS.</div></div>`;
+			      break;
+			    case "image":
+			      html = `
+			        <div class="rp-group"><span class="rp-label">Image URL</span>
+			          <input class="rp-input" type="url" data-key="src" value="${esc(b.src||"")}" placeholder="https://…"></div>
+			        <div class="rp-group"><span class="rp-label">Alt text</span>
+			          <input class="rp-input" type="text" data-key="alt" value="${esc(b.alt||"")}"></div>
+			        <div class="rp-group"><span class="rp-label">Link URL (optional)</span>
+			          <input class="rp-input" type="url" data-key="link" value="${esc(b.link||"")}"></div>
+			        <div class="rp-group"><span class="rp-label">Width %</span>
+			          <input class="rp-input" type="range" data-key="width" min="20" max="100" step="5" value="${b.width||100}" style="padding:6px 0;">
+			          <div class="rp-hint" id="imgWidthLabel">${b.width||100}%</div></div>`;
+			      break;
+			    case "button":
+			      html = `
+			        <div class="rp-group"><span class="rp-label">Button label</span>
+			          <input class="rp-input" type="text" data-key="text" value="${esc(b.text||"")}"></div>
+			        <div class="rp-group"><span class="rp-label">URL</span>
+			          <input class="rp-input" type="url" data-key="url" value="${esc(b.url||"")}"></div>
+			        <div class="rp-group"><span class="rp-label">Color (blank = accent)</span>
+			          <input class="rp-input" type="color" data-key="color" value="${b.color||_accent}" style="height:36px;padding:3px;cursor:pointer;"></div>
+			        <div class="rp-group"><span class="rp-label">Alignment</span>
+			          <select class="rp-select" data-key="align">
+			            <option value="left" ${b.align==="left"?"selected":""}>Left</option>
+			            <option value="center" ${(b.align||"center")==="center"?"selected":""}>Center</option>
+			            <option value="right" ${b.align==="right"?"selected":""}>Right</option>
+			          </select></div>`;
+			      break;
+			    case "divider":
+			      html = `
+			        <div class="rp-group"><span class="rp-label">Line style</span>
+			          <select class="rp-select" data-key="lineStyle">
+			            <option value="solid"  ${(b.lineStyle||"solid")==="solid"?"selected":""}>Solid</option>
+			            <option value="dashed" ${b.lineStyle==="dashed"?"selected":""}>Dashed</option>
+			            <option value="dotted" ${b.lineStyle==="dotted"?"selected":""}>Dotted</option>
+			          </select></div>
+			        <div class="rp-group"><span class="rp-label">Color</span>
+			          <input class="rp-input" type="color" data-key="lineColor" value="${b.lineColor||"#D4BBA0"}" style="height:36px;padding:3px;cursor:pointer;"></div>`;
+			      break;
+			    case "spacer":
+			      html = `
+			        <div class="rp-group"><span class="rp-label">Height (px)</span>
+			          <input class="rp-input" type="range" data-key="height" min="4" max="120" step="4" value="${b.height||24}" style="padding:6px 0;">
+			          <div class="rp-hint" id="spacerLabel">${b.height||24}px</div></div>`;
+			      break;
+			    case "2col":
+			      html = `
+			        <div class="rp-group"><span class="rp-label">Left column</span>
+			          <textarea class="rp-ta" data-key="col1" rows="5">${esc(b.col1||"")}</textarea></div>
+			        <div class="rp-group"><span class="rp-label">Right column</span>
+			          <textarea class="rp-ta" data-key="col2" rows="5">${esc(b.col2||"")}</textarea></div>`;
+			      break;
+			    case "3col":
+			      html = `
+			        <div class="rp-group"><span class="rp-label">Column 1</span>
+			          <textarea class="rp-ta" data-key="col1" rows="3">${esc(b.col1||"")}</textarea></div>
+			        <div class="rp-group"><span class="rp-label">Column 2</span>
+			          <textarea class="rp-ta" data-key="col2" rows="3">${esc(b.col2||"")}</textarea></div>
+			        <div class="rp-group"><span class="rp-label">Column 3</span>
+			          <textarea class="rp-ta" data-key="col3" rows="3">${esc(b.col3||"")}</textarea></div>`;
+			      break;
+			    case "quote":
+			      html = `
+			        <div class="rp-group"><span class="rp-label">Quote text</span>
+			          <textarea class="rp-ta" data-key="content" rows="4">${esc(b.content||"")}</textarea></div>
+			        <div class="rp-group"><span class="rp-label">Attribution</span>
+			          <input class="rp-input" type="text" data-key="author" value="${esc(b.author||"")}" placeholder="— Author Name"></div>`;
+			      break;
+			  }
+			
+			  // Global style section at bottom
+			  html += `
+			    <hr class="rp-sep">
+			    <div class="rp-group"><span class="rp-label" style="color:#A07858;">Email Style</span></div>
+			    <div class="rp-group"><span class="rp-label">Accent color</span>
+			      <div class="rp-color-row" id="rpColorRow2">
+			        ${ACCENT_PRESETS.map(c => `<div class="rp-chip${c===_accent?" sel":""}" data-c="${c}" style="background:${c};"></div>`).join("")}
+			        <input type="color" id="rpColorCustom2" value="${_accent}" style="width:24px;height:24px;padding:0;border:none;cursor:pointer;border-radius:50%;overflow:hidden;">
+			      </div></div>`;
+			
+			  body.innerHTML = html;
+			
+			  // Wire inputs
+			  body.querySelectorAll("[data-key]").forEach(inp => {
+			    const key = inp.dataset.key;
+			    const isNum = inp.type === "range" || inp.type === "number";
+			    inp.addEventListener("input", () => {
+			      b[key] = isNum ? (parseFloat(inp.value)||0) : inp.value;
+			      if (key === "width") { const l = document.getElementById("imgWidthLabel"); if(l) l.textContent = inp.value+"%"; }
+			      if (key === "height") { const l = document.getElementById("spacerLabel"); if(l) l.textContent = inp.value+"px"; }
+			      renderBlocks();
+			      markDirty();
+			      if (b.type === "text") syncFormatBar();
+			    });
+			    inp.addEventListener("change", () => pushHistory());
+			  });
+			
+			  // Accent in block props panel
+			  document.querySelectorAll("#rpColorRow2 .rp-chip").forEach(chip => {
+			    chip.addEventListener("click", () => {
+			      document.querySelectorAll("#rpColorRow2 .rp-chip").forEach(c => c.classList.remove("sel"));
+			      chip.classList.add("sel");
+			      _accent = chip.dataset.c;
+			      applyAccent(); markDirty(); pushHistory();
+			    });
+			  });
+			  const rpCC2 = document.getElementById("rpColorCustom2");
+			  if (rpCC2) rpCC2.addEventListener("input", e => { _accent = e.target.value; applyAccent(); markDirty(); });
+			}
+			
+			// ── Templates ─────────────────────────────────────────────────────────────────
+			function loadTemplate(name) {
+			  if (!confirm(`Load "${name}" template? This will replace current blocks.`)) return;
+			  _blocks = []; _selId = null; _nextId = 1;
+			  switch (name) {
+			    case "announcement":
+			      _blocks = [makeBlock("text"), makeBlock("divider"), makeBlock("button")];
+			      _blocks[0].content = "Something exciting is happening at Progress. Here's what you need to know about it:";
+			      _blocks[0].fontSize = 16;
+			      _blocks[2].text = "See what's new →";
+			      _blocks[2].url = SITE;
+			      break;
+			    case "update":
+			      _blocks = [makeBlock("text"), makeBlock("spacer"), makeBlock("text"), makeBlock("spacer"), makeBlock("button")];
+			      _blocks[0].content = "Hi! We have a quick update to share with you.";
+			      _blocks[0].fontSize = 18;
+			      _blocks[1].height = 12;
+			      _blocks[2].content = "Here's what changed and what it means for you as a member of the Progress community. We're always working to make things better.";
+			      _blocks[3].height = 8;
+			      _blocks[4].text = "Learn more";
+			      _blocks[4].url = SITE;
+			      break;
+			    case "image-text":
+			      _blocks = [makeBlock("image"), makeBlock("spacer"), makeBlock("text"), makeBlock("button")];
+			      _blocks[0].src = `${SITE}/images/nearheader.png`;
+			      _blocks[0].width = 50;
+			      _blocks[1].height = 10;
+			      _blocks[2].content = "A picture is worth a thousand words. But here are a few more to paint the full picture.";
+			      _blocks[2].align = "center";
+			      _blocks[3].text = "Explore";
+			      _blocks[3].url = SITE;
+			      break;
+			    case "newsletter":
+			      _blocks = [makeBlock("text"), makeBlock("2col"), makeBlock("divider"), makeBlock("text"), makeBlock("button")];
+			      _blocks[0].content = "Welcome to this week's roundup from Progress. Here's what's been happening:";
+			      _blocks[0].fontSize = 18;
+			      _blocks[1].col1 = "✦ New feature\nCheck out what we've been building for you.";
+			      _blocks[1].col2 = "✦ Community\nAmazing writing from our community this week.";
+			      _blocks[3].content = "Thank you for being part of Progress. Keep writing. ✿";
+			      _blocks[3].align = "center";
+			      _blocks[4].text = "Read more →";
+			      _blocks[4].url = SITE;
+			      break;
+			    case "welcome":
+			      _blocks = [makeBlock("text"), makeBlock("divider"), makeBlock("text"), makeBlock("button")];
+			      _blocks[0].content = "Welcome to Progress! We're so glad you're here.";
+			      _blocks[0].fontSize = 22;
+			      _blocks[0].align = "center";
+			      _blocks[2].content = "Progress is a writing community for people who love to write. Start by sharing your first post — we'd love to read it.";
+			      _blocks[3].text = "Go to Progress →";
+			      _blocks[3].url = SITE;
+			      break;
+			    case "digest":
+			      _blocks = [makeBlock("text"), makeBlock("2col"), makeBlock("2col"), makeBlock("divider"), makeBlock("text")];
+			      _blocks[0].content = "Your weekly writing digest is here! Here's what happened on Progress this week:";
+			      _blocks[0].fontSize = 17;
+			      _blocks[1].col1 = "📝 Posts this week\n—";
+			      _blocks[1].col2 = "❤️ Total likes\n—";
+			      _blocks[2].col1 = "💬 Comments\n—";
+			      _blocks[2].col2 = "✍ New writers\n—";
+			      _blocks[4].content = "Keep writing — we'll see you next week. ✿";
+			      _blocks[4].align = "center";
+			      break;
+			  }
+			  pushHistory(); renderBlocks(); renderGlobalProps(); markDirty();
+			  showToast(`Loaded "${name}" template`);
+			}
+			
+			// ── Compile to email HTML ──────────────────────────────────────────────────────
+			function compileBlocks() {
+			  const esc = s => String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+			  const n2b = s => esc(s).replace(/\n/g,"<br>");
+			  return _blocks.map(b => {
+			    switch (b.type) {
+			      case "text": {
+			        const ff2 = b.fontFamily || "Georgia,'Times New Roman',serif";
+			        const fwt = b.bold ? "bold" : "normal";
+			        const fst = b.italic ? "italic" : "normal";
+			        const tdec = b.underline ? "underline" : "none";
+			        const lh2 = b.lineHeight || 1.85;
+			        const ls2 = b.letterSpacing || "0";
+			        return `<p style="margin:0 0 18px;font-family:${ff2};font-size:${b.fontSize||15}px;color:${b.textColor||"#4A3728"};line-height:${lh2};text-align:${b.align||"left"};font-weight:${fwt};font-style:${fst};text-decoration:${tdec};letter-spacing:${ls2};">${n2b(b.content||"")}</p>`;
+			      }
+			      case "html": return b.content || "";
+			      case "image": {
+			        const px = Math.round((b.width||100)/100*440);
+			        const img = `<img src="${esc(b.src||"")}" alt="${esc(b.alt||"")}" width="${px}" border="0" style="display:block;max-width:100%;margin:0 auto;-ms-interpolation-mode:bicubic;">`;
+			        const inner = b.link ? `<a href="${esc(b.link)}" style="display:block;text-decoration:none;">${img}</a>` : img;
+			        return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td align="center" style="padding:0 0 18px;">${inner}</td></tr></table>`;
+			      }
+			      case "button": {
+			        const c = b.color || _accent;
+			        return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 auto 20px;"><tr><td bgcolor="${c}" style="border-radius:100px;"><a href="${esc(b.url||"#")}" style="display:inline-block;padding:13px 40px;font-family:Georgia,'Times New Roman',serif;font-size:13px;font-weight:bold;color:#FAF5EE;text-decoration:none;letter-spacing:.1em;">${esc(b.text||"Button")}</a></td></tr></table>`;
+			      }
+			      case "divider":
+			        return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:4px 0 22px;"><tr><td style="border-top:1px ${b.lineStyle||"solid"} ${b.lineColor||"#D4BBA0"};font-size:0;line-height:0;">&nbsp;</td></tr></table>`;
+			      case "spacer":
+			        return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td height="${b.height||24}" style="font-size:0;line-height:0;">&nbsp;</td></tr></table>`;
+			      case "2col":
+			        return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px;"><tr><td width="47%" valign="top" style="font-family:Georgia,'Times New Roman',serif;font-size:14px;color:#4A3728;line-height:1.75;">${n2b(b.col1||"")}</td><td width="6%"></td><td width="47%" valign="top" style="font-family:Georgia,'Times New Roman',serif;font-size:14px;color:#4A3728;line-height:1.75;">${n2b(b.col2||"")}</td></tr></table>`;
+			      case "3col":
+			        return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px;"><tr><td width="30%" valign="top" style="font-family:Georgia,'Times New Roman',serif;font-size:13px;color:#4A3728;line-height:1.7;">${n2b(b.col1||"")}</td><td width="5%"></td><td width="30%" valign="top" style="font-family:Georgia,'Times New Roman',serif;font-size:13px;color:#4A3728;line-height:1.7;">${n2b(b.col2||"")}</td><td width="5%"></td><td width="30%" valign="top" style="font-family:Georgia,'Times New Roman',serif;font-size:13px;color:#4A3728;line-height:1.7;">${n2b(b.col3||"")}</td></tr></table>`;
+			      case "quote":
+			        return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px;"><tr><td style="border-left:4px solid ${_accent};padding:10px 18px;background:rgba(160,120,88,.06);"><p style="margin:0 0 8px;font-family:Georgia,'Times New Roman',serif;font-size:16px;font-style:italic;color:#4A3728;line-height:1.7;">${n2b(b.content||"")}</p>${b.author ? `<p style="margin:0;font-family:Georgia,serif;font-size:12px;color:#9a7a60;">${esc(b.author)}</p>` : ""}</td></tr></table>`;
+			      default: return "";
+			    }
+			  }).join("\n");
+			}
+			
+			function getEmailPayload() {
+			  const subject = document.getElementById("ecHeadline").textContent.trim() || "Progress";
+			  return {
+			    subject,
+			    bodyHtml: compileBlocks(),
+			    body: _blocks.map(b => b.content || b.text || b.col1 || "").join(" ").slice(0, 150),
+			    emoticon: _emoticon === "none" ? "" : _emoticon,
+			    accentColor: _accent,
+			    buttonColor: _accent,
+			    footerTagline: _footerTagline,
+			  };
+			}
+			
+			// ── Preview ───────────────────────────────────────────────────────────────────
+			async function showPreview() {
+			  if (!_blocks.length) { showToast("Add content blocks first."); return; }
+			  const r = await apiFetch("/api/admin/preview-email", {
+			    method: "POST", headers: { "Content-Type": "application/json" },
+			    body: JSON.stringify(getEmailPayload())
+			  });
+			  if (r && r.html) {
+			    document.getElementById("previewFrame").srcdoc = r.html;
+			    document.getElementById("previewModal").classList.add("show");
+			  } else {
+			    showToast("Preview failed.");
+			  }
+			}
+			
+			// ── Send ──────────────────────────────────────────────────────────────────────
+			async function doSend() {
+			  const btn = document.getElementById("smSend");
+			  const status = document.getElementById("smStatus");
+			  const type = document.getElementById("smRecipient").value;
+			  const targetUsername = type === "specific"
+			    ? document.getElementById("smUsername").value.trim().replace(/^@/, "")
+			    : null;
+			  if (type === "specific" && !targetUsername) { showToast("Enter a username."); return; }
+			
+			  btn.disabled = true; btn.textContent = "Sending…"; status.textContent = "";
+			  const r = await apiFetch("/api/admin/send-email", {
+			    method: "POST", headers: { "Content-Type": "application/json" },
+			    body: JSON.stringify({ ...getEmailPayload(), targetUsername: targetUsername || undefined })
+			  });
+			  btn.disabled = false; btn.textContent = "Send email ✉";
+			  if (r && typeof r.sent === "number") {
+			    status.textContent = `✓ Sent to ${r.sent} user${r.sent!==1?"s":""}${r.failed?" ("+r.failed+" failed)":""}`;
+			    showToast(`Sent to ${r.sent} users.`);
+			    setTimeout(() => document.getElementById("sendModal").classList.remove("show"), 1500);
+			  } else if (r?.error) {
+			    status.textContent = `Error: ${r.error}`;
+			  } else {
+			    status.textContent = "Failed — check server.";
+			  }
+			}
+			
+			// ── Save ──────────────────────────────────────────────────────────────────────
+			function setSaveStatus(state, msg) {
+			  const el = document.getElementById("saveStatus");
+			  if (state === "saving")   { el.textContent = "Saving…";    el.className = "saving"; }
+			  else if (state === "saved") { el.textContent = "✓ Saved";  el.className = "saved"; }
+			  else if (state === "conflict") { el.textContent = "⚠ Conflict"; el.className = "conflict"; }
+			  else                      { el.textContent = "Unsaved";   el.className = ""; }
+			}
+			
+			let _saveTimeout;
+			
+			async function save(force = false) {
+			  if (!_dirty && !force) return;
+			  if (!_projectId) return;
+			  if (_saving) return;
+			  _saving = true;
+			  setSaveStatus("saving");
+			  const subject = document.getElementById("ecHeadline").textContent.trim();
+			  const name = document.getElementById("projectName").value.trim() || "Untitled email";
+			  const r = await apiFetch(`/api/admin/email-projects/${_projectId}`, {
+			    method: "PUT", headers: { "Content-Type": "application/json" },
+			    body: JSON.stringify({ name, subject, blocks: _blocks, emoticon: _emoticon, accentColor: _accent, footerTagline: _footerTagline, clientVersion: _version })
+			  });
+			  _saving = false;
+			  if (r && r.ok) {
+			    _version = r.version;
+			    _dirty = false;
+			    setSaveStatus("saved");
+			  } else if (r && r.conflict) {
+			    setSaveStatus("conflict");
+			    handleConflict(r);
+			  } else {
+			    setSaveStatus("unsaved");
+			  }
+			}
+			
+			function handleConflict(r) {
+			  // Store conflict data for the modal buttons to use
+			  window._conflictProject = r.project;
+			  window._conflictServerVersion = r.serverVersion;
+			  const modal = document.getElementById("conflictModal");
+			  document.getElementById("conflictMsg").textContent =
+			    `Someone else saved changes (server v${r.serverVersion} vs your v${_version}). Which version should we keep?`;
+			  modal.classList.add("show");
+			}
+			
+			// ── Collaboration ─────────────────────────────────────────────────────────────
+			function startHeartbeat() {
+			  if (!_projectId) return;
+			  const beat = async () => {
+			    const r = await apiFetch(`/api/admin/email-projects/${_projectId}/presence`, {
+			      method: "POST", headers: { "Content-Type": "application/json" },
+			      // Send selId so others can see which block you're editing
+			      body: JSON.stringify({ color: _myColor, selId: _selId || null })
+			    });
+			    if (r && r.project) updatePresence(r.project.presence || []);
+			  };
+			  beat();
+			  _heartbeatInterval = setInterval(beat, 8000);
+			}
+			
+			function startSync() {
+			  // Sync every 2s — real-time collaboration
+			  _syncInterval = setInterval(async () => {
+			    if (!_projectId || _dirty) return;
+			    const r = await apiFetch(`/api/admin/email-projects/${_projectId}`);
+			    if (!r || r.error) return;
+			    if (r.version > _version) {
+			      // Someone else saved — apply changes seamlessly
+			      const was = _selId;
+			      loadProject(r);
+			      _selId = was;
+			      showToast("✦ Updated from collaborator");
+			    }
+			    updatePresence(r.presence || []);
+			  }, 2000);
+			}
+			
+			function updatePresence(presence) {
+			  const me = Progress.getCurrentUser?.()?.username;
+			  const others = (presence || []).filter(p => p.username !== me);
+			
+			  // ── Top bar avatars ──
+			  const container = document.getElementById("collabAvatars");
+			  container.innerHTML = others.map(u => {
+			    const initials = (u.name||u.username||"?").slice(0,2).toUpperCase();
+			    const editing = u.selId ? ` · editing` : "";
+			    return `<div class="collab-avatar" style="background:${u.color||"#8C6E58"};">
+			      ${initials}
+			      <span class="ca-tip">${escapeHTML(u.name||u.username)}${editing}</span>
+			    </div>`;
+			  }).join("");
+			
+			  // ── Right panel collab bar ──
+			  const bar = document.getElementById("rpCollabBar");
+			  if (others.length) {
+			    bar.classList.add("has-others");
+			    bar.innerHTML = others.map(u =>
+			      `<span class="rp-collab-chip" style="background:${u.color||"#8C6E58"};">
+			        ${escapeHTML((u.name||u.username||"?").slice(0,12))}${u.selId ? " ✏" : " 👁"}
+			      </span>`
+			    ).join("");
+			  } else {
+			    bar.classList.remove("has-others");
+			    bar.innerHTML = "";
+			  }
+			
+			  // ── Block-level presence rings ──
+			  // Remove old collab tags and rings
+			  document.querySelectorAll(".ec-block-collab-tag").forEach(el => el.remove());
+			  document.querySelectorAll(".ec-block").forEach(el => {
+			    el.style.boxShadow = el.classList.contains("selected")
+			      ? "" : el.style.boxShadow?.startsWith("0 0 0 2px") ? "" : el.style.boxShadow;
+			  });
+			
+			  others.forEach(u => {
+			    if (!u.selId) return;
+			    const blockEl = document.querySelector(`.ec-block[data-id="${u.selId}"]`);
+			    if (!blockEl) return;
+			    // Colored ring
+			    blockEl.style.boxShadow = `0 0 0 2px ${u.color||"#8C6E58"}`;
+			    // Name tag above block
+			    const tag = document.createElement("div");
+			    tag.className = "ec-block-collab-tag";
+			    tag.style.background = u.color || "#8C6E58";
+			    tag.textContent = (u.name || u.username || "?").slice(0, 14);
+			    blockEl.appendChild(tag);
+			  });
+			}
+			
+			function markDirty() { _dirty = true; setSaveStatus("unsaved"); clearTimeout(_saveTimeout); _saveTimeout = setTimeout(() => save(), 2000); }
+			
+			// ── Boot ──────────────────────────────────────────────────────────────────────
+			start();

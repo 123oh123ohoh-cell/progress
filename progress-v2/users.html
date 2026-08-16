@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Community — Progress</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500;1,9..144,600&family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script>(function(){try{var t=localStorage.getItem("progressTheme");var dark=(t==="dark")||(t!=="light"&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);if(dark)document.documentElement.setAttribute("data-theme","dark");}catch(e){}})();</script>
+<link rel="stylesheet" href="v2-compat.css">
+<link rel="stylesheet" href="style.css">
+<style>
+#nav-root { display:none !important; }
+
+.v2-users-page { max-width: 900px; margin: 0 auto; padding: calc(var(--v2-nav-h)+36px) 24px 100px; }
+
+.v2-users-head { margin-bottom: 32px; }
+.v2-users-head h1 {
+  font-family: var(--v2-font-d); font-style: italic; font-size: 32px;
+  color: var(--v2-ink); margin: 0 0 8px;
+}
+.v2-users-head p { font-size: 15px; color: var(--v2-muted); margin: 0 0 20px; }
+
+/* Auth gate */
+.v2-auth-gate {
+  max-width: 360px; margin: 80px auto 0; text-align: center; padding: 0 24px;
+}
+.v2-auth-gate h1 { font-family: var(--v2-font-d); font-style: italic; font-size: 26px; margin: 0 0 10px; color: var(--v2-ink); }
+.v2-auth-gate p { font-size: 14px; color: var(--v2-muted); margin: 0 0 20px; line-height: 1.6; }
+.v2-auth-input {
+  width: 100%; padding: 11px 14px; border: 1.5px solid var(--v2-border);
+  border-radius: var(--r-md); background: var(--v2-paper); color: var(--v2-ink);
+  font-size: 15px; font-family: var(--v2-font-b); outline: none; margin-bottom: 10px;
+  box-sizing: border-box; transition: border-color .15s;
+}
+.v2-auth-input:focus { border-color: var(--v2-accent); box-shadow: 0 0 0 3px var(--v2-accent-dim); }
+.v2-auth-btn {
+  width: 100%; padding: 11px; background: var(--v2-ink); color: var(--v2-bg);
+  border: none; border-radius: 30px; font-size: 15px; font-weight: 700;
+  font-family: var(--v2-font-b); cursor: pointer; transition: opacity .15s;
+}
+.v2-auth-btn:hover { opacity: .88; }
+.v2-auth-error { color: #ef4444; font-size: 13px; margin-top: 10px; display: none; }
+
+/* Search bar */
+.v2-users-toolbar { display: flex; gap: 10px; margin-bottom: 24px; }
+.v2-users-search {
+  flex: 1; padding: 10px 14px; border: 1.5px solid var(--v2-border);
+  border-radius: 30px; background: var(--v2-paper); color: var(--v2-ink);
+  font-size: 14px; font-family: var(--v2-font-b); outline: none; transition: border-color .15s;
+}
+.v2-users-search:focus { border-color: var(--v2-accent); box-shadow: 0 0 0 3px var(--v2-accent-dim); }
+.v2-users-search::placeholder { color: var(--v2-muted); }
+
+/* User grid */
+.v2-users-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px;
+}
+
+/* User card */
+.v2-user-card {
+  background: var(--v2-paper); border: 1px solid var(--v2-border);
+  border-radius: var(--r-lg); padding: 20px; text-align: center;
+  text-decoration: none; color: inherit; display: block;
+  transition: transform .22s cubic-bezier(.34,1.56,.64,1), box-shadow .2s;
+}
+.v2-user-card:hover { transform: translateY(-5px); box-shadow: var(--sh-lift); }
+.v2-user-card-av {
+  width: 64px; height: 64px; border-radius: 50%; overflow: hidden;
+  margin: 0 auto 12px; border: 2.5px solid var(--v2-border);
+  background: var(--v2-paper-2);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--v2-font-d); font-style: italic; font-size: 22px; color: var(--v2-mocha-dark);
+}
+.v2-user-card-av img { width: 100%; height: 100%; object-fit: cover; }
+.v2-user-card-name { font-weight: 700; font-size: 15px; color: var(--v2-ink); margin-bottom: 2px; }
+.v2-user-card-handle { font-family: var(--v2-font-m); font-size: 12px; color: var(--v2-muted); margin-bottom: 8px; }
+.v2-user-card-bio { font-size: 12px; color: var(--v2-muted); line-height: 1.55; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.v2-user-card-stats { display: flex; gap: 12px; justify-content: center; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--v2-border); }
+.v2-user-card-stat { font-family: var(--v2-font-m); font-size: 11px; color: var(--v2-muted); }
+.v2-user-card-stat strong { display: block; font-size: 15px; color: var(--v2-ink); font-weight: 700; font-family: var(--v2-font-d); }
+
+.v2-users-empty { color: var(--v2-muted); font-size: 15px; padding: 40px 0; text-align: center; }
+</style>
+</head>
+<body class="v2 mobile">
+
+<div id="nav-root" aria-hidden="true"></div>
+<div id="modal-root"></div>
+
+<!-- ── V2 Nav ─────────────────────────────────────────────── -->
+<nav class="v2-nav" id="v2Nav">
+  <div class="v2-nav-inner">
+    <a href="index.html" class="v2-logo">
+      <img src="../images/etc1.png" alt="Progress" class="v2-logo-img">
+      <span class="v2-logo-text">Progress</span>
+    </a>
+    <div class="v2-nav-right" id="v2NavRight">
+      <a href="write.html" class="v2-btn v2-btn--dark" style="font-size:13px;padding:7px 15px;">Write</a>
+    </div>
+  </div>
+</nav>
+
+<!-- Auth gate -->
+<div id="authGate" style="display:none;">
+  <div class="v2-auth-gate" style="padding-top:calc(var(--v2-nav-h)+40px);">
+    <h1>Community</h1>
+    <p>This directory is only available to approved Progress accounts.</p>
+    <input type="password" id="directoryPassword" class="v2-auth-input" placeholder="Access password">
+    <button id="submitPassword" class="v2-auth-btn">Check access</button>
+    <p id="passwordError" class="v2-auth-error">Access denied.</p>
+  </div>
+</div>
+
+<!-- Main content -->
+<div id="contentContainer" style="display:none;">
+  <div class="v2-users-page">
+    <div class="v2-users-head">
+      <h1>Community</h1>
+      <p>Browse writers and follow their journeys</p>
+      <div class="v2-users-toolbar">
+        <input type="search" id="userSearch" class="v2-users-search" placeholder="Search writers…" autocomplete="off">
+      </div>
+    </div>
+    <div class="v2-users-grid" id="usersDirectory">
+      <div class="v2-skel" style="height:200px;border-radius:var(--r-lg);"></div>
+      <div class="v2-skel" style="height:200px;border-radius:var(--r-lg);"></div>
+      <div class="v2-skel" style="height:200px;border-radius:var(--r-lg);"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Mobile bottom nav -->
+<nav class="v2-mob-nav" aria-label="Mobile navigation">
+  <a href="index.html" class="v2-mob-tab"><svg viewBox="0 0 22 22" fill="none" width="21" height="21"><path d="M2.5 10 11 3l8.5 7V19a.8.8 0 0 1-.8.8H3.3a.8.8 0 0 1-.8-.8V10Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg><span>Feed</span></a>
+  <a href="explore.html" class="v2-mob-tab"><svg viewBox="0 0 22 22" fill="none" width="21" height="21"><circle cx="10" cy="10" r="7.5" stroke="currentColor" stroke-width="1.7"/><path d="m16 16 3.5 3.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg><span>Explore</span></a>
+  <a href="write.html" class="v2-mob-tab v2-mob-tab--write"><svg viewBox="0 0 22 22" fill="none" width="21" height="21"><path d="M16.5 3 19 5.5l-13 13L3 20l.5-3.5 13-13Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg><span>Write</span></a>
+  <a href="chat.html" class="v2-mob-tab"><svg viewBox="0 0 22 22" fill="none" width="21" height="21"><path d="M19.5 11c0 4.14-3.36 7.5-7.5 7.5A7.48 7.48 0 0 1 7.3 17.4L3 18.5l1.1-4.3A7.48 7.48 0 0 1 4.5 11C4.5 6.86 7.86 3.5 12 3.5s7.5 3.36 7.5 7.5Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg><span>Chat</span></a>
+  <a href="profile.html" class="v2-mob-tab" id="v2MobProfile"><svg viewBox="0 0 22 22" fill="none" width="21" height="21"><circle cx="11" cy="7.5" r="3.5" stroke="currentColor" stroke-width="1.7"/><path d="M4 19.5c0-3.87 3.13-7 7-7h.5c3.87 0 7 3.13 7 7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg><span>Profile</span></a>
+</nav>
+
+<script src="../data.js"></script>
+<script src="../app.js"></script>
+<script src="v2-nav.js"></script>
+<script>
+const ALLOWED = new Set(["mara","own","progresstesting1"]);
+const DIRECTORY_PW = "blowblow426J";
+
+function _esc(s) { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function ini(name) { return (name||"?").split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase(); }
+
+function hasAccess() {
+  const me = Progress.getCurrentUser();
+  return !!(me && ALLOWED.has(me.username)) || sessionStorage.getItem("directoryAuth") === "true";
+}
+
+async function start() {
+  const ready = initShell("users");
+  v2BootNav(ready);
+  await ready;
+
+  if (!hasAccess()) {
+    document.getElementById("authGate").style.display = "block";
+    document.getElementById("submitPassword").addEventListener("click", () => {
+      const pw = document.getElementById("directoryPassword").value;
+      if (pw === DIRECTORY_PW || hasAccess()) {
+        sessionStorage.setItem("directoryAuth","true");
+        document.getElementById("authGate").style.display = "none";
+        loadDirectory();
+      } else {
+        document.getElementById("passwordError").style.display = "block";
+        document.getElementById("directoryPassword").value = "";
+      }
+    });
+    document.getElementById("directoryPassword").addEventListener("keydown", e => {
+      if (e.key === "Enter") document.getElementById("submitPassword").click();
+    });
+    return;
+  }
+  loadDirectory();
+}
+
+let allUsers = [];
+
+async function loadDirectory() {
+  document.getElementById("contentContainer").style.display = "block";
+  const data = await apiFetch("/api/users").catch(() => null);
+  allUsers = data?.users || [];
+  renderUsers(allUsers);
+
+  document.getElementById("userSearch").addEventListener("input", e => {
+    const q = e.target.value.toLowerCase().trim();
+    renderUsers(q ? allUsers.filter(u =>
+      (u.name||"").toLowerCase().includes(q) ||
+      (u.username||"").toLowerCase().includes(q) ||
+      (u.bio||"").toLowerCase().includes(q)
+    ) : allUsers);
+  });
+}
+
+function renderUsers(users) {
+  const grid = document.getElementById("usersDirectory");
+  if (!users.length) {
+    grid.innerHTML = `<p class="v2-users-empty" style="grid-column:1/-1;">No writers found.</p>`;
+    return;
+  }
+  grid.innerHTML = users.map(u => {
+    const av = u.avatar
+      ? `<img src="${_esc(u.avatar)}" alt="${_esc(u.name||u.username)}" loading="lazy">`
+      : ini(u.name || u.username);
+    return `
+    <a href="user.html?id=${_esc(u.id)}" class="v2-user-card">
+      <div class="v2-user-card-av">${av}</div>
+      <div class="v2-user-card-name">${_esc(u.name||u.username)}</div>
+      <div class="v2-user-card-handle">@${_esc(u.username)}</div>
+      ${u.bio ? `<div class="v2-user-card-bio">${_esc(u.bio)}</div>` : ""}
+      <div class="v2-user-card-stats">
+        <div class="v2-user-card-stat"><strong>${u.postCount||0}</strong>posts</div>
+        <div class="v2-user-card-stat"><strong>${u.followers?.length||0}</strong>followers</div>
+        ${u.streak >= 2 ? `<div class="v2-user-card-stat"><strong>${u.streak}🔥</strong>streak</div>` : ""}
+      </div>
+    </a>`;
+  }).join("");
+}
+
+start();
+</script>
+</body>
+</html>

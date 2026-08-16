@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Progress v2 — a journal for what you're building</title>
+<meta property="og:site_name" content="Progress">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Progress v2">
+<meta property="og:description" content="A running record of things made, fixed, rebuilt, and understood a little better than yesterday.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500;1,9..144,600&family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<!-- Dark-mode flash prevention (same as v1) -->
+<script>(function(){try{var t=localStorage.getItem("progressTheme");var dark=(t==="dark")||(t!=="light"&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);if(dark)document.documentElement.setAttribute("data-theme","dark");}catch(e){}})();</script>
+<!-- Include parent style.css so initShell modals/dropdowns still work -->
+<link rel="stylesheet" href="v2-compat.css">
+<!-- V2 design system -->
+<link rel="stylesheet" href="style.css">
+<style>
+/* Hide the v1 nav injected by initShell – we have our own */
+#nav-root { display: none !important; }
+/* Override v1 body styles */
+body { background: var(--v2-bg); margin: 0; }
+</style>
+</head>
+<body class="v2 mobile">
+
+<!-- Hidden nav-root: keeps initShell auth/socket wiring alive -->
+<div id="nav-root" aria-hidden="true"></div>
+<div id="modal-root"></div>
+
+<!-- ══════════════════════════════════════════════════════════
+     V2 NAV
+══════════════════════════════════════════════════════════ -->
+<nav class="v2-nav" id="v2Nav">
+  <div class="v2-nav-inner">
+
+    <!-- Logo -->
+    <a href="index.html" class="v2-logo">
+      <img src="../images/etc1.png" alt="Progress" class="v2-logo-img">
+      <span class="v2-logo-text">Progress</span>
+    </a>
+
+    <!-- Search -->
+    <div class="v2-search">
+      <svg class="v2-search-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.4"/>
+        <path d="m11 11 2.5 2.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <input type="search" placeholder="Search posts…" id="v2SearchInput" autocomplete="off">
+    </div>
+
+    <!-- Right actions — filled by JS after auth is ready -->
+    <div class="v2-nav-right" id="v2NavRight">
+      <!-- default before auth loads -->
+      <a href="write.html" class="v2-btn v2-btn--dark" style="font-size:13px;padding:7px 15px;">
+        <svg viewBox="0 0 16 16" fill="none" width="13" height="13" aria-hidden="true">
+          <path d="M11.5 2 14 4.5l-8.5 8.5L3 14l.5-2.5L11.5 2Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+        </svg>
+        Write
+      </a>
+    </div>
+
+  </div>
+</nav>
+
+<!-- ══════════════════════════════════════════════════════════
+     PAGE LAYOUT
+══════════════════════════════════════════════════════════ -->
+<div class="v2-layout">
+
+  <!-- ── Left Sidebar ─────────────────────────────────────── -->
+  <aside class="v2-side v2-side--left">
+
+    <!-- User card (injected when logged in) -->
+    <div id="v2UserCard"></div>
+
+    <div class="v2-side-section">
+      <nav class="v2-side-nav" aria-label="Main">
+        <a href="index.html" class="v2-side-link v2-side-link--active">
+          <svg viewBox="0 0 18 18" fill="none" width="15" height="15" aria-hidden="true"><path d="M2 8.5 9 2.5l7 6V15a.8.8 0 0 1-.8.8H3a.8.8 0 0 1-.8-.8V8.5Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+          Feed
+        </a>
+        <a href="explore.html" class="v2-side-link">
+          <svg viewBox="0 0 18 18" fill="none" width="15" height="15" aria-hidden="true"><circle cx="9" cy="9" r="6.5" stroke="currentColor" stroke-width="1.4"/><path d="M6 12 8 7.5 12.5 6 10.5 10.5 6 12Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+          Explore
+        </a>
+        <a href="chat.html" class="v2-side-link">
+          <svg viewBox="0 0 18 18" fill="none" width="15" height="15" aria-hidden="true"><path d="M15.5 9c0 3.59-2.91 6.5-6.5 6.5A6.48 6.48 0 0 1 5.8 14.6L2.5 15.5l.9-3.3A6.48 6.48 0 0 1 2.5 9c0-3.59 2.91-6.5 6.5-6.5s6.5 2.91 6.5 6.5Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+          Chat
+        </a>
+        <a href="write.html" class="v2-side-link">
+          <svg viewBox="0 0 18 18" fill="none" width="15" height="15" aria-hidden="true"><path d="M13 2.5 15.5 5l-10 10L3 16l.5-2.5 10-11Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+          Write
+        </a>
+        <a href="profile.html" class="v2-side-link" id="v2SideProfile" style="display:none">
+          <svg viewBox="0 0 18 18" fill="none" width="15" height="15" aria-hidden="true"><circle cx="9" cy="6.5" r="3" stroke="currentColor" stroke-width="1.4"/><path d="M3 15.5c0-3.31 2.69-6 6-6s6 2.69 6 6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+          Profile
+        </a>
+      </nav>
+    </div>
+
+    <div class="v2-side-section">
+      <p class="v2-side-label">Categories</p>
+      <div class="v2-side-cats">
+        <button class="v2-cat-pill v2-cat-pill--dev"      onclick="v2FilterCat('development')">Development</button>
+        <button class="v2-cat-pill v2-cat-pill--creative" onclick="v2FilterCat('creative')">Creative</button>
+        <button class="v2-cat-pill v2-cat-pill--random"   onclick="v2FilterCat('random')">Random</button>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- ── Main Feed ──────────────────────────────────────────── -->
+  <main class="v2-main">
+
+    <!-- Category tabs -->
+    <div class="v2-tabs-wrap">
+      <div class="v2-tabs" id="v2Tabs" role="tablist" aria-label="Filter by category">
+        <button class="v2-tab active" data-cat="all" role="tab" aria-selected="true">All</button>
+        <button class="v2-tab" data-cat="following" role="tab" aria-selected="false">Following</button>
+        <button class="v2-tab" data-cat="development" role="tab" aria-selected="false">
+          <span class="v2-tab-dot" style="background:var(--cat-dev)"></span>Dev
+        </button>
+        <button class="v2-tab" data-cat="creative" role="tab" aria-selected="false">
+          <span class="v2-tab-dot" style="background:var(--cat-creative)"></span>Creative
+        </button>
+        <button class="v2-tab" data-cat="random" role="tab" aria-selected="false">
+          <span class="v2-tab-dot" style="background:var(--cat-random)"></span>Random
+        </button>
+      </div>
+    </div>
+
+    <!-- Banners -->
+    <div class="v2-event-banner" id="v2EventBanner"></div>
+    <div id="v2PromptBanner" style="margin-bottom:14px;"></div>
+
+    <!-- New posts pill -->
+    <div style="display:flex;justify-content:center;">
+      <button class="v2-new-posts-btn" id="v2NewBtn">
+        <svg viewBox="0 0 16 16" fill="none" width="13" height="13" aria-hidden="true"><path d="M8 3v10M4 7l4-4 4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span id="v2NewBtnText">New posts</span>
+      </button>
+    </div>
+
+    <!-- Feed -->
+    <div id="v2Feed">
+      <!-- Loading skeletons -->
+      <div id="v2Loading">
+        <div class="v2-skel v2-skel-feat"></div>
+        <div class="v2-skel-grid">
+          <div class="v2-skel v2-skel-card"></div>
+          <div class="v2-skel v2-skel-card"></div>
+          <div class="v2-skel v2-skel-card"></div>
+          <div class="v2-skel v2-skel-card"></div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ── Right Sidebar ─────────────────────────────────────── -->
+  <aside class="v2-side v2-side--right">
+
+    <div class="v2-side-section">
+      <p class="v2-side-label">Active Writers</p>
+      <div class="v2-trending-list" id="v2TrendingList">
+        <!-- Filled by JS -->
+      </div>
+    </div>
+
+    <div class="v2-side-section">
+      <p class="v2-side-label">About</p>
+      <p class="v2-side-about">A running record of things made, fixed, rebuilt, and understood a little better than yesterday.</p>
+      <a href="signup.html" class="v2-btn v2-btn--ghost v2-btn--full" id="v2JoinBtn" style="display:none;font-size:13.5px;">
+        Join Progress
+      </a>
+    </div>
+
+    <div class="v2-side-section" id="v2StreakBox" style="display:none;"></div>
+
+  </aside>
+
+</div><!-- /.v2-layout -->
+
+<!-- ══════════════════════════════════════════════════════════
+     MOBILE BOTTOM NAV
+══════════════════════════════════════════════════════════ -->
+<nav class="v2-mob-nav" aria-label="Mobile navigation">
+  <a href="index.html" class="v2-mob-tab v2-mob-tab--active" aria-label="Feed">
+    <svg viewBox="0 0 22 22" fill="none" width="21" height="21" aria-hidden="true"><path d="M2.5 10 11 3l8.5 7V19a.8.8 0 0 1-.8.8H3.3a.8.8 0 0 1-.8-.8V10Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+    <span>Feed</span>
+  </a>
+  <a href="explore.html" class="v2-mob-tab" aria-label="Explore">
+    <svg viewBox="0 0 22 22" fill="none" width="21" height="21" aria-hidden="true"><circle cx="10" cy="10" r="7.5" stroke="currentColor" stroke-width="1.7"/><path d="m16 16 3.5 3.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+    <span>Explore</span>
+  </a>
+  <a href="write.html" class="v2-mob-tab v2-mob-tab--write" aria-label="Write">
+    <svg viewBox="0 0 22 22" fill="none" width="21" height="21" aria-hidden="true"><path d="M16.5 3 19 5.5l-13 13L3 20l.5-3.5 13-13Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+    <span>Write</span>
+  </a>
+  <a href="chat.html" class="v2-mob-tab" aria-label="Chat">
+    <svg viewBox="0 0 22 22" fill="none" width="21" height="21" aria-hidden="true"><path d="M19.5 11c0 4.14-3.36 7.5-7.5 7.5A7.48 7.48 0 0 1 7.3 17.4L3 18.5l1.1-4.3A7.48 7.48 0 0 1 4.5 11C4.5 6.86 7.86 3.5 12 3.5s7.5 3.36 7.5 7.5Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+    <span>Chat</span>
+  </a>
+  <a href="profile.html" class="v2-mob-tab" id="v2MobProfile" aria-label="Profile">
+    <svg viewBox="0 0 22 22" fill="none" width="21" height="21" aria-hidden="true"><circle cx="11" cy="7.5" r="3.5" stroke="currentColor" stroke-width="1.7"/><path d="M4 19.5c0-3.87 3.13-7 7-7h.5c3.87 0 7 3.13 7 7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+    <span>Profile</span>
+  </a>
+</nav>
+
+
+<!-- ══════════════════════════════════════════════════════════
+     SCRIPTS
+══════════════════════════════════════════════════════════ -->
+<script src="../data.js"></script>
+<script src="../app.js"></script>
+<script src="v2-nav.js"></script>
+<script>
+/* ── V2 Feed — constants ──────────────────────────────────── */
+const V2_READ_KEY  = "progress:readPosts";
+const V2_CAT_KEY   = "progress:activeCategory";
+
+/* ── Helpers ──────────────────────────────────────────────── */
+function v2GetRead() {
+  try { return new Set(JSON.parse(localStorage.getItem(V2_READ_KEY) || "[]")); } catch { return new Set(); }
+}
+
+function v2MarkRead(id) {
+  try {
+    const s = v2GetRead();
+    s.add(id);
+    localStorage.setItem(V2_READ_KEY, JSON.stringify([...s].slice(-500)));
+  } catch {}
+}
+
+let v2ActiveCat = localStorage.getItem(V2_CAT_KEY) || "all";
+
+function v2SetCat(cat) {
+  v2ActiveCat = cat;
+  try { localStorage.setItem(V2_CAT_KEY, cat); } catch {}
+}
+
+function v2InitTabs() {
+  const tabs = document.querySelectorAll(".v2-tab");
+  tabs.forEach(btn => {
+    const isActive = btn.dataset.cat === v2ActiveCat;
+    btn.classList.toggle("active", isActive);
+    btn.setAttribute("aria-selected", String(isActive));
+    btn.addEventListener("click", () => {
+      v2SetCat(btn.dataset.cat);
+      tabs.forEach(t => {
+        t.classList.toggle("active", t.dataset.cat === v2ActiveCat);
+        t.setAttribute("aria-selected", String(t.dataset.cat === v2ActiveCat));
+      });
+      v2RenderFeed();
+    });
+  });
+}
+
+function v2FilterCat(cat) {
+  v2SetCat(cat);
+  document.querySelectorAll(".v2-tab").forEach(t => {
+    t.classList.toggle("active", t.dataset.cat === cat);
+    t.setAttribute("aria-selected", String(t.dataset.cat === cat));
+  });
+  v2RenderFeed();
+  // Scroll feed into view on mobile
+  document.getElementById("v2Feed").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+/* ── Avatar helper ────────────────────────────────────────── */
+function v2AvatarEl(user, size = 22) {
+  const cls = "v2-card-av";
+  if (!user) {
+    return `<div class="${cls}" style="width:${size}px;height:${size}px;">?</div>`;
+  }
+  if (user.avatar) {
+    return `<div class="${cls}" style="width:${size}px;height:${size}px;"><img src="${escapeHTML(user.avatar)}" alt="@${escapeHTML(user.username)}" loading="lazy"></div>`;
+  }
+  const initials = (user.name || user.username).split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+  return `<div class="${cls}" style="width:${size}px;height:${size}px;font-size:${Math.floor(size * .38)}px;">${initials}</div>`;
+}
+
+/* ── Card HTML builder ────────────────────────────────────── */
+function v2CardHTML(post, isFeat, readSet) {
+  const author = Progress.getUser(post.author);
+  const isRead = readSet.has(post.id);
+  const catSlug = (post.category || "").toLowerCase();
+  const catLabel = catSlug ? catSlug.charAt(0).toUpperCase() + catSlug.slice(1) : "";
+  const catChip = catLabel
+    ? `<span class="v2-card-cat cat-${catSlug}"><span class="v2-card-cat-dot"></span>${catLabel}</span>`
+    : "";
+  const dateStr = Progress.formatDateShort(post.date);
+  const title = renderEmoticonsText ? renderEmoticonsText(post.title, "inline-emoticon") : escapeHTML(post.title);
+  const excerpt = renderEmoticonsText ? renderEmoticonsText(post.excerpt, "inline-emoticon") : escapeHTML(post.excerpt);
+  const av = v2AvatarEl(author, isFeat ? 24 : 22);
+
+  if (isFeat) {
+    const imgWrap = post.cover
+      ? `<div class="v2-feat-img-wrap"><img class="v2-card-cover" src="${escapeHTML(post.cover)}" alt="" loading="lazy"></div>`
+      : `<div class="v2-feat-img-wrap"><div class="v2-feat-gradient">${post.emoji || "✍️"}</div></div>`;
+
+    return `
+    <article class="v2-card v2-card--feat${isRead ? " v2-read" : ""}" data-id="${post.id}" data-href="post.html?id=${post.id}" tabindex="0" role="article">
+      ${imgWrap}
+      <div class="v2-card-body">
+        <div class="v2-feat-eyebrow">Featured</div>
+        <div class="v2-card-meta">
+          ${catChip}
+          <span class="v2-card-date">${dateStr}</span>
+        </div>
+        <h2 class="v2-card-title">${title}</h2>
+        <p class="v2-card-excerpt">${excerpt}</p>
+        <div class="v2-card-footer">
+          ${av}
+          <span class="v2-card-author">@${escapeHTML(post.author)}</span>
+          <span class="v2-card-likes">
+            <svg viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M6 10.5S1 7.2 1 4.2C1 2.4 2.4 1 4.2 1c.9 0 1.8.5 2.8 1.6C8-.5 9.4 1 9.8 1c1.8 0 3.2 1.4 1.2 3.2C9 7.2 6 10.5 6 10.5Z" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg>
+            ${post.likes || 0}
+          </span>
+        </div>
+      </div>
+    </article>`;
+  }
+
+  const imgEl = post.cover
+    ? `<img class="v2-card-cover" src="${escapeHTML(post.cover)}" alt="" loading="lazy">`
+    : "";
+
+  return `
+  <article class="v2-card${isRead ? " v2-read" : ""}" data-id="${post.id}" data-href="post.html?id=${post.id}" tabindex="0" role="article">
+    ${imgEl}
+    <div class="v2-card-body">
+      <div class="v2-card-meta">
+        ${catChip}
+        <span class="v2-card-date">${dateStr}</span>
+      </div>
+      <h2 class="v2-card-title">${title}</h2>
+      <p class="v2-card-excerpt">${excerpt}</p>
+      <div class="v2-card-footer">
+        ${av}
+        <span class="v2-card-author">@${escapeHTML(post.author)}</span>
+        <span class="v2-card-likes">
+          <svg viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M6 10.5S1 7.2 1 4.2C1 2.4 2.4 1 4.2 1c.9 0 1.8.5 2.8 1.6C8-.5 9.4 1 9.8 1c1.8 0 3.2 1.4 1.2 3.2C9 7.2 6 10.5 6 10.5Z" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg>
+          ${post.likes || 0}
+        </span>
+      </div>
+    </div>
+  </article>`;
+}
+
+/* ── Render feed ──────────────────────────────────────────── */
+function v2RenderFeed() {
+  let posts = Progress.getPosts();
+  const feed = document.getElementById("v2Feed");
+
+  // Category filter
+  if (v2ActiveCat && v2ActiveCat !== "all") {
+    if (v2ActiveCat === "following") {
+      const me = Progress.getCurrentUser();
+      const fl = (me && me.following) ? me.following : [];
+      posts = posts.filter(p => fl.includes(p.author));
+    } else {
+      posts = posts.filter(p => (p.category || "").toLowerCase() === v2ActiveCat);
+    }
+  }
+
+  if (!posts.length) {
+    feed.innerHTML = `
+      <div class="v2-empty">
+        <h3>${v2ActiveCat === "following" ? "No posts from people you follow yet" : "Nothing here yet"}</h3>
+        <p>${v2ActiveCat === "following" ? "Follow some writers and their posts will show up here." : "The first entry is always the hardest one to publish."}</p>
+      </div>`;
+    return;
+  }
+
+  const readSet = v2GetRead();
+  const [first, ...rest] = posts;
+  const featHTML = v2CardHTML(first, true, readSet);
+  const restHTML = rest.map(p => v2CardHTML(p, false, readSet)).join("");
+
+  feed.innerHTML = `
+    ${featHTML}
+    ${rest.length ? `<div class="v2-grid">${restHTML}</div>` : ""}`;
+
+  // Wire click handlers
+  feed.querySelectorAll(".v2-card").forEach(card => {
+    card.addEventListener("click", e => {
+      if (e.target.closest("a")) return;
+      const href = card.dataset.href;
+      if (href) {
+        v2MarkRead(card.dataset.id);
+        card.classList.add("v2-read");
+        location.href = href;
+      }
+    });
+    card.addEventListener("keydown", e => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); card.click(); }
+    });
+  });
+}
+
+/* ── Nav scroll shadow ─────────────────────────────────────── */
+window.addEventListener("scroll", () => {
+  document.getElementById("v2Nav").classList.toggle("scrolled", window.scrollY > 10);
+}, { passive: true });
+
+/* ── Right sidebar: trending writers ──────────────────────── */
+function v2RenderTrending() {
+  const posts = Progress.getPosts();
+  const counts = {};
+  posts.forEach(p => { counts[p.author] = (counts[p.author] || 0) + 1; });
+  const top = Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([username]) => username);
+
+  const list = document.getElementById("v2TrendingList");
+  if (!list || !top.length) return;
+
+  list.innerHTML = top.map(username => {
+    const user = Progress.getUser(username);
+    const postCount = counts[username];
+    let avHTML;
+    if (user && user.avatar) {
+      avHTML = `<img src="${escapeHTML(user.avatar)}" alt="@${escapeHTML(username)}" loading="lazy">`;
+    } else {
+      const ini = (user ? (user.name || username) : username).split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+      avHTML = ini;
+    }
+    return `
+      <a href="user.html?id=${escapeHTML(username)}" class="v2-trending-user">
+        <div class="v2-trending-av">${avHTML}</div>
+        <div class="v2-trending-info">
+          <div class="v2-trending-name">@${escapeHTML(username)}</div>
+          <div class="v2-trending-posts">${postCount} post${postCount !== 1 ? "s" : ""}</div>
+        </div>
+      </a>`;
+  }).join("");
+}
+
+/* ── Left sidebar: user card ──────────────────────────────── */
+function v2RenderUserCard() {
+  const me = Progress.getCurrentUser();
+  const card = document.getElementById("v2UserCard");
+  const sideProfile = document.getElementById("v2SideProfile");
+  const joinBtn = document.getElementById("v2JoinBtn");
+  const streakBox = document.getElementById("v2StreakBox");
+
+  if (!me) {
+    if (joinBtn) joinBtn.style.display = "";
+    return;
+  }
+
+  if (sideProfile) sideProfile.style.display = "";
+  if (joinBtn) joinBtn.style.display = "none";
+
+  const ini = (me.name || me.username).split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+  const avHTML = me.avatar
+    ? `<img src="${escapeHTML(me.avatar)}" alt="" loading="lazy">`
+    : ini;
+
+  if (card) {
+    card.innerHTML = `
+      <div class="v2-user-card">
+        <div class="v2-user-card-av">${avHTML}</div>
+        <div class="v2-user-card-name">${escapeHTML(me.name || me.username)}</div>
+        <div class="v2-user-card-handle">@${escapeHTML(me.username)}</div>
+      </div>`;
+  }
+
+  // Streak
+  if (streakBox && me.streak >= 2) {
+    streakBox.style.display = "block";
+    streakBox.innerHTML = `
+      <div style="background:var(--v2-paper);border:1px solid var(--v2-border);border-radius:var(--r-md);padding:13px 14px;display:flex;align-items:center;gap:10px;box-shadow:var(--sh-xs);">
+        <span style="font-size:22px;">🔥</span>
+        <div>
+          <div style="font-weight:700;font-size:13.5px;color:var(--v2-ink);">${me.streak}-day streak</div>
+          <div style="font-size:11.5px;color:var(--v2-muted);">Keep it going!</div>
+        </div>
+      </div>`;
+  }
+
+  // Nav right: replace default write button with avatar + actions
+  const navRight = document.getElementById("v2NavRight");
+  if (navRight) {
+    const ini2 = (me.name || me.username).split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+    const avEl = me.avatar
+      ? `<img src="${escapeHTML(me.avatar)}" alt="" loading="lazy">`
+      : ini2;
+
+    navRight.innerHTML = `
+      <a href="write.html" class="v2-btn v2-btn--dark" style="font-size:13px;padding:7px 15px;">
+        <svg viewBox="0 0 16 16" fill="none" width="13" height="13" aria-hidden="true"><path d="M11.5 2 14 4.5l-8.5 8.5L3 14l.5-2.5L11.5 2Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+        Write
+      </a>
+      <div class="v2-nav-av" id="v2AvatarBtn" tabindex="0" role="button" aria-haspopup="true" aria-label="Account menu">
+        ${avEl}
+      </div>
+      <div class="v2-dropdown" id="v2AvatarDropdown" role="menu">
+        <a class="v2-dd-item" href="profile.html">Profile</a>
+        <a class="v2-dd-item" href="user.html?id=${escapeHTML(me.username)}">My journal</a>
+        <a class="v2-dd-item" href="admin.html" id="v2AdminLink" style="display:none">Admin</a>
+        <button class="v2-dd-item danger" id="v2LogoutBtn">Sign out</button>
+      </div>`;
+
+    // Avatar dropdown toggle
+    const avatarBtn = document.getElementById("v2AvatarBtn");
+    const dropdown  = document.getElementById("v2AvatarDropdown");
+
+    if (avatarBtn && dropdown) {
+      avatarBtn.addEventListener("click", e => {
+        e.stopPropagation();
+        dropdown.classList.toggle("open");
+      });
+      document.addEventListener("click", () => dropdown.classList.remove("open"));
+
+      // Sign out wired to initShell's logout
+      const logoutBtn = document.getElementById("v2LogoutBtn");
+      if (logoutBtn) {
+        logoutBtn.addEventListener("click", () => {
+          if (typeof Progress.logout === "function") Progress.logout();
+          else { localStorage.clear(); location.href = "index.html"; }
+        });
+      }
+
+      // Admin link
+      if (me.adminRole && ["owner","moderator"].includes(me.adminRole)) {
+        const adminLink = document.getElementById("v2AdminLink");
+        if (adminLink) adminLink.style.display = "";
+      }
+    }
+
+    // Mobile profile link
+    const mobProfile = document.getElementById("v2MobProfile");
+    if (mobProfile) mobProfile.href = `user.html?id=${escapeHTML(me.username)}`;
+  }
+}
+
+/* ── New posts polling ────────────────────────────────────── */
+let v2LastCount = 0;
+let v2NewAvail  = 0;
+const v2NewBtn  = document.getElementById("v2NewBtn");
+const v2NewTxt  = document.getElementById("v2NewBtnText");
+
+if (v2NewBtn) {
+  v2NewBtn.addEventListener("click", () => {
+    v2NewBtn.classList.remove("show");
+    v2RenderFeed();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    v2NewAvail = 0;
+  });
+}
+
+async function v2CheckNew() {
+  await Progress.loadFromApi().catch(() => {});
+  const n = Progress.getPosts().length;
+  if (!v2LastCount) { v2LastCount = n; return; }
+  const diff = n - v2LastCount;
+  if (diff > 0) {
+    v2NewAvail += diff;
+    v2LastCount = n;
+    if (v2NewBtn && v2NewTxt) {
+      v2NewTxt.textContent = v2NewAvail === 1 ? "1 new post" : `${v2NewAvail} new posts`;
+      v2NewBtn.classList.add("show");
+    }
+  }
+}
+
+/* ── Event banner ─────────────────────────────────────────── */
+let _efcTimer2 = null;
+async function v2RenderEvent() {
+  const banner = document.getElementById("v2EventBanner");
+  if (!banner) return;
+  try {
+    const ev = await apiFetch("/api/events/current");
+    if (!ev || !ev.id) return;
+    const gradient = ev.gradient || "linear-gradient(-45deg,#ff6b9d,#ffd93d,#ff6b35,#c471ed)";
+    banner.innerHTML = `
+      <div class="event-feed-card" onclick="location.href='event.html'" role="link" tabindex="0" style="cursor:pointer;background:${gradient};background-size:300% 300%;">
+        <div class="efc-inner">
+          <div class="efc-row1">
+            <div class="efc-live"><span class="efc-live-dot"></span>Live</div>
+            <span class="efc-emoji">${ev.emoji || "🎮"}</span>
+            <div class="efc-title">${escapeHTML(ev.title)}</div>
+          </div>
+          <div class="efc-row2">
+            <div class="efc-countdown" id="v2EfcCountdown"></div>
+            <a class="efc-cta" href="event.html?play=1" onclick="event.stopPropagation()">▶ Play</a>
+          </div>
+        </div>
+      </div>`;
+    const endDate = new Date(ev.endDate);
+    clearInterval(_efcTimer2);
+    function tick2() {
+      const el = document.getElementById("v2EfcCountdown");
+      if (!el) { clearInterval(_efcTimer2); return; }
+      const diff = endDate - Date.now();
+      if (diff <= 0) { el.innerHTML = `<span style="font-size:11px;color:rgba(255,255,255,.7)">Event ended</span>`; clearInterval(_efcTimer2); return; }
+      const d = Math.floor(diff / 86400000);
+      const h = Math.floor((diff % 86400000) / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      const s = Math.floor((diff % 60000) / 1000);
+      const u = (n,l) => `<div class="efc-unit"><span class="efc-unit-num">${String(n).padStart(2,"0")}</span><span class="efc-unit-label">${l}</span></div>`;
+      const sep = `<span class="efc-sep">:</span>`;
+      el.innerHTML = u(d,"days")+sep+u(h,"hrs")+sep+u(m,"min")+sep+u(s,"sec");
+    }
+    tick2();
+    _efcTimer2 = setInterval(tick2, 1000);
+  } catch {}
+}
+
+/* ── Daily prompt ─────────────────────────────────────────── */
+async function v2RenderPrompt() {
+  const wrap = document.getElementById("v2PromptBanner");
+  if (!wrap) return;
+  try {
+    const data = await apiFetch("/api/daily-prompt");
+    if (!data?.prompt) return;
+    const expiresAt = data.expiresAt ? new Date(data.expiresAt) : null;
+    if (expiresAt && expiresAt < Date.now()) return;
+    wrap.innerHTML = `
+      <div style="background:var(--v2-paper);border:1px solid var(--v2-border);border-left:3px solid var(--v2-accent);border-radius:var(--r-md);padding:13px 16px;">
+        <span style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--v2-accent);font-family:var(--v2-font-m);display:block;margin-bottom:5px;">✏️ Today's prompt</span>
+        <p style="margin:0;font-size:14.5px;color:var(--v2-ink);line-height:1.5;">${escapeHTML(data.prompt)}</p>
+      </div>`;
+  } catch {}
+}
+
+/* ── Search ───────────────────────────────────────────────── */
+(function() {
+  const input = document.getElementById("v2SearchInput");
+  if (!input) return;
+  let v2SearchActive = false;
+  let v2SearchQuery  = "";
+
+  input.addEventListener("input", () => {
+    v2SearchQuery = input.value.trim().toLowerCase();
+    v2SearchActive = v2SearchQuery.length > 0;
+    v2RenderFeed();
+  });
+
+  input.addEventListener("keydown", e => {
+    if (e.key === "Escape") { input.value = ""; input.blur(); v2SearchQuery = ""; v2SearchActive = false; v2RenderFeed(); }
+  });
+
+  /* Patch v2RenderFeed to honour search */
+  const _origFilter = window._v2SearchFilter = (posts) => {
+    if (!v2SearchActive) return posts;
+    return posts.filter(p =>
+      (p.title || "").toLowerCase().includes(v2SearchQuery) ||
+      (p.excerpt || "").toLowerCase().includes(v2SearchQuery) ||
+      (p.author || "").toLowerCase().includes(v2SearchQuery) ||
+      (p.category || "").toLowerCase().includes(v2SearchQuery)
+    );
+  };
+
+  /* Override getPosts for feed rendering when search is active */
+  const _origGetPosts = Progress.getPosts.bind(Progress);
+  const _v2GetPostsSearchWrapped = () => _v2SearchFilter ? _v2SearchFilter(_origGetPosts()) : _origGetPosts();
+
+  /* Monkey-patch v2RenderFeed to use search filter */
+  const _realRenderFeed = v2RenderFeed;
+  v2RenderFeed = function() {
+    if (!v2SearchActive) { _realRenderFeed(); return; }
+    let posts = Progress.getPosts();
+    posts = _v2SearchFilter(posts);
+    const feed = document.getElementById("v2Feed");
+    if (!posts.length) {
+      feed.innerHTML = `<div class="v2-empty"><h3>No results for "${escapeHTML(v2SearchQuery)}"</h3><p>Try a different keyword.</p></div>`;
+      return;
+    }
+    const readSet = v2GetRead();
+    const [first, ...rest] = posts;
+    feed.innerHTML = `${v2CardHTML(first, true, readSet)}${rest.length ? `<div class="v2-grid">${rest.map(p=>v2CardHTML(p,false,readSet)).join("")}</div>` : ""}`;
+    feed.querySelectorAll(".v2-card").forEach(card => {
+      card.addEventListener("click", e => {
+        if (e.target.closest("a")) return;
+        const href = card.dataset.href;
+        if (href) { v2MarkRead(card.dataset.id); card.classList.add("v2-read"); location.href = href; }
+      });
+    });
+  };
+})();
+
+/* ── Bootstrap ────────────────────────────────────────────── */
+async function v2Start() {
+  // Kick off initShell in background for auth/socket — nav hidden via CSS
+  const ready = initShell("feed");
+
+  // Init tabs
+  v2InitTabs();
+
+  // Initial render from cached data
+  v2RenderFeed();
+
+  // When posts arrive (cached), re-render
+  window.addEventListener("progress:posts-loaded", () => {
+    v2RenderFeed();
+    v2LastCount = Progress.getPosts().length;
+    document.getElementById("v2Loading")?.remove();
+  }, { once: true });
+
+  // Banners (don't await)
+  v2RenderEvent();
+  v2RenderPrompt();
+
+  // Wait for full auth resolution
+  ready.then(() => {
+    document.getElementById("v2Loading")?.remove();
+    v2RenderFeed();
+    v2RenderTrending();
+    v2RenderUserCard();
+    if (typeof _v2BetaBadge === "function") _v2BetaBadge(Progress.getCurrentUser());
+    v2LastCount = Progress.getPosts().length;
+    // Poll for new posts every 45s
+    setInterval(v2CheckNew, 45_000);
+  }).catch(() => {
+    document.getElementById("v2Loading")?.remove();
+    v2RenderFeed();
+    v2RenderTrending();
+  });
+
+  // Pull to refresh
+  if (typeof initPullToRefresh === "function") {
+    initPullToRefresh(async () => {
+      await Progress.loadFromApi().catch(() => {});
+      v2RenderFeed();
+      v2RenderTrending();
+      v2LastCount = Progress.getPosts().length;
+      v2NewAvail = 0;
+      document.getElementById("v2NewBtn")?.classList.remove("show");
+    });
+  }
+}
+
+v2Start();
+</script>
+</body>
+</html>

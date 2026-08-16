@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Explore — Progress</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500;1,9..144,600&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script>(function(){try{var t=localStorage.getItem("progressTheme");var dark=(t==="dark")||(t!=="light"&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);if(dark)document.documentElement.setAttribute("data-theme","dark");}catch(e){}})();</script>
+<link rel="stylesheet" href="v2-compat.css">
+<link rel="stylesheet" href="style.css">
+<style>
+#nav-root { display:none !important; }
+body { background: var(--v2-bg); }
+
+.v2-explore-layout {
+  max-width: 1200px; margin: 0 auto; padding: 0 24px 100px;
+  display: grid; grid-template-columns: 1fr 320px; gap: 0 32px; align-items: start;
+}
+@media (max-width: 900px) { .v2-explore-layout { grid-template-columns: 1fr; } .v2-explore-sidebar { display: none; } }
+@media (max-width: 740px) { .v2-explore-layout { padding: 0 0 88px; } }
+
+.v2-explore-main { padding-top: 32px; }
+.v2-explore-sidebar { padding-top: 32px; position: sticky; top: calc(var(--v2-nav-h)+20px); }
+
+.v2-explore-section { margin-bottom: 40px; }
+.v2-section-label {
+  font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--v2-muted); font-family: var(--v2-font-m); margin: 0 0 16px;
+  display: flex; align-items: center; gap: 8px;
+}
+.v2-section-label::after { content:""; flex:1; height:1px; background:var(--v2-border); }
+
+/* User row */
+.v2-user-row {
+  display: flex; align-items: center; gap: 12px; padding: 12px 14px;
+  border-radius: var(--r-md); transition: background .15s; text-decoration: none;
+}
+.v2-user-row:hover { background: var(--v2-paper); }
+.v2-user-row-av {
+  width: 40px; height: 40px; border-radius: 50%; overflow: hidden;
+  flex-shrink: 0; border: 1.5px solid var(--v2-border); background: var(--v2-paper-2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-style: italic; font-family: var(--v2-font-d); color: var(--v2-mocha-dark);
+}
+.v2-user-row-av img { width:100%; height:100%; object-fit:cover; }
+.v2-user-row-info { flex: 1; min-width: 0; }
+.v2-user-row-name { font-size: 14.5px; font-weight: 600; color: var(--v2-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2-user-row-sub  { font-size: 12px; color: var(--v2-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2-follow-btn {
+  flex-shrink: 0; padding: 6px 14px; border-radius: 20px; font-size: 12.5px; font-weight: 600;
+  border: 1.5px solid var(--v2-border); background: var(--v2-paper); color: var(--v2-ink);
+  cursor: pointer; font-family: var(--v2-font-b); transition: all .15s;
+  white-space: nowrap;
+}
+.v2-follow-btn:hover { background: var(--v2-ink); color: var(--v2-bg); border-color: var(--v2-ink); }
+.v2-follow-btn.following { background: var(--v2-paper-2); color: var(--v2-muted); }
+</style>
+</head>
+<body class="v2 mobile">
+
+<div id="nav-root" aria-hidden="true"></div>
+<div id="modal-root"></div>
+
+<!-- ── V2 Nav ─────────────────────────────────────────────── -->
+<nav class="v2-nav" id="v2Nav">
+  <div class="v2-nav-inner">
+    <a href="index.html" class="v2-logo">
+      <img src="../images/etc1.png" alt="Progress" class="v2-logo-img">
+      <span class="v2-logo-text">Progress</span>
+    </a>
+    <div class="v2-search">
+      <svg class="v2-search-icon" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.4"/><path d="m11 11 2.5 2.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+      <input type="search" placeholder="Search posts…" id="v2SearchInput" autocomplete="off">
+    </div>
+    <div class="v2-nav-right" id="v2NavRight">
+      <a href="write.html" class="v2-btn v2-btn--dark" style="font-size:13px;padding:7px 15px;">Write</a>
+    </div>
+  </div>
+</nav>
+
+<div class="v2-explore-layout">
+  <!-- Main -->
+  <div class="v2-explore-main">
+    <div id="v2ExploreRoot">
+      <!-- Loading -->
+      <div class="v2-explore-section">
+        <p class="v2-section-label">Writers to follow</p>
+        <div class="v2-skel" style="height:60px;border-radius:var(--r-md);margin-bottom:8px;"></div>
+        <div class="v2-skel" style="height:60px;border-radius:var(--r-md);margin-bottom:8px;"></div>
+        <div class="v2-skel" style="height:60px;border-radius:var(--r-md);"></div>
+      </div>
+      <div class="v2-explore-section">
+        <p class="v2-section-label">Trending posts</p>
+        <div class="v2-skel v2-skel-feat" style="height:200px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sidebar -->
+  <aside class="v2-explore-sidebar">
+    <div class="v2-side-section">
+      <p class="v2-side-label">About</p>
+      <p class="v2-side-about">Discover the best posts and writers on Progress from the last 30 days.</p>
+      <a href="write.html" class="v2-btn v2-btn--dark v2-btn--full" style="font-size:13.5px;margin-top:4px;">Start writing</a>
+    </div>
+    <div id="v2StreakBox"></div>
+    <div id="v2JoinBtn" style="display:none;">
+      <a href="signup.html" class="v2-btn v2-btn--ghost v2-btn--full" style="font-size:13.5px;">Join Progress</a>
+    </div>
+  </aside>
+</div>
+
+<!-- Mobile bottom nav -->
+<nav class="v2-mob-nav" aria-label="Mobile navigation">
+  <a href="index.html" class="v2-mob-tab" aria-label="Feed">
+    <svg viewBox="0 0 22 22" fill="none" width="21" height="21"><path d="M2.5 10 11 3l8.5 7V19a.8.8 0 0 1-.8.8H3.3a.8.8 0 0 1-.8-.8V10Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+    <span>Feed</span>
+  </a>
+  <a href="explore.html" class="v2-mob-tab v2-mob-tab--active" aria-label="Explore">
+    <svg viewBox="0 0 22 22" fill="none" width="21" height="21"><circle cx="10" cy="10" r="7.5" stroke="currentColor" stroke-width="1.7"/><path d="m16 16 3.5 3.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+    <span>Explore</span>
+  </a>
+  <a href="write.html" class="v2-mob-tab v2-mob-tab--write" aria-label="Write">
+    <svg viewBox="0 0 22 22" fill="none" width="21" height="21"><path d="M16.5 3 19 5.5l-13 13L3 20l.5-3.5 13-13Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+    <span>Write</span>
+  </a>
+  <a href="chat.html" class="v2-mob-tab" aria-label="Chat">
+    <svg viewBox="0 0 22 22" fill="none" width="21" height="21"><path d="M19.5 11c0 4.14-3.36 7.5-7.5 7.5A7.48 7.48 0 0 1 7.3 17.4L3 18.5l1.1-4.3A7.48 7.48 0 0 1 4.5 11C4.5 6.86 7.86 3.5 12 3.5s7.5 3.36 7.5 7.5Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+    <span>Chat</span>
+  </a>
+  <a href="profile.html" class="v2-mob-tab" id="v2MobProfile" aria-label="Profile">
+    <svg viewBox="0 0 22 22" fill="none" width="21" height="21"><circle cx="11" cy="7.5" r="3.5" stroke="currentColor" stroke-width="1.7"/><path d="M4 19.5c0-3.87 3.13-7 7-7h.5c3.87 0 7 3.13 7 7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+    <span>Profile</span>
+  </a>
+</nav>
+
+<script src="../data.js"></script>
+<script src="../app.js"></script>
+<script src="v2-nav.js"></script>
+<script>
+function _esc(s) { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+function ini(name) { return (name||"?").split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase(); }
+
+function renderUserRow(u, badge) {
+  const avHTML = u.avatar
+    ? `<img src="${_esc(u.avatar)}" alt="${_esc(u.name||u.username)}" loading="lazy">`
+    : ini(u.name || u.username);
+  const me = Progress.getCurrentUser();
+  const isFollow = Progress.isFollowing(u.username);
+  return `
+  <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:var(--r-md);transition:background .15s;" onmouseenter="this.style.background='var(--v2-paper)'" onmouseleave="this.style.background=''">
+    <a href="user.html?id=${_esc(u.id)}" class="v2-user-row-av">${avHTML}</a>
+    <div class="v2-user-row-info" style="flex:1;min-width:0;">
+      <a href="user.html?id=${_esc(u.id)}" style="display:block;">
+        <div class="v2-user-row-name">${_esc(u.name||u.username)}</div>
+        <div class="v2-user-row-sub">@${_esc(u.username)}${badge?" · "+badge:""} · ${u.followers?.length||0} followers</div>
+      </a>
+    </div>
+    ${me && me.username !== u.username ? `
+      <button class="v2-follow-btn${isFollow?" following":""}" data-uid="${_esc(u.id)}" data-uname="${_esc(u.username)}">
+        ${isFollow ? "Following" : "Follow"}
+      </button>` : ""}
+  </div>`;
+}
+
+async function start() {
+  const ready = initShell("explore");
+  v2BootNav(ready);
+
+  /* Wait for auth so viewer param + isFollowing() are accurate */
+  await ready.catch(() => {});
+  const me = Progress.getCurrentUser();
+  const viewerParam = me ? `?viewer=${encodeURIComponent(me.username)}` : "";
+
+  const data = await apiFetch(`/api/explore${viewerParam}`).catch(()=>null);
+
+  const root = document.getElementById("v2ExploreRoot");
+  if (!data) {
+    root.innerHTML = `<p style="color:var(--v2-muted);padding:40px 0;">Couldn't load explore — try refreshing.</p>`;
+    return;
+  }
+
+  const { trending=[], suggested=[], mightKnow=[] } = data;
+
+  const suggestedHTML = [...suggested, ...mightKnow].length
+    ? [...suggested, ...mightKnow].map(u => renderUserRow(u, mightKnow.includes(u) ? "Followed by people you follow" : null)).join("")
+    : `<p style="color:var(--v2-muted);font-size:14px;padding:12px 0;">No suggestions right now.</p>`;
+
+  const trendingHTML = trending.length ? trending.map(p => {
+    const author = Progress.getUser(p.author);
+    const av = author?.avatar ? `<img src="${_esc(author.avatar)}" alt="" loading="lazy">` : ini(p.author);
+    const catSlug = (p.category||"").toLowerCase();
+    return `
+    <article class="v2-card" onclick="location.href='post.html?id=${_esc(p.id)}'" style="cursor:pointer;margin-bottom:10px;">
+      ${p.cover ? `<img class="v2-card-cover" src="${_esc(p.cover)}" alt="" loading="lazy">` : ""}
+      <div class="v2-card-body">
+        <div class="v2-card-meta">
+          ${catSlug ? `<span class="v2-card-cat cat-${catSlug}">${_esc(p.category)}</span>` : ""}
+          <span class="v2-card-date">${Progress.formatDateShort(p.date)}</span>
+        </div>
+        <h2 class="v2-card-title" style="font-size:16px;">${_esc(p.title)}</h2>
+        <p class="v2-card-excerpt">${_esc(p.excerpt||"")}</p>
+        <div class="v2-card-footer">
+          <div class="v2-card-av" style="width:22px;height:22px;">${av}</div>
+          <span class="v2-card-author">@${_esc(p.author)}</span>
+          <span class="v2-card-likes">
+            <svg viewBox="0 0 12 12" fill="none"><path d="M6 10.5S1 7.2 1 4.2C1 2.4 2.4 1 4.2 1c.9 0 1.8.5 2.8 1.6C8-.5 9.4 1 9.8 1c1.8 0 3.2 1.4 1.2 3.2C9 7.2 6 10.5 6 10.5Z" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg>
+            ${p.likes||0}
+          </span>
+        </div>
+      </div>
+    </article>`;
+  }).join("") : `<p style="color:var(--v2-muted);font-size:14px;padding:12px 0;">No trending posts yet — publish something!</p>`;
+
+  root.innerHTML = `
+    <div class="v2-explore-section">
+      <p class="v2-section-label">Writers to follow</p>
+      ${suggestedHTML}
+    </div>
+    <div class="v2-explore-section">
+      <p class="v2-section-label">Trending this month</p>
+      ${trendingHTML}
+    </div>`;
+
+  /* Wire follow buttons */
+  root.querySelectorAll(".v2-follow-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const uname = btn.dataset.uname;
+      if (!me) { if(typeof showModal==="function") showModal("login"); return; }
+      btn.disabled = true;
+      await Progress.toggleFollow(uname);
+      btn.disabled = false;
+      const isNow = Progress.isFollowing(uname);
+      btn.textContent = isNow ? "Following" : "Follow";
+      btn.classList.toggle("following", isNow);
+    });
+  });
+}
+start();
+</script>
+</body>
+</html>

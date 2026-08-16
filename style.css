@@ -1722,6 +1722,29 @@ body.modal-open { overflow: hidden; }
 .profile-online-badge.online { background: #3a8a5a; }
 .profile-online-badge.idle { background: #d9a441; }
 
+/* Last active pill — mutual follows only */
+.last-active-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--muted);
+  background: var(--paper);
+  border: 1px solid var(--mocha-wash);
+  border-radius: 20px;
+  padding: 2px 9px;
+  white-space: nowrap;
+}
+.last-active-pill::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--mocha-light);
+  flex-shrink: 0;
+}
+
 .settings-avatar-row .upload-btn {
   font-family: var(--font-mono); font-size: 12px; text-transform: uppercase;
   border: 1px solid var(--mocha-light); background: var(--paper); padding: 9px 16px;

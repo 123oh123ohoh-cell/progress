@@ -1,0 +1,956 @@
+extends layout
+
+block title
+	| Email Management — Progress Admin
+
+block meta
+	//- no OG meta
+
+block head
+	style.
+		
+		  .admin-wrap { max-width: 1100px; margin: 0 auto; padding: 0 20px 80px; }
+		  .admin-header { margin: 40px 0 28px; display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+		  .admin-header h1 { font-family: var(--font-display); font-size: 28px; margin: 0; }
+		  .section-block { margin-bottom: 40px; padding-top: 32px; border-top: 1px solid var(--mocha-light); }
+		  .section-block:first-child { border-top: none; padding-top: 0; }
+		  .section-title { font-family: var(--font-display); font-size: 22px; margin: 0 0 16px; }
+		  .section-head { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin-bottom: 12px; }
+		
+		  /* Stats row */
+		  .email-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 14px; margin-bottom: 28px; }
+		  .stat-card { background: var(--paper); border: 1px solid var(--mocha-light); border-radius: 12px; padding: 16px; }
+		  .stat-label { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin-bottom: 6px; }
+		  .stat-value { font-family: var(--font-display); font-size: 28px; color: var(--ink); line-height: 1; }
+		
+		  /* Email list */
+		  .email-row { padding: 10px 0; border-bottom: 1px solid var(--mocha-wash); display: flex; align-items: center; gap: 12px; }
+		  .email-row:last-child { border-bottom: none; }
+		  .email-row-user { font-size: 14px; font-weight: 600; min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+		  .email-row-addr { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+		  .email-row-date { font-size: 12px; color: var(--muted); white-space: nowrap; }
+		  .email-search { padding: 7px 12px; border: 1px solid var(--mocha-light); border-radius: 8px; font-size: 13px; background: var(--paper); color: var(--ink); width: 240px; margin-bottom: 14px; }
+		
+		  #authContainer { max-width: 340px; margin: 100px auto 0; text-align: center; padding: 0 20px; }
+		
+		  /* Project cards */
+		  .proj-card {
+		    background: var(--paper); border: 1px solid var(--mocha-light); border-radius: 14px;
+		    padding: 16px 18px; display: flex; flex-direction: column; gap: 10px;
+		    transition: box-shadow .15s, border-color .15s; position: relative;
+		  }
+		  .proj-card:hover { box-shadow: 0 4px 18px rgba(59,37,24,.1); border-color: var(--mocha); }
+		  .proj-card-name { font-family: var(--font-display); font-size: 16px; font-weight: 600; color: var(--ink); margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+		  .proj-card-subject { font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 18px; }
+		  .proj-card-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+		  .proj-card-date { font-size: 11px; font-family: var(--font-mono); color: var(--muted); }
+		  .proj-presence { display: flex; gap: -6px; }
+		  .proj-avatar {
+		    width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--paper);
+		    display: flex; align-items: center; justify-content: center;
+		    font-size: 10px; font-weight: 700; color: #fff; margin-left: -6px;
+		    flex-shrink: 0; position: relative;
+		  }
+		  .proj-avatar:first-child { margin-left: 0; }
+		  .proj-avatar .live-dot {
+		    position: absolute; bottom: -1px; right: -1px; width: 7px; height: 7px;
+		    background: #4CAF50; border-radius: 50%; border: 1.5px solid var(--paper);
+		  }
+		  .proj-card-actions { display: flex; gap: 8px; }
+		  .proj-join-btn { flex: 1; text-align: center; padding: 8px; background: var(--ink); color: var(--cream); border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; text-decoration: none; display: block; transition: opacity .15s; }
+		  .proj-join-btn:hover { opacity: .85; }
+		  .proj-del-btn { padding: 8px 10px; background: none; border: 1px solid var(--mocha-light); border-radius: 8px; color: var(--muted); cursor: pointer; font-size: 13px; transition: border-color .15s, color .15s; }
+		  .proj-del-btn:hover { border-color: var(--danger); color: var(--danger); }
+		  .proj-card-blocks { font-size: 11px; font-family: var(--font-mono); color: var(--muted); }
+		
+
+block content
+	#authContainer(style='display:none;')
+		h1(style='font-family:var(--font-display); font-size:28px; margin-bottom:12px;') Admin
+		p(style='color:var(--muted); font-size:14px; margin-bottom:20px;') This page requires admin access.
+		input#adminPassword(type='password' placeholder='Access password' style='width:100%; padding:10px 12px; border:1px solid var(--mocha-light); border-radius:8px; font-size:14px; margin-bottom:10px; box-sizing:border-box; background:var(--paper); color:var(--ink);')
+		button#submitPassword(style='width:100%; padding:10px 12px; background:var(--ink); color:var(--cream); border:none; border-radius:8px; font-size:14px; cursor:pointer; font-weight:600;') Check access
+		p#passwordError(style='color:var(--danger); font-size:13px; margin-top:12px; display:none;') Access denied.
+	#contentContainer(style='display:none;')
+		.admin-wrap
+			.admin-header
+				div
+					h1 Email Management
+					p(style='color:var(--muted); font-size:14px; margin:6px 0 0;') Send emails and view subscriber stats.
+				div(style='display:flex; gap:10px; flex-wrap:wrap;')
+					a.btn(href='admin.html' style='font-size:13px; padding:7px 14px;') ← Dashboard
+					a.btn(href='admin-roles.html' style='font-size:13px; padding:7px 14px;') Roles →
+			//  Stats 
+			.section-block(style='border-top:none; padding-top:0;')
+				.email-stats#emailStats
+					div(style='grid-column:1/-1; color:var(--muted); font-size:14px;') Loading…
+			//  Live Projects 
+			.section-block(style='border-top:none; padding-top:0; margin-bottom:32px;')
+				div(style='display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; flex-wrap:wrap; gap:10px;')
+					div
+						h2.section-title(style='margin:0;') Email Projects
+						p(style='font-size:14px; color:var(--muted); margin:4px 0 0;') Collaborative email drafts. See who's editing and jump in.
+					div(style='display:flex; gap:10px; flex-wrap:wrap; align-items:center;')
+						button#loadProjectsBtn.btn(style='font-size:13px; padding:8px 16px;') ↻ Load Projects
+						a.btn(href='email-editor.html?new=1' style='background:var(--ink); color:var(--cream); font-size:14px; padding:10px 22px; font-weight:600; text-decoration:none; display:inline-flex; align-items:center; gap:6px;') ✍ Write Custom Email
+				#projectsList(style='display:none;')
+					#projectsGrid(style='display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:12px;')
+			//  Weekly digest 
+			.section-block
+				h2.section-title Weekly Digest
+				p(style='font-size:14px; color:var(--muted); margin:0 0 16px; line-height:1.6;') The digest is automatically sent each week to all subscribers. You can manually trigger it here.
+				div(style='display:flex; align-items:center; gap:14px; flex-wrap:wrap;')
+					button#sendDigestBtn.btn(style='padding:9px 20px; font-size:14px;') 📬 Send weekly digest now
+					span#digestStatus(style='font-size:13px; color:var(--muted);')
+			//  ── Email Builder (removed — use email-editor.html via Write Custom Email) ── 
+			.section-block#emailBuilder(style='display:none;')
+				//  ── Sidebar ── 
+				.builder-sidebar
+					.builder-tabs
+						button.b-tab.active(data-panel='elements') ELEMENTS
+						button.b-tab(data-panel='editor') EDITOR
+					//  Elements panel 
+					.builder-panel#bPanelElements
+						.palette-section
+							.palette-section-title General
+							.palette-grid
+								.p-item(data-add='text')
+									span.pi T
+									| Text
+								.p-item(data-add='html')
+									span.pi </>
+									| HTML
+								.p-item(data-add='image')
+									span.pi 🖼
+									| Image
+								.p-item(data-add='button')
+									span.pi □
+									| Button
+								.p-item(data-add='divider')
+									span.pi —
+									| Divider
+								.p-item(data-add='spacer')
+									span.pi ↕
+									| Spacer
+						.palette-section
+							.palette-section-title Columns
+							.col-options
+								.col-option(data-add='2col' title='Two columns')
+									.col-cell
+									.col-cell
+								.col-option(data-add='3col' title='Three columns')
+									.col-cell
+									.col-cell
+									.col-cell
+						.palette-section
+							.palette-section-title Templates
+							.template-card(data-template='announcement')
+								.template-card-name 📢 Announcement
+								.template-card-desc Text + divider + button
+							.template-card(data-template='update')
+								.template-card-name 📝 Update
+								.template-card-desc Heading + body paragraphs
+							.template-card(data-template='image-text')
+								.template-card-name 🖼 Image + Text
+								.template-card-desc Image then body text
+							.template-card(data-template='newsletter')
+								.template-card-name 📰 Newsletter
+								.template-card-desc Intro + two-column + outro
+					//  Editor panel 
+					.builder-panel#bPanelEditor(style='display:none;')
+						//  Block-specific controls 
+						#blockEditorArea
+							.editor-no-sel ← Click a block in the canvas to edit it
+						hr.editor-sep
+						//  Global email style (always visible) 
+						.editor-group
+							span.editor-label Sticker
+							.emo-dark-grid#emoGrid
+						.editor-group
+							span.editor-label Accent color
+							.editor-color-row#accentChips
+								.editor-chip.sel(data-c='#8C6E58' style='background:#8C6E58' title='Mocha')
+								.editor-chip(data-c='#6B7F6E' style='background:#6B7F6E' title='Sage')
+								.editor-chip(data-c='#7B6B9A' style='background:#7B6B9A' title='Lavender')
+								.editor-chip(data-c='#C47C5A' style='background:#C47C5A' title='Terracotta')
+								.editor-chip(data-c='#4A7C9E' style='background:#4A7C9E' title='Slate')
+								.editor-chip(data-c='#333333' style='background:#333333' title='Ink')
+								input#accentCustom(type='color' value='#8C6E58' style='width:22px;height:22px;padding:0;border:none;cursor:pointer;border-radius:50%;overflow:hidden;background:none;' title='Custom')
+							input#accentColor(type='hidden' value='#8C6E58')
+						.editor-group
+							span.editor-label Footer sign-off
+							input.editor-input#footerTagline(type='text' value='until next time' maxlength='80' placeholder='until next time')
+					//  Sidebar footer 
+					.builder-sb-footer
+						button#builderSendBtn.btn(style='width:100%; background:var(--ink); color:var(--cream); padding:9px; font-size:14px; justify-content:center; text-align:center;') Send email
+						span#builderSendStatus(style='font-size:12px; color:var(--muted); text-align:center; min-height:16px;')
+				//  ── Main area ── 
+				.builder-main
+					//  Top bar: subject + recipient + preview 
+					.builder-topbar
+						input#builderSubject(type='text' placeholder='Subject line…' maxlength='200')
+						select#builderRecipient
+							option(value='all') All subscribers
+							option(value='specific') Specific user
+						#specificWrap(style='display:none;')
+							input#builderUsername(type='text' placeholder='@username' style='width:140px;')
+						button#builderPreviewBtn.btn(style='font-size:13px; padding:7px 14px; flex-shrink:0; white-space:nowrap;') Preview ↗
+					//  Canvas 
+					.builder-canvas-wrap#canvasScrollWrap
+						.builder-canvas#builderCanvas
+							//  Brand header (read-only) 
+							.canvas-header
+								div
+									.canvas-brand-text progress.
+									.canvas-brand-sub a writing community  ✿
+								img(src='/images/nearheader.png' alt)
+							//  Sticker preview 
+							.canvas-sticker#canvasSticker
+								img#canvasStickerImg(src alt)
+								.dividers ✦    ✦    ✦
+							//  Blocks 
+							.canvas-blocks#canvasBlocks
+								.canvas-empty#canvasEmpty
+									p(style='margin:0 0 8px; font-size:20px;') ✉️
+									p(style='margin:0;') Click blocks on the left to build your email
+							//  Footer preview 
+							.canvas-footer
+								p#canvasFooterText until next time — progress ✿
+								small email preferences · progressing.online
+					//  Preview pane (appears below canvas) 
+					.builder-preview-pane#builderPreviewPane
+						.preview-header
+							span Email preview
+							button#closePreviewBtn.btn(style='font-size:12px; padding:5px 12px;') Close ✕
+						iframe#builderPreviewFrame(title='Email preview')
+		//  Subscriber list 
+		.section-block
+			div(style='display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:14px;')
+				div
+					h2.section-title(style='margin:0 0 4px;') Subscriber list
+					p#subCountLine(style='font-size:13px; color:var(--muted); margin:0;') Users with email notifications on.
+				input#emailSearch.email-search(type='search' placeholder='Search name, username, email…' style='max-width:240px;')
+			#subscriberList
+				p(style='color:var(--muted); font-size:14px;') Loading…
+			#subscriberPager(style='display:flex; gap:8px; margin-top:16px; flex-wrap:wrap;')
+	
+
+block scripts
+		script.
+			
+			  const ADMIN_EMAIL_PASSWORD = "blowblow426J";
+			  const OWNER_USERNAMES = new Set(["mara", "own", "progresstesting1"]);
+			
+			  function hasAccountAccess() {
+			    const user = Progress.getCurrentUser();
+			    if (!user) return false;
+			    return OWNER_USERNAMES.has(user.username);
+			  }
+			
+			  function checkAuth() {
+			    const allowed = hasAccountAccess() || sessionStorage.getItem("adminEmailAuth") === "true";
+			    document.getElementById("authContainer").style.display = allowed ? "none" : "block";
+			    document.getElementById("contentContainer").style.display = allowed ? "block" : "none";
+			    if (allowed) init();
+			  }
+			
+			  document.getElementById("submitPassword").addEventListener("click", () => {
+			    const val = document.getElementById("adminPassword").value;
+			    if (hasAccountAccess() || val === ADMIN_EMAIL_PASSWORD) {
+			      sessionStorage.setItem("adminEmailAuth", "true");
+			      document.getElementById("authContainer").style.display = "none";
+			      document.getElementById("contentContainer").style.display = "block";
+			      init();
+			    } else {
+			      document.getElementById("passwordError").textContent = "Access denied.";
+			      document.getElementById("passwordError").style.display = "block";
+			      document.getElementById("adminPassword").value = "";
+			      document.getElementById("adminPassword").focus();
+			    }
+			  });
+			  document.getElementById("adminPassword").addEventListener("keydown", e => {
+			    if (e.key === "Enter") document.getElementById("submitPassword").click();
+			  });
+			
+			  // ── Init ──────────────────────────────────────────────────────────────────────
+			  function init() {
+			    loadEmailStats();
+			    loadSubscribers();
+			    wireDigest();
+			    wireSearch();
+			  }
+			
+			  // ── Stats ─────────────────────────────────────────────────────────────────────
+			  async function loadEmailStats() {
+			    const statsEl = document.getElementById("emailStats");
+			    const result = await apiFetch("/api/admin/stats");
+			    if (!result) {
+			      statsEl.innerHTML = `<div style="color:var(--danger); font-size:14px;">Couldn't load stats.</div>`;
+			      return;
+			    }
+			    const c = result.counts;
+			    statsEl.innerHTML = [
+			      statCard("Total users", c?.users ?? "—"),
+			      statCard("Posts", c?.posts ?? "—"),
+			      statCard("Comments", c?.comments ?? "—"),
+			      statCard("Banned", c?.banned ?? "—"),
+			    ].join("");
+			  }
+			
+			  function statCard(label, value) {
+			    return `<div class="stat-card"><div class="stat-label">${label}</div><div class="stat-value">${value}</div></div>`;
+			  }
+			
+			  // ── Digest ────────────────────────────────────────────────────────────────────
+			  function wireDigest() {
+			    const btn = document.getElementById("sendDigestBtn");
+			    const status = document.getElementById("digestStatus");
+			    btn.addEventListener("click", async () => {
+			      const ok = await adminConfirm("Send weekly digest?", "This will email all subscribers with their weekly recap.", "Send digest");
+			      if (!ok) return;
+			      btn.disabled = true; btn.textContent = "Sending…";
+			      const r = await apiFetch("/api/admin/send-digest", { method: "POST" });
+			      btn.disabled = false; btn.textContent = "📬 Send weekly digest now";
+			      if (r && typeof r.sent === "number") {
+			        status.textContent = `✓ Sent to ${r.sent} user${r.sent !== 1 ? "s" : ""}`;
+			        showToast(`Digest sent to ${r.sent} users.`);
+			      } else if (r?.skipped) {
+			        status.textContent = `Skipped: ${r.skipped}`;
+			      } else {
+			        status.textContent = "Something went wrong.";
+			      }
+			    });
+			  }
+			
+			  // ── Subscriber list ───────────────────────────────────────────────────────────
+			  let subPage = 0;
+			  const SUB_PAGE_SIZE = 50;
+			  let subSearchTimeout;
+			
+			  async function loadSubscribers(page = 0) {
+			    subPage = page;
+			    const el = document.getElementById("subscriberList");
+			    el.innerHTML = `<p style="color:var(--muted); font-size:14px; padding:12px 0;">Loading…</p>`;
+			    const q = document.getElementById("emailSearch")?.value || "";
+			    const result = await apiFetch(`/api/admin/subscribers?page=${page}&limit=${SUB_PAGE_SIZE}&q=${encodeURIComponent(q)}`);
+			    if (!result) {
+			      el.innerHTML = `<p style="color:var(--danger); font-size:14px;">Couldn't load subscribers.</p>`;
+			      return;
+			    }
+			    const users = result.users || [];
+			
+			    // Update count line
+			    const countLine = document.getElementById("subCountLine");
+			    if (countLine) countLine.textContent = `${result.total.toLocaleString()} subscriber${result.total !== 1 ? "s" : ""} with email notifications on`;
+			
+			    if (!users.length) {
+			      el.innerHTML = `<p style="color:var(--muted); font-size:14px; padding:12px 0;">No subscribers found.</p>`;
+			      document.getElementById("subscriberPager").innerHTML = "";
+			      return;
+			    }
+			
+			    el.innerHTML = `
+			      <div style="overflow-x:auto; -webkit-overflow-scrolling:touch;">
+			      <table style="width:100%; border-collapse:collapse; font-size:13px; min-width:520px;">
+			        <thead>
+			          <tr style="border-bottom:2px solid var(--mocha-light);">
+			            <th style="text-align:left; padding:8px 12px 8px 4px; color:var(--muted); font-weight:600; font-size:11px; letter-spacing:.05em; text-transform:uppercase; white-space:nowrap;">Member</th>
+			            <th style="text-align:left; padding:8px 12px; color:var(--muted); font-weight:600; font-size:11px; letter-spacing:.05em; text-transform:uppercase;">Email</th>
+			            <th style="text-align:right; padding:8px 4px 8px 12px; color:var(--muted); font-weight:600; font-size:11px; letter-spacing:.05em; text-transform:uppercase; white-space:nowrap;">Joined</th>
+			          </tr>
+			        </thead>
+			        <tbody>
+			          ${users.map(u => `
+			          <tr style="border-bottom:1px solid var(--mocha-wash);">
+			            <td style="padding:10px 12px 10px 4px;">
+			              <a href="user.html?username=${encodeURIComponent(u.username)}" style="font-weight:600; color:var(--ink); text-decoration:none;">${escapeHTML(u.name)}</a>
+			              <span style="color:var(--muted); font-size:12px;"> @${escapeHTML(u.username)}</span>
+			              ${u.banned ? `<span style="margin-left:6px; font-size:10px; font-weight:700; color:var(--danger); font-family:var(--font-mono); vertical-align:middle;">BANNED</span>` : ""}
+			            </td>
+			            <td style="padding:10px 12px; color:var(--muted); font-size:12px; font-family:var(--font-mono);">
+			              ${u.email ? escapeHTML(u.email) : `<em style="opacity:.45; font-style:normal; font-family:var(--font-body);">no email</em>`}
+			            </td>
+			            <td style="padding:10px 4px 10px 12px; text-align:right; color:var(--muted); font-size:12px; white-space:nowrap;">
+			              ${u.joined ? new Date(u.joined).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—"}
+			            </td>
+			          </tr>`).join("")}
+			        </tbody>
+			      </table>
+			      </div>`;
+			
+			    const pages = Math.ceil(result.total / SUB_PAGE_SIZE);
+			    const pagerEl = document.getElementById("subscriberPager");
+			    pagerEl.innerHTML = pages > 1 ? Array.from({ length: pages }, (_, i) =>
+			      `<button class="btn ${i === subPage ? "primary" : ""}" data-page="${i}" style="padding:6px 14px; font-size:13px;">${i+1}</button>`
+			    ).join("") : "";
+			    pagerEl.querySelectorAll("button").forEach(btn => {
+			      btn.addEventListener("click", () => loadSubscribers(Number(btn.dataset.page)));
+			    });
+			  }
+			
+			  function wireSearch() {
+			    document.getElementById("emailSearch").addEventListener("input", () => {
+			      clearTimeout(subSearchTimeout);
+			      subSearchTimeout = setTimeout(() => loadSubscribers(0), 350);
+			    });
+			  }
+			
+			  // ── Email Projects ────────────────────────────────────────────────────────────
+			  let _projectsLoaded = false;
+			
+			  document.getElementById("loadProjectsBtn").addEventListener("click", () => loadProjects(true));
+			
+			  async function loadProjects(show = false) {
+			    const list = document.getElementById("projectsList");
+			    const grid = document.getElementById("projectsGrid");
+			    if (show) { list.style.display = "block"; grid.innerHTML = `<div style="color:var(--muted);font-size:14px;">Loading…</div>`; }
+			    const projects = await apiFetch("/api/admin/email-projects");
+			    if (!projects) { grid.innerHTML = `<div style="color:var(--danger);font-size:14px;">Couldn't load projects.</div>`; return; }
+			    _projectsLoaded = true;
+			    if (show) list.style.display = "block";
+			    if (!projects.length) {
+			      grid.innerHTML = `<div style="color:var(--muted);font-size:14px;grid-column:1/-1;">No projects yet. Click <strong>Write Custom Email</strong> to create one.</div>`;
+			      return;
+			    }
+			    grid.innerHTML = projects.map(p => renderProjectCard(p)).join("");
+			    grid.querySelectorAll(".proj-del-btn").forEach(btn => {
+			      btn.addEventListener("click", async () => {
+			        const id = btn.dataset.id;
+			        const ok = await adminConfirm("Delete project?", `"${escapeHTML(btn.dataset.name)}" will be permanently deleted.`, "Delete", "danger");
+			        if (!ok) return;
+			        await apiFetch(`/api/admin/email-projects/${id}`, { method: "DELETE" });
+			        loadProjects(true);
+			      });
+			    });
+			  }
+			
+			  function renderProjectCard(p) {
+			    const when = p.updatedAt ? new Date(p.updatedAt).toLocaleDateString() : "";
+			    const presence = (p.presence || []);
+			    const avatarsHtml = presence.map(u => {
+			      const initials = (u.name||u.username||"?").slice(0,2).toUpperCase();
+			      return `<div class="proj-avatar" style="background:${u.color||"#8C6E58"};" title="${escapeHTML(u.name||u.username)}">
+			        ${initials}<span class="live-dot"></span>
+			      </div>`;
+			    }).join("");
+			    const blockCount = (p.blocks||[]).length;
+			    return `<div class="proj-card">
+			      <div>
+			        <div class="proj-card-name">${escapeHTML(p.name||"Untitled")}</div>
+			        <div class="proj-card-subject">${p.subject ? escapeHTML(p.subject) : '<em style="opacity:.5;">No subject yet</em>'}</div>
+			      </div>
+			      <div class="proj-card-meta">
+			        ${presence.length ? `<div class="proj-presence">${avatarsHtml}</div><span style="font-size:11px;color:var(--muted);">${presence.length} online</span>` : ""}
+			        <span class="proj-card-blocks">${blockCount} block${blockCount!==1?"s":""}</span>
+			        <span class="proj-card-date">${when}</span>
+			      </div>
+			      <div class="proj-card-actions">
+			        <a class="proj-join-btn" href="email-editor.html?id=${p._id}">✍ Open / Join</a>
+			        <button class="proj-del-btn" data-id="${p._id}" data-name="${escapeHTML(p.name||"Untitled")}">🗑</button>
+			      </div>
+			    </div>`;
+			  }
+			
+			  // Refresh presence every 12s if panel is visible
+			  setInterval(() => { if (_projectsLoaded) loadProjects(false); }, 12000);
+			
+			  // ── (Email builder moved to email-editor.html) ──────────────────────────────
+			  // Legacy builder code removed. All email composition happens in email-editor.html.
+			
+			  function initBuilder_REMOVED() {
+			    // Tab switching
+			    document.querySelectorAll(".b-tab").forEach(btn => {
+			      btn.addEventListener("click", () => {
+			        document.querySelectorAll(".b-tab").forEach(b => b.classList.remove("active"));
+			        btn.classList.add("active");
+			        const panel = btn.dataset.panel;
+			        document.getElementById("bPanelElements").style.display = panel === "elements" ? "" : "none";
+			        document.getElementById("bPanelEditor").style.display   = panel === "editor"   ? "" : "none";
+			      });
+			    });
+			
+			    // Palette adds
+			    document.querySelectorAll("[data-add]").forEach(el =>
+			      el.addEventListener("click", () => addBlock(el.dataset.add))
+			    );
+			
+			    // Templates
+			    document.querySelectorAll("[data-template]").forEach(el =>
+			      el.addEventListener("click", () => loadTemplate(el.dataset.template))
+			    );
+			
+			    // Recipient toggle
+			    document.getElementById("builderRecipient").addEventListener("change", e => {
+			      document.getElementById("specificWrap").style.display = e.target.value === "specific" ? "" : "none";
+			    });
+			
+			    // Preview / send
+			    document.getElementById("builderPreviewBtn").addEventListener("click", previewEmail);
+			    document.getElementById("closePreviewBtn").addEventListener("click", () => {
+			      document.getElementById("builderPreviewPane").classList.remove("show");
+			      document.getElementById("canvasScrollWrap").style.display = "";
+			    });
+			    document.getElementById("builderSendBtn").addEventListener("click", sendEmail);
+			
+			    // Emoticon grid
+			    buildEmoGrid();
+			
+			    // Accent color chips
+			    document.querySelectorAll("#accentChips .editor-chip").forEach(chip => {
+			      chip.addEventListener("click", () => {
+			        document.querySelectorAll("#accentChips .editor-chip").forEach(c => c.classList.remove("sel"));
+			        chip.classList.add("sel");
+			        setAccent(chip.dataset.c);
+			      });
+			    });
+			    document.getElementById("accentCustom").addEventListener("input", e => {
+			      document.querySelectorAll("#accentChips .editor-chip").forEach(c => c.classList.remove("sel"));
+			      setAccent(e.target.value);
+			    });
+			
+			    // Footer tagline live update
+			    document.getElementById("footerTagline").addEventListener("input", e => {
+			      const t = e.target.value.trim() || "until next time";
+			      document.getElementById("canvasFooterText").textContent = `${t} — progress ✿`;
+			    });
+			  }
+			
+			  function buildEmoGrid() {
+			    const grid = document.getElementById("emoGrid");
+			    grid.innerHTML = "";
+			    // "None" button
+			    const noneBtn = document.createElement("button");
+			    noneBtn.type = "button";
+			    noneBtn.className = "emo-dark-btn" + (_emoticon === "none" ? " sel" : "");
+			    noneBtn.title = "No sticker";
+			    noneBtn.innerHTML = `<span class="emo-none">✕</span>`;
+			    noneBtn.dataset.name = "none";
+			    noneBtn.addEventListener("click", () => setEmoticon("none", noneBtn));
+			    grid.appendChild(noneBtn);
+			
+			    EMOTICONS.forEach(name => {
+			      const btn = document.createElement("button");
+			      btn.type = "button";
+			      btn.className = "emo-dark-btn" + (name === _emoticon ? " sel" : "");
+			      btn.title = name.replace(/_/g," ");
+			      btn.dataset.name = name;
+			      btn.innerHTML = `<img src="/images/emoticons/${name}.png" alt="${name}" loading="lazy">`;
+			      btn.addEventListener("click", () => setEmoticon(name, btn));
+			      grid.appendChild(btn);
+			    });
+			  }
+			
+			  function setEmoticon(name, el) {
+			    _emoticon = name;
+			    grid.querySelectorAll && null; // unused
+			    document.querySelectorAll("#emoGrid .emo-dark-btn").forEach(b => b.classList.remove("sel"));
+			    el.classList.add("sel");
+			    const stickerDiv = document.getElementById("canvasSticker");
+			    const stickerImg = document.getElementById("canvasStickerImg");
+			    if (name === "none") {
+			      stickerDiv.style.display = "none";
+			    } else {
+			      stickerImg.src = `/images/emoticons/${name}.png`;
+			      stickerDiv.style.display = "block";
+			    }
+			  }
+			
+			  function setAccent(color) {
+			    _accent = color;
+			    document.getElementById("accentColor").value = color;
+			    // Update canvas footer link color
+			    document.getElementById("canvasFooterText").style.color = color;
+			    // Rerender blocks to update button colors
+			    renderBlocks();
+			  }
+			
+			  // ── Blocks ────────────────────────────────────────────────────────────────────
+			  function makeBlock(type) {
+			    const id = `b${_nextId++}`;
+			    const D = {
+			      text:    { id, type, content:"Your text here. Write something warm and personal.", fontSize:15, textColor:"#4A3728", align:"left" },
+			      html:    { id, type, content:"<p>Custom HTML</p>" },
+			      image:   { id, type, src:"", alt:"", link:"", width:100 },
+			      button:  { id, type, text:"Click here", url:"https://progressing.online", align:"center" },
+			      divider: { id, type, lineStyle:"solid", lineColor:"#D4BBA0" },
+			      spacer:  { id, type, height:24 },
+			      "2col":  { id, type, col1:"First column text.", col2:"Second column text." },
+			      "3col":  { id, type, col1:"Col 1", col2:"Col 2", col3:"Col 3" },
+			    };
+			    return D[type] || { id, type };
+			  }
+			
+			  function addBlock(type) {
+			    const b = makeBlock(type);
+			    _blocks.push(b);
+			    renderBlocks();
+			    selectBlock(b.id);
+			    // Switch to editor
+			    document.querySelector("[data-panel=editor]").click();
+			  }
+			
+			  function removeBlock(id) {
+			    _blocks = _blocks.filter(b => b.id !== id);
+			    if (_selId === id) { _selId = null; resetBlockEditor(); }
+			    renderBlocks();
+			  }
+			
+			  function moveBlock(id, dir) {
+			    const i = _blocks.findIndex(b => b.id === id);
+			    if (i < 0) return;
+			    const j = i + dir;
+			    if (j < 0 || j >= _blocks.length) return;
+			    [_blocks[i], _blocks[j]] = [_blocks[j], _blocks[i]];
+			    renderBlocks();
+			  }
+			
+			  function selectBlock(id) {
+			    _selId = id;
+			    renderBlocks();
+			    const b = _blocks.find(x => x.id === id);
+			    if (b) renderBlockEditor(b);
+			    // Switch to editor tab
+			    document.querySelector("[data-panel=editor]").click();
+			  }
+			
+			  function renderBlocks() {
+			    const container = document.getElementById("canvasBlocks");
+			    document.getElementById("canvasEmpty").style.display = _blocks.length ? "none" : "block";
+			    // Clear existing block els
+			    container.querySelectorAll(".c-block").forEach(el => el.remove());
+			    _blocks.forEach((b, idx) => {
+			      const el = document.createElement("div");
+			      el.className = "c-block" + (b.id === _selId ? " sel" : "");
+			      el.dataset.id = b.id;
+			      el.innerHTML = blockPreviewHtml(b) + `
+			        <div class="b-controls">
+			          ${idx > 0 ? `<button class="b-ctrl" title="Up" onclick="moveBlock('${b.id}',-1)">↑</button>` : ""}
+			          ${idx < _blocks.length-1 ? `<button class="b-ctrl" title="Down" onclick="moveBlock('${b.id}',1)">↓</button>` : ""}
+			          <button class="b-ctrl" title="Delete" onclick="removeBlock('${b.id}')">✕</button>
+			        </div>`;
+			      el.addEventListener("click", e => {
+			        if (e.target.closest(".b-ctrl")) return;
+			        selectBlock(b.id);
+			      });
+			      container.appendChild(el);
+			    });
+			  }
+			
+			  function blockPreviewHtml(b) {
+			    const esc = s => String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+			    const n2b = s => esc(s).replace(/\n/g,"<br>");
+			    switch (b.type) {
+			      case "text":
+			        return `<div class="bt-text" style="font-size:${b.fontSize||15}px;color:${b.textColor||"#4A3728"};text-align:${b.align||"left"};">${n2b(b.content||"")}</div>`;
+			      case "html":
+			        return `<div class="bt-html">${b.content||""}</div>`;
+			      case "image":
+			        return b.src
+			          ? `<div class="bt-image"><img src="${b.src}" alt="${esc(b.alt||"")}" style="width:${b.width||100}%;"></div>`
+			          : `<div class="bt-image"><div class="bt-img-placeholder">🖼 set image URL in editor</div></div>`;
+			      case "button": {
+			        const color = b.color || _accent;
+			        return `<div class="bt-button" style="text-align:${b.align||"center"};"><span class="bt-btn-inner" style="background:${color};">${esc(b.text||"Button")}</span></div>`;
+			      }
+			      case "divider":
+			        return `<div class="bt-divider"><hr style="border-top:1px ${b.lineStyle||"solid"} ${b.lineColor||"#D4BBA0"};"></div>`;
+			      case "spacer":
+			        return `<div class="bt-spacer" style="height:${b.height||24}px;">[spacer ${b.height||24}px]</div>`;
+			      case "2col":
+			        return `<div class="bt-2col"><div class="bt-col-cell">${n2b(b.col1||"")}</div><div class="bt-col-cell">${n2b(b.col2||"")}</div></div>`;
+			      case "3col":
+			        return `<div class="bt-3col"><div class="bt-col-cell">${n2b(b.col1||"")}</div><div class="bt-col-cell">${n2b(b.col2||"")}</div><div class="bt-col-cell">${n2b(b.col3||"")}</div></div>`;
+			      default:
+			        return `<div style="padding:8px 16px;color:#aaa;font-size:12px;">[${b.type}]</div>`;
+			    }
+			  }
+			
+			  // ── Block Editor ──────────────────────────────────────────────────────────────
+			  function resetBlockEditor() {
+			    document.getElementById("blockEditorArea").innerHTML = `<div class="editor-no-sel">← Click a block in the canvas to edit it</div>`;
+			  }
+			
+			  function renderBlockEditor(b) {
+			    const area = document.getElementById("blockEditorArea");
+			    let html = `<div class="editor-group" style="margin-bottom:10px;"><span class="editor-label" style="color:#A07858;">${b.type.toUpperCase()} BLOCK</span></div>`;
+			
+			    switch (b.type) {
+			      case "text":
+			        html += `
+			          <div class="editor-group"><span class="editor-label">Content</span>
+			            <textarea class="editor-textarea" data-key="content" rows="5">${b.content||""}</textarea></div>
+			          <div class="editor-group"><span class="editor-label">Font size</span>
+			            <select class="editor-select" data-key="fontSize">
+			              <option value="13" ${b.fontSize==13?"selected":""}>Small</option>
+			              <option value="15" ${(b.fontSize||15)==15?"selected":""}>Normal</option>
+			              <option value="18" ${b.fontSize==18?"selected":""}>Large</option>
+			              <option value="22" ${b.fontSize==22?"selected":""}>Heading</option>
+			            </select></div>
+			          <div class="editor-group"><span class="editor-label">Align</span>
+			            <select class="editor-select" data-key="align">
+			              <option value="left" ${(b.align||"left")==="left"?"selected":""}>Left</option>
+			              <option value="center" ${b.align==="center"?"selected":""}>Center</option>
+			              <option value="right" ${b.align==="right"?"selected":""}>Right</option>
+			            </select></div>
+			          <div class="editor-group"><span class="editor-label">Color</span>
+			            <input class="editor-input" type="color" data-key="textColor" value="${b.textColor||"#4A3728"}" style="height:32px;padding:2px;cursor:pointer;"></div>`;
+			        break;
+			      case "html":
+			        html += `
+			          <div class="editor-group"><span class="editor-label">HTML</span>
+			            <textarea class="editor-textarea" data-key="content" rows="8" style="font-family:monospace;font-size:11px;">${b.content||""}</textarea>
+			            <div class="editor-hint">Raw HTML — use email-safe inline styles.</div></div>`;
+			        break;
+			      case "image":
+			        html += `
+			          <div class="editor-group"><span class="editor-label">Image URL</span>
+			            <input class="editor-input" type="url" data-key="src" value="${b.src||""}" placeholder="https://…"></div>
+			          <div class="editor-group"><span class="editor-label">Alt text</span>
+			            <input class="editor-input" type="text" data-key="alt" value="${b.alt||""}"></div>
+			          <div class="editor-group"><span class="editor-label">Link URL (optional)</span>
+			            <input class="editor-input" type="url" data-key="link" value="${b.link||""}"></div>
+			          <div class="editor-group"><span class="editor-label">Width (%)</span>
+			            <input class="editor-input" type="number" data-key="width" min="20" max="100" value="${b.width||100}"></div>`;
+			        break;
+			      case "button":
+			        html += `
+			          <div class="editor-group"><span class="editor-label">Button text</span>
+			            <input class="editor-input" type="text" data-key="text" value="${b.text||""}"></div>
+			          <div class="editor-group"><span class="editor-label">URL</span>
+			            <input class="editor-input" type="url" data-key="url" value="${b.url||""}"></div>
+			          <div class="editor-group"><span class="editor-label">Color (leave blank for accent)</span>
+			            <input class="editor-input" type="color" data-key="color" value="${b.color||_accent}" style="height:32px;padding:2px;cursor:pointer;"></div>
+			          <div class="editor-group"><span class="editor-label">Align</span>
+			            <select class="editor-select" data-key="align">
+			              <option value="left" ${b.align==="left"?"selected":""}>Left</option>
+			              <option value="center" ${(b.align||"center")==="center"?"selected":""}>Center</option>
+			              <option value="right" ${b.align==="right"?"selected":""}>Right</option>
+			            </select></div>`;
+			        break;
+			      case "divider":
+			        html += `
+			          <div class="editor-group"><span class="editor-label">Style</span>
+			            <select class="editor-select" data-key="lineStyle">
+			              <option value="solid" ${(b.lineStyle||"solid")==="solid"?"selected":""}>Solid</option>
+			              <option value="dashed" ${b.lineStyle==="dashed"?"selected":""}>Dashed</option>
+			              <option value="dotted" ${b.lineStyle==="dotted"?"selected":""}>Dotted</option>
+			            </select></div>
+			          <div class="editor-group"><span class="editor-label">Color</span>
+			            <input class="editor-input" type="color" data-key="lineColor" value="${b.lineColor||"#D4BBA0"}" style="height:32px;padding:2px;cursor:pointer;"></div>`;
+			        break;
+			      case "spacer":
+			        html += `
+			          <div class="editor-group"><span class="editor-label">Height (px)</span>
+			            <input class="editor-input" type="number" data-key="height" min="4" max="120" value="${b.height||24}"></div>`;
+			        break;
+			      case "2col":
+			        html += `
+			          <div class="editor-group"><span class="editor-label">Left column</span>
+			            <textarea class="editor-textarea" data-key="col1" rows="4">${b.col1||""}</textarea></div>
+			          <div class="editor-group"><span class="editor-label">Right column</span>
+			            <textarea class="editor-textarea" data-key="col2" rows="4">${b.col2||""}</textarea></div>`;
+			        break;
+			      case "3col":
+			        html += `
+			          <div class="editor-group"><span class="editor-label">Column 1</span>
+			            <textarea class="editor-textarea" data-key="col1" rows="3">${b.col1||""}</textarea></div>
+			          <div class="editor-group"><span class="editor-label">Column 2</span>
+			            <textarea class="editor-textarea" data-key="col2" rows="3">${b.col2||""}</textarea></div>
+			          <div class="editor-group"><span class="editor-label">Column 3</span>
+			            <textarea class="editor-textarea" data-key="col3" rows="3">${b.col3||""}</textarea></div>`;
+			        break;
+			    }
+			
+			    area.innerHTML = html;
+			
+			    // Wire inputs → update block → re-render
+			    area.querySelectorAll("[data-key]").forEach(inp => {
+			      const key = inp.dataset.key;
+			      const isNum = inp.type === "number";
+			      inp.addEventListener("input", () => {
+			        b[key] = isNum ? parseInt(inp.value)||0 : inp.value;
+			        renderBlocks();
+			      });
+			    });
+			  }
+			
+			  // ── Templates ─────────────────────────────────────────────────────────────────
+			  function loadTemplate(name) {
+			    _blocks = []; _selId = null; _nextId = 1;
+			    switch (name) {
+			      case "announcement":
+			        _blocks = [makeBlock("text"), makeBlock("divider"), makeBlock("button")];
+			        _blocks[0].content = "Something exciting is happening at Progress. Here's what you need to know:";
+			        _blocks[0].fontSize = 16;
+			        _blocks[2].text = "See what's new";
+			        _blocks[2].url = "https://progressing.online";
+			        break;
+			      case "update":
+			        _blocks = [makeBlock("text"), makeBlock("spacer"), makeBlock("text")];
+			        _blocks[0].content = "Hi! We wanted to share a quick update with you.";
+			        _blocks[0].fontSize = 18;
+			        _blocks[1].height = 16;
+			        _blocks[2].content = "Here are the details of what's changed and what it means for you as part of the Progress community.";
+			        break;
+			      case "image-text":
+			        _blocks = [makeBlock("image"), makeBlock("spacer"), makeBlock("text")];
+			        _blocks[0].src = "https://progressing.online/images/nearheader.png";
+			        _blocks[0].width = 50;
+			        _blocks[1].height = 12;
+			        _blocks[2].content = "A picture is worth a thousand words. But here are a few more.";
+			        _blocks[2].align = "center";
+			        break;
+			      case "newsletter":
+			        _blocks = [makeBlock("text"), makeBlock("2col"), makeBlock("divider"), makeBlock("text")];
+			        _blocks[0].content = "Welcome to this week's roundup from Progress. Here's what's been happening:";
+			        _blocks[0].fontSize = 18;
+			        _blocks[1].col1 = "✦ New feature\nCheck out what we've been building.";
+			        _blocks[1].col2 = "✦ Community\nAmazing writing from our community this week.";
+			        _blocks[3].content = "Thank you for being part of Progress. Keep writing. ✿";
+			        _blocks[3].align = "center";
+			        break;
+			    }
+			    renderBlocks();
+			    resetBlockEditor();
+			    document.querySelector("[data-panel=elements]").click();
+			    showToast(`Loaded "${name}" template`);
+			  }
+			
+			  // ── Compile blocks → email HTML ────────────────────────────────────────────────
+			  function compileBlocks() {
+			    const esc = s => String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+			    const n2b = s => esc(s).replace(/\n/g,"<br>");
+			    return _blocks.map(b => {
+			      switch (b.type) {
+			        case "text":
+			          return `<p style="margin:0 0 18px;font-family:Georgia,'Times New Roman',serif;font-size:${b.fontSize||15}px;color:${b.textColor||"#4A3728"};line-height:1.85;text-align:${b.align||"left"};">${n2b(b.content||"")}</p>`;
+			        case "html":
+			          return b.content || "";
+			        case "image": {
+			          const px = Math.round((b.width||100) / 100 * 440);
+			          const img = `<img src="${esc(b.src||"")}" alt="${esc(b.alt||"")}" width="${px}" border="0" style="display:block;max-width:100%;margin:0 auto;outline:none;-ms-interpolation-mode:bicubic;">`;
+			          const inner = b.link ? `<a href="${esc(b.link)}" style="display:block;text-decoration:none;">${img}</a>` : img;
+			          return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td align="center" style="padding:0 0 18px;">${inner}</td></tr></table>`;
+			        }
+			        case "button": {
+			          const c = b.color || _accent;
+			          return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 auto 20px;"><tr><td bgcolor="${c}" style="border-radius:100px;"><a href="${esc(b.url||"#")}" style="display:inline-block;padding:13px 40px;font-family:Georgia,'Times New Roman',serif;font-size:13px;font-weight:bold;color:#FAF5EE;text-decoration:none;letter-spacing:0.1em;">${esc(b.text||"Button")}</a></td></tr></table>`;
+			        }
+			        case "divider":
+			          return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:4px 0 22px;"><tr><td style="border-top:1px ${b.lineStyle||"solid"} ${b.lineColor||"#D4BBA0"};font-size:0;line-height:0;">&nbsp;</td></tr></table>`;
+			        case "spacer":
+			          return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td height="${b.height||24}" style="font-size:0;line-height:0;">&nbsp;</td></tr></table>`;
+			        case "2col":
+			          return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px;"><tr><td width="47%" valign="top" style="font-family:Georgia,'Times New Roman',serif;font-size:14px;color:#4A3728;line-height:1.75;">${n2b(b.col1||"")}</td><td width="6%"></td><td width="47%" valign="top" style="font-family:Georgia,'Times New Roman',serif;font-size:14px;color:#4A3728;line-height:1.75;">${n2b(b.col2||"")}</td></tr></table>`;
+			        case "3col":
+			          return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px;"><tr><td width="30%" valign="top" style="font-family:Georgia,'Times New Roman',serif;font-size:13px;color:#4A3728;line-height:1.7;">${n2b(b.col1||"")}</td><td width="5%"></td><td width="30%" valign="top" style="font-family:Georgia,'Times New Roman',serif;font-size:13px;color:#4A3728;line-height:1.7;">${n2b(b.col2||"")}</td><td width="5%"></td><td width="30%" valign="top" style="font-family:Georgia,'Times New Roman',serif;font-size:13px;color:#4A3728;line-height:1.7;">${n2b(b.col3||"")}</td></tr></table>`;
+			        default: return "";
+			      }
+			    }).join("\n");
+			  }
+			
+			  function getPayload() {
+			    return {
+			      subject:      document.getElementById("builderSubject").value.trim() || "(no subject)",
+			      bodyHtml:     compileBlocks(),
+			      body:         _blocks.map(b => b.content || b.text || b.col1 || "").join(" ").slice(0, 150),
+			      emoticon:     _emoticon === "none" ? "" : _emoticon,
+			      accentColor:  _accent,
+			      buttonColor:  _accent,
+			      footerTagline: document.getElementById("footerTagline").value.trim() || "until next time",
+			    };
+			  }
+			
+			  // ── Preview ────────────────────────────────────────────────────────────────────
+			  async function previewEmail() {
+			    if (!_blocks.length) { showToast("Add some content first."); return; }
+			    const payload = getPayload();
+			    const r = await apiFetch("/api/admin/preview-email", {
+			      method: "POST", headers: { "Content-Type": "application/json" },
+			      body: JSON.stringify(payload)
+			    });
+			    if (r && r.html) {
+			      document.getElementById("builderPreviewFrame").srcdoc = r.html;
+			      document.getElementById("canvasScrollWrap").style.display = "none";
+			      document.getElementById("builderPreviewPane").classList.add("show");
+			    } else {
+			      showToast("Preview failed — check server.");
+			    }
+			  }
+			
+			  // ── Send ───────────────────────────────────────────────────────────────────────
+			  async function sendEmail() {
+			    const subject = document.getElementById("builderSubject").value.trim();
+			    if (!subject) { showToast("Subject line is required."); return; }
+			    if (!_blocks.length) { showToast("Add some content blocks first."); return; }
+			
+			    const type = document.getElementById("builderRecipient").value;
+			    const targetUsername = type === "specific"
+			      ? document.getElementById("builderUsername").value.trim().replace(/^@/, "")
+			      : null;
+			    if (type === "specific" && !targetUsername) { showToast("Enter a username."); return; }
+			
+			    const label = type === "all" ? "all subscribers" : `@${targetUsername}`;
+			    const ok = await adminConfirm(
+			      `Send to ${label}?`,
+			      `Subject: <strong>${escapeHTML(subject)}</strong><br><br>This cannot be undone.`,
+			      "Send"
+			    );
+			    if (!ok) return;
+			
+			    const btn = document.getElementById("builderSendBtn");
+			    const status = document.getElementById("builderSendStatus");
+			    btn.disabled = true; btn.textContent = "Sending…"; status.textContent = "";
+			
+			    const r = await apiFetch("/api/admin/send-email", {
+			      method: "POST", headers: { "Content-Type": "application/json" },
+			      body: JSON.stringify({ ...getPayload(), targetUsername: targetUsername || undefined })
+			    });
+			
+			    btn.disabled = false; btn.textContent = "Send email";
+			    if (r && typeof r.sent === "number") {
+			      const failNote = r.failed ? ` (${r.failed} failed)` : "";
+			      status.textContent = `✓ Sent to ${r.sent}${failNote}`;
+			      showToast(`Sent to ${r.sent} user${r.sent !== 1 ? "s" : ""}.`);
+			    } else if (r?.error) {
+			      status.textContent = `Error: ${r.error}`;
+			      showToast(r.error);
+			    } else {
+			      status.textContent = "Failed.";
+			      showToast("Couldn't send email.");
+			    }
+			  }
+			
+			  // ── Confirm dialog ────────────────────────────────────────────────────────────
+			  function adminConfirm(title, bodyHtml, confirmLabel = "Confirm", variant = "primary") {
+			    return new Promise(resolve => {
+			      document.getElementById("adminConfirmDialog")?.remove();
+			      const dlg = document.createElement("div");
+			      dlg.id = "adminConfirmDialog";
+			      dlg.style.cssText = `position:fixed; inset:0; z-index:9000; display:flex; align-items:center; justify-content:center; background:rgba(28,25,23,.45); backdrop-filter:blur(4px);`;
+			      dlg.innerHTML = `
+			        <div style="background:var(--paper); border:1px solid var(--mocha-light); border-radius:14px; box-shadow:0 20px 60px rgba(0,0,0,.22); padding:28px 28px 24px; max-width:380px; width:90%;">
+			          <h3 style="font-family:var(--font-display); font-size:20px; margin:0 0 10px;">${title}</h3>
+			          <p style="font-size:14px; color:var(--muted); line-height:1.55; margin:0 0 22px;">${bodyHtml}</p>
+			          <div style="display:flex; gap:10px; justify-content:flex-end;">
+			            <button id="adminConfirmCancel" style="padding:10px 20px; border-radius:var(--radius); border:1px solid var(--mocha-light); background:var(--paper); color:var(--ink); font-size:14px; font-weight:600; cursor:pointer;">Cancel</button>
+			            <button id="adminConfirmOk" style="padding:10px 20px; border-radius:var(--radius); border:none; background:${variant==="danger"?"var(--danger)":"var(--ink)"}; color:#fff; font-size:14px; font-weight:600; cursor:pointer;">${confirmLabel}</button>
+			          </div>
+			        </div>`;
+			      const cleanup = r => { dlg.style.opacity="0"; dlg.style.transition="opacity .1s"; setTimeout(()=>dlg.remove(),120); resolve(r); };
+			      dlg.addEventListener("click", e => { if(e.target===dlg) cleanup(false); });
+			      dlg.querySelector("#adminConfirmCancel").addEventListener("click", () => cleanup(false));
+			      dlg.querySelector("#adminConfirmOk").addEventListener("click",    () => cleanup(true));
+			      document.addEventListener("keydown", function esc(e) { if(e.key==="Escape"){document.removeEventListener("keydown",esc);cleanup(false);} });
+			      document.body.appendChild(dlg);
+			      dlg.querySelector("#adminConfirmOk").focus();
+			    });
+			  }
+			
+			  // ── Bootstrap ─────────────────────────────────────────────────────────────────
+			  async function start() {
+			    initShell("admin");
+			    await Progress.loadFromApi().catch(() => {});
+			    checkAuth();
+			  }
+			  start();

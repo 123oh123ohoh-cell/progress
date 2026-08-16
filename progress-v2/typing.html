@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Typing Test — Progress</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500;1,9..144,600&family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script>(function(){try{var t=localStorage.getItem("progressTheme");var dark=(t==="dark")||(t!=="light"&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);if(dark)document.documentElement.setAttribute("data-theme","dark");}catch(e){}})();</script>
+<link rel="stylesheet" href="style.css">
+<style>
+html, body { height: 100%; margin: 0; background: var(--v2-bg); }
+
+.v2-typing-shell { display: flex; flex-direction: column; height: 100dvh; }
+
+/* Minimal v2 typing nav */
+.v2-typing-nav {
+  height: var(--v2-nav-h); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 20px;
+  background: var(--v2-bg); border-bottom: 1px solid transparent;
+  transition: border-color .3s; position: relative; z-index: 100;
+}
+.v2-typing-nav.scrolled { border-bottom-color: var(--v2-border); }
+.v2-typing-nav-left { display: flex; align-items: center; gap: 12px; }
+.v2-typing-logo { font-family: var(--v2-font-d); font-style: italic; font-size: 19px; font-weight: 600; color: var(--v2-ink); text-decoration: none; opacity: .9; }
+.v2-typing-logo:hover { opacity: 1; }
+.v2-typing-nav-links { display: flex; align-items: center; gap: 2px; }
+.v2-typing-nav-link { font-family: var(--v2-font-m); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--v2-muted); text-decoration: none; padding: 6px 10px; border-radius: 6px; transition: color .15s, background .15s; }
+.v2-typing-nav-link:hover { color: var(--v2-ink); background: var(--v2-paper-2); }
+
+/* Content iframe */
+.v2-typing-iframe-wrap { flex: 1; overflow: hidden; }
+.v2-typing-iframe { width: 100%; height: 100%; border: none; display: block; background: var(--v2-bg); }
+</style>
+</head>
+<body>
+<div class="v2-typing-shell">
+
+  <!-- V2 typing nav -->
+  <nav class="v2-typing-nav" id="v2TypingNav">
+    <div class="v2-typing-nav-left">
+      <a href="index.html" class="v2-typing-logo">progress</a>
+      <div class="v2-typing-nav-links">
+        <a href="index.html" class="v2-typing-nav-link">feed</a>
+        <a href="fun.html" class="v2-typing-nav-link">games</a>
+        <a href="write.html" class="v2-typing-nav-link">write</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Embed original typing test -->
+  <div class="v2-typing-iframe-wrap">
+    <iframe
+      src="../typing.html"
+      class="v2-typing-iframe"
+      id="typingFrame"
+      title="Typing Test"
+      sandbox="allow-same-origin allow-scripts allow-forms"
+    ></iframe>
+  </div>
+
+</div>
+<script>
+const frame = document.getElementById("typingFrame");
+frame.addEventListener("load", () => {
+  try {
+    const dark = localStorage.getItem("progressTheme") === "dark" ||
+      (localStorage.getItem("progressTheme") !== "light" && window.matchMedia("(prefers-color-scheme:dark)").matches);
+    if (dark) frame.contentDocument.documentElement.setAttribute("data-theme", "dark");
+    // Hide the original tp-bar since we have our own nav
+    const style = frame.contentDocument.createElement("style");
+    style.textContent = `.tp-bar { display:none !important; } .tp-shell { padding-top:20px !important; }`;
+    frame.contentDocument.head.appendChild(style);
+  } catch(e) {}
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Event — Progress</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500;1,9..144,600&family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script>(function(){try{var t=localStorage.getItem("progressTheme");var dark=(t==="dark")||(t!=="light"&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);if(dark)document.documentElement.setAttribute("data-theme","dark");}catch(e){}})();</script>
+<link rel="stylesheet" href="v2-compat.css">
+<link rel="stylesheet" href="style.css">
+<style>
+#nav-root { display:none !important; }
+/* Transparent nav over hero */
+.v2-nav { background: transparent !important; border-bottom-color: rgba(255,255,255,.15) !important; }
+.v2-nav.scrolled { background: var(--v2-nav-bg) !important; border-bottom-color: var(--v2-border) !important; }
+.v2-logo-text, .v2-btn--dark { color: #fff !important; }
+.v2-btn--dark { background: rgba(255,255,255,.15) !important; border-color: rgba(255,255,255,.3) !important; backdrop-filter: blur(8px); }
+.v2-btn--dark:hover { background: rgba(255,255,255,.28) !important; }
+
+/* Hero */
+.v2-ev-hero {
+  position: relative; overflow: hidden; color: #fff;
+  min-height: min(72vh, 640px);
+  display: flex; flex-direction: column; justify-content: flex-end;
+  padding: 0; background-size: 300% 300%;
+  animation: v2EvGrad 10s ease infinite;
+}
+@keyframes v2EvGrad { 0%,100%{background-position:0% 60%} 33%{background-position:100% 40%} 66%{background-position:50% 100%} }
+
+.v2-ev-scrim {
+  position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background: linear-gradient(to bottom, rgba(0,0,0,.04) 0%, rgba(0,0,0,.10) 40%, rgba(0,0,0,.58) 100%);
+}
+.v2-ev-shimmer {
+  position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background: linear-gradient(108deg, transparent 30%, rgba(255,255,255,.09) 50%, transparent 70%);
+  animation: v2EvShimmer 6s ease-in-out infinite;
+}
+@keyframes v2EvShimmer { 0%{transform:translateX(-120%)} 100%{transform:translateX(220%)} }
+
+#heroCanvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+
+.v2-ev-hero-inner {
+  position: relative; z-index: 2;
+  max-width: 760px; margin: 0 auto; padding: calc(var(--v2-nav-h) + 60px) 24px 52px;
+  width: 100%; display: flex; flex-direction: column; align-items: center; text-align: center;
+}
+
+.v2-ev-live-badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: rgba(255,255,255,.18); backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,.3); border-radius: 30px;
+  padding: 7px 18px; font-size: 10.5px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: .14em; margin-bottom: 28px;
+  animation: v2FadeIn .6s cubic-bezier(.34,1.56,.64,1) both;
+}
+.v2-ev-live-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: #fff;
+  animation: v2EvPing 1.3s cubic-bezier(.4,0,.6,1) infinite;
+}
+@keyframes v2EvPing { 0%{box-shadow:0 0 0 0 rgba(255,255,255,.7)} 70%{box-shadow:0 0 0 8px rgba(255,255,255,0)} 100%{box-shadow:0 0 0 0 rgba(255,255,255,0)} }
+
+.v2-ev-emoji { font-size: 56px; line-height: 1; margin-bottom: 16px; animation: v2FadeIn .5s .15s both; }
+.v2-ev-title {
+  font-family: var(--v2-font-d); font-style: italic; font-weight: 600;
+  font-size: clamp(30px,6vw,52px); line-height: 1.15; color: #fff;
+  margin: 0 0 14px; text-shadow: 0 2px 20px rgba(0,0,0,.3);
+  animation: v2FadeIn .5s .25s both;
+}
+.v2-ev-desc { font-size: 17px; color: rgba(255,255,255,.82); line-height: 1.6; max-width: 480px; margin: 0 auto 32px; animation: v2FadeIn .5s .35s both; }
+
+@keyframes v2FadeIn { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:none} }
+
+/* Countdown */
+.v2-ev-countdown { display: flex; align-items: center; gap: 8px; margin-bottom: 32px; justify-content: center; animation: v2FadeIn .5s .45s both; }
+.v2-ev-unit {
+  background: rgba(0,0,0,.32); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,.18);
+  border-radius: var(--r-md); padding: 10px 16px; text-align: center; min-width: 58px;
+}
+.v2-ev-unit-num { display: block; font-family: var(--v2-font-m); font-size: 22px; font-weight: 700; color: #fff; line-height: 1; }
+.v2-ev-unit-lbl { display: block; font-size: 9px; text-transform: uppercase; letter-spacing: .1em; color: rgba(255,255,255,.55); margin-top: 3px; }
+.v2-ev-sep { font-size: 18px; font-weight: 700; color: rgba(255,255,255,.35); }
+
+/* CTA buttons */
+.v2-ev-ctas { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; animation: v2FadeIn .5s .55s both; }
+.v2-ev-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 12px 28px; border-radius: 30px; font-size: 15px; font-weight: 700;
+  border: 2px solid transparent; cursor: pointer; text-decoration: none;
+  transition: transform .15s cubic-bezier(.34,1.56,.64,1), box-shadow .15s;
+  font-family: var(--v2-font-b);
+}
+.v2-ev-btn--primary { background: #fff; color: #1a1a1a; }
+.v2-ev-btn--primary:hover { transform: translateY(-3px) scale(1.04); box-shadow: 0 12px 32px rgba(0,0,0,.25); }
+.v2-ev-btn--ghost { background: rgba(255,255,255,.15); color: #fff; border-color: rgba(255,255,255,.3); backdrop-filter: blur(8px); }
+.v2-ev-btn--ghost:hover { background: rgba(255,255,255,.25); transform: translateY(-2px); }
+
+/* Body */
+.v2-ev-body { max-width: 860px; margin: 0 auto; padding: 48px 24px 100px; }
+@media (max-width: 740px) { .v2-ev-body { padding: 32px 16px 88px; } }
+
+.v2-ev-section-title {
+  font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--v2-muted); font-family: var(--v2-font-m); margin: 0 0 20px;
+  display: flex; align-items: center; gap: 10px;
+}
+.v2-ev-section-title::after { content:""; flex:1; height:1px; background:var(--v2-border); }
+
+/* Submissions */
+.v2-ev-submissions { display: flex; flex-direction: column; gap: 12px; }
+.v2-ev-sub {
+  background: var(--v2-paper); border: 1px solid var(--v2-border);
+  border-radius: var(--r-lg); padding: 18px 20px; display: flex; align-items: center;
+  gap: 14px; transition: box-shadow .2s, transform .2s;
+}
+.v2-ev-sub:hover { box-shadow: var(--sh-md); transform: translateY(-2px); }
+.v2-ev-sub-rank { font-family: var(--v2-font-m); font-size: 13px; font-weight: 700; color: var(--v2-muted); width: 24px; text-align: center; flex-shrink: 0; }
+.v2-ev-sub-rank:first-child { color: #f59e0b; }
+.v2-ev-sub-av {
+  width: 36px; height: 36px; border-radius: 50%; overflow: hidden; flex-shrink: 0;
+  background: var(--v2-paper-2); border: 1.5px solid var(--v2-border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-style: italic; font-family: var(--v2-font-d); color: var(--v2-mocha-dark);
+}
+.v2-ev-sub-av img { width:100%;height:100%;object-fit:cover; }
+.v2-ev-sub-info { flex: 1; min-width: 0; }
+.v2-ev-sub-title { font-size: 15px; font-weight: 600; color: var(--v2-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2-ev-sub-meta  { font-size: 12px; color: var(--v2-muted); font-family: var(--v2-font-m); margin-top: 2px; }
+.v2-ev-sub-likes { display: flex; align-items: center; gap: 4px; font-size: 13px; color: var(--v2-muted); flex-shrink: 0; }
+.v2-ev-sub-likes svg { width: 13px; height: 13px; }
+</style>
+</head>
+<body class="v2 mobile">
+
+<div id="nav-root" aria-hidden="true"></div>
+<div id="modal-root"></div>
+
+<!-- ── V2 Nav (transparent over hero) ──────────────────────── -->
+<nav class="v2-nav" id="v2Nav" style="position:fixed;">
+  <div class="v2-nav-inner">
+    <a href="index.html" class="v2-logo">
+      <img src="../images/etc1.png" alt="Progress" class="v2-logo-img">
+      <span class="v2-logo-text">Progress</span>
+    </a>
+    <div class="v2-nav-right" id="v2NavRight">
+      <a href="write.html" class="v2-btn v2-btn--dark" style="font-size:13px;padding:7px 15px;">Write</a>
+    </div>
+  </div>
+</nav>
+
+<!-- Hero -->
+<div class="v2-ev-hero" id="v2EvHero">
+  <canvas id="heroCanvas"></canvas>
+  <div class="v2-ev-scrim"></div>
+  <div class="v2-ev-shimmer"></div>
+  <div class="v2-ev-hero-inner" id="v2EvHeroInner">
+    <!-- Filled by JS -->
+    <div class="v2-ev-live-badge"><span class="v2-ev-live-dot"></span>Loading event…</div>
+  </div>
+</div>
+
+<!-- Body -->
+<div class="v2-ev-body" id="v2EvBody">
+  <!-- Filled by JS -->
+  <div class="v2-skel v2-skel-feat" style="height:200px;"></div>
+</div>
+
+<!-- Mobile bottom nav -->
+<nav class="v2-mob-nav" aria-label="Mobile navigation">
+  <a href="index.html" class="v2-mob-tab" aria-label="Feed">
+    <svg viewBox="0 0 22 22" fill="none" width="21" height="21"><path d="M2.5 10 11 3l8.5 7V19a.8.8 0 0 1-.8.8H3.3a.8.8 0 0 1-.8-.8V10Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+    <span>Feed</span>
+  </a>
+  <a href="explore.html" class="v2-mob-tab" aria-label="Explore">
+    <svg viewBox="0 0 22 22" fill="none" width="21" height="21"><circle cx="10" cy="10" r="7.5" stroke="currentColor" stroke-width="1.7"/><path d="m16 16 3.5 3.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+    <span>Explore</span>
+  </a>
+  <a href="write.html" class="v2-mob-tab v2-mob-tab--write" aria-label="Write">
+    <svg viewBox="0 0 22 22" fill="none" width="21" height="21"><path d="M16.5 3 19 5.5l-13 13L3 20l.5-3.5 13-13Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+    <span>Write</span>
+  </a>
+  <a href="chat.html" class="v2-mob-tab" aria-label="Chat">
+    <svg viewBox="0 0 22 22" fill="none" width="21" height="21"><path d="M19.5 11c0 4.14-3.36 7.5-7.5 7.5A7.48 7.48 0 0 1 7.3 17.4L3 18.5l1.1-4.3A7.48 7.48 0 0 1 4.5 11C4.5 6.86 7.86 3.5 12 3.5s7.5 3.36 7.5 7.5Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+    <span>Chat</span>
+  </a>
+  <a href="profile.html" class="v2-mob-tab" id="v2MobProfile" aria-label="Profile">
+    <svg viewBox="0 0 22 22" fill="none" width="21" height="21"><circle cx="11" cy="7.5" r="3.5" stroke="currentColor" stroke-width="1.7"/><path d="M4 19.5c0-3.87 3.13-7 7-7h.5c3.87 0 7 3.13 7 7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+    <span>Profile</span>
+  </a>
+</nav>
+
+<script src="../data.js"></script>
+<script src="../app.js"></script>
+<script src="v2-nav.js"></script>
+<script>
+function _esc(s) { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+async function start() {
+  const ready = initShell("event");
+  v2BootNav(ready);
+
+  let ev;
+  try { ev = await apiFetch("/api/events/current"); } catch {}
+
+  const hero = document.getElementById("v2EvHeroInner");
+  const body = document.getElementById("v2EvBody");
+  const heroEl = document.getElementById("v2EvHero");
+
+  if (!ev || !ev.id) {
+    hero.innerHTML = `
+      <div class="v2-ev-live-badge"><span class="v2-ev-live-dot"></span>No active event</div>
+      <h1 class="v2-ev-title">No event right now</h1>
+      <p class="v2-ev-desc">Check back soon for the next Progress event!</p>
+      <div class="v2-ev-ctas"><a href="index.html" class="v2-ev-btn v2-ev-btn--ghost">Back to feed</a></div>`;
+    body.innerHTML = "";
+    return;
+  }
+
+  const gradient = ev.gradient || "linear-gradient(-45deg,#ff6b9d,#ffd93d,#ff6b35,#c471ed)";
+  heroEl.style.background = gradient;
+
+  const endDate = new Date(ev.endDate);
+
+  hero.innerHTML = `
+    <div class="v2-ev-live-badge"><span class="v2-ev-live-dot"></span>Live now</div>
+    <div class="v2-ev-emoji">${ev.emoji || "🎮"}</div>
+    <h1 class="v2-ev-title">${_esc(ev.title)}</h1>
+    ${ev.description ? `<p class="v2-ev-desc">${_esc(ev.description)}</p>` : ""}
+    <div class="v2-ev-countdown" id="v2EvCountdown"></div>
+    <div class="v2-ev-ctas">
+      <a href="write.html?event=${_esc(ev.id)}" class="v2-ev-btn v2-ev-btn--primary">▶ Join &amp; Write</a>
+      <a href="#submissions" class="v2-ev-btn v2-ev-btn--ghost">View entries</a>
+    </div>`;
+
+  /* countdown */
+  let _timer;
+  function tick() {
+    const el = document.getElementById("v2EvCountdown");
+    if (!el) { clearInterval(_timer); return; }
+    const diff = endDate - Date.now();
+    if (diff <= 0) { el.innerHTML = `<span style="font-size:13px;color:rgba(255,255,255,.7)">Event ended</span>`; clearInterval(_timer); return; }
+    const d = Math.floor(diff/86400000), h = Math.floor((diff%86400000)/3600000),
+          m = Math.floor((diff%3600000)/60000), s = Math.floor((diff%60000)/1000);
+    const u = (n,l) => `<div class="v2-ev-unit"><span class="v2-ev-unit-num">${String(n).padStart(2,"0")}</span><span class="v2-ev-unit-lbl">${l}</span></div>`;
+    el.innerHTML = u(d,"days")+`<span class="v2-ev-sep">:</span>`+u(h,"hrs")+`<span class="v2-ev-sep">:</span>`+u(m,"min")+`<span class="v2-ev-sep">:</span>`+u(s,"sec");
+  }
+  tick(); _timer = setInterval(tick, 1000);
+
+  /* submissions */
+  ready.then(async () => {
+    const subs = await apiFetch(`/api/events/${ev.id}/submissions`).catch(() => []);
+    if (!subs?.length) { body.innerHTML = `<p style="color:var(--v2-muted);font-size:14px;">No submissions yet. Be the first!</p>`; return; }
+    body.innerHTML = `
+      <p class="v2-ev-section-title" id="submissions">Submissions</p>
+      <div class="v2-ev-submissions">
+        ${subs.map((sub, i) => {
+          const author = Progress.getUser(sub.author);
+          const ini2 = (author?.name || sub.author).split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
+          const av = author?.avatar ? `<img src="${_esc(author.avatar)}" alt="" loading="lazy">` : ini2;
+          return `
+          <a href="post.html?id=${_esc(sub.id)}" class="v2-ev-sub" style="text-decoration:none;color:inherit;">
+            <span class="v2-ev-sub-rank">${i===0?"🥇":i===1?"🥈":i===2?"🥉":i+1}</span>
+            <div class="v2-ev-sub-av">${av}</div>
+            <div class="v2-ev-sub-info">
+              <div class="v2-ev-sub-title">${_esc(sub.title)}</div>
+              <div class="v2-ev-sub-meta">@${_esc(sub.author)} · ${Progress.formatDateShort(sub.date)}</div>
+            </div>
+            <span class="v2-ev-sub-likes">
+              <svg viewBox="0 0 12 12" fill="none"><path d="M6 10.5S1 7.2 1 4.2C1 2.4 2.4 1 4.2 1c.9 0 1.8.5 2.8 1.6C8-.5 9.4 1 9.8 1c1.8 0 3.2 1.4 1.2 3.2C9 7.2 6 10.5 6 10.5Z" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg>
+              ${sub.likes||0}
+            </span>
+          </a>`;
+        }).join("")}
+      </div>`;
+  }).catch(() => {});
+}
+start();
+</script>
+</body>
+</html>

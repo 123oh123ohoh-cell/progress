@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Install Progress — Get the App</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500;1,9..144,600&family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script>(function(){try{var t=localStorage.getItem("progressTheme");var dark=(t==="dark")||(t!=="light"&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);if(dark)document.documentElement.setAttribute("data-theme","dark");}catch(e){}})();</script>
+<link rel="stylesheet" href="v2-compat.css">
+<link rel="stylesheet" href="style.css">
+<style>
+#nav-root { display:none !important; }
+
+.v2-install-wrap { max-width: 560px; margin: 0 auto; padding: calc(var(--v2-nav-h)+40px) 24px 100px; }
+
+/* Hero */
+.v2-install-hero { text-align: center; margin-bottom: 48px; }
+.v2-install-logo {
+  width: 88px; height: 88px; border-radius: 22px; overflow: hidden;
+  box-shadow: 0 12px 36px rgba(0,0,0,.12); margin: 0 auto 20px;
+  border: 1.5px solid var(--v2-border);
+}
+.v2-install-logo img { width: 100%; height: 100%; object-fit: cover; }
+.v2-install-hero h1 {
+  font-family: var(--v2-font-d); font-style: italic; font-size: 30px;
+  color: var(--v2-ink); margin: 0 0 10px;
+}
+.v2-install-hero p { font-size: 16px; color: var(--v2-muted); line-height: 1.6; margin: 0; }
+
+/* Tabs */
+.v2-install-tabs {
+  display: flex; gap: 4px; border-bottom: 1px solid var(--v2-border);
+  margin-bottom: 32px; overflow-x: auto; scrollbar-width: none;
+}
+.v2-install-tabs::-webkit-scrollbar { display: none; }
+.v2-install-tab {
+  padding: 10px 18px; border: none; background: none; cursor: pointer;
+  font-family: var(--v2-font-b); font-size: 14px; font-weight: 500;
+  color: var(--v2-muted); border-bottom: 2px solid transparent; margin-bottom: -1px;
+  transition: color .15s, border-color .15s; white-space: nowrap;
+}
+.v2-install-tab:hover { color: var(--v2-ink); }
+.v2-install-tab.active { color: var(--v2-ink); font-weight: 700; border-bottom-color: var(--v2-ink); }
+
+/* Panels */
+.v2-install-panel { display: none; }
+.v2-install-panel.active { display: block; }
+
+/* Steps */
+.v2-install-steps { display: flex; flex-direction: column; gap: 24px; }
+.v2-install-step { display: flex; gap: 16px; align-items: flex-start; }
+.v2-install-step-num {
+  width: 34px; height: 34px; border-radius: 50%; background: var(--v2-ink); color: var(--v2-bg);
+  display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700;
+  flex-shrink: 0; margin-top: 1px;
+}
+.v2-install-step-body strong {
+  display: block; font-size: 15px; font-weight: 700; color: var(--v2-ink); margin-bottom: 5px;
+}
+.v2-install-step-body span { font-size: 14px; color: var(--v2-muted); line-height: 1.55; }
+
+/* Step icon pill */
+.v2-step-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; background: var(--v2-paper-2); border: 1px solid var(--v2-border);
+  border-radius: 7px; vertical-align: middle; margin: 0 3px;
+}
+
+/* Note */
+.v2-install-note {
+  margin-top: 32px; padding: 16px 18px; background: var(--v2-paper);
+  border: 1px solid var(--v2-border); border-radius: var(--r-lg);
+  font-size: 13.5px; color: var(--v2-muted); line-height: 1.6;
+}
+
+/* Footer link */
+.v2-install-footer {
+  text-align: center; margin-top: 40px; padding-top: 32px;
+  border-top: 1px solid var(--v2-border); font-size: 14px; color: var(--v2-muted);
+}
+.v2-install-footer a {
+  color: var(--v2-ink); font-weight: 600; text-decoration: none;
+}
+.v2-install-footer a:hover { text-decoration: underline; }
+</style>
+</head>
+<body class="v2 mobile">
+
+<div id="nav-root" aria-hidden="true"></div>
+<div id="modal-root"></div>
+
+<!-- ── V2 Nav ─────────────────────────────────────────────── -->
+<nav class="v2-nav" id="v2Nav">
+  <div class="v2-nav-inner">
+    <a href="index.html" class="v2-logo">
+      <img src="../images/etc1.png" alt="Progress" class="v2-logo-img">
+      <span class="v2-logo-text">Progress</span>
+    </a>
+    <div class="v2-nav-right" id="v2NavRight">
+      <a href="index.html" class="v2-btn v2-btn--dark" style="font-size:13px;padding:7px 15px;">Open app</a>
+    </div>
+  </div>
+</nav>
+
+<div class="v2-install-wrap">
+
+  <div class="v2-install-hero">
+    <div class="v2-install-logo">
+      <img src="../images/nearheader.png" alt="Progress">
+    </div>
+    <h1>Get the Progress app</h1>
+    <p>Install Progress on your device for a faster, full-screen experience — no browser bar.</p>
+  </div>
+
+  <div class="v2-install-tabs">
+    <button class="v2-install-tab active" data-panel="ios">iPhone / iPad</button>
+    <button class="v2-install-tab" data-panel="android">Android</button>
+    <button class="v2-install-tab" data-panel="desktop">Desktop</button>
+  </div>
+
+  <!-- iOS -->
+  <div class="v2-install-panel active" id="panel-ios">
+    <div class="v2-install-steps">
+      <div class="v2-install-step">
+        <div class="v2-install-step-num">1</div>
+        <div class="v2-install-step-body">
+          <strong>Open Safari</strong>
+          <span>Progress can only be installed from Safari. Switch from Chrome or another browser if needed.</span>
+        </div>
+      </div>
+      <div class="v2-install-step">
+        <div class="v2-install-step-num">2</div>
+        <div class="v2-install-step-body">
+          <strong>Tap the Share button</strong>
+          <span>At the bottom of the screen, tap the Share button
+            <span class="v2-step-icon">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+            </span>
+            — the box with an arrow pointing up.
+          </span>
+        </div>
+      </div>
+      <div class="v2-install-step">
+        <div class="v2-install-step-num">3</div>
+        <div class="v2-install-step-body">
+          <strong>Tap "Add to Home Screen"</strong>
+          <span>Scroll down in the share sheet and tap <em>Add to Home Screen</em>. Then tap <em>Add</em> in the top right.</span>
+        </div>
+      </div>
+      <div class="v2-install-step">
+        <div class="v2-install-step-num">4</div>
+        <div class="v2-install-step-body">
+          <strong>Done! Open from your home screen</strong>
+          <span>Progress appears on your home screen like a native app — full screen, no browser bar.</span>
+        </div>
+      </div>
+    </div>
+    <div class="v2-install-note">💡 On iPad, the Share button is in the top-right toolbar next to the address bar.</div>
+  </div>
+
+  <!-- Android -->
+  <div class="v2-install-panel" id="panel-android">
+    <div class="v2-install-steps">
+      <div class="v2-install-step">
+        <div class="v2-install-step-num">1</div>
+        <div class="v2-install-step-body">
+          <strong>Open Chrome</strong>
+          <span>Use Google Chrome. Other browsers may not support installing web apps.</span>
+        </div>
+      </div>
+      <div class="v2-install-step">
+        <div class="v2-install-step-num">2</div>
+        <div class="v2-install-step-body">
+          <strong>Look for the install prompt</strong>
+          <span>Chrome may show a banner at the bottom or an Install icon in the address bar. Tap it.</span>
+        </div>
+      </div>
+      <div class="v2-install-step">
+        <div class="v2-install-step-num">3</div>
+        <div class="v2-install-step-body">
+          <strong>Or use the browser menu</strong>
+          <span>Tap the three-dot menu ⋮ in the top right, then tap <em>Add to Home screen</em> or <em>Install app</em>.</span>
+        </div>
+      </div>
+      <div class="v2-install-step">
+        <div class="v2-install-step-num">4</div>
+        <div class="v2-install-step-body">
+          <strong>Tap Install and you're done</strong>
+          <span>Progress appears in your app drawer and home screen.</span>
+        </div>
+      </div>
+    </div>
+    <div class="v2-install-note">💡 If you don't see the option, make sure you're on <strong>progressing.online</strong> using the latest Chrome.</div>
+  </div>
+
+  <!-- Desktop -->
+  <div class="v2-install-panel" id="panel-desktop">
+    <div class="v2-install-steps">
+      <div class="v2-install-step">
+        <div class="v2-install-step-num">1</div>
+        <div class="v2-install-step-body">
+          <strong>Open Chrome or Edge</strong>
+          <span>Desktop installation works in Chrome and Edge. Firefox and Safari on Mac don't support it yet.</span>
+        </div>
+      </div>
+      <div class="v2-install-step">
+        <div class="v2-install-step-num">2</div>
+        <div class="v2-install-step-body">
+          <strong>Click the install icon in the address bar</strong>
+          <span>Look for a small computer or download icon on the right side of the address bar and click it.</span>
+        </div>
+      </div>
+      <div class="v2-install-step">
+        <div class="v2-install-step-num">3</div>
+        <div class="v2-install-step-body">
+          <strong>Click Install</strong>
+          <span>A dialog appears. Click <em>Install</em> and Progress opens in its own window, no browser tabs.</span>
+        </div>
+      </div>
+    </div>
+    <div class="v2-install-note">💡 On Mac, use Chrome for the best experience. Safari on Mac doesn't support PWA installation yet.</div>
+  </div>
+
+  <div class="v2-install-footer">
+    Already installed? <a href="index.html">Go to Progress →</a>
+  </div>
+
+</div>
+
+<script src="../data.js"></script>
+<script src="../app.js"></script>
+<script src="v2-nav.js"></script>
+<script>
+  async function start() {
+    const ready = initShell("install");
+    v2BootNav(ready);
+  }
+  start();
+
+  // Tab switching
+  document.querySelectorAll(".v2-install-tab").forEach(tab => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll(".v2-install-tab").forEach(t => t.classList.remove("active"));
+      document.querySelectorAll(".v2-install-panel").forEach(p => p.classList.remove("active"));
+      tab.classList.add("active");
+      document.getElementById("panel-" + tab.dataset.panel).classList.add("active");
+    });
+  });
+
+  // Auto-select right tab based on device
+  (function() {
+    const ua = navigator.userAgent;
+    if (/iphone|ipad|ipod/i.test(ua)) {
+      document.querySelector('[data-panel="ios"]').click();
+    } else if (/android/i.test(ua)) {
+      document.querySelector('[data-panel="android"]').click();
+    }
+  })();
+</script>
+</body>
+</html>

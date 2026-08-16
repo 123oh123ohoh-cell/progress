@@ -1,0 +1,1102 @@
+extends layout
+
+block title
+	| Profile — Progress
+
+block meta
+	//- no OG meta
+
+block content
+	main.container
+		.settings-wrap#settingsWrap
+	input#avatarInput(type='file' accept='image/*' style='display:none;')
+	
+
+block scripts
+		script.
+			
+			  const wrap = document.getElementById("settingsWrap");
+			  const params = new URLSearchParams(location.search);
+			  const isBetaMode = () => !!(user && (
+			    (Array.isArray(user.badges) && user.badges.includes("tester")) ||
+			    user.adminRole === "owner"
+			  ));
+			  // If Spotify just redirected back here (spotify=connected / spotify=error),
+			  // force the settings tab open so the user lands on the section that matters.
+			  let activeTab = (params.get("tab") === "settings" || params.get("spotify")) ? "settings" : params.get("tab") === "stats" ? "stats" : "profile";
+			  let activeSettingsTab = params.get("spotify") ? "integrations" : "profile";
+			  let user;
+			  const timezoneOptions = [
+			    { value: "America/Los_Angeles", label: "Pacific Time - US & Canada" },
+			    { value: "America/Denver", label: "Mountain Time - US & Canada" },
+			    { value: "America/Chicago", label: "Central Time - US & Canada" },
+			    { value: "America/New_York", label: "Eastern Time - US & Canada" },
+			    { value: "America/Anchorage", label: "Alaska Time - US & Canada" },
+			    { value: "Pacific/Honolulu", label: "Hawaii Time - US & Canada" },
+			    { value: "Europe/London", label: "London" },
+			    { value: "Europe/Berlin", label: "Central Europe" },
+			    { value: "Asia/Tokyo", label: "Tokyo" },
+			    { value: "Asia/Seoul", label: "Seoul" },
+			    { value: "Asia/Kolkata", label: "India" },
+			    { value: "Australia/Sydney", label: "Sydney" },
+			    { value: "UTC", label: "UTC" }
+			  ];
+			
+			  function getNotifPref(key) {
+			    try { const p = JSON.parse(localStorage.getItem("notifPrefs") || "{}"); return key in p ? p[key] : true; } catch { return true; }
+			  }
+			  function setNotifPref(key, val) {
+			    try { const p = JSON.parse(localStorage.getItem("notifPrefs") || "{}"); p[key] = val; localStorage.setItem("notifPrefs", JSON.stringify(p)); } catch {}
+			  }
+			
+			  // Every custom switch in Settings (.theme-toggle-switch) is a <span>, not a
+			  // real <input>, so a listener bound only to that span only fires when a tap
+			  // lands on the exact pill - the label text and any flanking icons in the
+			  // same ".sett-toggle-row" do nothing. This binds the click to the whole
+			  // row instead (what people actually tap, especially on mobile), then hands
+			  // the switch element to the callback so existing logic doesn't change.
+			  function wireToggleRow(switchId, handler) {
+			    const el = document.getElementById(switchId);
+			    if (!el) return;
+			    const row = el.closest(".sett-toggle-row") || el.parentElement;
+			    row.addEventListener("click", (e) => {
+			      e.preventDefault();
+			      handler(el, e);
+			    });
+			  }
+			
+			  function formatZonePreview(zone) {
+			    if (!zone) return "";
+			    try {
+			      return new Intl.DateTimeFormat(undefined, {
+			        month: "long",
+			        day: "numeric",
+			        year: "numeric",
+			        hour: "numeric",
+			        minute: "2-digit",
+			        timeZone: zone,
+			        timeZoneName: "short"
+			      }).format(new Date());
+			    } catch (e) {
+			      return zone;
+			    }
+			  }
+			
+			  async function refreshNowPlaying() {
+			    const slot = document.getElementById("nowPlayingSlot");
+			    if (!slot || !user) return;
+			    // Always attempt — cached spotifyAccount.connected can be stale
+			    // (e.g. user connected Spotify after the local cache was populated).
+			    const data = await fetchSpotifyNowPlaying(user.id).catch(() => null);
+			    const html = renderNowPlayingWidget(data);
+			    slot.innerHTML = html;
+			    slot.style.display = html ? "" : "none";
+			  }
+			
+			  async function start() {
+			    initShell("profile");
+			    user = Progress.getCurrentUser();
+			    if (!user) {
+			      wrap.innerHTML = `
+			        <div class="feed-empty" style="padding-top:60px;">
+			          <h3>Log in to view your profile</h3>
+			          <p>Use the account menu in the top right to log in or create an account.</p>
+			        </div>`;
+			      return;
+			    }
+			    const spotifyStatus = params.get("spotify");
+			    if (spotifyStatus === "connected") {
+			      showToast("Spotify connected!");
+			      activeSettingsTab = "integrations";
+			      history.replaceState(null, "", "profile.html?tab=settings");
+			    } else if (spotifyStatus === "error") {
+			      showToast("Couldn't connect Spotify. Please try again.");
+			      activeSettingsTab = "integrations";
+			      history.replaceState(null, "", "profile.html?tab=settings");
+			    }
+			    render();
+			    Progress.loadFromApi().then(() => {
+			      user = Progress.getCurrentUser();
+			      render();
+			    }).catch(() => {});
+			    setInterval(refreshNowPlaying, 10000); // Refresh every 10 seconds
+			  }
+			
+			  start();
+			
+			  function render() {
+			    const myPosts = Progress.getPosts().filter(p => p.author === user.username);
+			
+			    const hasBanner = isBetaMode() && user.bannerImage;
+			    wrap.innerHTML = `
+			      <h1>Your account</h1>
+			      <div class="${hasBanner ? "has-banner" : ""}">
+			        ${hasBanner ? `<img class="profile-banner" src="${escapeHTML(user.bannerImage)}" alt="" draggable="false">` : ""}
+			        <div class="settings-avatar-row">
+			          ${user.avatar ? `<img src="${user.avatar}" alt="">` : `<div class="initials-lg">${initials(user.name)}</div>`}
+			          <div>
+			            <div style="font-family:var(--font-display); font-size:19px; margin-bottom:4px;">${user.name}${renderDisplayBadge(user)}</div>
+			            <div style="color:var(--muted); font-size:13.5px; margin-bottom:8px;">@${user.username}</div>
+			            <div style="display:flex; gap:16px; font-size:13px; color:var(--muted); margin-bottom:10px;">
+			              <span>${user.followers?.length || 0} followers</span>
+			              <span>${user.following?.length || 0} following</span>
+			            </div>
+			            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+			              <button class="upload-btn" id="changeAvatarBtn">Change photo</button>
+			              <a class="upload-btn" href="user.html?id=${user.id}" style="text-decoration:none;">View profile</a>
+			            </div>
+			          </div>
+			        </div>
+			      </div>
+			
+			      <div class="tab-row">
+			        <button class="tab-btn ${activeTab === "profile" ? "active" : ""}" data-tab="profile">Profile</button>
+			        <button class="tab-btn ${activeTab === "stats" ? "active" : ""}" data-tab="stats">Stats</button>
+			        <button class="tab-btn ${activeTab === "settings" ? "active" : ""}" data-tab="settings">Settings</button>
+			      </div>
+			
+			      <div id="tabContent"></div>
+			    `;
+			
+			    document.getElementById("changeAvatarBtn").addEventListener("click", () => document.getElementById("avatarInput").click());
+			
+			    document.querySelectorAll(".tab-btn").forEach(btn => {
+			      btn.addEventListener("click", () => {
+			        activeTab = btn.dataset.tab;
+			        history.replaceState(null, "", "profile.html?tab=" + activeTab);
+			        render();
+			      });
+			    });
+			
+			    const content = document.getElementById("tabContent");
+			    if (activeTab === "profile") {
+			      content.innerHTML = `
+			        <div id="nowPlayingSlot" style="max-width:360px;"></div>
+			        <div class="settings-section">
+			          <h3>Joined</h3>
+			          <p style="margin:0;">${Progress.formatDate(user.joined || "Unknown")}</p>
+			        </div>
+			        <div class="settings-section">
+			          <h3>Streak</h3>
+			          ${(user.streak && user.streak > 0)
+			            ? `<p style="margin:0; font-size:15px;">🔥 <strong>${user.streak}</strong> day${user.streak === 1 ? "" : "s"} in a row</p>`
+			            : `<p style="margin:0; color:var(--muted); font-size:14px;">No active streak — log in daily to build one.</p>`}
+			        </div>
+			        <div class="settings-section">
+			          <h3>Bio</h3>
+			          <div class="bio-text">${user.bio ? renderEmoticonsText(user.bio, "bio-emoticon") : `<span style="color:var(--muted);">No bio yet.</span>`}</div>
+			        </div>
+			        ${user.spotify ? `
+			        <div class="settings-section">
+			          <h3>Featured track</h3>
+			          ${renderSpotifyEmbed(user)}
+			        </div>` : ""}
+			        <div class="settings-section">
+			          <h3>Timezone</h3>
+			          <p style="margin:0;">${user.timezone || Progress.getTimeZone()}</p>
+			        </div>
+			        <div class="settings-section">
+			          <h3>Badges</h3>
+			          ${user.badges && user.badges.length ? renderBadgeDetails(user) : `<p style="color:var(--muted); font-size:14px;">No badges earned yet.</p>`}
+			        </div>
+			        <div class="settings-section" id="bookmarksSection">
+			          <h3>Bookmarks</h3>
+			          <p style="color:var(--muted); font-size:14px;">Loading…</p>
+			        </div>
+			        <div class="settings-section">
+			          <h3>Entries (${myPosts.length})</h3>
+			          ${myPosts.length ? myPosts.map(p => `
+			            <a href="post.html?id=${p.id}" style="display:block; padding:12px 0; border-bottom:1px solid var(--mocha-wash); font-size:14.5px;">
+			              <span style="font-family:var(--font-mono); font-size:11px; color:var(--muted); text-transform:uppercase; margin-right:10px;">${Progress.formatDateShort(p.date)}</span>
+			              ${p.title}
+			            </a>`).join("") : `<p style="color:var(--muted); font-size:14px;">No entries published yet.</p>`}
+			        </div>
+			      `;
+			refreshNowPlaying();
+			    // Load bookmarks async after render
+			    apiFetch("/api/bookmarks").then(bookmarks => {
+			      const sec = document.getElementById("bookmarksSection");
+			      if (!sec) return;
+			      if (!bookmarks || !bookmarks.length) {
+			        sec.querySelector("p").textContent = "Nothing saved yet — bookmark posts to find them here.";
+			        return;
+			      }
+			      sec.innerHTML = `<h3>Bookmarks</h3>` + bookmarks.map(p => `
+			        <a href="post.html?id=${p.id}" style="display:block; padding:12px 0; border-bottom:1px solid var(--mocha-wash); font-size:14.5px; text-decoration:none; color:inherit;">
+			          <span style="font-family:var(--font-mono); font-size:11px; color:var(--muted); text-transform:uppercase; margin-right:8px;">${Progress.formatDateShort(p.date)}</span>
+			          ${p.title}
+			          <span style="font-size:12px; color:var(--muted); margin-left:8px;">by @${p.author}</span>
+			        </a>`).join("");
+			    }).catch(() => {});
+			
+			    } else if (activeTab === "stats") {
+			      content.innerHTML = `<div style="padding-top:12px;"><p style="color:var(--muted);font-size:14px;">loading your stats…</p></div>`;
+			      apiFetch(`/api/users/${user.username}/stats`).then(s => {
+			        if (!s) { content.innerHTML = `<div style="padding-top:12px;"><p style="color:var(--muted);font-size:14px;">couldn't load stats.</p></div>`; return; }
+			        const fmt = n => n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, "") + "k" : String(n);
+			        const statCard = (num, label) => `
+			          <div style="background:var(--mocha-wash);border-radius:var(--radius);padding:20px 16px;text-align:center;">
+			            <span style="display:block;font-size:30px;font-weight:700;color:var(--ink);font-family:var(--font-display);line-height:1;margin-bottom:7px;">${fmt(num)}</span>
+			            <span style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.12em;">${label}</span>
+			          </div>`;
+			
+			        // ── Heatmap ──────────────────────────────────────────────
+			        function buildHeatmap(postsByDay) {
+			          const C = 11, G = 3; // cell size, gap
+			          const today = new Date(); today.setHours(0,0,0,0);
+			          const start = new Date(today); start.setDate(start.getDate() - 364);
+			          start.setDate(start.getDate() - start.getDay()); // align to Sunday
+			
+			          const lvl = n => {
+			            if (n <= 0) return "var(--mocha-wash)";
+			            if (n === 1) return "#C8A87E";
+			            if (n === 2) return "#A9866D";
+			            return "#7A5840";
+			          };
+			
+			          const weeks = [];
+			          const cur = new Date(start);
+			          while (cur <= today) {
+			            const week = [];
+			            for (let d = 0; d < 7; d++) {
+			              const ds = cur.toISOString().slice(0,10);
+			              week.push({ ds, count: cur <= today ? (postsByDay[ds] || 0) : -1,
+			                month: cur.getDate() === 1 ? cur.toLocaleString("en-US",{month:"short"}) : "" });
+			              cur.setDate(cur.getDate() + 1);
+			            }
+			            weeks.push(week);
+			          }
+			
+			          const monthRow = weeks.map(w => {
+			            const m = w.find(d => d.month);
+			            return `<div style="width:${C}px;overflow:visible;white-space:nowrap;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em;">${m ? m.month : ""}</div>`;
+			          }).join("");
+			
+			          const grid = weeks.map(w =>
+			            `<div style="display:flex;flex-direction:column;gap:${G}px;">` +
+			            w.map(d => d.count < 0
+			              ? `<div style="width:${C}px;height:${C}px;"></div>`
+			              : `<div style="width:${C}px;height:${C}px;border-radius:2px;background:${lvl(d.count)};cursor:default;" title="${d.ds}${d.count ? " · "+d.count+" post"+(d.count>1?"s":"") : ""}"></div>`
+			            ).join("") + "</div>"
+			          ).join("");
+			
+			          return `<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px;">
+			            <div style="display:inline-flex;flex-direction:column;gap:${G}px;">
+			              <div style="display:flex;gap:${G}px;">${monthRow}</div>
+			              <div style="display:flex;gap:${G}px;">${grid}</div>
+			            </div>
+			          </div>`;
+			        }
+			
+			        content.innerHTML = `
+			          <div style="padding-top:12px;">
+			
+			            <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px;">
+			              ${statCard(s.totalPosts, "posts published")}
+			              ${statCard(s.totalWords, "words written")}
+			              ${statCard(s.totalLikes, "likes received")}
+			              ${statCard(s.followers, "followers")}
+			            </div>
+			
+			            <div style="background:var(--mocha-wash);border-radius:var(--radius);padding:18px 20px;margin-bottom:16px;display:flex;align-items:stretch;">
+			              <div style="flex:1;text-align:center;">
+			                <span style="display:block;font-size:26px;font-weight:700;color:var(--ink);font-family:var(--font-display);line-height:1;margin-bottom:6px;">${user.streak || 0}</span>
+			                <span style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;">current streak</span>
+			              </div>
+			              <div style="width:1px;background:var(--border-color);margin:0 20px;"></div>
+			              <div style="flex:1;text-align:center;">
+			                <span style="display:block;font-size:26px;font-weight:700;color:var(--ink);font-family:var(--font-display);line-height:1;margin-bottom:6px;">${s.longestStreak}</span>
+			                <span style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;">longest streak</span>
+			              </div>
+			            </div>
+			
+			            <div class="settings-section">
+			              <h3>Writing days — last year</h3>
+			              ${buildHeatmap(s.postsByDay || {})}
+			              <div style="display:flex;align-items:center;gap:6px;margin-top:10px;">
+			                <span style="font-size:10px;color:var(--muted);">less</span>
+			                ${["var(--mocha-wash)","#C8A87E","#A9866D","#7A5840"].map(c =>
+			                  `<div style="width:11px;height:11px;border-radius:2px;background:${c};"></div>`
+			                ).join("")}
+			                <span style="font-size:10px;color:var(--muted);">more</span>
+			              </div>
+			            </div>
+			
+			            ${s.topPost ? `
+			            <div class="settings-section">
+			              <h3>Best post</h3>
+			              <a href="post.html?id=${s.topPost.id}" style="display:block;padding:14px 16px;background:var(--mocha-wash);border-radius:var(--radius);text-decoration:none;color:inherit;">
+			                <p style="margin:0 0 5px;font-size:15px;font-weight:600;color:var(--ink);line-height:1.3;">${s.topPost.title || "Untitled"}</p>
+			                <p style="margin:0;font-size:12px;color:var(--muted);">♡ ${s.topPost.likes} like${s.topPost.likes !== 1 ? "s" : ""}</p>
+			              </a>
+			            </div>` : ""}
+			
+			          </div>`;
+			      }).catch(() => {
+			        content.innerHTML = `<div style="padding-top:12px;"><p style="color:var(--muted);font-size:14px;">couldn't load stats.</p></div>`;
+			      });
+			
+			    } else {
+			      // ── SETTINGS: vertical sub-tabs ────────────────────────────────────────
+			      const SETT_TABS = [
+			        { id: "profile",       label: "Profile",       icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>` },
+			        { id: "account",       label: "Account",       icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>` },
+			        { id: "notifications", label: "Notifications", icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>` },
+			        { id: "appearance",    label: "Appearance",    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8L6 18M18 6l1.8-1.8"/></svg>` },
+			        { id: "privacy",       label: "Privacy",       icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>` },
+			        { id: "integrations",  label: "Integrations",  icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>` },
+			        { id: "beta",          label: "Beta",          icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2v-4M9 21H5a2 2 0 0 1-2-2v-4m0 0h18"/></svg>` },
+			      ];
+			
+			      content.innerHTML = `
+			        <div class="sett-layout sett-layout--inline">
+			          <nav class="sett-nav" id="settSubNav"></nav>
+			          <div class="sett-panel" id="settSubPanel"></div>
+			        </div>
+			      `;
+			
+			      function renderSubNav() {
+			        const nav = document.getElementById("settSubNav");
+			        if (!nav) return;
+			        nav.innerHTML = SETT_TABS.map(t => `
+			          <button class="sett-nav-item${activeSettingsTab === t.id ? " active" : ""}" data-tab="${t.id}">
+			            ${t.icon}<span>${t.label}</span>
+			          </button>
+			        `).join("");
+			        nav.querySelectorAll(".sett-nav-item").forEach(btn => {
+			          btn.addEventListener("click", () => {
+			            activeSettingsTab = btn.dataset.tab;
+			            renderSubNav();
+			            renderSubPanel();
+			          });
+			        });
+			      }
+			
+			      function renderSubPanel() {
+			        const panel = document.getElementById("settSubPanel");
+			        if (!panel) return;
+			        switch (activeSettingsTab) {
+			          case "profile":       renderSubProfile(panel); break;
+			          case "account":       renderSubAccount(panel); break;
+			          case "notifications": renderSubNotifications(panel); break;
+			          case "appearance":    renderSubAppearance(panel); break;
+			          case "privacy":       renderSubPrivacy(panel); break;
+			          case "integrations":  renderSubIntegrations(panel); break;
+			          case "beta":          renderSubBeta(panel); break;
+			
+			          default:              renderSubProfile(panel);
+			        }
+			      }
+			
+			      // ── Profile ──────────────────────────────────────────────────────────
+			      function renderSubProfile(panel) {
+			        const betaOn = isBetaMode();
+			        panel.innerHTML = `
+			          <h2 class="sett-panel-title">Profile</h2>
+			          ${betaOn ? `
+			          <div class="sett-section" style="margin-bottom:20px;">
+			            <div class="sett-section-title" style="display:flex;align-items:center;gap:6px;">Profile Banner <span class="beta-badge">Beta</span></div>
+			            <p style="font-size:13.5px;color:var(--muted);margin-bottom:12px;">A cover image shown at the top of your public profile.</p>
+			            <div id="bannerPreviewWrap" style="margin-bottom:12px;">${user.bannerImage ? `<img src="${escapeHTML(user.bannerImage)}" style="width:100%;max-height:160px;object-fit:cover;border-radius:10px;display:block;">` : `<div style="width:100%;height:100px;background:var(--mocha-wash);border:1px dashed var(--mocha-light);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;">No banner set</div>`}</div>
+			            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+			              <button class="upload-btn" id="changeBannerBtn">Upload banner</button>
+			              ${user.bannerImage ? `<button class="upload-btn" id="removeBannerBtn" style="color:var(--danger);">Remove</button>` : ""}
+			            </div>
+			            <input type="file" id="bannerInput" accept="image/*" style="display:none;">
+			          </div>
+			          ` : ""}
+			          <div class="sett-field-group">
+			            <div class="sett-field">
+			              <label class="sett-label">Display name</label>
+			              <div class="field"><input id="nameField" value="${escapeHTML(user.name)}" placeholder="Your name"></div>
+			            </div>
+			            <div class="sett-field">
+			              <label class="sett-label">Username</label>
+			              <div class="field"><input value="@${escapeHTML(user.username)}" disabled style="opacity:.5;cursor:not-allowed;"></div>
+			              <p class="field-note">Username can't be changed.</p>
+			            </div>
+			            <div class="sett-field">
+			              <label class="sett-label">Bio</label>
+			              <div class="field bio-field">
+			                <textarea id="bioField" rows="4" placeholder="Tell people about yourself…">${escapeHTML(user.bio || "")}</textarea>
+			              </div>
+			              <div class="emoji-picker" id="profileEmojiPicker" style="margin-top:8px;"></div>
+			              <p class="field-note">Use <code>:computer:</code>, <code>:dead:</code>, <code>:two:</code> for custom emoticons.</p>
+			            </div>
+			            <div class="sett-field">
+			              <label class="sett-label">Timezone</label>
+			              <div class="field">
+			                <select id="timezoneField">
+			                  ${timezoneOptions.map(o => `<option value="${o.value}"${user.timezone === o.value ? " selected" : ""}>${o.label}</option>`).join("")}
+			                </select>
+			              </div>
+			              <p class="field-note">Current time: <span id="timezonePreview">${formatZonePreview(user.timezone)}</span></p>
+			            </div>
+			            <div class="sett-field">
+			              <label class="sett-label">Featured Spotify link</label>
+			              <div class="field"><input id="spotifyField" placeholder="Paste a Spotify track, album, playlist, or artist link" value="${escapeHTML(user.spotify || "")}"></div>
+			              <p class="field-note">Right-click a song in Spotify → Share → Copy Link. Shows as a mini player on your profile.</p>
+			              <div id="spotifyPreview" style="margin-top:10px;">${renderSpotifyEmbed(user)}</div>
+			            </div>
+			          </div>
+			          <button class="btn primary" id="saveProfileBtn">Save changes</button>
+			        `;
+			
+			        // Emoji picker
+			        const picker = document.getElementById("profileEmojiPicker");
+			        if (picker) {
+			          picker.innerHTML = getEmoticonNames().map(n => `
+			            <button type="button" class="emoji-btn" data-name="${n}"><img src="images/emoticons/${n}.png" alt="${n}"></button>
+			          `).join("");
+			          picker.querySelectorAll(".emoji-btn").forEach(btn => {
+			            btn.addEventListener("click", () => {
+			              const ta = document.getElementById("bioField");
+			              if (!ta) return;
+			              const ph = `:${btn.dataset.name}:`, s = ta.selectionStart, e = ta.selectionEnd;
+			              ta.value = ta.value.slice(0, s) + ph + ta.value.slice(e);
+			              ta.focus(); ta.selectionStart = ta.selectionEnd = s + ph.length;
+			            });
+			          });
+			        }
+			
+			        // Timezone preview
+			        document.getElementById("timezoneField").addEventListener("change", (e) => {
+			          document.getElementById("timezonePreview").textContent = formatZonePreview(e.target.value);
+			        });
+			
+			        // Spotify link preview
+			        let spTimer;
+			        document.getElementById("spotifyField").addEventListener("input", (e) => {
+			          clearTimeout(spTimer);
+			          spTimer = setTimeout(() => {
+			            const val = e.target.value.trim();
+			            const preview = document.getElementById("spotifyPreview");
+			            if (!val) { preview.innerHTML = ""; return; }
+			            const embed = renderSpotifyEmbed({ spotify: val });
+			            preview.innerHTML = embed || `<p class="field-note" style="color:var(--danger);">That doesn't look like a Spotify link yet.</p>`;
+			          }, 400);
+			        });
+			
+			        // Save
+			        document.getElementById("saveProfileBtn").addEventListener("click", async () => {
+			          const name = document.getElementById("nameField").value.trim();
+			          const bio = document.getElementById("bioField").value.trim();
+			          const timezone = document.getElementById("timezoneField").value;
+			          const spotify = document.getElementById("spotifyField").value.trim();
+			          if (!name) { showToast("Display name can't be empty."); return; }
+			          if (spotify && !spotifyEmbedUrl(spotify)) { showToast("That doesn't look like a valid Spotify link."); return; }
+			          const btn = document.getElementById("saveProfileBtn");
+			          btn.disabled = true; btn.textContent = "Saving…";
+			          const updated = await Progress.updateProfile({ name, bio, timezone, spotify });
+			          btn.disabled = false; btn.textContent = "Save changes";
+			          if (updated) { user = Progress.getCurrentUser() || user; showToast("Saved."); }
+			          else showToast("Could not save. Try again.");
+			        });
+			
+			        // ── Banner upload (beta only) ────────────────────────────────────
+			        const changeBannerBtn = document.getElementById("changeBannerBtn");
+			        const bannerInput = document.getElementById("bannerInput");
+			        const removeBannerBtn = document.getElementById("removeBannerBtn");
+			
+			        if (changeBannerBtn && bannerInput) {
+			          changeBannerBtn.addEventListener("click", () => bannerInput.click());
+			          bannerInput.addEventListener("change", async () => {
+			            const file = bannerInput.files[0];
+			            if (!file) return;
+			            if (file.size > 6 * 1024 * 1024) { showToast("Banner image must be under 6 MB."); return; }
+			            const reader = new FileReader();
+			            reader.onload = async (e) => {
+			              const base64 = e.target.result;
+			              // Preview immediately
+			              const preview = document.getElementById("bannerPreviewWrap");
+			              if (preview) preview.innerHTML = `<img src="${base64}" style="width:100%;max-height:160px;object-fit:cover;border-radius:10px;display:block;">`;
+			              changeBannerBtn.disabled = true;
+			              changeBannerBtn.textContent = "Uploading…";
+			              const updated = await Progress.updateProfile({ bannerImage: base64 });
+			              changeBannerBtn.disabled = false;
+			              changeBannerBtn.textContent = "Upload banner";
+			              if (updated) {
+			                user = Progress.getCurrentUser() || user;
+			                showToast("Banner updated.");
+			                render(); // re-render so banner shows in profile header too
+			              } else {
+			                showToast("Could not upload banner. Try again.");
+			              }
+			            };
+			            reader.readAsDataURL(file);
+			          });
+			        }
+			
+			        if (removeBannerBtn) {
+			          removeBannerBtn.addEventListener("click", async () => {
+			            removeBannerBtn.disabled = true; removeBannerBtn.textContent = "Removing…";
+			            const updated = await Progress.updateProfile({ bannerImage: null });
+			            if (updated) {
+			              user = Progress.getCurrentUser() || user;
+			              showToast("Banner removed.");
+			              render();
+			            } else {
+			              removeBannerBtn.disabled = false; removeBannerBtn.textContent = "Remove";
+			              showToast("Could not remove banner.");
+			            }
+			          });
+			        }
+			      }
+			
+			      // ── Beta ─────────────────────────────────────────────────────────────
+			      function renderSubBeta(panel) {
+			        const hasAccess = isBetaMode();
+			        panel.innerHTML = `
+			          <h2 class="sett-panel-title">Beta <span class="beta-badge">Preview</span></h2>
+			          ${hasAccess ? `
+			          <div class="sett-section">
+			            <div style="display:flex;align-items:center;gap:10px;padding:14px 16px;background:linear-gradient(135deg,rgba(167,139,250,.12),rgba(96,165,250,.10));border:1px solid rgba(167,139,250,.3);border-radius:12px;margin-bottom:20px;">
+			              <span style="font-size:22px;">🧪</span>
+			              <div>
+			                <div style="font-weight:600;font-size:14px;">Early tester access</div>
+			                <div style="font-size:12.5px;color:var(--muted);">You have the <strong>tester</strong> badge — beta features are enabled for you.</div>
+			              </div>
+			            </div>
+			            <div class="sett-section-title">Active beta features</div>
+			            <div style="display:flex;flex-direction:column;gap:10px;margin-top:10px;">
+			              <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--mocha-wash);border-radius:10px;font-size:14px;">
+			                <span style="font-size:20px;">🖼️</span>
+			                <div>
+			                  <div style="font-weight:600;">Profile banner image</div>
+			                  <div style="font-size:12.5px;color:var(--muted);">Add a header photo to your profile. Upload in Settings → Profile.</div>
+			                </div>
+			              </div>
+			            </div>
+			          </div>` : `
+			          <div class="sett-section">
+			            <div style="display:flex;align-items:center;gap:10px;padding:14px 16px;background:var(--mocha-wash);border:1px solid var(--mocha-light);border-radius:12px;">
+			              <span style="font-size:22px;">🔒</span>
+			              <div>
+			                <div style="font-weight:600;font-size:14px;">Beta access is invite-only</div>
+			                <div style="font-size:12.5px;color:var(--muted);">You need the <strong>early tester</strong> badge to access beta features.</div>
+			              </div>
+			            </div>
+			          </div>`}
+			        `;
+			      }
+			
+			      // ── Account ──────────────────────────────────────────────────────────
+			      function renderSubAccount(panel) {
+			        const emailVal = escapeHTML(user.email || localStorage.getItem("progress:myEmail") || "");
+			        const emailOn = user.emailNotifications !== false && !!user.email;
+			        panel.innerHTML = `
+			          <h2 class="sett-panel-title">Account</h2>
+			          <div class="sett-section">
+			            <div class="sett-section-title">Email address</div>
+			            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+			              <input type="email" id="emailInput" placeholder="your@email.com" autocomplete="email"
+			                style="flex:1;padding:10px 12px;border:1px solid var(--mocha-light);border-radius:var(--radius);font-size:14px;background:var(--paper);color:var(--ink);"
+			                value="${emailVal}">
+			              <button class="btn primary" id="saveEmailBtn" style="white-space:nowrap;padding:10px 16px;">Save</button>
+			            </div>
+			            <label class="sett-toggle-row" style="margin-top:6px;">
+			              <span class="theme-toggle-switch${emailOn ? " on" : ""}" id="emailNotifsToggle" data-on="${emailOn ? "1" : "0"}"><span class="theme-toggle-knob"></span></span>
+			              <span>Email notifications</span>
+			            </label>
+			            <p class="field-note">Get emailed for likes, replies, and follows.${!user.email ? " Add an email first." : ""}</p>
+			          </div>
+			          <div class="sett-section">
+			            <div class="sett-section-title">Password</div>
+			            <div class="sett-field-group" style="margin-bottom:12px;">
+			              <div class="sett-field">
+			                <label class="sett-label">Current password</label>
+			                <div class="field"><input type="password" id="currentPassField" placeholder="Current password" autocomplete="current-password"></div>
+			              </div>
+			              <div class="sett-field">
+			                <label class="sett-label">New password</label>
+			                <div class="field"><input type="password" id="newPassField" placeholder="New password" autocomplete="new-password"></div>
+			              </div>
+			              <div class="sett-field">
+			                <label class="sett-label">Confirm new password</label>
+			                <div class="field"><input type="password" id="confirmPassField" placeholder="Confirm new password" autocomplete="new-password"></div>
+			              </div>
+			            </div>
+			            <button class="btn" id="changePassBtn">Change password</button>
+			          </div>
+			          <div class="sett-section" style="border-bottom:none;">
+			            <div class="sett-section-title" style="color:var(--danger);">Danger zone</div>
+			            <p style="color:var(--muted);font-size:14px;margin-bottom:12px;">Permanently delete your account and all your posts. This cannot be undone.</p>
+			            <button class="btn danger" id="deleteAccountBtn">Delete account</button>
+			          </div>
+			        `;
+			
+			        // Email save
+			        document.getElementById("saveEmailBtn").addEventListener("click", async () => {
+			          const val = (document.getElementById("emailInput")?.value || "").trim();
+			          if (val && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(val)) { showToast("That doesn't look like a valid email."); return; }
+			          const btn = document.getElementById("saveEmailBtn");
+			          btn.disabled = true; btn.textContent = "Saving…";
+			          const updated = await Progress.updateProfile({ email: val || null });
+			          btn.disabled = false; btn.textContent = "Save";
+			          if (updated) { user = Progress.getCurrentUser() || user; showToast(val ? "Email saved." : "Email removed."); }
+			          else showToast("Could not save email.");
+			        });
+			
+			        // Email notifs toggle — whole row is clickable
+			        wireToggleRow("emailNotifsToggle", async (emailToggle) => {
+			          if (emailToggle.dataset.on !== "1" && !user.email) { showToast("Add an email address first."); return; }
+			          const on = emailToggle.dataset.on !== "1";
+			          emailToggle.dataset.on = on ? "1" : "0"; emailToggle.classList.toggle("on", on);
+			          await Progress.updateProfile({ emailNotifications: on });
+			          showToast(on ? "Email notifications on." : "Email notifications off.");
+			        });
+			
+			        // Password change
+			        document.getElementById("changePassBtn").addEventListener("click", async () => {
+			          const current = document.getElementById("currentPassField").value;
+			          const next = document.getElementById("newPassField").value;
+			          const confirm = document.getElementById("confirmPassField").value;
+			          if (!current || !next) { showToast("Fill in both password fields."); return; }
+			          if (next !== confirm) { showToast("New passwords don't match."); return; }
+			          if (next === current) { showToast("Your new password must be different from your current one."); return; }
+			          const passwordError = Progress.validatePassword ? Progress.validatePassword(next) : null;
+			          if (passwordError) { showToast(passwordError); return; }
+			          const btn = document.getElementById("changePassBtn");
+			          btn.disabled = true; btn.textContent = "Saving…";
+			          try {
+			            const res = await apiFetch("/api/account/password", {
+			              method: "POST", headers: { "Content-Type": "application/json" },
+			              body: JSON.stringify({ currentPassword: current, newPassword: next })
+			            });
+			            if (res && res.ok !== false) {
+			              showToast("Password changed.");
+			              document.getElementById("currentPassField").value = "";
+			              document.getElementById("newPassField").value = "";
+			              document.getElementById("confirmPassField").value = "";
+			            } else showToast(res?.error || "Incorrect current password.");
+			          } catch (e) { showToast("Could not change password."); }
+			          btn.disabled = false; btn.textContent = "Change password";
+			        });
+			
+			        // Delete account
+			        document.getElementById("deleteAccountBtn").addEventListener("click", async () => {
+			          if (!confirm("This will permanently delete your account and all your posts.")) return;
+			          const confirmText = prompt("Type 'delete' to confirm:");
+			          if (confirmText !== "delete") { showToast("Cancelled."); return; }
+			          showToast("Deleting account…");
+			          const deleted = await Progress.deleteAccount();
+			          if (deleted) { showToast("Account deleted."); setTimeout(() => location.href = "index.html", 500); }
+			          else showToast("Could not delete account.");
+			        });
+			      }
+			
+			      // ── Notifications ─────────────────────────────────────────────────────
+			      function renderSubNotifications(panel) {
+			        const emailOn = user.emailNotifications !== false && !!user.email;
+			        const pushOn  = getNotificationOptIn();
+			        panel.innerHTML = `
+			          <h2 class="sett-panel-title">Notifications</h2>
+			          <div class="sett-section">
+			            <div class="sett-section-title">Email</div>
+			            <label class="sett-toggle-row">
+			              <span class="theme-toggle-switch${emailOn ? " on" : ""}" id="notifEmailToggle" data-on="${emailOn ? "1" : "0"}"><span class="theme-toggle-knob"></span></span>
+			              <span>Email notifications${!user.email ? `<span class="sett-row-note">Add an email in Account settings first.</span>` : ""}</span>
+			            </label>
+			          </div>
+			          <div class="sett-section">
+			            <div class="sett-section-title">Browser</div>
+			            <label class="sett-toggle-row">
+			              <span class="theme-toggle-switch${pushOn ? " on" : ""}" id="notifPushToggle" data-on="${pushOn ? "1" : "0"}"><span class="theme-toggle-knob"></span></span>
+			              <span>Browser push notifications<span class="sett-row-note" id="pushNote">Get a popup for likes, replies, follows, and messages.</span></span>
+			            </label>
+			          </div>
+			          <div class="sett-section">
+			            <div class="sett-section-title">Chat</div>
+			            <label class="sett-toggle-row">
+			              <span class="theme-toggle-switch${getChatSoundEnabled() ? " on" : ""}" id="chatSoundToggle" data-on="${getChatSoundEnabled() ? "1" : "0"}"><span class="theme-toggle-knob"></span></span>
+			              <span>Chat sounds<span class="sett-row-note">Play a sound when new messages arrive.</span></span>
+			            </label>
+			            <label class="sett-toggle-row">
+			              <span class="theme-toggle-switch${getChatNotificationsEnabled() ? " on" : ""}" id="chatAlertToggle" data-on="${getChatNotificationsEnabled() ? "1" : "0"}"><span class="theme-toggle-knob"></span></span>
+			              <span>Chat alerts<span class="sett-row-note">Browser notifications for new messages and mentions.</span></span>
+			            </label>
+			          </div>
+			          <div class="sett-section" style="border-bottom:none;">
+			            <div class="sett-section-title">Per-type controls</div>
+			            ${[
+			              ["notif-likes",     "Likes",              "When someone likes your post"],
+			              ["notif-comments",  "Comments",           "When someone replies to you"],
+			              ["notif-follows",   "Follows",            "When someone follows you"],
+			              ["notif-mentions",  "Community mentions", "@mentions in community chat"],
+			              ["notif-reactions", "Reactions",          "When someone reacts to your message"],
+			              ["notif-events",    "Event alerts",       "Score saves and leaderboard news"],
+			            ].map(([key, label, note]) => {
+			              const on = getNotifPref(key);
+			              return `<label class="sett-toggle-row">
+			                <span class="theme-toggle-switch${on ? " on" : ""}" id="${key}Toggle" data-key="${key}" data-on="${on ? "1" : "0"}"><span class="theme-toggle-knob"></span></span>
+			                <span>${label}<span class="sett-row-note">${note}</span></span>
+			              </label>`;
+			            }).join("")}
+			          </div>
+			          <div class="sett-section" style="border-bottom:none;">
+			            <div class="sett-section-title">Community message level</div>
+			            <div class="sett-row-note" style="margin-bottom:10px;">Choose how much activity from communities shows up in your notification bell.</div>
+			            ${[["all","All messages"],["mentions","@mentions only"],["off","Off"]].map(([v,l]) => {
+			              const checked = (getNotifPref("community-level") || "mentions") === v;
+			              return `<label class="sett-toggle-row" style="gap:10px;">
+			                <input type="radio" name="communityLevel" value="${v}" ${checked ? "checked" : ""} style="width:16px;height:16px;accent-color:var(--accent,#6366f1);">
+			                <span>${l}</span>
+			              </label>`;
+			            }).join("")}
+			          </div>
+			        `;
+			
+			        // Chat sounds — whole row clickable
+			        wireToggleRow("chatSoundToggle", (el) => {
+			          const on = el.dataset.on !== "1";
+			          el.dataset.on = on ? "1" : "0";
+			          el.classList.toggle("on", on);
+			          setChatSoundEnabled(on);
+			          showToast(on ? "Chat sounds enabled." : "Chat sounds disabled.");
+			        });
+			
+			        // Chat alerts — whole row clickable
+			        wireToggleRow("chatAlertToggle", async (el) => {
+			          const on = el.dataset.on !== "1";
+			          if (!on) {
+			            el.dataset.on = "0";
+			            el.classList.remove("on");
+			            setChatNotificationsEnabled(false);
+			            showToast("Chat alerts disabled.");
+			            return;
+			          }
+			          const granted = await requestNotificationPermission();
+			          el.dataset.on = granted ? "1" : "0";
+			          el.classList.toggle("on", granted);
+			          setChatNotificationsEnabled(granted);
+			          if (granted) showToast("Chat alerts enabled.");
+			          else showToast("Notifications blocked. Allow them in browser settings.");
+			        });
+			
+			        // Per-type notification toggles — whole row clickable
+			        panel.querySelectorAll("[id$='Toggle'][data-key]").forEach(el => {
+			          const row = el.closest(".sett-toggle-row") || el.parentElement;
+			          row.addEventListener("click", (e) => {
+			            e.preventDefault();
+			            const on = el.dataset.on !== "1";
+			            el.dataset.on = on ? "1" : "0";
+			            el.classList.toggle("on", on);
+			            setNotifPref(el.dataset.key, on);
+			            showToast(on ? "Turned on." : "Turned off.");
+			          });
+			        });
+			
+			        // Community level radio — real <input>, already fully clickable via <label>
+			        panel.querySelectorAll("input[name='communityLevel']").forEach(radio => {
+			          radio.addEventListener("change", () => {
+			            setNotifPref("community-level", radio.value);
+			            showToast(`Community notifications: ${radio.value}`);
+			          });
+			        });
+			
+			        // Email notifications — whole row clickable
+			        wireToggleRow("notifEmailToggle", async (el) => {
+			          if (el.dataset.on !== "1" && !user.email) { showToast("Add an email address first."); return; }
+			          const on = el.dataset.on !== "1";
+			          el.dataset.on = on ? "1" : "0"; el.classList.toggle("on", on);
+			          await Progress.updateProfile({ emailNotifications: on });
+			          showToast(on ? "Email notifications on." : "Email notifications off.");
+			        });
+			
+			        // Browser push notifications — whole row clickable
+			        wireToggleRow("notifPushToggle", async (el) => {
+			          const noteEl = document.getElementById("pushNote");
+			          const turningOn = el.dataset.on !== "1";
+			          if (!turningOn) { el.dataset.on = "0"; el.classList.remove("on"); setNotificationOptIn(false); return; }
+			          if (!("Notification" in window)) { noteEl.textContent = "Your browser doesn't support notifications."; return; }
+			          const granted = await requestNotificationPermission();
+			          el.dataset.on = granted ? "1" : "0"; el.classList.toggle("on", granted);
+			          if (!granted) noteEl.textContent = "Notifications are blocked — allow them in your browser settings first.";
+			        });
+			      }
+			
+			      // ── Appearance ────────────────────────────────────────────────────────
+			      function renderSubAppearance(panel) {
+			        const darkOn  = getStoredTheme() === "dark";
+			        const candyOn = getCandyMode();
+			        const catOn   = getCategoryTabsEnabled();
+			        panel.innerHTML = `
+			          <h2 class="sett-panel-title">Appearance</h2>
+			          <div class="sett-section">
+			            <div class="sett-section-title">Theme</div>
+			            <label class="sett-toggle-row">
+			              <svg class="theme-flank-icon sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8L6 18M18 6l1.8-1.8"/></svg>
+			              <span class="theme-toggle-switch${darkOn ? " on" : ""}" id="themeToggle" data-on="${darkOn ? "1" : "0"}"><span class="theme-toggle-knob"></span></span>
+			              <svg class="theme-flank-icon moon" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M20.5 14.5A8.5 8.5 0 019.5 3.5 8.5 8.5 0 1020.5 14.5z"/></svg>
+			              <span style="margin-left:4px;">Dark mode</span>
+			            </label>
+			            <p class="field-note">Saved to this browser.</p>
+			          </div>
+			          <div class="sett-section">
+			            <div class="sett-section-title">Chat</div>
+			            <div class="sett-row" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+			              <span>Font size</span>
+			              <select id="chatFontSizeSelect" style="padding:8px 10px;border:1px solid var(--mocha-light);border-radius:8px;background:var(--paper);color:var(--ink);font-size:13px;">
+			                <option value="12">Small</option>
+			                <option value="14">Normal</option>
+			                <option value="16">Large</option>
+			                <option value="18">Extra large</option>
+			              </select>
+			            </div>
+			            <label class="sett-toggle-row">
+			              <span class="theme-toggle-switch${getChatCompactMode() ? " on" : ""}" id="chatCompactToggle" data-on="${getChatCompactMode() ? "1" : "0"}"><span class="theme-toggle-knob"></span></span>
+			              <span>Compact chat mode<span class="sett-row-note">Tighter message spacing and smaller controls.</span></span>
+			            </label>
+			          </div>
+			          <div class="sett-section">
+			            <div class="sett-section-title">Fun</div>
+			            <label class="sett-toggle-row">
+			              <span class="theme-toggle-switch${candyOn ? " on" : ""}" id="candyToggle" data-on="${candyOn ? "1" : "0"}"><span class="theme-toggle-knob"></span></span>
+			              <span>🍭 Mexican Candy mode<span class="sett-row-note">Rainbow nav, hot pink accents, lollipop cursor.</span></span>
+			            </label>
+			          </div>
+			          <div class="sett-section" style="border-bottom:none;">
+			            <div class="sett-section-title">Feed</div>
+			            <label class="sett-toggle-row">
+			              <span class="theme-toggle-switch${catOn ? " on" : ""}" id="catToggle" data-on="${catOn ? "1" : "0"}"><span class="theme-toggle-knob"></span></span>
+			              <span>Category tabs<span class="sett-row-note">Show All / Development / Creative / Random on the home feed.</span></span>
+			            </label>
+			          </div>
+			        `;
+			
+			        // Dark mode — whole row clickable
+			        wireToggleRow("themeToggle", (el) => {
+			          const on = el.dataset.on !== "1";
+			          el.dataset.on = on ? "1" : "0"; el.classList.toggle("on", on); setTheme(on ? "dark" : "light");
+			        });
+			
+			        const fontSelect = document.getElementById("chatFontSizeSelect");
+			        if (fontSelect) {
+			          fontSelect.value = String(getChatFontSize());
+			          fontSelect.addEventListener("change", (e) => {
+			            const size = parseInt(e.currentTarget.value, 10) || 14;
+			            setChatFontSize(size);
+			            applyChatPreferences();
+			            showToast(`Chat font size set to ${size}px.`);
+			          });
+			        }
+			
+			        // Compact chat mode — whole row clickable
+			        wireToggleRow("chatCompactToggle", (el) => {
+			          const on = el.dataset.on !== "1";
+			          el.dataset.on = on ? "1" : "0"; el.classList.toggle("on", on);
+			          setChatCompactMode(on);
+			          applyChatPreferences();
+			          showToast(on ? "Compact chat mode enabled." : "Compact chat mode disabled.");
+			        });
+			
+			        // Candy mode — whole row clickable
+			        wireToggleRow("candyToggle", (el) => {
+			          const on = el.dataset.on !== "1";
+			          el.dataset.on = on ? "1" : "0"; el.classList.toggle("on", on);
+			          setCandyMode(on); showToast(on ? "🍭 Mexican Candy mode activated!" : "Candy mode off.");
+			        });
+			
+			        // Category tabs — whole row clickable
+			        wireToggleRow("catToggle", (el) => {
+			          const on = el.dataset.on !== "1";
+			          el.dataset.on = on ? "1" : "0"; el.classList.toggle("on", on);
+			          setCategoryTabsEnabled(on); showToast(on ? "Category tabs enabled." : "Category tabs hidden.");
+			        });
+			      }
+			
+			      // ── Privacy ───────────────────────────────────────────────────────────
+			      function renderSubPrivacy(panel) {
+			        panel.innerHTML = `
+			          <h2 class="sett-panel-title">Privacy</h2>
+			          <div class="sett-section">
+			            <div class="sett-section-title">Visibility — coming soon</div>
+			            ${[["Ghost mode","Appear offline while still browsing"],["Open DMs","Let anyone message you, not just followers"],["Profile visibility","Control who can see your profile"]].map(([l,n]) => `
+			              <div class="sett-toggle-row sett-disabled">
+			                <span class="theme-toggle-switch" style="opacity:.35;pointer-events:none;"><span class="theme-toggle-knob"></span></span>
+			                <span>${l}<span class="sett-row-note">${n}</span></span>
+			              </div>`).join("")}
+			          </div>
+			          <div class="sett-section" style="border-bottom:none;">
+			            <div class="sett-section-title">Blocked users — coming soon</div>
+			            <p style="color:var(--muted);font-size:14px;">Manage blocked users here.</p>
+			          </div>
+			        `;
+			      }
+			
+			      // ── Integrations ──────────────────────────────────────────────────────
+			      function renderSubIntegrations(panel) {
+			        const spConnected = user.spotifyAccount && user.spotifyAccount.connected;
+			        panel.innerHTML = `
+			          <h2 class="sett-panel-title">Integrations</h2>
+			          <div class="sett-section">
+			            <div class="sett-integration-card">
+			              <div class="sett-integration-icon sett-spotify-icon">
+			                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.484 17.316a.747.747 0 0 1-1.028.249c-2.815-1.72-6.358-2.109-10.529-1.156a.748.748 0 0 1-.352-1.452c4.564-1.045 8.477-.595 11.661 1.331a.748.748 0 0 1 .248 1.028zm1.464-3.261a.934.934 0 0 1-1.284.308c-3.222-1.98-8.133-2.553-11.944-1.397a.934.934 0 0 1-.583-1.777c4.354-1.295 9.765-.668 13.504 1.593a.934.934 0 0 1 .307 1.273zm.126-3.397c-3.867-2.297-10.241-2.508-13.934-1.387a1.12 1.12 0 1 1-.649-2.144c4.245-1.286 11.293-1.038 15.748 1.605a1.12 1.12 0 1 1-1.165 1.926z"/></svg>
+			              </div>
+			              <div class="sett-integration-info">
+			                <div class="sett-integration-name">Spotify</div>
+			                <div class="sett-integration-status">
+			                  ${spConnected ? `<span class="sett-connected-badge">✓ Connected${user.spotifyAccount.displayName ? ` as ${escapeHTML(user.spotifyAccount.displayName)}` : ""}</span>` : `<span style="color:var(--muted);font-size:13px;">Not connected</span>`}
+			                </div>
+			                <p class="field-note" style="margin:6px 0 12px;">Shows what you're listening to on your profile and enables Listen Together in chat.</p>
+			                ${spConnected
+			                  ? `<button class="btn danger" id="disconnectSpotifyBtn">Disconnect</button>`
+			                  : `<button class="btn" id="connectSpotifyBtn">Connect Spotify</button>`}
+			              </div>
+			            </div>
+			          </div>
+			          <!-- Steam — Coming Soon -->
+			          <div class="sett-section">
+			            <div class="sett-integration-card" style="opacity:0.55; pointer-events:none; user-select:none;">
+			              <div class="sett-integration-icon" style="background:#1b2838;color:#c6d4df;">
+			                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.979 0C5.678 0 .511 4.86.022 11.037l6.432 2.658c.545-.371 1.203-.59 1.912-.59.063 0 .125.004.187.006l2.861-4.142V8.91c0-2.495 2.028-4.524 4.524-4.524 2.494 0 4.524 2.029 4.524 4.524s-2.03 4.525-4.524 4.525h-.105l-4.076 2.911c0 .052.004.105.004.159 0 1.875-1.515 3.396-3.39 3.396-1.635 0-3.016-1.173-3.331-2.718L.436 15.27C1.862 20.307 6.486 24 11.979 24c6.627 0 11.999-5.373 11.999-12S18.606 0 11.979 0z"/></svg>
+			              </div>
+			              <div class="sett-integration-info">
+			                <div style="display:flex;align-items:center;gap:8px;">
+			                  <div class="sett-integration-name">Steam</div>
+			                  <span style="font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;background:var(--mocha-wash);color:var(--muted);border-radius:6px;padding:2px 6px;">Coming Soon</span>
+			                </div>
+			                <p class="field-note" style="margin:6px 0 0;">Shows what game you're playing on your profile and in DMs.</p>
+			              </div>
+			            </div>
+			          </div>
+			          <!-- Roblox -->
+			          <div class="sett-section" style="border-bottom:none;">
+			            <div class="sett-integration-card">
+			              <div class="sett-integration-icon" style="background:#e2231a;">
+			                <img src="images/Roblox.png" alt="Roblox" style="width:26px;height:26px;object-fit:contain;filter:brightness(10);">
+			              </div>
+			              <div class="sett-integration-info">
+			                <div class="sett-integration-name">Roblox</div>
+			                <div class="sett-integration-status" id="robloxStatus">
+			                  ${user.robloxAccount?.connected ? `<span class="sett-connected-badge">✓ Connected as ${escapeHTML(user.robloxAccount.robloxUsername)}</span>` : `<span style="color:var(--muted);font-size:13px;">Not connected</span>`}
+			                </div>
+			                <p class="field-note" style="margin:6px 0 8px;">Shows what Roblox game you're in on your profile and in DMs.</p>
+			                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+			                  <a class="btn" href="connect.html?platform=roblox" style="text-decoration:none;">⚙️ ${user.robloxAccount?.connected ? "Manage" : "Connect"} Roblox</a>
+			                  ${user.robloxAccount?.connected ? `<button class="btn danger" id="disconnectRobloxBtn">Disconnect</button>` : ""}
+			                </div>
+			              </div>
+			            </div>
+			          </div>
+			        `;
+			
+			        const connectBtn = document.getElementById("connectSpotifyBtn");
+			        if (connectBtn) {
+			          apiFetch("/api/spotify/status").then(status => {
+			            if (status && status.configured === false) { connectBtn.disabled = true; connectBtn.textContent = "Not configured yet"; }
+			          }).catch(() => {});
+			          connectBtn.addEventListener("click", () => {
+			            window.location.href = `${API_BASE}/api/spotify/login?userId=${encodeURIComponent(user.id)}`;
+			          });
+			        }
+			        const disconnectBtn = document.getElementById("disconnectSpotifyBtn");
+			        if (disconnectBtn) {
+			          disconnectBtn.addEventListener("click", async () => {
+			            disconnectBtn.disabled = true;
+			            const result = await apiFetch(`/api/users/${user.id}/spotify/disconnect`, { method: "POST" });
+			            if (result) { user = result; activeSettingsTab = "integrations"; render(); showToast("Disconnected Spotify."); }
+			            else { disconnectBtn.disabled = false; showToast("Could not disconnect. Try again."); }
+			          });
+			        }
+			
+			        // Helper: update local Progress cache with fresh user data
+			        function applyUserResult(result) {
+			          if (!result) return;
+			          // Patch the in-memory users list so the cache reflects the change immediately
+			          const idx = (Progress.db.users || []).findIndex(u => u.id === result.id);
+			          if (idx >= 0) Progress.db.users[idx] = { ...Progress.db.users[idx], ...result };
+			          else if (Progress.db.users) Progress.db.users.push(result);
+			          // Also update currentUser record if it's our own profile
+			          const cu = Progress.getCurrentUser();
+			          if (cu && cu.username === result.username) {
+			            Progress.db.currentUser = result.username;
+			            try { localStorage.setItem("progressUser_" + result.username, JSON.stringify(result)); } catch(e) {}
+			          }
+			        }
+			
+			        // Steam is coming soon — no disconnect handler needed
+			
+			        // Roblox disconnect (connect is handled by connect.html)
+			        const disconnectRobloxBtn = document.getElementById("disconnectRobloxBtn");
+			        if (disconnectRobloxBtn) {
+			          disconnectRobloxBtn.addEventListener("click", async () => {
+			            disconnectRobloxBtn.disabled = true;
+			            const result = await apiFetch(`/api/users/${user.id}/roblox`, { method: "DELETE" });
+			            if (result) { applyUserResult(result); user = result; activeSettingsTab = "integrations"; render(); showToast("Roblox disconnected."); }
+			            else { disconnectRobloxBtn.disabled = false; showToast("Could not disconnect. Try again."); }
+			          });
+			        }
+			      }
+			
+			      renderSubNav();
+			      renderSubPanel();
+			    }
+			
+			    attachBadgeTooltip(wrap);
+			    attachBadgeClick(wrap);
+			  }
+			
+			  function attachBadgeClick(root) {
+			    if (!root) return;
+			    root.querySelectorAll(".profile-badge").forEach(el => {
+			      el.addEventListener("click", async () => {
+			        const badgeId = el.dataset.badgeId;
+			        if (!badgeId) return;
+			        if (badgeId === "dexterity") {
+			          showToast("This badge can't be displayed on display name.");
+			          return;
+			        }
+			        const isActive = user.displayBadge === badgeId;
+			        const nextBadge = isActive ? null : badgeId;
+			
+			        // Dim the chip while saving so the user knows it's in flight
+			        el.style.opacity = "0.45";
+			        el.style.pointerEvents = "none";
+			
+			        // Call the API directly — updateProfile applies changes optimistically
+			        // so we can't rely on it to detect a server rejection (it returns the
+			        // locally-updated user even on API failure). Here we call PATCH ourselves
+			        // and only commit to local state when the server confirms it.
+			        const payload = await apiFetch(`/api/users/${user.id}`, {
+			          method: "PATCH",
+			          headers: { "Content-Type": "application/json" },
+			          body: JSON.stringify({ displayBadge: nextBadge })
+			        });
+			
+			        el.style.opacity = "";
+			        el.style.pointerEvents = "";
+			
+			        if (!payload) {
+			          showToast("Couldn't save badge — please try again.");
+			          return;
+			        }
+			
+			        // Server confirmed — apply its authoritative response to local state
+			        const localUser = Progress.db.users.find(u => u.username === user.username);
+			        if (localUser) {
+			          const preserved = { email: localUser.email };
+			          Object.assign(localUser, payload, preserved);
+			          Progress.persist();
+			        }
+			        user = Progress.getCurrentUser() || user;
+			        render();
+			        showToast(isActive
+			          ? `Removed ${BADGES[badgeId]?.label ?? badgeId} from your name.`
+			          : `Displaying ${BADGES[badgeId]?.label ?? badgeId} on your name.`);
+			      });
+			    });
+			  }
+			
+			  document.getElementById("avatarInput").addEventListener("change", () => {
+			    const file = document.getElementById("avatarInput").files[0];
+			    if (!file) return;
+			    const reader = new FileReader();
+			    reader.onload = async () => {
+			      await Progress.updateProfile({ avatar: reader.result });
+			      showToast("Photo updated.");
+			      setTimeout(() => location.reload(), 400);
+			    };
+			    reader.readAsDataURL(file);
+			  });

@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Email Management — Progress Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500;1,9..144,600&family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script>(function(){try{var t=localStorage.getItem("progressTheme");var dark=(t==="dark")||(t!=="light"&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);if(dark)document.documentElement.setAttribute("data-theme","dark");}catch(e){}})();</script>
+<link rel="stylesheet" href="style.css">
+<style>
+html, body { height: 100%; margin: 0; background: var(--v2-bg); }
+.v2-admin-shell { display: flex; flex-direction: column; height: 100dvh; }
+.v2-admin-nav {
+  height: var(--v2-nav-h); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 20px;
+  background: var(--v2-nav-bg); backdrop-filter: blur(20px) saturate(1.6);
+  border-bottom: 1px solid var(--v2-border);
+  position: sticky; top: 0; z-index: 200;
+}
+.v2-admin-nav-left { display: flex; align-items: center; gap: 10px; }
+.v2-admin-logo { font-family: var(--v2-font-d); font-style: italic; font-size: 18px; font-weight: 600; color: var(--v2-ink); text-decoration: none; }
+.v2-admin-sep { width: 1px; height: 18px; background: var(--v2-border); }
+.v2-admin-nav-title { font-family: var(--v2-font-m); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--v2-muted); }
+.v2-admin-badge { background: rgba(220,38,38,.12); color: #dc2626; border: 1px solid rgba(220,38,38,.2); font-family: var(--v2-font-m); font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; padding: 3px 8px; border-radius: 6px; }
+.v2-admin-nav-links { display: flex; align-items: center; gap: 4px; }
+.v2-admin-nav-link { font-size: 13px; font-weight: 500; color: var(--v2-muted); text-decoration: none; padding: 6px 12px; border-radius: var(--r-md); font-family: var(--v2-font-b); transition: color .15s, background .15s; white-space: nowrap; }
+.v2-admin-nav-link:hover { color: var(--v2-ink); background: var(--v2-paper); }
+.v2-admin-nav-link.active { color: var(--v2-ink); background: var(--v2-paper); font-weight: 600; }
+.v2-admin-home-btn { font-size: 13px; font-weight: 600; color: var(--v2-muted); text-decoration: none; padding: 6px 12px; border: 1px solid var(--v2-border); border-radius: var(--r-md); font-family: var(--v2-font-b); transition: all .15s; }
+.v2-admin-home-btn:hover { color: var(--v2-ink); border-color: var(--v2-ink); }
+.v2-admin-iframe-wrap { flex: 1; overflow: hidden; }
+.v2-admin-iframe { width: 100%; height: 100%; border: none; display: block; background: var(--v2-bg); }
+</style>
+</head>
+<body>
+<div class="v2-admin-shell">
+  <nav class="v2-admin-nav">
+    <div class="v2-admin-nav-left">
+      <a href="index.html" class="v2-admin-logo">Progress</a>
+      <div class="v2-admin-sep"></div>
+      <span class="v2-admin-nav-title">Admin</span>
+      <span class="v2-admin-badge">restricted</span>
+    </div>
+    <div class="v2-admin-nav-links">
+      <a href="admin.html" class="v2-admin-nav-link">Dashboard</a>
+      <a href="admin-emails.html" class="v2-admin-nav-link active">Emails</a>
+      <a href="admin-roles.html" class="v2-admin-nav-link">Roles</a>
+      <a href="users.html" class="v2-admin-nav-link">Users</a>
+      <a href="index.html" class="v2-admin-home-btn">← Feed</a>
+    </div>
+  </nav>
+  <div class="v2-admin-iframe-wrap">
+    <iframe src="../admin-emails.html" class="v2-admin-iframe" id="adminFrame" title="Email Management" sandbox="allow-same-origin allow-scripts allow-forms allow-popups"></iframe>
+  </div>
+</div>
+<script>
+const frame = document.getElementById("adminFrame");
+frame.addEventListener("load", () => {
+  try {
+    const theme = localStorage.getItem("progressTheme");
+    const dark = theme === "dark" || (theme !== "light" && window.matchMedia("(prefers-color-scheme:dark)").matches);
+    if (dark) frame.contentDocument.documentElement.setAttribute("data-theme", "dark");
+    const style = frame.contentDocument.createElement("style");
+    style.textContent = `#nav-root { display:none !important; } .admin-wrap { padding-top: 24px !important; }`;
+    frame.contentDocument.head.appendChild(style);
+  } catch(e) {}
+});
+</script>
+</body>
+</html>

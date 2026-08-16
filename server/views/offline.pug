@@ -1,0 +1,29 @@
+extends layout
+
+block title
+	| You're offline — Progress
+
+block meta
+	//- no OG meta
+
+block head
+	style.
+		
+		  .offline-wrap { min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:40px 24px; text-align:center; }
+		  .offline-logo { width:64px; height:64px; border-radius:16px; margin-bottom:24px; opacity:.7; }
+		  .offline-wordmark { font-family:var(--font-serif); font-style:italic; font-size:32px; font-weight:600; color:var(--ink); margin-bottom:32px; letter-spacing:-.5px; }
+		  .offline-icon { font-size:56px; margin-bottom:20px; filter:grayscale(1); opacity:.5; }
+		  .offline-title { font-family:var(--font-serif); font-size:24px; font-weight:600; color:var(--ink); margin:0 0 10px; }
+		  .offline-sub { font-size:15px; color:var(--muted); line-height:1.6; max-width:320px; margin:0 auto 32px; }
+		  .offline-retry { padding:12px 28px; background:var(--ink); color:var(--cream); border:none; border-radius:10px; font-size:15px; font-weight:600; cursor:pointer; transition:opacity .15s; }
+		  .offline-retry:hover { opacity:.85; }
+
+block content
+	.offline-wrap
+		img.offline-logo(src='/images/nearheader.png' alt='Progress')
+		.offline-wordmark progress.
+		.offline-icon 📡
+		h1.offline-title You're offline
+		p.offline-sub Progress needs a connection to load new posts and messages. Check your connection and try again.
+		button.offline-retry(onclick='window.location.reload()') Try again
+	

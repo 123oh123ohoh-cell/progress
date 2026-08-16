@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>404 — Progress</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500;1,9..144,600&family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script>(function(){try{var t=localStorage.getItem("progressTheme");var dark=(t==="dark")||(t!=="light"&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);if(dark)document.documentElement.setAttribute("data-theme","dark");}catch(e){}})();</script>
+<link rel="stylesheet" href="v2-compat.css">
+<link rel="stylesheet" href="style.css">
+<style>
+#nav-root { display:none !important; }
+
+.v2-404-page {
+  min-height: 100dvh; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; padding: calc(var(--v2-nav-h) + 40px) 24px 80px;
+  text-align: center;
+}
+
+.v2-404-num {
+  font-family: var(--v2-font-d); font-style: italic; font-weight: 600;
+  font-size: clamp(80px, 20vw, 160px); line-height: 1; color: var(--v2-ink);
+  opacity: .07; position: absolute; user-select: none; pointer-events: none;
+  top: 50%; left: 50%; transform: translate(-50%,-50%);
+}
+
+.v2-404-inner {
+  position: relative; z-index: 1; max-width: 480px;
+}
+
+.v2-404-emoji {
+  font-size: 64px; margin-bottom: 24px; display: block;
+  animation: v2404float 4s ease-in-out infinite;
+}
+@keyframes v2404float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-12px)} }
+
+.v2-404-title {
+  font-family: var(--v2-font-d); font-style: italic; font-weight: 600;
+  font-size: clamp(24px, 5vw, 38px); color: var(--v2-ink); margin: 0 0 14px;
+}
+
+.v2-404-sub {
+  font-size: 16px; color: var(--v2-muted); line-height: 1.65; margin: 0 0 36px;
+}
+
+.v2-404-btns { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+
+.v2-404-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 12px 24px; border-radius: 30px; font-size: 14px; font-weight: 700;
+  font-family: var(--v2-font-b); text-decoration: none; cursor: pointer;
+  transition: transform .2s cubic-bezier(.34,1.56,.64,1), box-shadow .2s;
+}
+.v2-404-btn--dark {
+  background: var(--v2-ink); color: var(--v2-bg);
+}
+.v2-404-btn--dark:hover { transform: translateY(-3px); box-shadow: var(--sh-lift); }
+.v2-404-btn--ghost {
+  background: var(--v2-paper); color: var(--v2-ink);
+  border: 1.5px solid var(--v2-border);
+}
+.v2-404-btn--ghost:hover { transform: translateY(-2px); box-shadow: var(--sh-md); }
+
+.v2-404-links {
+  margin-top: 40px; display: flex; gap: 20px; flex-wrap: wrap; justify-content: center;
+}
+.v2-404-link {
+  font-size: 13px; color: var(--v2-muted); text-decoration: none;
+  font-family: var(--v2-font-m); font-weight: 500;
+  display: flex; align-items: center; gap: 4px;
+}
+.v2-404-link:hover { color: var(--v2-ink); }
+</style>
+</head>
+<body class="v2 mobile">
+
+<div id="nav-root" aria-hidden="true"></div>
+<div id="modal-root"></div>
+
+<!-- ── V2 Nav ─────────────────────────────────────────────── -->
+<nav class="v2-nav" id="v2Nav">
+  <div class="v2-nav-inner">
+    <a href="index.html" class="v2-logo">
+      <img src="../images/etc1.png" alt="Progress" class="v2-logo-img">
+      <span class="v2-logo-text">Progress</span>
+    </a>
+    <div class="v2-nav-right" id="v2NavRight">
+      <a href="index.html" class="v2-btn v2-btn--dark" style="font-size:13px;padding:7px 15px;">Go home</a>
+    </div>
+  </div>
+</nav>
+
+<div class="v2-404-page">
+  <span class="v2-404-num">404</span>
+  <div class="v2-404-inner">
+    <span class="v2-404-emoji">🗺️</span>
+    <h1 class="v2-404-title">Lost in the writing?</h1>
+    <p class="v2-404-sub">We couldn't find the page you were looking for. Maybe it moved, maybe it never existed, or maybe you just took a wrong turn.</p>
+
+    <div class="v2-404-btns">
+      <a href="index.html" class="v2-404-btn v2-404-btn--dark">Back to Feed</a>
+      <button class="v2-404-btn v2-404-btn--ghost" onclick="history.back()">← Go back</button>
+    </div>
+
+    <div class="v2-404-links">
+      <a href="explore.html" class="v2-404-link">🔍 Explore</a>
+      <a href="write.html" class="v2-404-link">✍️ Write</a>
+      <a href="signup.html" class="v2-404-link">👤 Sign up</a>
+    </div>
+  </div>
+</div>
+
+<script src="../data.js"></script>
+<script src="../app.js"></script>
+<script src="v2-nav.js"></script>
+<script>
+  async function start() {
+    const ready = initShell("404");
+    v2BootNav(ready);
+  }
+  start();
+</script>
+</body>
+</html>

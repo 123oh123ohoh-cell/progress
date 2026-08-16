@@ -1,0 +1,1538 @@
+extends layout
+
+block title
+	| Watch Party — Progress
+
+block meta
+	//- no OG meta
+
+block head
+	style.
+		  /* ── Watch Party Shell ─────────────────────────────────────────────────── */
+		  .wp-root {
+		    min-height: 100dvh;
+		    display: flex;
+		    flex-direction: column;
+		    background: var(--cream);
+		  }
+		  /* ── Top bar ───────────────────────────────────────────────────────────── */
+		  .wp-topbar {
+		    display: flex;
+		    align-items: center;
+		    gap: 12px;
+		    padding: 14px 20px;
+		    background: var(--paper);
+		    border-bottom: 1px solid var(--mocha-light);
+		    flex-shrink: 0;
+		  }
+		  .wp-topbar-title {
+		    font-family: var(--font-display);
+		    font-size: 15px;
+		    font-weight: 600;
+		    color: var(--ink);
+		    flex: 1;
+		    min-width: 0;
+		    white-space: nowrap;
+		    overflow: hidden;
+		    text-overflow: ellipsis;
+		  }
+		  .wp-topbar-title span { color: var(--muted); font-weight: 400; }
+		  .wp-room-code {
+		    font-family: var(--font-mono);
+		    font-size: 12px;
+		    color: var(--muted);
+		    background: var(--mocha-wash);
+		    border: 1px solid var(--mocha-light);
+		    border-radius: 6px;
+		    padding: 4px 10px;
+		    cursor: pointer;
+		    transition: color .15s, border-color .15s;
+		    user-select: none;
+		    white-space: nowrap;
+		  }
+		  .wp-room-code:hover { color: var(--ink); border-color: var(--mocha); }
+		  .wp-sync-badge {
+		    font-family: var(--font-mono);
+		    font-size: 11px;
+		    padding: 3px 8px;
+		    border-radius: 20px;
+		    background: rgba(111, 214, 196, .12);
+		    color: var(--mocha);
+		    border: 1px solid rgba(111, 214, 196, .25);
+		    white-space: nowrap;
+		    transition: all .3s;
+		  }
+		  .wp-sync-badge.off { background: rgba(232,169,76,.1); color: var(--tok-number,#e8a94c); border-color: rgba(232,169,76,.2); }
+		  /* ── Main layout ───────────────────────────────────────────────────────── */
+		  .wp-body {
+		    display: grid;
+		    grid-template-columns: 1fr 280px;
+		    gap: 0;
+		    flex: 1;
+		    min-height: 0;
+		  }
+		  @media (max-width: 700px) {
+		    .wp-body { grid-template-columns: 1fr; }
+		    .wp-sidebar { border-left: none; border-top: 1px solid var(--mocha-light); order: 2; }
+		    .wp-main { order: 1; }
+		  }
+		  /* ── Video column ──────────────────────────────────────────────────────── */
+		  .wp-main {
+		    display: flex;
+		    flex-direction: column;
+		    padding: 24px 24px 16px;
+		    gap: 16px;
+		    background: var(--cream);
+		  }
+		  .wp-video-wrap {
+		    position: relative;
+		    width: 100%;
+		    background: #0a0a0a;
+		    border-radius: 12px;
+		    overflow: hidden;
+		    aspect-ratio: 16 / 9;
+		    box-shadow:
+		      0 0 0 1px var(--mocha-light),
+		      0 8px 32px rgba(0,0,0,.18),
+		      0 0 60px rgba(232,169,76,.07);
+		  }
+		  [data-theme="dark"] .wp-video-wrap,
+		  [data-theme="code"] .wp-video-wrap {
+		    box-shadow:
+		      0 0 0 1px var(--mocha-light),
+		      0 8px 40px rgba(0,0,0,.4),
+		      0 0 80px rgba(232,169,76,.1);
+		  }
+		  .wp-video-wrap iframe,
+		  .wp-video-wrap #ytPlayer {
+		    position: absolute;
+		    inset: 0;
+		    width: 100% !important;
+		    height: 100% !important;
+		    border: none;
+		  }
+		  /* placeholder shown before a video is loaded */
+		  .wp-video-placeholder {
+		    position: absolute;
+		    inset: 0;
+		    display: flex;
+		    flex-direction: column;
+		    align-items: center;
+		    justify-content: center;
+		    gap: 10px;
+		    color: #555;
+		    font-family: var(--font-display);
+		    font-size: 16px;
+		    background: #0e0e0e;
+		    user-select: none;
+		  }
+		  .wp-video-placeholder .wp-flicker {
+		    font-size: 40px;
+		    animation: flicker 3s ease-in-out infinite;
+		  }
+		  @keyframes flicker {
+		    0%,100% { opacity: 1; }
+		    50%      { opacity: .55; }
+		    70%      { opacity: .9; }
+		    85%      { opacity: .6; }
+		  }
+		  /* floating emoji reactions */
+		  .wp-reactions-layer {
+		    position: absolute;
+		    inset: 0;
+		    pointer-events: none;
+		    overflow: hidden;
+		  }
+		  .wp-float-emoji {
+		    position: absolute;
+		    bottom: 16px;
+		    font-size: 28px;
+		    animation: floatUp 2.4s ease-out forwards;
+		    pointer-events: none;
+		    user-select: none;
+		  }
+		  @keyframes floatUp {
+		    0%   { transform: translateY(0) scale(1);   opacity: 1; }
+		    80%  { opacity: 1; }
+		    100% { transform: translateY(-180px) scale(1.3); opacity: 0; }
+		  }
+		  /* ── Controls bar ──────────────────────────────────────────────────────── */
+		  .wp-controls {
+		    display: flex;
+		    align-items: center;
+		    gap: 10px;
+		    flex-wrap: wrap;
+		  }
+		  .wp-ctrl-btn {
+		    display: flex;
+		    align-items: center;
+		    gap: 6px;
+		    padding: 8px 14px;
+		    border-radius: 8px;
+		    font-family: var(--font-body);
+		    font-size: 13.5px;
+		    font-weight: 500;
+		    border: 1px solid var(--mocha-light);
+		    background: var(--paper);
+		    color: var(--ink);
+		    cursor: pointer;
+		    transition: background .12s, border-color .12s, color .12s;
+		  }
+		  .wp-ctrl-btn:hover { background: var(--mocha-wash); border-color: var(--mocha); }
+		  .wp-ctrl-btn.primary {
+		    background: var(--mocha);
+		    border-color: var(--mocha);
+		    color: var(--paper);
+		  }
+		  .wp-ctrl-btn.primary:hover { filter: brightness(1.1); }
+		  .wp-ctrl-btn:disabled { opacity: .4; cursor: not-allowed; }
+		  .wp-viewer-note {
+		    font-size: 13px;
+		    color: var(--muted);
+		    display: flex;
+		    align-items: center;
+		    gap: 6px;
+		  }
+		  .wp-video-url-form {
+		    display: flex;
+		    gap: 8px;
+		    flex: 1;
+		    min-width: 0;
+		    max-width: 480px;
+		  }
+		  .wp-video-url-input {
+		    flex: 1;
+		    min-width: 0;
+		    padding: 8px 12px;
+		    border-radius: 8px;
+		    border: 1px solid var(--mocha-light);
+		    background: var(--mocha-wash);
+		    color: var(--ink);
+		    font-family: var(--font-mono);
+		    font-size: 13px;
+		    outline: none;
+		    transition: border-color .15s;
+		  }
+		  .wp-video-url-input::placeholder { color: var(--muted); }
+		  .wp-video-url-input:focus { border-color: var(--mocha); }
+		  /* reaction picker */
+		  .wp-reaction-picker {
+		    display: flex;
+		    gap: 4px;
+		    margin-left: auto;
+		  }
+		  .wp-react-btn {
+		    width: 34px;
+		    height: 34px;
+		    border-radius: 8px;
+		    border: 1px solid var(--mocha-light);
+		    background: var(--paper);
+		    font-size: 18px;
+		    cursor: pointer;
+		    display: flex;
+		    align-items: center;
+		    justify-content: center;
+		    transition: background .12s, transform .08s;
+		    line-height: 1;
+		  }
+		  .wp-react-btn:hover { background: var(--mocha-wash); transform: scale(1.15); }
+		  .wp-react-btn:active { transform: scale(.92); }
+		  /* ── Sidebar ───────────────────────────────────────────────────────────── */
+		  .wp-sidebar {
+		    background: var(--paper);
+		    border-left: 1px solid var(--mocha-light);
+		    display: flex;
+		    flex-direction: column;
+		    overflow: hidden;
+		  }
+		  .wp-sidebar-section {
+		    padding: 16px 16px 12px;
+		    border-bottom: 1px solid var(--mocha-light);
+		    flex-shrink: 0;
+		  }
+		  .wp-sidebar-label {
+		    font-family: var(--font-mono);
+		    font-size: 10.5px;
+		    text-transform: uppercase;
+		    letter-spacing: .07em;
+		    color: var(--muted);
+		    margin-bottom: 10px;
+		  }
+		  .wp-member-list {
+		    display: flex;
+		    flex-direction: column;
+		    gap: 6px;
+		    overflow-y: auto;
+		    max-height: 220px;
+		  }
+		  @media (max-width: 700px) {
+		    .wp-member-list { flex-direction: row; flex-wrap: wrap; max-height: none; }
+		  }
+		  .wp-member-item {
+		    display: flex;
+		    align-items: center;
+		    gap: 8px;
+		    padding: 4px 0;
+		  }
+		  .wp-member-avatar {
+		    width: 28px; height: 28px;
+		    border-radius: 50%;
+		    background: var(--mocha-light);
+		    flex-shrink: 0;
+		    overflow: hidden;
+		    display: flex;
+		    align-items: center;
+		    justify-content: center;
+		    font-size: 11px;
+		    font-weight: 600;
+		    color: var(--mocha-dark);
+		  }
+		  .wp-member-avatar img { width: 100%; height: 100%; object-fit: cover; }
+		  .wp-member-name {
+		    font-size: 13px;
+		    color: var(--ink);
+		    flex: 1;
+		    min-width: 0;
+		    overflow: hidden;
+		    text-overflow: ellipsis;
+		    white-space: nowrap;
+		  }
+		  .wp-leader-crown {
+		    font-size: 13px;
+		    flex-shrink: 0;
+		  }
+		  .wp-transfer-btn {
+		    font-size: 11px;
+		    color: var(--muted);
+		    cursor: pointer;
+		    padding: 2px 5px;
+		    border-radius: 4px;
+		    border: 1px solid var(--mocha-light);
+		    background: none;
+		    transition: color .12s, border-color .12s;
+		  }
+		  .wp-transfer-btn:hover { color: var(--ink); border-color: var(--mocha); }
+		  /* ── Sidebar chat ──────────────────────────────────────────────────────── */
+		  .wp-chat {
+		    flex: 1;
+		    display: flex;
+		    flex-direction: column;
+		    overflow: hidden;
+		    min-height: 0;
+		  }
+		  .wp-chat-messages {
+		    flex: 1;
+		    overflow-y: auto;
+		    padding: 10px 14px;
+		    display: flex;
+		    flex-direction: column;
+		    gap: 8px;
+		    scroll-behavior: smooth;
+		  }
+		  .wp-chat-msg {
+		    display: flex;
+		    flex-direction: column;
+		    gap: 1px;
+		    animation: fadeInUp .18s ease;
+		  }
+		  .wp-chat-msg.is-system .wp-chat-body {
+		    color: var(--muted);
+		    font-style: italic;
+		    font-size: 11.5px;
+		  }
+		  .wp-chat-meta {
+		    display: flex;
+		    align-items: baseline;
+		    gap: 5px;
+		  }
+		  .wp-chat-author {
+		    font-size: 11.5px;
+		    font-weight: 600;
+		    color: var(--mocha);
+		    line-height: 1;
+		  }
+		  .wp-chat-time {
+		    font-size: 10px;
+		    color: var(--muted);
+		    font-family: var(--font-mono);
+		  }
+		  .wp-chat-body {
+		    font-size: 13px;
+		    color: var(--ink);
+		    line-height: 1.45;
+		    word-break: break-word;
+		  }
+		  .wp-chat-input-row {
+		    display: flex;
+		    gap: 6px;
+		    padding: 10px 12px;
+		    border-top: 1px solid var(--mocha-light);
+		    flex-shrink: 0;
+		    background: var(--paper);
+		  }
+		  .wp-chat-input {
+		    flex: 1;
+		    min-width: 0;
+		    padding: 7px 11px;
+		    border-radius: 8px;
+		    border: 1px solid var(--mocha-light);
+		    background: var(--mocha-wash);
+		    color: var(--ink);
+		    font-family: var(--font-body);
+		    font-size: 13px;
+		    outline: none;
+		    transition: border-color .15s;
+		    resize: none;
+		  }
+		  .wp-chat-input::placeholder { color: var(--muted); }
+		  .wp-chat-input:focus { border-color: var(--mocha); }
+		  .wp-chat-send {
+		    padding: 7px 13px;
+		    border-radius: 8px;
+		    border: 1px solid var(--mocha-light);
+		    background: var(--mocha);
+		    color: var(--paper);
+		    font-family: var(--font-body);
+		    font-size: 13px;
+		    font-weight: 600;
+		    cursor: pointer;
+		    flex-shrink: 0;
+		    transition: filter .12s;
+		  }
+		  .wp-chat-send:hover { filter: brightness(1.1); }
+		  .wp-chat-send:disabled { opacity: .4; cursor: not-allowed; }
+		  @keyframes fadeInUp {
+		    from { opacity: 0; transform: translateY(4px); }
+		    to   { opacity: 1; transform: translateY(0); }
+		  }
+		  /* ── Create / join lobby ───────────────────────────────────────────────── */
+		  .wp-lobby-page {
+		    min-height: calc(100vh - 60px);
+		    display: flex;
+		    flex-direction: column;
+		    align-items: center;
+		    padding: 0 20px 60px;
+		  }
+		  .wp-lobby-hero {
+		    width: 100%;
+		    max-width: 700px;
+		    text-align: center;
+		    padding: 64px 0 48px;
+		    display: flex;
+		    flex-direction: column;
+		    align-items: center;
+		    gap: 16px;
+		  }
+		  .wp-lobby-hero-img {
+		    width: 72px;
+		    height: 72px;
+		    object-fit: contain;
+		    filter: drop-shadow(0 4px 12px rgba(0,0,0,.12));
+		  }
+		  .wp-lobby-title {
+		    font-family: var(--font-display);
+		    font-size: 36px;
+		    font-weight: 700;
+		    color: var(--ink);
+		    line-height: 1.1;
+		    letter-spacing: -.5px;
+		  }
+		  .wp-lobby-sub {
+		    font-size: 15px;
+		    color: var(--muted);
+		    line-height: 1.65;
+		    max-width: 420px;
+		  }
+		  .wp-lobby-cards {
+		    display: grid;
+		    grid-template-columns: 1fr 1fr;
+		    gap: 16px;
+		    width: 100%;
+		    max-width: 700px;
+		  }
+		  @media (max-width: 560px) {
+		    .wp-lobby-cards { grid-template-columns: 1fr; }
+		    .wp-lobby-title { font-size: 28px; }
+		  }
+		  .wp-lobby-card {
+		    background: var(--paper);
+		    border: 1px solid var(--mocha-light);
+		    border-radius: 16px;
+		    padding: 24px;
+		    display: flex;
+		    flex-direction: column;
+		    gap: 14px;
+		    transition: box-shadow .15s, border-color .15s;
+		  }
+		  .wp-lobby-card:hover {
+		    box-shadow: 0 4px 20px rgba(0,0,0,.07);
+		    border-color: var(--mocha);
+		  }
+		  .wp-lobby-card-icon {
+		    font-size: 22px;
+		    line-height: 1;
+		  }
+		  .wp-lobby-card-label {
+		    font-family: var(--font-display);
+		    font-size: 16px;
+		    font-weight: 600;
+		    color: var(--ink);
+		  }
+		  .wp-lobby-card-desc {
+		    font-size: 13px;
+		    color: var(--muted);
+		    line-height: 1.55;
+		    margin-top: -6px;
+		  }
+		  .wp-lobby-input {
+		    width: 100%;
+		    padding: 10px 14px;
+		    border-radius: 8px;
+		    border: 1px solid var(--mocha-light);
+		    background: var(--cream);
+		    color: var(--ink);
+		    font-family: var(--font-body);
+		    font-size: 14px;
+		    outline: none;
+		    transition: border-color .15s;
+		    box-sizing: border-box;
+		  }
+		  .wp-lobby-input::placeholder { color: var(--muted); }
+		  .wp-lobby-input:focus { border-color: var(--mocha); }
+		  .wp-lobby-pills {
+		    display: flex;
+		    flex-wrap: wrap;
+		    gap: 6px;
+		    margin-top: -4px;
+		  }
+		  .wp-lobby-pill {
+		    font-size: 11.5px;
+		    color: var(--muted);
+		    background: var(--mocha-wash);
+		    border-radius: 20px;
+		    padding: 3px 10px;
+		  }
+		  /* toast */
+		  .wp-toast {
+		    position: fixed;
+		    bottom: 24px;
+		    left: 50%;
+		    transform: translateX(-50%) translateY(80px);
+		    background: var(--ink);
+		    color: var(--cream);
+		    padding: 9px 18px;
+		    border-radius: 8px;
+		    font-size: 13.5px;
+		    font-weight: 500;
+		    z-index: 9999;
+		    white-space: nowrap;
+		    pointer-events: none;
+		    transition: transform .25s cubic-bezier(.34,1.56,.64,1), opacity .25s;
+		    opacity: 0;
+		  }
+		  .wp-toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+block content
+	.wp-root#wpRoot
+		//  content injected by JS 
+	.wp-toast#wpToast
+	//  Multi-source player SDKs 
+	
+
+block scripts
+		script(src="/https://player.vimeo.com/api/player.js")
+		script(src="/https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.4.10/hls.min.js")
+		script.
+			// ── Utilities ─────────────────────────────────────────────────────────────────
+			function escapeHTML(str) {
+			  return String(str || "")
+			    .replace(/&/g, "&amp;")
+			    .replace(/</g, "&lt;")
+			    .replace(/>/g, "&gt;")
+			    .replace(/"/g, "&quot;");
+			}
+			function wpToast(msg, dur = 2800) {
+			  const el = document.getElementById("wpToast");
+			  el.textContent = msg;
+			  el.classList.add("show");
+			  clearTimeout(el._t);
+			  el._t = setTimeout(() => el.classList.remove("show"), dur);
+			}
+			// ── Universal URL parser ──────────────────────────────────────────────────────
+			// Returns { type, id, url, isLive } or null
+			function parseVideoUrl(input) {
+			  if (!input) return null;
+			  input = input.trim();
+			
+			  try {
+			    const u = new URL(input.includes("://") ? input : "https://" + input);
+			    const host = u.hostname.replace(/^www\./, "");
+			
+			    // YouTube
+			    if (host === "youtube.com" || host === "youtu.be" || host === "m.youtube.com") {
+			      let vid = null;
+			      if (host === "youtu.be") vid = u.pathname.slice(1, 12);
+			      else vid = u.searchParams.get("v")?.slice(0, 11) || null;
+			      // Live channel URL: youtube.com/live/VIDEO_ID
+			      if (!vid && u.pathname.startsWith("/live/")) vid = u.pathname.split("/")[2]?.slice(0, 11) || null;
+			      if (!vid && /^[a-zA-Z0-9_-]{11}$/.test(input)) vid = input;
+			      if (!vid) return null;
+			      const isLive = u.pathname.includes("/live") || u.searchParams.get("live") === "1";
+			      return { type: "youtube", id: vid, url: null, isLive };
+			    }
+			
+			    // Vimeo
+			    if (host === "vimeo.com" || host === "player.vimeo.com") {
+			      const vid = u.pathname.match(/\d+/)?.[0];
+			      if (!vid) return null;
+			      return { type: "vimeo", id: vid, url: null, isLive: false };
+			    }
+			
+			    // Twitch
+			    if (host === "twitch.tv" || host === "clips.twitch.tv") {
+			      const parts = u.pathname.split("/").filter(Boolean);
+			      if (!parts.length) return null;
+			      const isClip = host === "clips.twitch.tv" || parts[1] === "clip";
+			      return { type: "twitch", id: parts[0], url: input, isLive: !isClip };
+			    }
+			
+			    // YouTube Live shortcut e.g. youtube.com/@channel/live
+			    if (host === "youtube.com" && u.pathname.includes("/live")) {
+			      return { type: "youtube-live-channel", id: null, url: input, isLive: true };
+			    }
+			
+			    // Direct video file or HLS stream
+			    if (/\.(mp4|webm|ogg|ogv)(\?|$)/i.test(u.pathname)) {
+			      return { type: "html5", id: null, url: input, isLive: false };
+			    }
+			    if (/\.m3u8(\?|$)/i.test(u.pathname)) {
+			      return { type: "html5", id: null, url: input, isLive: true };
+			    }
+			
+			    // Fallback: try to embed as direct video
+			    return { type: "html5", id: null, url: input, isLive: false };
+			
+			  } catch {
+			    // Bare YouTube ID?
+			    if (/^[a-zA-Z0-9_-]{11}$/.test(input)) return { type: "youtube", id: input, url: null, isLive: false };
+			    return null;
+			  }
+			}
+			
+			// Kept for back-compat
+			function extractYouTubeId(input) {
+			  const p = parseVideoUrl(input);
+			  return (p && p.type === "youtube") ? p.id : null;
+			}
+			
+			// ── Unified player interface ───────────────────────────────────────────────────
+			// All sync logic calls these instead of player.xxx() directly.
+			let activePlayerType = null; // 'youtube' | 'vimeo' | 'html5' | 'twitch'
+			let ytPlayer  = null;   // YouTube IFrame player instance
+			let vmPlayer  = null;   // Vimeo player instance
+			let h5El      = null;   // HTML5 <video> element
+			let hlsInst   = null;   // HLS.js instance (for m3u8)
+			let twEmbed   = null;   // Twitch embed instance
+			let twPlayer2 = null;   // Twitch player from embed
+			
+			function pReady()   { return playerReady; }
+			function pPlay()    {
+			  if (activePlayerType === "youtube") ytPlayer?.playVideo();
+			  else if (activePlayerType === "vimeo") vmPlayer?.play();
+			  else if (activePlayerType === "html5") h5El?.play().catch(()=>{});
+			  else if (activePlayerType === "twitch") twPlayer2?.play();
+			}
+			function pPause()   {
+			  if (activePlayerType === "youtube") ytPlayer?.pauseVideo();
+			  else if (activePlayerType === "vimeo") vmPlayer?.pause();
+			  else if (activePlayerType === "html5") h5El?.pause();
+			  else if (activePlayerType === "twitch") twPlayer2?.pause();
+			}
+			function pSeekTo(t) {
+			  if (activePlayerType === "youtube") ytPlayer?.seekTo(t, true);
+			  else if (activePlayerType === "vimeo") vmPlayer?.setCurrentTime(t);
+			  else if (activePlayerType === "html5" && h5El) h5El.currentTime = t;
+			  // Twitch live — no seeking
+			}
+			function pGetTime() {
+			  if (activePlayerType === "youtube") return ytPlayer?.getCurrentTime() || 0;
+			  // Vimeo getCurrentTime is async — we cache it
+			  if (activePlayerType === "html5") return h5El?.currentTime || 0;
+			  return 0;
+			}
+			function pMute()   {
+			  if (activePlayerType === "youtube") ytPlayer?.mute();
+			  else if (activePlayerType === "vimeo") vmPlayer?.setVolume(0);
+			  else if (activePlayerType === "html5" && h5El) h5El.muted = true;
+			}
+			function pUnmute() {
+			  if (activePlayerType === "youtube") ytPlayer?.unMute();
+			  else if (activePlayerType === "vimeo") vmPlayer?.setVolume(1);
+			  else if (activePlayerType === "html5" && h5El) h5El.muted = false;
+			}
+			function pIsStatePlaying() {
+			  if (activePlayerType === "youtube") return ytPlayer?.getPlayerState() === YT.PlayerState.PLAYING;
+			  if (activePlayerType === "html5") return h5El && !h5El.paused;
+			  return false;
+			}
+			
+			function pDestroy() {
+			  try {
+			    if (activePlayerType === "youtube" && ytPlayer) { ytPlayer.destroy(); ytPlayer = null; }
+			    if (activePlayerType === "vimeo"   && vmPlayer) { vmPlayer.destroy(); vmPlayer = null; }
+			    if (activePlayerType === "html5"   && h5El)     { h5El.pause(); h5El.src = ""; h5El.remove(); h5El = null; }
+			    if (hlsInst) { hlsInst.destroy(); hlsInst = null; }
+			    if (activePlayerType === "twitch"  && twEmbed)  { const f = document.getElementById("twEmbed"); if(f) f.remove(); twEmbed = null; twPlayer2 = null; }
+			  } catch(e) {}
+			  playerReady = false;
+			  activePlayerType = null;
+			}
+			function getWsBase() {
+			  // WS_BASE is defined in data.js and already handles local vs production correctly
+			  if (typeof WS_BASE !== "undefined") return WS_BASE;
+			  const isLocal = location.hostname === "localhost" || location.hostname === "127.0.0.1";
+			  if (isLocal) return `ws://localhost:${location.port || 3000}`;
+			  return "wss://progress-p7ko.onrender.com";
+			}
+			
+			// ── State ─────────────────────────────────────────────────────────────────────
+			const params       = new URLSearchParams(location.search);
+			const roomIdParam  = params.get("room");
+			let roomId         = roomIdParam || null;
+			let myUsername     = null;
+			let isLeader       = false;
+			let currentLeader  = null;
+			let members        = [];
+			let ws               = null;
+			let player           = null; // alias kept for legacy refs → ytPlayer
+			let playerReady      = false;
+			let currentVideoId   = null;
+			let currentVideoType = null;
+			let currentVideoUrl  = null;
+			let currentIsLive    = false;
+			let ignoreStateChange = false;
+			let ignoreTimer    = null;
+			let reconnecting   = false;
+			
+			// Drift correction: track what the server last told us about playback
+			// so we can periodically check if we've drifted and silently correct.
+			let lastKnownServerTime  = null; // Date.now() when the state was received
+			let lastKnownCurrentTime = 0;    // video seconds the server reported
+			let lastKnownIsPlaying   = false;
+			let driftTimer           = null;
+			const DRIFT_THRESHOLD    = 1.0;  // seconds — resync if further than this
+			const DRIFT_INTERVAL     = 2000; // ms — how often to check
+			
+			function setIgnore(ms = 2500) {
+			  ignoreStateChange = true;
+			  clearTimeout(ignoreTimer);
+			  ignoreTimer = setTimeout(() => { ignoreStateChange = false; }, ms);
+			}
+			
+			function recordServerState(currentTime, isPlaying, serverTime) {
+			  lastKnownCurrentTime = currentTime;
+			  lastKnownIsPlaying   = isPlaying;
+			  lastKnownServerTime  = serverTime || Date.now();
+			}
+			
+			function startDriftCorrection() {
+			  clearInterval(driftTimer);
+			  driftTimer = setInterval(() => {
+			    // Only viewers need correction; leader controls their own player
+			    if (isLeader || !playerReady || !lastKnownServerTime || !lastKnownIsPlaying) return;
+			    if (currentIsLive) return; // live streams don't need drift correction
+			    const elapsed = (Date.now() - lastKnownServerTime) / 1000;
+			    const expected = lastKnownCurrentTime + elapsed;
+			    const actual   = pGetTime();
+			    const drift    = Math.abs(actual - expected);
+			    if (drift > DRIFT_THRESHOLD) {
+			      setIgnore(2000);
+			      pSeekTo(expected);
+			      // Don't wpToast — silent correction
+			    }
+			  }, DRIFT_INTERVAL);
+			}
+			
+			function stopDriftCorrection() {
+			  clearInterval(driftTimer);
+			  driftTimer = null;
+			}
+			
+			// ── YouTube IFrame API ────────────────────────────────────────────────────────
+			const ytScript = document.createElement("script");
+			ytScript.src = "https://www.youtube.com/iframe_api";
+			document.head.appendChild(ytScript);
+			
+			// ── Multi-source player loaders ───────────────────────────────────────────────
+			function ensurePlayerContainer() {
+			  // Make sure the ytPlayer div exists (may have been replaced by another player)
+			  let el = document.getElementById("ytPlayer");
+			  if (!el) {
+			    el = document.createElement("div");
+			    el.id = "ytPlayer";
+			    el.style.cssText = "width:100%;height:100%;";
+			    const wrap = document.getElementById("wpVideoWrap");
+			    if (wrap) wrap.prepend(el);
+			  }
+			  return el;
+			}
+			
+			function loadYouTubeVideo(id, startSeconds, autoplay, isLive) {
+			  pDestroy();
+			  activePlayerType = "youtube";
+			  currentIsLive = !!isLive;
+			  const el = ensurePlayerContainer();
+			  ytPlayer = new YT.Player(el, {
+			    height: "100%", width: "100%", videoId: "",
+			    playerVars: { autoplay: 1, rel: 0, modestbranding: 1, iv_load_policy: 3, fs: 1 },
+			    events: {
+			      onReady: () => {
+			        player = ytPlayer; // keep alias
+			        playerReady = true;
+			        if (window._pendingState) {
+			          applyServerState(window._pendingState, true);
+			          window._pendingState = null;
+			        }
+			        if (isLeader) startLeaderHeartbeat();
+			        else startDriftCorrection();
+			        // Now actually load the video
+			        ytLoadVideoNow(id, startSeconds, autoplay);
+			      },
+			      onStateChange: (event) => {
+			        if (_pendingSeekTarget !== null && event.data === YT.PlayerState.PLAYING) {
+			          const t = _pendingSeekTarget, playing = _pendingSeekPlaying;
+			          _pendingSeekTarget = null; _pendingSeekPlaying = false;
+			          setIgnore(3000); ytPlayer.seekTo(t, true);
+			          if (!playing) setTimeout(() => { try { ytPlayer.pauseVideo(); } catch(e){} }, 300);
+			          setTimeout(() => { try { ytPlayer.unMute(); } catch(e){} }, 500);
+			          return;
+			        }
+			        if (ignoreStateChange || !isLeader || !ws || ws.readyState !== WebSocket.OPEN) return;
+			        if (event.data === YT.PlayerState.PLAYING) {
+			          ws.send(JSON.stringify({ type: "play", time: ytPlayer.getCurrentTime(), serverTime: Date.now() }));
+			        } else if (event.data === YT.PlayerState.PAUSED) {
+			          ws.send(JSON.stringify({ type: "pause", time: ytPlayer.getCurrentTime() }));
+			        }
+			      }
+			    }
+			  });
+			}
+			
+			function ytLoadVideoNow(id, startSeconds, autoplay) {
+			  if (!ytPlayer) return;
+			  if (autoplay) ytPlayer.loadVideoById({ videoId: id, startSeconds: startSeconds || 0 });
+			  else          ytPlayer.cueVideoById({ videoId: id, startSeconds: startSeconds || 0 });
+			}
+			
+			function loadVimeoVideo(id, startSeconds, autoplay) {
+			  pDestroy();
+			  activePlayerType = "vimeo";
+			  currentIsLive = false;
+			  // Recreate iframe in video wrap
+			  const wrap = document.getElementById("wpVideoWrap");
+			  const iframe = document.createElement("iframe");
+			  iframe.id = "vmPlayer";
+			  iframe.src = `https://player.vimeo.com/video/${id}?autoplay=${autoplay?1:0}&autopause=0`;
+			  iframe.style.cssText = "width:100%;height:100%;border:none;";
+			  iframe.allow = "autoplay; fullscreen; picture-in-picture";
+			  // Remove ytPlayer div first
+			  document.getElementById("ytPlayer")?.remove();
+			  wrap.prepend(iframe);
+			
+			  vmPlayer = new Vimeo.Player(iframe);
+			  playerReady = true;
+			
+			  if (startSeconds && startSeconds > 1) {
+			    vmPlayer.setCurrentTime(startSeconds).catch(()=>{});
+			  }
+			  if (autoplay) vmPlayer.play().catch(()=>{});
+			
+			  // Wire events for leader
+			  vmPlayer.on("play",  () => {
+			    if (ignoreStateChange || !isLeader || !ws || ws.readyState !== WebSocket.OPEN) return;
+			    vmPlayer.getCurrentTime().then(t => {
+			      ws.send(JSON.stringify({ type: "play", time: t, serverTime: Date.now() }));
+			    });
+			  });
+			  vmPlayer.on("pause", () => {
+			    if (ignoreStateChange || !isLeader || !ws || ws.readyState !== WebSocket.OPEN) return;
+			    vmPlayer.getCurrentTime().then(t => {
+			      ws.send(JSON.stringify({ type: "pause", time: t }));
+			    });
+			  });
+			  vmPlayer.on("seeked", () => {
+			    if (ignoreStateChange || !isLeader || !ws || ws.readyState !== WebSocket.OPEN) return;
+			    vmPlayer.getCurrentTime().then(t => {
+			      ws.send(JSON.stringify({ type: "seek", time: t, serverTime: Date.now() }));
+			    });
+			  });
+			
+			  if (isLeader) startLeaderHeartbeat();
+			  else startDriftCorrection();
+			}
+			
+			function loadHtml5Video(url, startSeconds, autoplay) {
+			  pDestroy();
+			  activePlayerType = "html5";
+			  document.getElementById("ytPlayer")?.remove();
+			  const wrap = document.getElementById("wpVideoWrap");
+			  h5El = document.createElement("video");
+			  h5El.id = "h5Player";
+			  h5El.style.cssText = "width:100%;height:100%;background:#000;";
+			  h5El.controls = true;
+			  h5El.playsInline = true;
+			  wrap.prepend(h5El);
+			
+			  const isM3U8 = /\.m3u8(\?|$)/i.test(url);
+			  if (isM3U8 && window.Hls && Hls.isSupported()) {
+			    hlsInst = new Hls();
+			    hlsInst.loadSource(url);
+			    hlsInst.attachMedia(h5El);
+			    hlsInst.on(Hls.Events.MANIFEST_PARSED, () => {
+			      if (startSeconds) h5El.currentTime = startSeconds;
+			      if (autoplay) h5El.play().catch(()=>{});
+			    });
+			  } else {
+			    h5El.src = url;
+			    if (startSeconds) h5El.currentTime = startSeconds;
+			    if (autoplay) h5El.play().catch(()=>{});
+			  }
+			
+			  playerReady = true;
+			  currentIsLive = isM3U8;
+			
+			  // Leader events
+			  h5El.addEventListener("play",  () => {
+			    if (ignoreStateChange || !isLeader || !ws || ws.readyState !== WebSocket.OPEN) return;
+			    ws.send(JSON.stringify({ type: "play", time: h5El.currentTime, serverTime: Date.now() }));
+			  });
+			  h5El.addEventListener("pause", () => {
+			    if (ignoreStateChange || !isLeader || !ws || ws.readyState !== WebSocket.OPEN) return;
+			    ws.send(JSON.stringify({ type: "pause", time: h5El.currentTime }));
+			  });
+			  h5El.addEventListener("seeked", () => {
+			    if (ignoreStateChange || !isLeader || !ws || ws.readyState !== WebSocket.OPEN) return;
+			    ws.send(JSON.stringify({ type: "seek", time: h5El.currentTime, serverTime: Date.now() }));
+			  });
+			
+			  if (isLeader) startLeaderHeartbeat();
+			  else startDriftCorrection();
+			}
+			
+			function loadTwitchStream(channel) {
+			  pDestroy();
+			  activePlayerType = "twitch";
+			  currentIsLive = true;
+			  document.getElementById("ytPlayer")?.remove();
+			  const wrap = document.getElementById("wpVideoWrap");
+			
+			  // Twitch requires the parent domain
+			  const parent = location.hostname === "localhost" ? "localhost" : location.hostname;
+			  const iframe = document.createElement("iframe");
+			  iframe.id = "twEmbed";
+			  iframe.src = `https://player.twitch.tv/?channel=${encodeURIComponent(channel)}&parent=${parent}&autoplay=true`;
+			  iframe.style.cssText = "width:100%;height:100%;border:none;";
+			  iframe.allow = "autoplay; fullscreen";
+			  wrap.prepend(iframe);
+			
+			  playerReady = true;
+			  // Twitch live: no sync needed — everyone just watches live
+			  // Show LIVE badge
+			  const badge = document.getElementById("wpSyncBadge");
+			  if (badge) { badge.textContent = "● LIVE"; badge.style.color = "#e53"; }
+			
+			  if (isLeader) startLeaderHeartbeat();
+			}
+			
+			// ── Leader heartbeat — keeps server position fresh so joining viewers sync ────
+			let leaderHeartbeatTimer = null;
+			function startLeaderHeartbeat() {
+			  clearInterval(leaderHeartbeatTimer);
+			  leaderHeartbeatTimer = setInterval(() => {
+			    if (!isLeader || !playerReady || !ws || ws.readyState !== WebSocket.OPEN) return;
+			    ws.send(JSON.stringify({
+			      type: "state",
+			      videoId:   currentVideoId,
+			      videoType: currentVideoType,
+			      videoUrl:  currentVideoUrl,
+			      isPlaying: pIsStatePlaying(),
+			      currentTime: pGetTime(),
+			    }));
+			  }, 2000);
+			}
+			function stopLeaderHeartbeat() {
+			  clearInterval(leaderHeartbeatTimer);
+			  leaderHeartbeatTimer = null;
+			}
+			
+			// Pending seek target for the viewer join flow (YouTube only)
+			let _pendingSeekTarget  = null;
+			let _pendingSeekPlaying = false;
+			
+			// YouTube IFrame API ready — don't load a player yet; loadYouTubeVideo() does it on demand
+			window.onYouTubeIframeAPIReady = function() {
+			  window._ytApiReady = true;
+			  // If there's a pending state waiting for YouTube, apply it now
+			  if (window._pendingState && (!currentVideoType || currentVideoType === "youtube")) {
+			    applyServerState(window._pendingState, true);
+			    window._pendingState = null;
+			  }
+			};
+			
+			function applyServerState({ videoId, videoType, videoUrl, isPlaying, currentTime, serverTime }, forceSync = false) {
+			  const type = videoType || "youtube";
+			  const src  = videoUrl || videoId;
+			
+			  // If YouTube API not ready yet, buffer and wait
+			  if ((type === "youtube") && !window._ytApiReady && !playerReady) {
+			    window._pendingState = { videoId, videoType, videoUrl, isPlaying, currentTime, serverTime };
+			    return;
+			  }
+			  if (!playerReady && type !== "youtube") {
+			    window._pendingState = { videoId, videoType, videoUrl, isPlaying, currentTime, serverTime };
+			    // Non-YT players init synchronously, so just load now
+			  }
+			
+			  const netLatency = serverTime ? Math.min((Date.now() - serverTime) / 1000, 5) : 0;
+			  const target = Math.max(0, currentTime + (isPlaying && !currentIsLive ? netLatency : 0));
+			  recordServerState(target, isPlaying, Date.now());
+			
+			  const isNewSource = (videoId !== currentVideoId) || (type !== currentVideoType) || (videoUrl !== currentVideoUrl);
+			
+			  if (src && isNewSource) {
+			    currentVideoId   = videoId;
+			    currentVideoType = type;
+			    currentVideoUrl  = videoUrl;
+			    hidePlaceholder();
+			    window._pendingState = null;
+			
+			    if (type === "youtube") {
+			      if (!window._ytApiReady) {
+			        // YT script still loading — buffer
+			        window._pendingState = { videoId, videoType, videoUrl, isPlaying, currentTime, serverTime };
+			        return;
+			      }
+			      if (!ytPlayer || activePlayerType !== "youtube") {
+			        // First load or switching from another type
+			        loadYouTubeVideo(videoId, target, true);
+			        if (!isLeader) {
+			          _pendingSeekTarget  = target;
+			          _pendingSeekPlaying = isPlaying;
+			        }
+			      } else {
+			        setIgnore(3000);
+			        if (!isLeader) {
+			          _pendingSeekTarget  = target;
+			          _pendingSeekPlaying = isPlaying;
+			          pMute();
+			          ytPlayer.loadVideoById({ videoId, startSeconds: 0 });
+			        } else {
+			          if (isPlaying) ytPlayer.loadVideoById({ videoId, startSeconds: target });
+			          else           ytPlayer.cueVideoById({ videoId, startSeconds: target });
+			        }
+			      }
+			    } else if (type === "vimeo") {
+			      if (!window.Vimeo) { wpToast("Vimeo SDK not ready yet, try again."); return; }
+			      loadVimeoVideo(videoId, target, isPlaying);
+			    } else if (type === "twitch") {
+			      loadTwitchStream(videoId);
+			    } else if (type === "html5") {
+			      loadHtml5Video(videoUrl, target, isPlaying);
+			    }
+			
+			  } else if (src && !currentIsLive) {
+			    // Same source — seek/play/pause
+			    setIgnore(2000);
+			    const drift = Math.abs(pGetTime() - target);
+			    if (forceSync || drift > 1) pSeekTo(target);
+			    if (isPlaying) pPlay(); else pPause();
+			  }
+			}
+			
+			function loadVideo(videoId, startSeconds, autoplay) {
+			  // Called when leader changes video via URL input
+			  // The change-video WS message already carries type/url, so this is just a fallback
+			  if (!playerReady) return;
+			  setIgnore(3000);
+			  hidePlaceholder();
+			  if (activePlayerType === "youtube" && ytPlayer) {
+			    if (autoplay) ytPlayer.loadVideoById({ videoId, startSeconds: startSeconds || 0 });
+			    else          ytPlayer.cueVideoById({ videoId, startSeconds: startSeconds || 0 });
+			  }
+			}
+			
+			function hidePlaceholder() {
+			  const ph = document.getElementById("wpPlaceholder");
+			  if (ph) ph.style.display = "none";
+			}
+			
+			// ── WebSocket ─────────────────────────────────────────────────────────────────
+			function connectWs(rid) {
+			  const token = (typeof getAuthToken === "function" ? getAuthToken() : null)
+			    || localStorage.getItem("progress:authToken") || "";
+			  if (!token) return;
+			  const url = `${getWsBase()}/ws/watch?room=${encodeURIComponent(rid)}&token=${encodeURIComponent(token)}`;
+			  ws = new WebSocket(url);
+			  ws.onopen = () => { reconnecting = false; updateSyncBadge(true); };
+			  ws.onclose = () => {
+			    updateSyncBadge(false);
+			    stopDriftCorrection();
+			    stopLeaderHeartbeat();
+			    if (roomId && !reconnecting) {
+			      reconnecting = true;
+			      setTimeout(() => connectWs(roomId), 4000);
+			    }
+			  };
+			  ws.onerror = () => {};
+			  ws.onmessage = (event) => {
+			    let data;
+			    try { data = JSON.parse(event.data); } catch { return; }
+			    switch (data.type) {
+			      case "joined":
+			        isLeader      = data.isLeader;
+			        currentLeader = data.leader;
+			        members       = data.members || [];
+			        renderControls();
+			        renderMembers();
+			        if (data.videoId) applyServerState(data, true);
+			        if (isLeader) { if (playerReady) startLeaderHeartbeat(); }
+			        else          { if (playerReady) startDriftCorrection(); }
+			        appendChatMsg({ body: `You joined the watch party 🍦`, isSystem: true });
+			        break;
+			      case "play": {
+			        const lat = data.serverTime ? Math.min((Date.now() - data.serverTime) / 1000, 3) : 0;
+			        const t = data.time + lat;
+			        recordServerState(t, true, Date.now());
+			        if (!isLeader && playerReady && !currentIsLive) { setIgnore(2000); pSeekTo(t); pPlay(); }
+			        logActivity(data.from === myUsername ? "▶ You played" : `▶ <strong>@${escapeHTML(data.from)}</strong> played`);
+			        break;
+			      }
+			      case "pause": {
+			        recordServerState(data.time, false, Date.now());
+			        if (!isLeader && playerReady && !currentIsLive) { setIgnore(2000); pSeekTo(data.time); pPause(); }
+			        logActivity(data.from === myUsername ? "⏸ You paused" : `⏸ <strong>@${escapeHTML(data.from)}</strong> paused`);
+			        break;
+			      }
+			      case "seek": {
+			        const lat2 = data.serverTime ? Math.min((Date.now() - data.serverTime) / 1000, 3) : 0;
+			        const t2 = data.time + (data.isPlaying ? lat2 : 0);
+			        recordServerState(t2, data.isPlaying, Date.now());
+			        if (!isLeader && playerReady && !currentIsLive) { setIgnore(2000); pSeekTo(t2); if (data.isPlaying) pPlay(); else pPause(); }
+			        break;
+			      }
+			      case "change-video":
+			        recordServerState(0, false, Date.now());
+			        applyServerState({ videoId: data.videoId, videoType: data.videoType, videoUrl: data.videoUrl, isPlaying: false, currentTime: 0, serverTime: Date.now() }, true);
+			        logActivity(data.from === myUsername
+			          ? "📺 You changed the video"
+			          : `📺 <strong>@${escapeHTML(data.from)}</strong> changed the video`);
+			        { const urlInput = document.getElementById("wpUrlInput");
+			          if (urlInput) urlInput.value = `https://youtu.be/${data.videoId}`; }
+			        break;
+			      case "leader-changed":
+			        currentLeader = data.leader;
+			        isLeader      = data.leader === myUsername;
+			        if (data.members) members = data.members;
+			        renderControls();
+			        renderMembers();
+			        logActivity(isLeader ? "👑 You're now the host!" : `👑 <strong>@${escapeHTML(data.leader)}</strong> is now the host`);
+			        if (isLeader) { wpToast("You're now the host — you control playback."); stopDriftCorrection(); if (playerReady) startLeaderHeartbeat(); }
+			        else          { stopLeaderHeartbeat(); if (playerReady) startDriftCorrection(); }
+			        break;
+			      case "members":
+			        members = data.members || [];
+			        renderMembers();
+			        break;
+			      case "reaction":
+			        showFloatingReaction(data.emoji, data.from);
+			        break;
+			      case "state":
+			        // 2s heartbeat from leader — keeps viewers in sync passively
+			        if (!isLeader && data.currentTime !== undefined) {
+			          recordServerState(data.currentTime, data.isPlaying, Date.now());
+			          // Only force-apply if genuinely drifted; drift correction handles minor gaps
+			          if (playerReady) {
+			            const drift = Math.abs(player.getCurrentTime() - data.currentTime);
+			            if (drift > 3) applyServerState({ videoId: data.videoId, isPlaying: data.isPlaying, currentTime: data.currentTime, serverTime: Date.now() });
+			          }
+			        }
+			        break;
+			      case "chat":
+			        if (data.from === "system") {
+			          appendChatMsg({ body: data.body, isSystem: true, ts: data.ts });
+			        } else {
+			          appendChatMsg({ author: data.from, body: data.body, ts: data.ts });
+			        }
+			        break;
+			    }
+			  };
+			}
+			
+			// ── UI Rendering ──────────────────────────────────────────────────────────────
+			function updateSyncBadge(online) {
+			  const badge = document.getElementById("wpSyncBadge");
+			  if (!badge) return;
+			  badge.textContent = online ? "● synced" : "● reconnecting…";
+			  badge.classList.toggle("off", !online);
+			}
+			
+			function renderControls() {
+			  const area = document.getElementById("wpControlsArea");
+			  if (!area) return;
+			  const reactionBtns = ["🔥","❤️","😂","😮","👏","💀"].map(e =>
+			    `<button class="wp-react-btn" data-emoji="${e}" title="React">${e}</button>`
+			  ).join("");
+			
+			  if (isLeader) {
+			    area.innerHTML = `
+			      <form class="wp-video-url-form" id="wpVideoForm">
+			        <input class="wp-video-url-input" id="wpUrlInput" type="text"
+			          placeholder="YouTube, Vimeo, Twitch, or direct .mp4/.m3u8 URL…"
+			          autocomplete="off" autocorrect="off" spellcheck="false">
+			        <button type="submit" class="wp-ctrl-btn primary">Load</button>
+			      </form>
+			      <div class="wp-reaction-picker">${reactionBtns}</div>`;
+			    document.getElementById("wpVideoForm").addEventListener("submit", e => {
+			      e.preventDefault();
+			      const raw = document.getElementById("wpUrlInput").value.trim();
+			      const parsed = parseVideoUrl(raw);
+			      if (!parsed) { wpToast("Couldn't recognise that URL. Try YouTube, Vimeo, Twitch, or a direct video link."); return; }
+			      if (ws && ws.readyState === WebSocket.OPEN) {
+			        ws.send(JSON.stringify({
+			          type: "change-video",
+			          videoId:   parsed.id   || parsed.url || "",
+			          videoType: parsed.type,
+			          videoUrl:  parsed.url  || null,
+			        }));
+			      }
+			    });
+			  } else {
+			    const liveTag = currentIsLive ? ` <span style="background:#e53;color:#fff;font-size:10px;padding:1px 5px;border-radius:4px;vertical-align:middle;">LIVE</span>` : "";
+			    area.innerHTML = `
+			      <p class="wp-viewer-note">🍿 Synced to <strong>@${escapeHTML(currentLeader || "host")}</strong>${liveTag} — sit back and enjoy</p>
+			      <div class="wp-reaction-picker">${reactionBtns}</div>`;
+			  }
+			
+			  area.querySelectorAll(".wp-react-btn").forEach(btn => {
+			    btn.addEventListener("click", () => {
+			      if (ws && ws.readyState === WebSocket.OPEN) {
+			        ws.send(JSON.stringify({ type: "reaction", emoji: btn.dataset.emoji }));
+			      }
+			    });
+			  });
+			}
+			
+			function renderMembers() {
+			  const list = document.getElementById("wpMemberList");
+			  if (!list) return;
+			  if (!members.length) {
+			    list.innerHTML = `<p style="color:var(--muted);font-size:13px;">Just you so far…</p>`;
+			    return;
+			  }
+			  list.innerHTML = members.map(m => {
+			    const u = typeof Progress !== "undefined" ? Progress.getUser(m.username) : null;
+			    const avatar = u && u.avatar
+			      ? `<img src="${escapeHTML(u.avatar)}" alt="">`
+			      : escapeHTML((m.username || "?").slice(0, 2).toUpperCase());
+			    const transferBtn = (!m.isLeader && isLeader && myUsername !== m.username)
+			      ? `<button class="wp-transfer-btn" data-to="${escapeHTML(m.username)}" title="Make host">→ host</button>`
+			      : "";
+			    return `
+			      <div class="wp-member-item">
+			        <div class="wp-member-avatar">${avatar}</div>
+			        <span class="wp-member-name">@${escapeHTML(m.username)}</span>
+			        ${m.isLeader ? `<span class="wp-leader-crown" title="Host">👑</span>` : ""}
+			        ${transferBtn}
+			      </div>`;
+			  }).join("");
+			
+			  list.querySelectorAll(".wp-transfer-btn").forEach(btn => {
+			    btn.addEventListener("click", () => {
+			      if (ws && ws.readyState === WebSocket.OPEN) {
+			        ws.send(JSON.stringify({ type: "transfer-leader", to: btn.dataset.to }));
+			      }
+			    });
+			  });
+			}
+			
+			function appendChatMsg({ author, body, isSystem = false, ts }) {
+			  const container = document.getElementById("wpChatMessages");
+			  if (!container) return;
+			  const msg = document.createElement("div");
+			  msg.className = "wp-chat-msg" + (isSystem ? " is-system" : "");
+			  const timeStr = ts ? new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
+			  if (isSystem) {
+			    msg.innerHTML = `<div class="wp-chat-body">${body}</div>`;
+			  } else {
+			    msg.innerHTML = `
+			      <div class="wp-chat-meta">
+			        <span class="wp-chat-author">@${escapeHTML(author)}</span>
+			        ${timeStr ? `<span class="wp-chat-time">${timeStr}</span>` : ""}
+			      </div>
+			      <div class="wp-chat-body">${escapeHTML(body)}</div>`;
+			  }
+			  container.appendChild(msg);
+			  while (container.children.length > 120) container.removeChild(container.firstChild);
+			  container.scrollTop = container.scrollHeight;
+			}
+			
+			function logActivity(html) {
+			  // Kept for backward compat — route playback events into chat as system msgs
+			  const tmp = document.createElement("div");
+			  tmp.innerHTML = html;
+			  appendChatMsg({ body: tmp.innerHTML, isSystem: true });
+			}
+			
+			function showFloatingReaction(emoji, from) {
+			  const layer = document.getElementById("wpReactionsLayer");
+			  if (!layer) return;
+			  const el = document.createElement("div");
+			  el.className = "wp-float-emoji";
+			  // If it's an emoticon name (no special chars), render as image
+			  if (/^[a-z0-9_]+$/.test(emoji)) {
+			    const img = document.createElement("img");
+			    img.src = `images/emoticons/${emoji}.png`;
+			    img.alt = emoji;
+			    img.style.cssText = "width:40px;height:40px;object-fit:contain;";
+			    el.appendChild(img);
+			  } else {
+			    el.textContent = emoji;
+			  }
+			  el.style.left = (12 + Math.random() * 68) + "%";
+			  el.title = "@" + escapeHTML(from);
+			  layer.appendChild(el);
+			  setTimeout(() => el.remove(), 2600);
+			}
+			
+			// ── Chat input wiring ─────────────────────────────────────────────────────────
+			function wireChatInput() {
+			  const input = document.getElementById("wpChatInput");
+			  const btn   = document.getElementById("wpChatSend");
+			  if (!input || !btn) return;
+			
+			  function sendChat() {
+			    const body = input.value.trim();
+			    if (!body || !ws || ws.readyState !== WebSocket.OPEN) return;
+			    ws.send(JSON.stringify({ type: "chat", body }));
+			    input.value = "";
+			  }
+			
+			  btn.addEventListener("click", sendChat);
+			  input.addEventListener("keydown", e => {
+			    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChat(); }
+			  });
+			}
+			
+			// ── Room watch shell ──────────────────────────────────────────────────────────
+			function renderWatchShell() {
+			  const root = document.getElementById("wpRoot");
+			  root.innerHTML = `
+			    <div class="wp-topbar">
+			      <div class="wp-topbar-title" style="display:flex;align-items:center;gap:8px;color:#000;"><img src="images/emoticons/icecream.png" alt="" style="width:22px;height:22px;object-fit:contain;flex-shrink:0;"> <span>Watch Party <span style="color:#888;font-weight:400;">· ${escapeHTML(roomId)}</span></span></div>
+			      <button class="wp-room-code" id="wpShareBtn" title="Copy invite link">🔗 share</button>
+			      <span class="wp-sync-badge off" id="wpSyncBadge">● connecting…</span>
+			    </div>
+			    <div class="wp-body">
+			      <div class="wp-main">
+			        <div class="wp-video-wrap" id="wpVideoWrap">
+			          <div id="ytPlayer"></div>
+			          <div class="wp-video-placeholder" id="wpPlaceholder">
+			            <span class="wp-flicker"><img src="images/emoticons/donut_sit.png" alt="donut_sit" style="width:48px;height:48px;object-fit:contain;"></span>
+			            <span>Waiting for video…</span>
+			          </div>
+			          <div class="wp-reactions-layer" id="wpReactionsLayer"></div>
+			        </div>
+			        <div class="wp-controls" id="wpControlsArea"></div>
+			      </div>
+			      <aside class="wp-sidebar">
+			        <div class="wp-sidebar-section">
+			          <div class="wp-sidebar-label">Watching now</div>
+			          <div class="wp-member-list" id="wpMemberList">
+			            <p style="color:var(--muted);font-size:13px;">Connecting…</p>
+			          </div>
+			        </div>
+			        <div class="wp-chat">
+			          <div class="wp-sidebar-label" style="padding:10px 14px 0; flex-shrink:0;">Chat</div>
+			          <div class="wp-chat-messages" id="wpChatMessages">
+			            <div class="wp-chat-msg is-system">
+			              <div class="wp-chat-body">The party just started 🎉</div>
+			            </div>
+			          </div>
+			          <div class="wp-chat-input-row">
+			            <input class="wp-chat-input" id="wpChatInput" type="text"
+			              placeholder="Say something…" autocomplete="off" autocorrect="off"
+			              spellcheck="false" maxlength="500">
+			            <button class="wp-chat-send" id="wpChatSend">Send</button>
+			          </div>
+			        </div>
+			      </aside>
+			    </div>`;
+			
+			  document.getElementById("wpShareBtn").addEventListener("click", async () => {
+			    const link = `${location.origin}/watch.html?room=${roomId}`;
+			    try { await navigator.clipboard.writeText(link); wpToast("Invite link copied!"); }
+			    catch { wpToast("Share: " + link); }
+			  });
+			
+			  wireChatInput();
+			
+			  // Re-init YouTube player after DOM is ready
+			  if (window.YT && window.YT.Player) {
+			    window.onYouTubeIframeAPIReady();
+			  }
+			}
+			
+			// ── Lobby (create / join) ─────────────────────────────────────────────────────
+			function renderLobby() {
+			  const root = document.getElementById("wpRoot");
+			  root.innerHTML = `
+			    <div class="wp-lobby-page">
+			      <div class="wp-lobby-hero">
+			        <img class="wp-lobby-hero-img" src="images/emoticons/icecream.png" alt="" draggable="false">
+			        <div class="wp-lobby-title">Watch Party</div>
+			        <p class="wp-lobby-sub">Start a room, paste a YouTube link, and watch together — perfectly in sync.</p>
+			      </div>
+			      <div class="wp-lobby-cards">
+			        <div class="wp-lobby-card">
+			          <div class="wp-lobby-card-icon">✨</div>
+			          <div class="wp-lobby-card-label">Start a room</div>
+			          <p class="wp-lobby-card-desc">You're the host — you control play, pause, and what's on screen.</p>
+			          <input class="wp-lobby-input" id="lobbyUrlInput" type="text"
+			            placeholder="YouTube link (optional)"
+			            autocomplete="off" autocorrect="off" spellcheck="false">
+			          <button class="wp-ctrl-btn primary" id="lobbyCreateBtn" style="align-self:flex-start;">Create room</button>
+			        </div>
+			        <div class="wp-lobby-card">
+			          <div class="wp-lobby-card-icon">🔗</div>
+			          <div class="wp-lobby-card-label">Join a room</div>
+			          <p class="wp-lobby-card-desc">Got an invite code? Drop it in and you'll sync right up.</p>
+			          <input class="wp-lobby-input" id="lobbyJoinInput" type="text"
+			            placeholder="Room code"
+			            autocomplete="off" autocorrect="off" spellcheck="false">
+			          <button class="wp-ctrl-btn" id="lobbyJoinBtn" style="align-self:flex-start;">Join room</button>
+			        </div>
+			      </div>
+			    </div>`;
+			
+			  document.getElementById("lobbyCreateBtn").addEventListener("click", createRoom);
+			  document.getElementById("lobbyUrlInput").addEventListener("keydown", e => {
+			    if (e.key === "Enter") createRoom();
+			  });
+			  document.getElementById("lobbyJoinBtn").addEventListener("click", joinRoom);
+			  document.getElementById("lobbyJoinInput").addEventListener("keydown", e => {
+			    if (e.key === "Enter") joinRoom();
+			  });
+			}
+			
+			async function createRoom() {
+			  const urlVal  = document.getElementById("lobbyUrlInput").value.trim();
+			  const parsed  = urlVal ? parseVideoUrl(urlVal) : null;
+			  if (urlVal && !parsed) { wpToast("Couldn't recognise that URL. Try YouTube, Vimeo, Twitch, or a direct video link."); return; }
+			  const videoId = parsed?.id || parsed?.url || null;
+			  const videoType = parsed?.type || null;
+			  const videoUrl  = parsed?.url  || null;
+			  const btn = document.getElementById("lobbyCreateBtn");
+			  btn.disabled = true;
+			  btn.textContent = "Creating…";
+			
+			  const doFetch = () => {
+			    const token = (typeof getAuthToken === "function" ? getAuthToken() : null)
+			      || localStorage.getItem("progress:authToken") || "";
+			    if (!token) return Promise.reject(Object.assign(new Error("auth"), { code: "auth" }));
+			    return fetch("/api/watch/rooms", {
+			      method: "POST",
+			      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+			      body: JSON.stringify({ videoId: videoId || undefined, videoType: videoType || undefined, videoUrl: videoUrl || undefined })
+			    }).then(res => {
+			      if (res.status === 401) throw Object.assign(new Error("auth"), { code: "auth" });
+			      if (!res.ok) throw Object.assign(new Error("http:" + res.status), { code: "server", status: res.status });
+			      return res.json();
+			    });
+			  };
+			
+			  try {
+			    let data;
+			    try {
+			      data = await doFetch();
+			    } catch (e) {
+			      if (e.code === "auth") {
+			        wpToast("Log in first to create a watch party.");
+			        btn.disabled = false; btn.textContent = "Create room"; return;
+			      }
+			      // Likely a cold-start timeout or network error — wait and retry once
+			      let secs = 25;
+			      btn.textContent = `Server waking up… (${secs}s)`;
+			      await new Promise(resolve => {
+			        const iv = setInterval(() => {
+			          secs--;
+			          if (secs <= 0) { clearInterval(iv); resolve(); }
+			          else btn.textContent = `Server waking up… (${secs}s)`;
+			        }, 1000);
+			      });
+			      btn.textContent = "Retrying…";
+			      data = await doFetch();
+			    }
+			    if (!data || !data.roomId) throw new Error("no roomId");
+			    roomId = data.roomId;
+			    history.replaceState(null, "", `?room=${roomId}`);
+			    enterRoom();
+			  } catch (e) {
+			    const hint = e.status === 404 ? " (server not deployed yet?)" : "";
+			    wpToast(`Couldn't create room${hint} — try again.`, 4000);
+			    btn.disabled = false; btn.textContent = "Create room";
+			  }
+			}
+			
+			function joinRoom() {
+			  const code = document.getElementById("lobbyJoinInput").value.trim().toUpperCase();
+			  if (!code) { wpToast("Enter a room code."); return; }
+			  roomId = code;
+			  history.replaceState(null, "", `?room=${roomId}`);
+			  enterRoom();
+			}
+			
+			async function enterRoom() {
+			  const me = Progress.getCurrentUser();
+			  if (!me) {
+			    if (typeof showModal === "function") showModal("login");
+			    else wpToast("You need to be logged in to join a watch party.");
+			    return;
+			  }
+			  myUsername = me.username;
+			  renderWatchShell();
+			  renderControls();
+			  connectWs(roomId);
+			}
+			
+			// ── Boot ──────────────────────────────────────────────────────────────────────
+			async function boot() {
+			  await initShell("watch");
+			  const me = Progress.getCurrentUser();
+			  myUsername = me ? me.username : null;
+			  if (roomIdParam) {
+			    if (!me) {
+			      renderLobby();
+			      wpToast("Log in to join the watch party!");
+			      return;
+			    }
+			    roomId = roomIdParam;
+			    renderWatchShell();
+			    renderControls();
+			    connectWs(roomId);
+			  } else {
+			    renderLobby();
+			  }
+			}
+			boot();
+			
+			// ── Leave on page exit ────────────────────────────────────────────────────────
+			function leaveRoom() {
+			  stopDriftCorrection();
+			  if (ws) {
+			    try { ws.close(1000, "left"); } catch(e) {}
+			    ws = null;
+			  }
+			  roomId = null;
+			}
+			
+			window.addEventListener("beforeunload", leaveRoom);

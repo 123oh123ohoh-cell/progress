@@ -1,0 +1,877 @@
+extends layout
+
+block title
+	| fun stuff — Progress
+
+block meta
+	//- no OG meta
+
+block head
+	style.
+		
+		/* ── Fun page ── */
+		.fun-hero {
+		  text-align: center;
+		  padding: 48px 0 32px;
+		}
+		.fun-hero h1 {
+		  font-family: var(--font-display);
+		  font-size: clamp(36px, 6vw, 64px);
+		  font-style: italic;
+		  margin: 0 0 10px;
+		  background: linear-gradient(135deg, #e05252, #e0a352, #52c7e0, #a352e0);
+		  -webkit-background-clip: text;
+		  -webkit-text-fill-color: transparent;
+		  background-clip: text;
+		}
+		.fun-hero p {
+		  color: var(--muted);
+		  font-family: var(--font-mono);
+		  font-size: 13px;
+		  text-transform: uppercase;
+		  letter-spacing: 0.1em;
+		  margin: 0;
+		}
+		
+		.fun-grid {
+		  display: grid;
+		  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+		  gap: 14px;
+		  margin-bottom: 40px;
+		}
+		
+		.fun-card {
+		  background: var(--mocha-wash);
+		  border: 2px solid transparent;
+		  border-radius: 16px;
+		  padding: 24px 16px 20px;
+		  cursor: pointer;
+		  text-align: center;
+		  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+		  user-select: none;
+		}
+		.fun-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,.12); }
+		.fun-card.active { border-color: var(--ink); background: var(--paper); box-shadow: 0 8px 24px rgba(0,0,0,.15); }
+		.fun-card-emoji { font-size: 36px; margin-bottom: 10px; display: block; }
+		.fun-card-name {
+		  font-family: var(--font-display);
+		  font-size: 15px;
+		  font-weight: 600;
+		  margin-bottom: 4px;
+		}
+		.fun-card-desc {
+		  font-size: 11px;
+		  color: var(--muted);
+		  font-family: var(--font-mono);
+		}
+		
+		/* ── Game stage ── */
+		.fun-stage {
+		  background: var(--mocha-wash);
+		  border-radius: 20px;
+		  padding: 28px;
+		  margin-bottom: 80px;
+		  min-height: 360px;
+		  position: relative;
+		}
+		
+		/* shared game UI */
+		.game-header {
+		  display: flex;
+		  align-items: center;
+		  justify-content: space-between;
+		  margin-bottom: 20px;
+		}
+		.game-title {
+		  font-family: var(--font-display);
+		  font-style: italic;
+		  font-size: 22px;
+		  margin: 0;
+		}
+		.game-score {
+		  font-family: var(--font-mono);
+		  font-size: 13px;
+		  color: var(--muted);
+		}
+		.game-score strong {
+		  color: var(--ink);
+		  font-size: 18px;
+		}
+		.game-btn {
+		  font-family: var(--font-mono);
+		  font-size: 12px;
+		  text-transform: uppercase;
+		  letter-spacing: 0.05em;
+		  padding: 8px 16px;
+		  border-radius: var(--radius);
+		  border: 1px solid var(--mocha-light);
+		  background: var(--paper);
+		  color: var(--ink);
+		  cursor: pointer;
+		  transition: background 0.1s;
+		}
+		.game-btn:hover { background: var(--mocha-light); }
+		.game-btn.primary { background: var(--ink); color: var(--cream); border-color: var(--ink); }
+		.game-btn.primary:hover { opacity: 0.85; }
+		.game-over {
+		  position: absolute; inset: 0;
+		  display: flex; flex-direction: column;
+		  align-items: center; justify-content: center;
+		  background: rgba(var(--paper-rgb, 250,247,243), 0.92);
+		  border-radius: 20px;
+		  z-index: 10;
+		  gap: 14px;
+		}
+		[data-theme="dark"] .game-over { background: rgba(23,19,15,0.92); }
+		.game-over h2 { font-family: var(--font-display); font-style: italic; font-size: 32px; margin: 0; }
+		.game-over p { color: var(--muted); font-family: var(--font-mono); font-size: 13px; margin: 0; }
+		
+		/* ── SNAKE ── */
+		#snakeCanvas {
+		  display: block;
+		  margin: 0 auto;
+		  border-radius: 12px;
+		  image-rendering: pixelated;
+		  max-width: 100%;
+		}
+		.snake-controls {
+		  display: flex;
+		  flex-direction: column;
+		  align-items: center;
+		  gap: 4px;
+		  margin-top: 14px;
+		}
+		.snake-controls .row { display: flex; gap: 4px; }
+		.dpad-btn {
+		  width: 44px; height: 44px;
+		  background: var(--paper);
+		  border: 1px solid var(--mocha-light);
+		  border-radius: 10px;
+		  font-size: 18px;
+		  cursor: pointer;
+		  display: flex; align-items: center; justify-content: center;
+		  -webkit-tap-highlight-color: transparent;
+		  user-select: none;
+		}
+		.dpad-btn:active { background: var(--mocha-light); }
+		
+		/* ── MEMORY ── */
+		.memory-grid {
+		  display: grid;
+		  grid-template-columns: repeat(4, 1fr);
+		  gap: 10px;
+		  max-width: 380px;
+		  margin: 0 auto;
+		}
+		.mem-card {
+		  aspect-ratio: 1;
+		  border-radius: 12px;
+		  cursor: pointer;
+		  position: relative;
+		  transform-style: preserve-3d;
+		  transition: transform 0.35s;
+		  -webkit-tap-highlight-color: transparent;
+		  user-select: none;
+		}
+		.mem-card.flipped, .mem-card.matched { transform: rotateY(180deg); }
+		.mem-card.matched { cursor: default; }
+		.mem-front, .mem-back {
+		  position: absolute; inset: 0;
+		  border-radius: 12px;
+		  display: flex; align-items: center; justify-content: center;
+		  backface-visibility: hidden;
+		  -webkit-backface-visibility: hidden;
+		}
+		.mem-front { background: var(--paper); border: 2px solid var(--mocha-light); font-size: 28px; }
+		.mem-back {
+		  background: var(--mocha-light);
+		  transform: rotateY(180deg);
+		  border: 2px solid var(--mocha-light);
+		}
+		.mem-card.matched .mem-front { border-color: #52c7a0; background: rgba(82,199,160,.1); }
+		.mem-stats {
+		  display: flex; gap: 24px; justify-content: center;
+		  font-family: var(--font-mono); font-size: 12px; color: var(--muted);
+		  margin-top: 16px;
+		}
+		.mem-stats strong { color: var(--ink); font-size: 16px; display: block; }
+		
+		/* ── 2048 ── */
+		.g2048-wrap { max-width: 340px; margin: 0 auto; }
+		.g2048-grid {
+		  display: grid;
+		  grid-template-columns: repeat(4, 1fr);
+		  gap: 8px;
+		  background: var(--mocha-light);
+		  border-radius: 12px;
+		  padding: 8px;
+		}
+		.g2048-cell {
+		  aspect-ratio: 1;
+		  border-radius: 8px;
+		  display: flex; align-items: center; justify-content: center;
+		  font-family: var(--font-display);
+		  font-weight: 700;
+		  font-size: 20px;
+		  transition: background 0.1s;
+		  background: var(--mocha-wash);
+		  color: var(--ink);
+		}
+		.g2048-hint { text-align:center; font-family:var(--font-mono); font-size:11px; color:var(--muted); margin-top:12px; }
+		
+		/* ── REACTION ── */
+		.reaction-stage {
+		  display: flex; flex-direction: column;
+		  align-items: center; justify-content: center;
+		  gap: 24px;
+		  min-height: 260px;
+		}
+		.reaction-box {
+		  width: 220px; height: 220px;
+		  border-radius: 24px;
+		  display: flex; align-items: center; justify-content: center;
+		  font-family: var(--font-display);
+		  font-size: 18px;
+		  font-style: italic;
+		  cursor: pointer;
+		  transition: background 0.2s;
+		  user-select: none;
+		  -webkit-tap-highlight-color: transparent;
+		}
+		.reaction-box.wait { background: #e05252; color: #fff; }
+		.reaction-box.ready { background: #52c752; color: #fff; }
+		.reaction-box.idle { background: var(--mocha-light); color: var(--ink); }
+		.reaction-results {
+		  font-family: var(--font-mono);
+		  font-size: 12px;
+		  color: var(--muted);
+		  text-align: center;
+		  line-height: 1.8;
+		}
+		
+		/* ── WORD SCRAMBLE ── */
+		.word-stage {
+		  display: flex; flex-direction: column;
+		  align-items: center; gap: 20px;
+		  padding: 16px 0;
+		}
+		.scrambled-word {
+		  font-family: var(--font-display);
+		  font-size: clamp(28px, 6vw, 48px);
+		  font-style: italic;
+		  letter-spacing: 0.15em;
+		  color: var(--ink);
+		}
+		.word-letters {
+		  display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
+		}
+		.word-letter {
+		  width: 48px; height: 58px;
+		  background: var(--paper);
+		  border: 2px solid var(--mocha-light);
+		  border-radius: 10px;
+		  display: flex; align-items: center; justify-content: center;
+		  font-family: var(--font-mono);
+		  font-size: 22px;
+		  font-weight: 600;
+		  cursor: pointer;
+		  transition: transform 0.1s, border-color 0.1s;
+		  user-select: none;
+		  -webkit-tap-highlight-color: transparent;
+		}
+		.word-letter:hover { border-color: var(--ink); transform: translateY(-3px); }
+		.word-letter.used { opacity: 0.3; pointer-events: none; transform: none; }
+		.word-input-display {
+		  display: flex; gap: 6px; min-height: 58px; flex-wrap: wrap; justify-content: center;
+		}
+		.word-input-slot {
+		  width: 44px; height: 54px;
+		  border-bottom: 3px solid var(--ink);
+		  display: flex; align-items: center; justify-content: center;
+		  font-family: var(--font-mono);
+		  font-size: 20px;
+		  font-weight: 700;
+		  cursor: pointer;
+		  transition: color 0.1s;
+		}
+		.word-input-slot:hover { color: #e05252; }
+		.word-input-slot.correct { border-color: #52c752; color: #52c752; }
+		.word-input-slot.wrong { border-color: #e05252; color: #e05252; }
+		.word-hint {
+		  font-family: var(--font-mono);
+		  font-size: 12px;
+		  color: var(--muted);
+		  text-align: center;
+		}
+		.word-score-row {
+		  display: flex; gap: 24px;
+		  font-family: var(--font-mono); font-size: 12px; color: var(--muted);
+		}
+		.word-score-row strong { color: var(--ink); font-size: 18px; display: block; }
+
+block content
+	main.container
+		.fun-hero
+			h1 fun stuff.
+			p taking a break from writing? good.
+		.fun-grid#gameGrid
+		.fun-stage#gameStage(style='display:none;')
+	
+
+block scripts
+		script.
+			
+			initShell("fun");
+			
+			const GAMES = [
+			  { id: "typing",    emoji: "⌨️", name: "Typing Test",   desc: "how fast?", href: "typing.html" },
+			  { id: "snake",     emoji: "🐍", name: "Snake",        desc: "classic" },
+			  { id: "memory",    emoji: "🃏", name: "Memory Match",  desc: "find the pairs" },
+			  { id: "g2048",     emoji: "🔢", name: "2048",          desc: "slide & merge" },
+			  { id: "reaction",  emoji: "⚡", name: "Reaction Time", desc: "how fast are you?" },
+			  { id: "scramble",  emoji: "🔤", name: "Word Scramble", desc: "unscramble it" },
+			];
+			
+			let activeGame = null;
+			let cleanupFn = null;
+			
+			// ── Game selector ────────────────────────────────────────────────────────────
+			const grid = document.getElementById("gameGrid");
+			const stage = document.getElementById("gameStage");
+			
+			grid.innerHTML = GAMES.map(g => `
+			  <div class="fun-card" data-game="${g.id}">
+			    <span class="fun-card-emoji">${g.emoji}</span>
+			    <div class="fun-card-name">${g.name}</div>
+			    <div class="fun-card-desc">${g.desc}</div>
+			  </div>
+			`).join("");
+			
+			grid.querySelectorAll(".fun-card").forEach(card => {
+			  const game = GAMES.find(g => g.id === card.dataset.game);
+			  card.addEventListener("click", () => {
+			    if (game && game.href) { window.location.href = game.href; return; }
+			    if (cleanupFn) { cleanupFn(); cleanupFn = null; }
+			    grid.querySelectorAll(".fun-card").forEach(c => c.classList.remove("active"));
+			    card.classList.add("active");
+			    activeGame = card.dataset.game;
+			    stage.style.display = "block";
+			    stage.scrollIntoView({ behavior: "smooth", block: "nearest" });
+			    launchGame(activeGame);
+			  });
+			});
+			
+			function launchGame(id) {
+			  switch (id) {
+			    case "snake":    initSnake(); break;
+			    case "memory":   initMemory(); break;
+			    case "g2048":    init2048(); break;
+			    case "reaction": initReaction(); break;
+			    case "scramble": initScramble(); break;
+			  }
+			}
+			
+			// ════════════════════════════════════════════════════════════════════════════
+			// 🐍 SNAKE
+			// ════════════════════════════════════════════════════════════════════════════
+			function initSnake() {
+			  const COLS = 20, ROWS = 20, CELL = 20;
+			  let snake, food, dir, nextDir, score, loop, running;
+			
+			  stage.innerHTML = `
+			    <div class="game-header">
+			      <h2 class="game-title">🐍 Snake</h2>
+			      <div class="game-score">Score <strong id="snakeScore">0</strong></div>
+			      <button class="game-btn primary" id="snakeStart">Start</button>
+			    </div>
+			    <canvas id="snakeCanvas" width="${COLS*CELL}" height="${ROWS*CELL}" style="background:var(--mocha-light);"></canvas>
+			    <div class="snake-controls">
+			      <div class="row"><button class="dpad-btn" id="dUp">▲</button></div>
+			      <div class="row"><button class="dpad-btn" id="dLeft">◄</button><button class="dpad-btn" id="dDown">▼</button><button class="dpad-btn" id="dRight">►</button></div>
+			    </div>
+			  `;
+			
+			  const canvas = document.getElementById("snakeCanvas");
+			  const ctx = canvas.getContext("2d");
+			
+			  function randomFood() {
+			    let pos;
+			    do { pos = { x: Math.floor(Math.random()*COLS), y: Math.floor(Math.random()*ROWS) }; }
+			    while (snake.some(s => s.x === pos.x && s.y === pos.y));
+			    return pos;
+			  }
+			
+			  function reset() {
+			    snake = [{x:10,y:10},{x:9,y:10},{x:8,y:10}];
+			    dir = {x:1,y:0}; nextDir = {x:1,y:0};
+			    score = 0;
+			    food = randomFood();
+			    document.getElementById("snakeScore").textContent = 0;
+			  }
+			
+			  function draw() {
+			    ctx.clearRect(0,0,canvas.width,canvas.height);
+			    // food
+			    ctx.fillStyle = "#e05252";
+			    ctx.beginPath();
+			    ctx.arc(food.x*CELL+CELL/2, food.y*CELL+CELL/2, CELL/2-2, 0, Math.PI*2);
+			    ctx.fill();
+			    // snake
+			    snake.forEach((s, i) => {
+			      const hue = 140 - i * 2;
+			      ctx.fillStyle = i === 0 ? `hsl(${hue},60%,38%)` : `hsl(${hue},55%,48%)`;
+			      ctx.beginPath();
+			      ctx.roundRect(s.x*CELL+1, s.y*CELL+1, CELL-2, CELL-2, 4);
+			      ctx.fill();
+			    });
+			  }
+			
+			  function tick() {
+			    dir = nextDir;
+			    const head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
+			    if (head.x < 0 || head.x >= COLS || head.y < 0 || head.y >= ROWS || snake.some(s => s.x===head.x && s.y===head.y)) {
+			      clearInterval(loop); running = false;
+			      showSnakeOver();
+			      return;
+			    }
+			    snake.unshift(head);
+			    if (head.x === food.x && head.y === food.y) {
+			      score++;
+			      document.getElementById("snakeScore").textContent = score;
+			      food = randomFood();
+			    } else {
+			      snake.pop();
+			    }
+			    draw();
+			  }
+			
+			  function showSnakeOver() {
+			    const over = document.createElement("div");
+			    over.className = "game-over";
+			    over.innerHTML = `<h2>Game over</h2><p>Score: ${score}</p><button class="game-btn primary" id="snakeRestart">Play again</button>`;
+			    stage.appendChild(over);
+			    over.querySelector("#snakeRestart").addEventListener("click", () => { over.remove(); start(); });
+			  }
+			
+			  function start() {
+			    reset(); draw();
+			    clearInterval(loop);
+			    running = true;
+			    loop = setInterval(tick, Math.max(80, 150 - score * 2));
+			  }
+			
+			  // Controls
+			  const keyHandler = (e) => {
+			    const map = { ArrowUp:{x:0,y:-1}, ArrowDown:{x:0,y:1}, ArrowLeft:{x:-1,y:0}, ArrowRight:{x:1,y:0}, w:{x:0,y:-1}, s:{x:0,y:1}, a:{x:-1,y:0}, d:{x:1,y:0} };
+			    const nd = map[e.key];
+			    if (!nd) return;
+			    if (nd.x !== -dir.x || nd.y !== -dir.y) nextDir = nd;
+			    if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.key)) e.preventDefault();
+			  };
+			  window.addEventListener("keydown", keyHandler);
+			  document.getElementById("dUp").addEventListener("click",    () => { if(dir.y!==1) nextDir={x:0,y:-1}; });
+			  document.getElementById("dDown").addEventListener("click",  () => { if(dir.y!==-1) nextDir={x:0,y:1}; });
+			  document.getElementById("dLeft").addEventListener("click",  () => { if(dir.x!==1) nextDir={x:-1,y:0}; });
+			  document.getElementById("dRight").addEventListener("click", () => { if(dir.x!==-1) nextDir={x:1,y:0}; });
+			  document.getElementById("snakeStart").addEventListener("click", () => { if (!running) start(); });
+			
+			  reset(); draw();
+			
+			  cleanupFn = () => { clearInterval(loop); window.removeEventListener("keydown", keyHandler); };
+			}
+			
+			// ════════════════════════════════════════════════════════════════════════════
+			// 🃏 MEMORY MATCH
+			// ════════════════════════════════════════════════════════════════════════════
+			function initMemory() {
+			  const EMOJIS = ["🌙","🔥","🎸","🌊","🦋","🍓","⚡","🌸"];
+			  let cards, flipped, matched, moves, timerEl, seconds, timerInt;
+			
+			  function shuffle(arr) { return [...arr].sort(() => Math.random()-0.5); }
+			
+			  function reset() {
+			    const pairs = shuffle([...EMOJIS,...EMOJIS]);
+			    cards = pairs.map((e,i) => ({ id:i, emoji:e, isFlipped:false, isMatched:false }));
+			    flipped = []; matched = 0; moves = 0; seconds = 0;
+			    clearInterval(timerInt);
+			    render();
+			  }
+			
+			  function render() {
+			    stage.innerHTML = `
+			      <div class="game-header">
+			        <h2 class="game-title">🃏 Memory Match</h2>
+			        <button class="game-btn" id="memReset">Restart</button>
+			      </div>
+			      <div class="memory-grid" id="memGrid"></div>
+			      <div class="mem-stats">
+			        <div><strong id="memMoves">0</strong>moves</div>
+			        <div><strong id="memTime">0:00</strong>time</div>
+			        <div><strong id="memLeft">${EMOJIS.length}</strong>pairs left</div>
+			      </div>
+			    `;
+			    timerEl = document.getElementById("memTime");
+			    document.getElementById("memReset").addEventListener("click", reset);
+			
+			    const grid2 = document.getElementById("memGrid");
+			    cards.forEach(card => {
+			      const el = document.createElement("div");
+			      el.className = "mem-card" + (card.isFlipped ? " flipped" : "") + (card.isMatched ? " matched" : "");
+			      el.innerHTML = `<div class="mem-back" style="font-size:28px;">${card.emoji}</div><div class="mem-front"></div>`;
+			      el.addEventListener("click", () => flip(card));
+			      grid2.appendChild(el);
+			    });
+			  }
+			
+			  function flip(card) {
+			    if (card.isMatched || card.isFlipped || flipped.length === 2) return;
+			    card.isFlipped = true;
+			    if (!timerInt && seconds === 0) {
+			      timerInt = setInterval(() => {
+			        seconds++;
+			        if (timerEl) timerEl.textContent = `${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,"0")}`;
+			      }, 1000);
+			    }
+			    flipped.push(card);
+			    updateCards();
+			    if (flipped.length === 2) {
+			      moves++;
+			      document.getElementById("memMoves").textContent = moves;
+			      if (flipped[0].emoji === flipped[1].emoji) {
+			        flipped.forEach(c => c.isMatched = true);
+			        matched++;
+			        document.getElementById("memLeft").textContent = EMOJIS.length - matched;
+			        flipped = [];
+			        updateCards();
+			        if (matched === EMOJIS.length) {
+			          clearInterval(timerInt);
+			          setTimeout(() => {
+			            const over = document.createElement("div");
+			            over.className = "game-over";
+			            over.innerHTML = `<h2>🎉 You did it!</h2><p>${moves} moves · ${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,"0")}</p><button class="game-btn primary" id="memAgain">Play again</button>`;
+			            stage.appendChild(over);
+			            over.querySelector("#memAgain").addEventListener("click", () => { over.remove(); reset(); });
+			          }, 500);
+			        }
+			      } else {
+			        setTimeout(() => {
+			          flipped.forEach(c => c.isFlipped = false);
+			          flipped = [];
+			          updateCards();
+			        }, 900);
+			      }
+			    }
+			  }
+			
+			  function updateCards() {
+			    const els = document.querySelectorAll(".mem-card");
+			    cards.forEach((card, i) => {
+			      els[i].className = "mem-card" + (card.isFlipped ? " flipped" : "") + (card.isMatched ? " matched" : "");
+			    });
+			  }
+			
+			  reset();
+			  cleanupFn = () => clearInterval(timerInt);
+			}
+			
+			// ════════════════════════════════════════════════════════════════════════════
+			// 🔢 2048
+			// ════════════════════════════════════════════════════════════════════════════
+			function init2048() {
+			  let board, score;
+			  const COLORS = {
+			    0:"var(--mocha-wash)",2:"#eee4da",4:"#ede0c8",8:"#f2b179",16:"#f59563",
+			    32:"#f67c5f",64:"#f65e3b",128:"#edcf72",256:"#edcc61",512:"#edc850",
+			    1024:"#edc53f",2048:"#edc22e"
+			  };
+			
+			  function newBoard() { return Array(4).fill(null).map(() => Array(4).fill(0)); }
+			  function addRandom() {
+			    const empty = [];
+			    board.forEach((r,y) => r.forEach((v,x) => { if (!v) empty.push({x,y}); }));
+			    if (!empty.length) return;
+			    const {x,y} = empty[Math.floor(Math.random()*empty.length)];
+			    board[y][x] = Math.random() < 0.9 ? 2 : 4;
+			  }
+			
+			  function reset() { board = newBoard(); score = 0; addRandom(); addRandom(); renderBoard(); }
+			
+			  function renderBoard() {
+			    const wrap = document.getElementById("g2048Grid");
+			    if (!wrap) return;
+			    wrap.innerHTML = board.flat().map(v => {
+			      const bg = COLORS[Math.min(v, 2048)] || "#3c3a32";
+			      const color = v > 4 ? "#f9f6f2" : "#776e65";
+			      const size = v >= 1000 ? "16px" : v >= 100 ? "20px" : "24px";
+			      return `<div class="g2048-cell" style="background:${bg};color:${color};font-size:${size};">${v || ""}</div>`;
+			    }).join("");
+			    document.getElementById("g2048Score").textContent = score;
+			
+			    // check game over
+			    const hasMoves = board.some((r,y) => r.some((v,x) =>
+			      !v || (x<3 && board[y][x+1]===v) || (y<3 && board[y+1][x]===v)
+			    ));
+			    if (!hasMoves) {
+			      setTimeout(() => {
+			        const over = document.createElement("div");
+			        over.className = "game-over";
+			        over.innerHTML = `<h2>Game over</h2><p>Score: ${score}</p><button class="game-btn primary" id="g2048Again">Try again</button>`;
+			        stage.appendChild(over);
+			        over.querySelector("#g2048Again").addEventListener("click", () => { over.remove(); reset(); });
+			      }, 300);
+			    }
+			  }
+			
+			  function slide(row) {
+			    let arr = row.filter(v => v);
+			    let gained = 0;
+			    for (let i = 0; i < arr.length-1; i++) {
+			      if (arr[i] === arr[i+1]) { arr[i] *= 2; gained += arr[i]; arr.splice(i+1,1); }
+			    }
+			    score += gained;
+			    while (arr.length < 4) arr.push(0);
+			    return arr;
+			  }
+			
+			  function move(dir) {
+			    let moved = false;
+			    const prev = JSON.stringify(board);
+			    if (dir === "left")  board = board.map(r => slide(r));
+			    if (dir === "right") board = board.map(r => slide([...r].reverse()).reverse());
+			    if (dir === "up")    { board = transpose(board).map(r => slide(r)); board = transpose(board); }
+			    if (dir === "down")  { board = transpose(board).map(r => slide([...r].reverse()).reverse()); board = transpose(board); }
+			    if (JSON.stringify(board) !== prev) { addRandom(); moved = true; }
+			    if (moved) renderBoard();
+			  }
+			
+			  function transpose(b) { return b[0].map((_,i) => b.map(r => r[i])); }
+			
+			  stage.innerHTML = `
+			    <div class="game-header">
+			      <h2 class="game-title">🔢 2048</h2>
+			      <div class="game-score">Score <strong id="g2048Score">0</strong></div>
+			      <button class="game-btn" id="g2048Reset">Restart</button>
+			    </div>
+			    <div class="g2048-wrap">
+			      <div class="g2048-grid" id="g2048Grid"></div>
+			      <p class="g2048-hint">Arrow keys or swipe to slide tiles</p>
+			    </div>
+			  `;
+			
+			  document.getElementById("g2048Reset").addEventListener("click", reset);
+			
+			  const keyHandler = (e) => {
+			    const map = { ArrowLeft:"left", ArrowRight:"right", ArrowUp:"up", ArrowDown:"down" };
+			    if (map[e.key]) { move(map[e.key]); e.preventDefault(); }
+			  };
+			  window.addEventListener("keydown", keyHandler);
+			
+			  // Touch/swipe
+			  let tx, ty;
+			  const el = document.getElementById("g2048Grid");
+			  el.addEventListener("touchstart", e => { tx = e.touches[0].clientX; ty = e.touches[0].clientY; }, {passive:true});
+			  el.addEventListener("touchend", e => {
+			    const dx = e.changedTouches[0].clientX - tx, dy = e.changedTouches[0].clientY - ty;
+			    if (Math.abs(dx) > Math.abs(dy)) move(dx > 0 ? "right" : "left");
+			    else move(dy > 0 ? "down" : "up");
+			  }, {passive:true});
+			
+			  reset();
+			  cleanupFn = () => window.removeEventListener("keydown", keyHandler);
+			}
+			
+			// ════════════════════════════════════════════════════════════════════════════
+			// ⚡ REACTION TIME
+			// ════════════════════════════════════════════════════════════════════════════
+			function initReaction() {
+			  let state = "idle", startTime, results = [], timer;
+			
+			  stage.innerHTML = `
+			    <div class="game-header">
+			      <h2 class="game-title">⚡ Reaction Time</h2>
+			      <button class="game-btn" id="reactReset">Reset</button>
+			    </div>
+			    <div class="reaction-stage">
+			      <div class="reaction-box idle" id="reactBox">tap to start</div>
+			      <div class="reaction-results" id="reactResults"></div>
+			    </div>
+			  `;
+			
+			  const box = document.getElementById("reactBox");
+			  const resultsEl = document.getElementById("reactResults");
+			  document.getElementById("reactReset").addEventListener("click", () => {
+			    clearTimeout(timer); results = []; state = "idle";
+			    box.className = "reaction-box idle"; box.textContent = "tap to start";
+			    resultsEl.innerHTML = "";
+			  });
+			
+			  function updateResults() {
+			    if (!results.length) return;
+			    const avg = Math.round(results.reduce((a,b)=>a+b,0)/results.length);
+			    const best = Math.min(...results);
+			    const label = avg < 200 ? "🔥 lightning fast" : avg < 300 ? "⚡ great" : avg < 400 ? "👍 pretty good" : "🐌 keep practicing";
+			    resultsEl.innerHTML = results.map((r,i) => `<span>Round ${i+1}: <strong>${r}ms</strong></span>`).join(" &nbsp;·&nbsp; ") +
+			      `<br><br>Avg: <strong>${avg}ms</strong> &nbsp;·&nbsp; Best: <strong>${best}ms</strong> &nbsp;·&nbsp; ${label}`;
+			  }
+			
+			  box.addEventListener("click", () => {
+			    if (state === "idle") {
+			      state = "wait";
+			      box.className = "reaction-box wait"; box.textContent = "wait for green…";
+			      const delay = 1500 + Math.random() * 3000;
+			      timer = setTimeout(() => {
+			        startTime = Date.now();
+			        state = "ready";
+			        box.className = "reaction-box ready"; box.textContent = "click NOW!";
+			      }, delay);
+			    } else if (state === "wait") {
+			      clearTimeout(timer);
+			      state = "idle";
+			      box.className = "reaction-box idle"; box.textContent = "too early! tap to try again";
+			    } else if (state === "ready") {
+			      const rt = Date.now() - startTime;
+			      results.push(rt);
+			      state = results.length >= 5 ? "idle" : "idle";
+			      box.className = "reaction-box idle";
+			      box.textContent = results.length >= 5 ? "done! tap to start over" : `${rt}ms — tap for next`;
+			      if (results.length >= 5) {
+			        document.getElementById("reactReset").click();
+			        results = [5].map((_,i) => results[i] ?? rt); // keep the 5
+			        results.length = 5;
+			      }
+			      updateResults();
+			    }
+			  });
+			
+			  cleanupFn = () => clearTimeout(timer);
+			}
+			
+			// ════════════════════════════════════════════════════════════════════════════
+			// 🔤 WORD SCRAMBLE
+			// ════════════════════════════════════════════════════════════════════════════
+			function initScramble() {
+			  const WORDS = [
+			    {word:"writing",hint:"what you do here"},
+			    {word:"progress",hint:"the site you're on"},
+			    {word:"journal",hint:"a daily practice"},
+			    {word:"creative",hint:"what you are"},
+			    {word:"chapter",hint:"part of a story"},
+			    {word:"curious",hint:"a great quality"},
+			    {word:"phantom",hint:"ghost-like"},
+			    {word:"library",hint:"books live here"},
+			    {word:"publish",hint:"share with the world"},
+			    {word:"stories",hint:"plural of story"},
+			    {word:"morning",hint:"first part of the day"},
+			    {word:"inspire",hint:"to motivate"},
+			    {word:"horizon",hint:"where sky meets earth"},
+			    {word:"mystery",hint:"a whodunit"},
+			    {word:"journey",hint:"a long trip"},
+			  ];
+			
+			  let current, scrambled, answer, wrongFlash, streak = 0, total = 0;
+			
+			  function shuffle(str) {
+			    const a = str.split("");
+			    for (let i = a.length-1; i > 0; i--) {
+			      const j = Math.floor(Math.random()*(i+1));
+			      [a[i],a[j]] = [a[j],a[i]];
+			    }
+			    // make sure scrambled != original
+			    const result = a.join("");
+			    return result === str ? shuffle(str) : result;
+			  }
+			
+			  function newWord() {
+			    const entry = WORDS[Math.floor(Math.random()*WORDS.length)];
+			    current = entry.word;
+			    scrambled = shuffle(current);
+			    answer = [];
+			    render();
+			  }
+			
+			  function render() {
+			    stage.innerHTML = `
+			      <div class="game-header">
+			        <h2 class="game-title">🔤 Word Scramble</h2>
+			        <button class="game-btn" id="scrambleSkip">Skip</button>
+			      </div>
+			      <div class="word-stage">
+			        <div class="word-score-row">
+			          <div><strong id="scrambleStreak">${streak}</strong>streak 🔥</div>
+			          <div><strong id="scrambleTotal">${total}</strong>solved</div>
+			        </div>
+			        <div class="word-hint">hint: ${WORDS.find(w=>w.word===current)?.hint}</div>
+			        <div class="word-input-display" id="answerSlots">
+			          ${current.split("").map((_,i) => `<div class="word-input-slot" data-idx="${i}">${answer[i]||""}</div>`).join("")}
+			        </div>
+			        <div class="word-letters" id="letterBank">
+			          ${scrambled.split("").map((l,i) => `<div class="word-letter${answer.includes(i) ? " used" : ""}" data-li="${i}">${l}</div>`).join("")}
+			        </div>
+			        <div style="display:flex;gap:10px;margin-top:4px;">
+			          <button class="game-btn" id="scrambleClear">Clear</button>
+			        </div>
+			      </div>
+			    `;
+			
+			    let usedIndices = []; // which letter indices from scrambled are used
+			
+			    function syncDisplay(flash) {
+			      // update slots
+			      document.querySelectorAll(".word-input-slot").forEach((sl, i) => {
+			        sl.textContent = answer[i] ? scrambled[usedIndices[i]] : "";
+			        if (flash === "correct") sl.className = "word-input-slot correct";
+			        else if (flash === "wrong") sl.className = "word-input-slot wrong";
+			        else sl.className = "word-input-slot";
+			      });
+			      // update letter bank
+			      document.querySelectorAll(".word-letter").forEach(l => {
+			        l.classList.toggle("used", usedIndices.includes(parseInt(l.dataset.li)));
+			      });
+			    }
+			
+			    document.getElementById("scrambleSkip").addEventListener("click", () => { streak = 0; newWord(); });
+			    document.getElementById("scrambleClear").addEventListener("click", () => { answer = []; usedIndices = []; syncDisplay(); });
+			
+			    // Letter bank click
+			    document.getElementById("letterBank").addEventListener("click", e => {
+			      const btn = e.target.closest(".word-letter");
+			      if (!btn || btn.classList.contains("used")) return;
+			      const li = parseInt(btn.dataset.li);
+			      const slot = answer.length;
+			      if (slot >= current.length) return;
+			      answer.push(scrambled[li]);
+			      usedIndices.push(li);
+			      syncDisplay();
+			
+			      if (answer.length === current.length) {
+			        const guess = answer.join("");
+			        if (guess === current) {
+			          syncDisplay("correct");
+			          streak++; total++;
+			          document.getElementById("scrambleStreak").textContent = streak;
+			          document.getElementById("scrambleTotal").textContent = total;
+			          setTimeout(newWord, 800);
+			        } else {
+			          syncDisplay("wrong");
+			          setTimeout(() => { answer = []; usedIndices = []; syncDisplay(); }, 600);
+			          streak = 0;
+			          if (document.getElementById("scrambleStreak")) document.getElementById("scrambleStreak").textContent = 0;
+			        }
+			      }
+			    });
+			
+			    // Slot click to remove
+			    document.getElementById("answerSlots").addEventListener("click", e => {
+			      const sl = e.target.closest(".word-input-slot");
+			      if (!sl) return;
+			      const idx = parseInt(sl.dataset.idx);
+			      if (idx >= answer.length) return;
+			      answer = answer.slice(0, idx);
+			      usedIndices = usedIndices.slice(0, idx);
+			      syncDisplay();
+			    });
+			  }
+			
+			  newWord();
+			  cleanupFn = null;
+			}

@@ -1,0 +1,395 @@
+extends layout
+
+block title
+	| Progress
+
+block meta
+	meta(property="og:site_name", content="Progress")
+	meta(property="og:type", content="website")
+	meta(property="og:url", content="https://progressing.online/post.html")
+	meta(property="og:title", content="Progress")
+	meta(property="og:description", content="Read what's being made, fixed, and figured out — one entry at a time.")
+	meta(property="og:image", content="https://progressing.online/images/nearheader.png")
+	meta(name="twitter:card", content="summary_large_image")
+	meta(name="twitter:title", content="Progress")
+	meta(name="twitter:description", content="Read what's being made, fixed, and figured out — one entry at a time.")
+	meta(name="twitter:image", content="https://progressing.online/images/nearheader.png")
+
+block content
+	.progress-track
+		.progress-fill#progressFill
+	main.container#postRoot
+		//  post injected by JS 
+	
+
+block scripts
+		script.
+			
+			  const params = new URLSearchParams(location.search);
+			  const postId = params.get("id");
+			  const root = document.getElementById("postRoot");
+			
+			  function renderNotFound() {
+			    root.innerHTML = `
+			      <div class="feed-empty" style="padding-top:80px; text-align:center;">
+			        <div class="error-illustration" style="margin-bottom:28px; max-width:360px; margin-left:auto; margin-right:auto;">
+			          <img src="images/404page.png" alt="Not found illustration">
+			        </div>
+			        <h3>This entry doesn't exist</h3>
+			        <p><a href="index.html" style="text-decoration:underline;">Back to the journal</a></p>
+			      </div>`;
+			  }
+			
+			  window.addEventListener("scroll", () => {
+			    const h = document.documentElement;
+			    const scrolled = (h.scrollTop) / (h.scrollHeight - h.clientHeight) * 100;
+			    const fill = document.getElementById("progressFill");
+			    if (fill) fill.style.width = Math.min(100, scrolled) + "%";
+			  });
+			
+			  // Announce to the presence layer that we're reading this post.
+			  // Fires once the socket is ready (or immediately if already open).
+			  function startViewingAnnounce() {
+			    if (typeof announceViewingPost === "function") {
+			      announceViewingPost(postId);
+			    } else {
+			      // presenceSocket may not be open yet — retry briefly
+			      setTimeout(() => { if (typeof announceViewingPost === "function") announceViewingPost(postId); }, 1500);
+			    }
+			  }
+			  startViewingAnnounce();
+			  window.addEventListener("beforeunload", () => { if (typeof announceLeftPost === "function") announceLeftPost(); });
+			  document.addEventListener("visibilitychange", () => {
+			    if (document.hidden) { if (typeof announceLeftPost === "function") announceLeftPost(); }
+			    else startViewingAnnounce();
+			  });
+			
+			  async function renderPost() {
+			    let post = Progress.getPost(postId);
+			    const comments = await Progress.loadComments(postId);
+			    if (!post) {
+			      await Progress.loadFromApi().catch(() => {});
+			      const refreshed = Progress.getPost(postId);
+			      if (!refreshed) {
+			        renderNotFound();
+			        return;
+			      }
+			      return renderPost();
+			    }
+			    // The cached copy from Progress.db.posts comes from the list endpoint,
+			    // which deliberately excludes `content` (it's the field that can
+			    // balloon a post's size with embedded images) - the feed never needs
+			    // full content, but this page does, so fetch the individual post
+			    // directly here to get it back.
+			    if (!post.content) {
+			      const full = await apiFetch(`/api/posts/${postId}`);
+			      if (full && full.content) post = { ...post, content: full.content };
+			    }
+			    const user = Progress.getCurrentUser();
+			    const likedByMe = post.likedBy.includes(user ? user.username : "guest");
+			    const author = Progress.getUser(post.author);
+			
+			    // Update OG/social meta so direct links share real data
+			    const SITE = location.origin;
+			    const ogUrl = `${SITE}/og/${post.id}`;
+			    const ogImage = post.cover || `${SITE}/api/posts/${post.id}/og.svg`;
+			    const ogDesc = (post.excerpt || "").replace(/<[^>]+>/g, "").slice(0, 200);
+			    document.title = `${post.title} — Progress`;
+			    const setMeta = (sel, val) => { const el = document.querySelector(sel); if (el) el.setAttribute("content", val); };
+			    setMeta('meta[property="og:url"]', ogUrl);
+			    setMeta('meta[property="og:title"]', post.title);
+			    setMeta('meta[property="og:description"]', ogDesc);
+			    setMeta('meta[property="og:image"]', ogImage);
+			    setMeta('meta[name="twitter:title"]', post.title);
+			    setMeta('meta[name="twitter:description"]', ogDesc);
+			    setMeta('meta[name="twitter:image"]', ogImage);
+			
+			    root.innerHTML = `
+			      <div class="post-head">
+			        <a class="post-back" href="index.html">&larr; all entries</a>
+			        <span class="post-date">${Progress.formatDateTime(post.createdAt || post.date + "T00:00:00")}</span>
+			        <h1 class="post-title">${renderEmoticonsText(post.title, "inline-emoticon")}</h1>
+			        <div class="post-byline">
+			          <a class="avatar-link" href="user.html?id=${author ? author.id : ""}">${avatarHTML(author, 30)}</a>
+			          <span>Written by <a class="username-link" href="user.html?id=${author ? author.id : ""}">@${post.author}</a></span>
+			        </div>
+			      </div>
+			      ${post.cover ? `<img class="post-cover" src="${post.cover}" alt="">` : ""}
+			      <article class="post-content">${renderMentionsInHTML(renderEmoticonsInHTML(post.content, "inline-emoticon"), "post-mention-link")}</article>
+			      <div class="post-footer">
+			        <button class="react-btn ${likedByMe ? "liked" : ""}" id="likeBtn">
+			          ${ICONS.heart} <span id="likeCount">${post.likes}</span>
+			        </button>
+			        <button type="button" class="react-btn" id="replyBtn">${ICONS.reply} Reply</button>
+			        ${user ? `<button type="button" class="react-btn" id="bookmarkBtn" title="Bookmark">
+			          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+			        </button>` : ""}
+			        <button type="button" class="react-btn" id="shareBtn" title="Share">
+			          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+			        </button>
+			        ${user && user.username !== post.author ? `<button type="button" class="react-btn" id="followBtn">${Progress.isFollowing(post.author) ? "Following" : "Follow author"}</button>` : ""}
+			        ${user && user.username === post.author ? `<button type="button" class="react-btn danger" id="deleteBtn">Delete entry</button>` : ""}
+			      </div>
+			      <section class="replies-section">
+			        <div class="replies-header">
+			          <h2>Replies</h2>
+			          <span class="replies-count">${comments.length} ${comments.length === 1 ? "reply" : "replies"}</span>
+			        </div>
+			        <div id="repliesRoot">
+			          ${comments.length ? comments.map(comment => {
+			            const author = Progress.getUser(comment.author);
+			            return `
+			              <div class="reply-item">
+			                <a class="reply-avatar" href="user.html?id=${author ? author.id : ""}">${avatarHTML(author, 32)}</a>
+			                <div class="reply-content">
+			                  <div class="reply-meta"><strong><a class="username-link" href="user.html?id=${author ? author.id : ""}">@${comment.author}</a></strong><span>${Progress.formatDateTime(comment.time)}</span></div>
+			                  <p class="reply-body">${renderEmoticonsText(comment.body, "reply-emoticon")}</p>
+			                  ${comment.image ? `<div class="reply-image"><img src="${comment.image}" alt="Reply image"></div>` : ""}
+			                </div>
+			              </div>
+			            `;
+			          }).join("") : `<div class="reply-empty">No replies yet. Be the first to reply.</div>`}
+			        </div>
+			        ${user ? `
+			          <form id="replyForm" class="reply-form">
+			            <textarea id="replyInput" placeholder="Leave a reply..."></textarea>
+			            <div class="reply-controls">
+			              <button type="button" class="btn secondary" id="attachImageBtn">Attach image</button>
+			              <div class="emoji-picker" id="emojiPicker"></div>
+			            </div>
+			            <div id="replyImagePreview" class="reply-image-preview"></div>
+			            <input type="file" id="replyImageInput" accept="image/*" style="display:none;">
+			            <button type="submit" class="btn primary">Post reply</button>
+			          </form>
+			        ` : `
+			          <div class="reply-empty">Log in to leave a reply.</div>
+			        `}
+			      </section>
+			    `;
+			
+			    document.getElementById("likeBtn").addEventListener("click", async () => {
+			      if (!user) { showModal("login"); return; }
+			      const updated = await Progress.toggleLike(post.id);
+			      if (!updated) return;
+			      document.getElementById("likeCount").textContent = updated.likes;
+			      document.getElementById("likeBtn").classList.toggle("liked", updated.likedBy.includes(user.username));
+			    });
+			
+			    // Bookmark
+			    const bookmarkBtn = document.getElementById("bookmarkBtn");
+			    if (bookmarkBtn && user) {
+			      // Check initial state
+			      apiFetch(`/api/bookmarks/${post.id}/status`).then(r => {
+			        if (r && r.bookmarked) bookmarkBtn.classList.add("liked");
+			      });
+			      bookmarkBtn.addEventListener("click", async () => {
+			        bookmarkBtn.disabled = true;
+			        const r = await apiFetch(`/api/bookmarks/${post.id}`, { method: "POST" });
+			        bookmarkBtn.disabled = false;
+			        if (r) {
+			          bookmarkBtn.classList.toggle("liked", r.bookmarked);
+			          showToast(r.bookmarked ? "Saved to bookmarks." : "Removed from bookmarks.");
+			        }
+			      });
+			    }
+			
+			    // Share
+			    const shareBtn = document.getElementById("shareBtn");
+			    if (shareBtn) {
+			      shareBtn.addEventListener("click", async () => {
+			        const url = `${location.origin}/og/${post.id}`;
+			        if (navigator.share) {
+			          navigator.share({ title: post.title, url }).catch(() => {});
+			        } else {
+			          try { await navigator.clipboard.writeText(url); showToast("Link copied!"); } catch(e) { showToast("Copy this link: " + url); }
+			        }
+			      });
+			    }
+			
+			    document.getElementById("replyBtn").addEventListener("click", () => {
+			      if (!Progress.getCurrentUser()) { showModal("login"); return; }
+			      const form = document.getElementById("replyForm");
+			      if (form) {
+			        form.scrollIntoView({ behavior: "smooth", block: "center" });
+			        document.getElementById("replyInput").focus();
+			      }
+			    });
+			
+			    const followBtn = document.getElementById("followBtn");
+			    if (followBtn) {
+			      followBtn.addEventListener("click", async () => {
+			        if (!Progress.getCurrentUser()) { showModal("login"); return; }
+			        const result = await Progress.toggleFollow(post.author);
+			        if (result) {
+			          followBtn.textContent = Progress.isFollowing(post.author) ? "Following" : "Follow author";
+			          showToast(Progress.isFollowing(post.author) ? "You are now following this author." : "Unfollowed the author.");
+			        }
+			      });
+			    }
+			
+			    const deleteBtn = document.getElementById("deleteBtn");
+			    if (deleteBtn) {
+			      deleteBtn.addEventListener("click", async () => {
+			        if (!confirm("Delete this entry? This cannot be undone.")) return;
+			        const deleted = await Progress.deletePost(post.id);
+			        if (deleted) {
+			          showToast("Entry deleted.");
+			          setTimeout(() => location.href = "index.html", 400);
+			        } else {
+			          showToast("Could not delete this entry.");
+			        }
+			      });
+			    }
+			
+			    let replyImageData = null;
+			    let replyImageLoading = false;
+			    const imageInput = document.getElementById("replyImageInput");
+			    const imagePreview = document.getElementById("replyImagePreview");
+			    const attachImageBtn = document.getElementById("attachImageBtn");
+			    const emojiPicker = document.getElementById("emojiPicker");
+			    const replySubmitBtn = document.querySelector("#replyForm button[type='submit']");
+			
+			    function setReplySubmitEnabled(enabled) {
+			      if (replySubmitBtn) replySubmitBtn.disabled = !enabled;
+			    }
+			
+			    if (attachImageBtn && imageInput) {
+			      attachImageBtn.addEventListener("click", () => imageInput.click());
+			      imageInput.addEventListener("change", () => {
+			        const file = imageInput.files && imageInput.files[0];
+			        if (!file) return;
+			        replyImageLoading = true;
+			        setReplySubmitEnabled(false);
+			        if (imagePreview) imagePreview.innerHTML = `<div class="reply-image-loading">Loading image...</div>`;
+			        const reader = new FileReader();
+			        reader.onload = () => {
+			          replyImageData = reader.result;
+			          replyImageLoading = false;
+			          setReplySubmitEnabled(true);
+			          if (imagePreview) {
+			            imagePreview.innerHTML = `
+			              <div class="reply-image-preview-card">
+			                <img src="${reader.result}" alt="Reply attachment">
+			                <button type="button" class="btn secondary" id="removeImageBtn">Remove</button>
+			              </div>`;
+			            const removeButton = document.getElementById("removeImageBtn");
+			            removeButton && removeButton.addEventListener("click", () => {
+			              replyImageData = null;
+			              imageInput.value = "";
+			              if (imagePreview) imagePreview.innerHTML = "";
+			            });
+			          }
+			        };
+			        reader.onerror = () => {
+			          replyImageLoading = false;
+			          setReplySubmitEnabled(true);
+			          showToast("Could not load the selected image.");
+			          if (imagePreview) imagePreview.innerHTML = "";
+			          replyImageData = null;
+			          imageInput.value = "";
+			        };
+			        reader.readAsDataURL(file);
+			      });
+			    }
+			
+			    const emoticonNames = getEmoticonNames();
+			    if (emojiPicker) {
+			      emojiPicker.innerHTML = emoticonNames.map(name => `
+			        <button type="button" class="emoji-btn" data-name="${name}">
+			          <img src="images/emoticons/${name}.png" alt="${name}">
+			        </button>
+			      `).join("");
+			
+			      let emojiTooltip = document.getElementById("emojiTooltip");
+			      if (!emojiTooltip) {
+			        emojiTooltip = document.createElement("div");
+			        emojiTooltip.id = "emojiTooltip";
+			        emojiTooltip.className = "emoji-tooltip hidden";
+			        document.body.appendChild(emojiTooltip);
+			      }
+			
+			      const attachEmoticonTooltip = (element, name) => {
+			        const small = element.classList.contains("reply-emoticon");
+			        element.addEventListener("mouseenter", () => {
+			          emojiTooltip.innerHTML = `
+			            <img src="images/emoticons/${name}.png" alt="${name}">
+			            <div class="emoji-tooltip-label${name.length > 10 ? " long-name" : ""}">:${name}:</div>
+			          `;
+			          emojiTooltip.classList.toggle("small", small);
+			          emojiTooltip.classList.remove("hidden");
+			          const rect = element.getBoundingClientRect();
+			          const tooltipWidth = small ? 90 : 120;
+			          const gap = small ? 4 : 12;
+			          const left = Math.min(window.innerWidth - tooltipWidth - 12, Math.max(12, rect.left + rect.width / 2 - tooltipWidth / 2));
+			          const top = rect.top - emojiTooltip.offsetHeight - gap;
+			          emojiTooltip.style.left = `${left}px`;
+			          emojiTooltip.style.top = `${top < 12 ? rect.bottom + gap : top}px`;
+			        });
+			        element.addEventListener("mouseleave", () => {
+			          emojiTooltip.classList.add("hidden");
+			          emojiTooltip.classList.remove("small");
+			        });
+			      };
+			
+			      emojiPicker.querySelectorAll(".emoji-btn").forEach(btn => {
+			        const name = btn.dataset.name || "";
+			        btn.addEventListener("click", () => {
+			          const textarea = document.getElementById("replyInput");
+			          if (!textarea) return;
+			          const placeholder = `:${name}:`;
+			          const start = textarea.selectionStart;
+			          const end = textarea.selectionEnd;
+			          const value = textarea.value;
+			          textarea.value = value.slice(0, start) + placeholder + value.slice(end);
+			          textarea.focus();
+			          textarea.selectionStart = textarea.selectionEnd = start + placeholder.length;
+			        });
+			
+			        attachEmoticonTooltip(btn, name);
+			      });
+			
+			      document.querySelectorAll('.reply-emoticon').forEach(img => {
+			        const name = img.alt || img.src.split('/').pop().replace('.png', '');
+			        attachEmoticonTooltip(img, name);
+			      });
+			    }
+			
+			    const replyForm = document.getElementById("replyForm");
+			    if (replyForm) {
+			      replyForm.addEventListener("submit", async (event) => {
+			        event.preventDefault();
+			        const body = document.getElementById("replyInput").value.trim();
+			        if (!body && !replyImageData) {
+			          showToast("Write a reply or attach an image before posting.");
+			          return;
+			        }
+			        setReplySubmitEnabled(false);
+			        const comment = await Progress.createComment(post.id, body, replyImageData);
+			        setReplySubmitEnabled(true);
+			        if (!comment) {
+			          showToast("Log in to reply.");
+			          return;
+			        }
+			        replyImageData = null;
+			        if (imageInput) imageInput.value = "";
+			        if (imagePreview) imagePreview.innerHTML = "";
+			        showToast("Reply posted.");
+			        renderPost();
+			      });
+			    }
+			  }
+			
+			  renderPost();
+			
+			  Progress.loadFromApi().then(() => {
+			    // A single background refresh once fresh data arrives. Never re-schedule
+			    // itself (that caused an infinite render loop that kept wiping out the
+			    // reply form and duplicating emoji tooltips). Also skip it entirely if
+			    // the visitor is actively composing a reply so it can't yank the form
+			    // out from under them.
+			    const activeInput = document.getElementById("replyInput");
+			    if (activeInput && (document.activeElement === activeInput || activeInput.value.trim())) return;
+			    renderPost();
+			  }).catch(() => {});
+			
+			  initShell("post");

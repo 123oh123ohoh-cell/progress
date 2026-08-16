@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Join Progress — a journal for what you're building</title>
+<meta property="og:title" content="Join Progress">
+<meta property="og:description" content="A running record of things made, fixed, rebuilt, and understood a little better than yesterday.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500;1,9..144,600&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script>(function(){try{var t=localStorage.getItem("progressTheme");var dark=(t==="dark")||(t!=="light"&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);if(dark)document.documentElement.setAttribute("data-theme","dark");}catch(e){}})();</script>
+<link rel="stylesheet" href="v2-compat.css">
+<link rel="stylesheet" href="style.css">
+<style>
+#nav-root { display:none !important; }
+
+html, body { height: 100%; }
+
+body {
+  background: var(--v2-bg);
+  display: flex; min-height: 100dvh;
+}
+
+.v2-auth-page {
+  display: flex; width: 100%; min-height: 100dvh;
+}
+
+/* Left panel — branding */
+.v2-auth-hero {
+  flex: 1; display: none;
+  background: var(--v2-ink);
+  color: var(--v2-bg);
+  flex-direction: column; justify-content: center;
+  padding: 60px;
+  position: relative; overflow: hidden;
+}
+@media (min-width: 900px) { .v2-auth-hero { display: flex; } }
+
+.v2-auth-hero::before {
+  content: "";
+  position: absolute; inset: 0;
+  background: url('../images/nearheader.png') center/cover no-repeat;
+  opacity: .07;
+  pointer-events: none;
+}
+
+.v2-auth-hero-inner { position: relative; z-index: 1; max-width: 440px; }
+
+.v2-auth-wordmark {
+  font-family: var(--v2-font-d); font-style: italic; font-weight: 600;
+  font-size: 42px; letter-spacing: -1px; margin: 0 0 16px;
+  color: #fff;
+}
+
+.v2-auth-tagline {
+  font-size: 18px; line-height: 1.6; color: rgba(255,255,255,.72);
+  margin: 0 0 48px; max-width: 380px;
+}
+
+.v2-auth-quotes { display: flex; flex-direction: column; gap: 20px; }
+
+.v2-auth-quote {
+  background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1);
+  border-radius: var(--r-lg); padding: 18px 20px;
+}
+.v2-auth-quote-text {
+  font-size: 14.5px; color: rgba(255,255,255,.85); line-height: 1.6;
+  font-style: italic; margin: 0 0 10px;
+  font-family: var(--v2-font-d);
+}
+.v2-auth-quote-author { font-size: 12px; color: rgba(255,255,255,.5); font-family: var(--v2-font-m); }
+
+/* Right panel — form */
+.v2-auth-form-wrap {
+  width: 100%; max-width: 480px;
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 48px 40px;
+  background: var(--v2-paper);
+}
+
+@media (max-width: 899px) { .v2-auth-form-wrap { max-width: 100%; } }
+@media (max-width: 500px) { .v2-auth-form-wrap { padding: 32px 24px; } }
+
+.v2-auth-logo {
+  display: flex; align-items: center; gap: 9px;
+  margin-bottom: 40px; text-decoration: none;
+}
+.v2-auth-logo img { width: 28px; height: 28px; border-radius: 8px; }
+.v2-auth-logo span {
+  font-family: var(--v2-font-d); font-style: italic; font-weight: 600;
+  font-size: 20px; color: var(--v2-ink);
+}
+
+.v2-auth-title {
+  font-family: var(--v2-font-d); font-style: italic; font-weight: 600;
+  font-size: 28px; color: var(--v2-ink); margin: 0 0 6px;
+}
+.v2-auth-sub { font-size: 14.5px; color: var(--v2-muted); margin: 0 0 28px; }
+
+/* Error banner */
+.v2-auth-error {
+  background: rgba(220,38,38,.08); border: 1px solid rgba(220,38,38,.25);
+  border-radius: var(--r-md); padding: 11px 14px;
+  font-size: 13.5px; color: var(--v2-danger);
+  margin-bottom: 16px; display: none;
+}
+.v2-auth-error:not(:empty) { display: block; }
+
+/* Fields */
+.v2-field { margin-bottom: 16px; }
+.v2-field label { display: block; font-size: 13px; font-weight: 600; color: var(--v2-ink); margin-bottom: 6px; }
+.v2-field input {
+  width: 100%; padding: 10px 14px;
+  border: 1.5px solid var(--v2-border);
+  border-radius: var(--r-md);
+  background: var(--v2-paper-2);
+  color: var(--v2-ink);
+  font-family: var(--v2-font-b); font-size: 15px;
+  outline: none; transition: border-color .15s, box-shadow .15s;
+}
+.v2-field input:focus {
+  border-color: var(--v2-accent);
+  box-shadow: 0 0 0 3px var(--v2-accent-dim);
+}
+.v2-field input::placeholder { color: var(--v2-muted); }
+
+.v2-field-hint { font-size: 11.5px; color: var(--v2-muted); margin-top: 5px; }
+
+/* Submit button */
+.v2-auth-submit {
+  width: 100%; padding: 12px;
+  background: var(--v2-ink); color: var(--v2-bg);
+  border: none; border-radius: var(--r-lg);
+  font-family: var(--v2-font-b); font-size: 15px; font-weight: 600;
+  cursor: pointer; transition: opacity .15s, transform .15s;
+  margin-top: 8px;
+}
+.v2-auth-submit:hover { opacity: .9; transform: translateY(-1px); }
+.v2-auth-submit:disabled { opacity: .6; cursor: not-allowed; transform: none; }
+
+/* Switch pane link */
+.v2-auth-switch {
+  font-size: 13.5px; color: var(--v2-muted); margin-top: 18px; text-align: center;
+}
+.v2-auth-switch button {
+  color: var(--v2-accent); font-weight: 600; font-family: var(--v2-font-b);
+  background: none; border: none; cursor: pointer; font-size: inherit;
+}
+.v2-auth-switch button:hover { text-decoration: underline; }
+
+.v2-auth-demo {
+  font-size: 12px; color: var(--v2-muted); margin-top: 10px; text-align: center;
+}
+
+/* Divider */
+.v2-auth-divider {
+  display: flex; align-items: center; gap: 12px;
+  color: var(--v2-muted); font-size: 12px; margin: 20px 0;
+}
+.v2-auth-divider::before, .v2-auth-divider::after {
+  content: ""; flex: 1; height: 1px; background: var(--v2-border);
+}
+</style>
+</head>
+<body class="v2">
+
+<div id="modal-root"><div class="toast" id="toast"></div></div>
+
+<div class="v2-auth-page">
+
+  <!-- Left hero panel -->
+  <div class="v2-auth-hero">
+    <div class="v2-auth-hero-inner">
+      <h1 class="v2-auth-wordmark">Progress.</h1>
+      <p class="v2-auth-tagline">A running record of things made, fixed, rebuilt, and understood a little better than yesterday.</p>
+      <div class="v2-auth-quotes">
+        <div class="v2-auth-quote">
+          <p class="v2-auth-quote-text">"The best way to track progress is to write it down — even the small wins."</p>
+          <p class="v2-auth-quote-author">— Community member</p>
+        </div>
+        <div class="v2-auth-quote">
+          <p class="v2-auth-quote-text">"I've learned more by documenting my failures than celebrating my successes."</p>
+          <p class="v2-auth-quote-author">— Community member</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right form panel -->
+  <div class="v2-auth-form-wrap">
+
+    <a href="index.html" class="v2-auth-logo">
+      <img src="../images/etc1.png" alt="Progress">
+      <span>Progress</span>
+    </a>
+
+    <!-- ── Signup pane ── -->
+    <div id="signupPane">
+      <h2 class="v2-auth-title">Start your journal</h2>
+      <p class="v2-auth-sub">It takes a minute. Everyone's welcome.</p>
+
+      <div class="v2-auth-error" id="signupError"></div>
+
+      <div class="v2-field">
+        <label for="signupName">Display name</label>
+        <input id="signupName" type="text" placeholder="Mara Studios" autocapitalize="words" spellcheck="false">
+      </div>
+      <div class="v2-field">
+        <label for="signupUsername">Username</label>
+        <input id="signupUsername" type="text" placeholder="mara" autocapitalize="none" spellcheck="false" autocorrect="off">
+      </div>
+      <div class="v2-field">
+        <label for="signupPassword">Password</label>
+        <input id="signupPassword" type="password" autocomplete="new-password" placeholder="••••••••" autocapitalize="none">
+        <p class="v2-field-hint">8+ characters with at least one letter and one number.</p>
+      </div>
+
+      <button class="v2-auth-submit" id="signupSubmit">Create account</button>
+      <p class="v2-auth-switch">Already have an account? <button id="toLogin">Log in</button></p>
+    </div>
+
+    <!-- ── Login pane ── -->
+    <div id="loginPane" style="display:none;">
+      <h2 class="v2-auth-title">Welcome back</h2>
+      <p class="v2-auth-sub">Good to see you again.</p>
+
+      <div class="v2-auth-error" id="loginError"></div>
+
+      <div class="v2-field">
+        <label for="loginUsername">Username</label>
+        <input id="loginUsername" type="text" placeholder="mara" autocapitalize="none" spellcheck="false" autocorrect="off" autocomplete="username">
+      </div>
+      <div class="v2-field">
+        <label for="loginPassword">Password</label>
+        <input id="loginPassword" type="password" autocomplete="current-password" placeholder="••••••••" autocapitalize="none">
+      </div>
+
+      <button class="v2-auth-submit" id="loginSubmit">Log in</button>
+      <p class="v2-auth-switch">New here? <button id="toSignup">Create an account</button></p>
+      <p class="v2-auth-demo">Demo account: <strong>mara</strong> / <strong>demo1234</strong></p>
+    </div>
+
+    <!-- ── Notification step ── -->
+    <div id="notifPane" style="display:none;">
+      <h2 class="v2-auth-title">Stay in the loop</h2>
+      <p class="v2-auth-sub">Get notified when people reply to your entries.</p>
+      <div id="notifContent"></div>
+    </div>
+
+  </div>
+</div>
+
+<script src="../data.js"></script>
+<script src="../app.js"></script>
+<script>
+  /* ── Pane switching ─────────────────────────────────────── */
+  document.getElementById("toLogin").addEventListener("click", () => {
+    document.getElementById("signupPane").style.display = "none";
+    document.getElementById("loginPane").style.display = "";
+  });
+  document.getElementById("toSignup").addEventListener("click", () => {
+    document.getElementById("loginPane").style.display = "none";
+    document.getElementById("signupPane").style.display = "";
+  });
+
+  function showError(id, msg) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = msg;
+    el.style.display = msg ? "block" : "none";
+  }
+
+  function setLoading(btnId, loading) {
+    const btn = document.getElementById(btnId);
+    if (!btn) return;
+    btn.disabled = loading;
+    btn.textContent = loading ? "Please wait…" : (btnId === "signupSubmit" ? "Create account" : "Log in");
+  }
+
+  /* ── Signup ─────────────────────────────────────────────── */
+  document.getElementById("signupSubmit").addEventListener("click", async () => {
+    const name     = document.getElementById("signupName").value.trim();
+    const username = document.getElementById("signupUsername").value.trim().toLowerCase();
+    const password = document.getElementById("signupPassword").value;
+    showError("signupError", "");
+    if (!name || !username || !password) { showError("signupError", "Please fill in all fields."); return; }
+    if (password.length < 8 || !/[a-zA-Z]/.test(password) || !/[0-9]/.test(password)) {
+      showError("signupError", "Password must be 8+ characters with at least one letter and one number.");
+      return;
+    }
+    setLoading("signupSubmit", true);
+    const result = await Progress.signup({ name, username, password }).catch(e => ({ error: e.message }));
+    setLoading("signupSubmit", false);
+    if (result?.error) { showError("signupError", result.error); return; }
+    /* Show notification step or redirect */
+    if (typeof showNotifStep === "function") {
+      showNotifStep();
+    } else {
+      location.href = "index.html";
+    }
+  });
+
+  /* ── Login ──────────────────────────────────────────────── */
+  document.getElementById("loginSubmit").addEventListener("click", async () => {
+    const username = document.getElementById("loginUsername").value.trim().toLowerCase();
+    const password = document.getElementById("loginPassword").value;
+    showError("loginError", "");
+    if (!username || !password) { showError("loginError", "Please enter your username and password."); return; }
+    setLoading("loginSubmit", true);
+    const result = await Progress.login({ username, password }).catch(e => ({ error: e.message }));
+    setLoading("loginSubmit", false);
+    if (result?.error) { showError("loginError", result.error || "Incorrect username or password."); return; }
+    const returnTo = new URLSearchParams(location.search).get("return");
+    location.href = returnTo || "index.html";
+  });
+
+  /* Enter key on inputs */
+  ["signupPassword"].forEach(id => {
+    document.getElementById(id)?.addEventListener("keydown", e => {
+      if (e.key === "Enter") document.getElementById("signupSubmit")?.click();
+    });
+  });
+  ["loginPassword"].forEach(id => {
+    document.getElementById(id)?.addEventListener("keydown", e => {
+      if (e.key === "Enter") document.getElementById("loginSubmit")?.click();
+    });
+  });
+
+  /* If already logged in, redirect */
+  Progress.loadFromApi().catch(() => {});
+  window.addEventListener("progress:posts-loaded", () => {
+    const me = Progress.getCurrentUser();
+    if (me) location.href = "index.html";
+  }, { once: true });
+</script>
+</body>
+</html>

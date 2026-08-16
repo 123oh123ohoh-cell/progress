@@ -1,0 +1,31 @@
+extends layout
+
+block title
+	| 404 — Page not found
+
+block meta
+	meta(property="og:site_name", content="Progress")
+	meta(property="og:type", content="website")
+	meta(property="og:url", content="https://progressing.online/404.html")
+	meta(property="og:title", content="404 — Page not found")
+	meta(property="og:description", content="We couldn't find the page you were looking for.")
+	meta(property="og:image", content="https://progressing.online/images/nearheader.png")
+	meta(name="twitter:card", content="summary_large_image")
+	meta(name="twitter:title", content="404 — Page not found")
+	meta(name="twitter:description", content="We couldn't find the page you were looking for.")
+	meta(name="twitter:image", content="https://progressing.online/images/nearheader.png")
+
+block content
+	main.container(style='padding: 120px 20px; text-align:center;')
+		div(style='max-width:620px; margin:0 auto;')
+			.error-illustration
+				img(src='images/404page.png' alt='404 page not found illustration')
+			h1(style='font-family:var(--font-display); font-size:52px; margin-bottom:18px; color:var(--ink);') 404
+			p(style='font-size:18px; color:var(--muted); margin-bottom:28px;') We couldn’t find the page you were looking for.
+			a.btn.primary(href='index.html' style='font-size:14px; padding:14px 22px;') Return to progress home
+	
+
+block scripts
+		script.
+			
+			  initShell();

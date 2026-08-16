@@ -1,0 +1,129 @@
+extends layout
+
+block title
+	| Explore — Progress
+
+block meta
+	meta(property="og:site_name", content="Progress")
+	meta(property="og:title", content="Explore — Progress")
+	meta(property="og:description", content="Discover trending posts and writers on Progress.")
+	meta(property="og:image", content="https://progressing.online/images/nearheader.png")
+
+block content
+	main.container
+		header.feed-header
+			h1 Explore
+			p Trending posts and writers from the last 30 days.
+		#exploreRoot
+			p.feed-empty(style='padding:40px 0;') Loading…
+	
+
+block scripts
+		script.
+			
+			  async function start() {
+			    const ready = initShell("explore");
+			    const me = Progress.getCurrentUser();
+			    const viewerParam = me ? `?viewer=${encodeURIComponent(me.username)}` : "";
+			    const [data] = await Promise.all([
+			      apiFetch(`/api/explore${viewerParam}`),
+			      ready
+			    ]);
+			
+			    const root = document.getElementById("exploreRoot");
+			    if (!data) {
+			      root.innerHTML = `<p style="color:var(--muted); padding:40px 0;">Couldn't load explore — try refreshing.</p>`;
+			      return;
+			    }
+			
+			    const { trending = [], suggested = [], mightKnow = [] } = data;
+			
+			    function renderUserRow(u, badge) {
+			      return `
+			      <div style="display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid var(--mocha-wash);">
+			        <a href="user.html?id=${u.id}" style="flex-shrink:0; text-decoration:none;">
+			          ${u.avatar
+			            ? `<img src="${u.avatar}" alt="${escapeHTML(u.name)}" style="width:40px; height:40px; border-radius:50%; object-fit:cover;">`
+			            : `<div class="initials-lg" style="width:40px; height:40px; font-size:14px;">${initials(u.name)}</div>`}
+			        </a>
+			        <div style="min-width:0; flex:1;">
+			          <a href="user.html?id=${u.id}" style="font-size:14.5px; font-weight:600; color:var(--ink); text-decoration:none; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHTML(u.name)}</a>
+			          <div style="font-size:12px; color:var(--muted);">@${escapeHTML(u.username)}${badge ? ` &middot; <span style="color:var(--mocha);">${badge}</span>` : ""} &middot; ${u.followers?.length || 0} followers</div>
+			        </div>
+			        ${me && me.username !== u.username ? `
+			          <button class="explore-follow-btn upload-btn" data-user-id="${u.id}" data-username="${escapeHTML(u.username)}" style="flex-shrink:0; padding:6px 14px; font-size:12.5px;">
+			            ${Progress.isFollowing(u.username) ? "Following" : "Follow"}
+			          </button>` : ""}
+			      </div>`;
+			    }
+			
+			    // ── Suggested writers ──────────────────────────────────────────────────
+			    const suggestedHTML = suggested.length
+			      ? suggested.map(u => renderUserRow(u, null)).join("")
+			      : `<p style="color:var(--muted); font-size:14px; padding:12px 0;">No suggestions right now.</p>`;
+			
+			    // ── People you might know ──────────────────────────────────────────────
+			    const mightKnowHTML = mightKnow.length
+			      ? mightKnow.map(u => renderUserRow(u, "Followed by people you follow")).join("")
+			      : "";
+			
+			    // ── Trending posts ─────────────────────────────────────────────────────
+			    const trendingHTML = trending.length ? trending.map(p => {
+			      const author = Progress.getUser(p.author);
+			      return `
+			        <div class="entry" data-post-href="post.html?id=${p.id}" style="cursor:pointer;">
+			          <div class="entry-body">
+			            <span class="entry-date">${Progress.formatDateShort(p.date)}</span>
+			            <h2 class="entry-title"><a class="entry-link" href="post.html?id=${p.id}"><span class="underline">${escapeHTML(p.title)}</span></a></h2>
+			            <p class="entry-excerpt">${escapeHTML(p.excerpt || "")}</p>
+			            <div class="entry-meta">
+			              <span style="font-family:var(--font-mono); font-size:11px; color:var(--muted);">♥ ${p.likes || 0}</span>
+			              <span class="entry-author" style="margin-left:12px;">${avatarHTML(author, 22)}<a class="username-link" href="user.html?id=${author ? author.id : ""}">@${escapeHTML(p.author)}</a></span>
+			            </div>
+			          </div>
+			          ${p.cover ? `<div class="entry-thumb"><img src="${p.cover}" alt="" loading="lazy"></div>` : ""}
+			        </div>`;
+			    }).join("") : `<p style="color:var(--muted); font-size:14px; padding:12px 0;">No trending posts yet — publish something!</p>`;
+			
+			    root.innerHTML = `
+			      <div style="display:grid; grid-template-columns:1fr; gap:40px;">
+			        <section>
+			          <h2 style="font-family:var(--font-mono); font-size:11.5px; text-transform:uppercase; letter-spacing:0.07em; color:var(--muted); margin-bottom:16px;">Writers to follow</h2>
+			          ${suggestedHTML}
+			        </section>
+			        ${mightKnowHTML ? `
+			        <section>
+			          <h2 style="font-family:var(--font-mono); font-size:11.5px; text-transform:uppercase; letter-spacing:0.07em; color:var(--muted); margin-bottom:16px;">People you might know</h2>
+			          ${mightKnowHTML}
+			        </section>` : ""}
+			        <section>
+			          <h2 style="font-family:var(--font-mono); font-size:11.5px; text-transform:uppercase; letter-spacing:0.07em; color:var(--muted); margin-bottom:4px;">Trending this month</h2>
+			          <div class="timeline" style="padding:0 0 60px;">${trendingHTML}</div>
+			        </section>
+			      </div>`;
+			
+			    // Wire entry clicks
+			    root.querySelectorAll(".entry[data-post-href]").forEach(el => {
+			      el.addEventListener("click", e => {
+			        if (e.target.closest("a,button")) return;
+			        location.href = el.dataset.postHref;
+			      });
+			    });
+			
+			    // Wire follow buttons
+			    root.querySelectorAll(".explore-follow-btn").forEach(btn => {
+			      btn.addEventListener("click", async () => {
+			        if (!Progress.getCurrentUser()) { showModal("login"); return; }
+			        btn.disabled = true;
+			        const result = await Progress.toggleFollow(btn.dataset.username);
+			        btn.disabled = false;
+			        if (result) {
+			          const isNowFollowing = Progress.isFollowing(btn.dataset.username);
+			          btn.textContent = isNowFollowing ? "Following" : "Follow";
+			          btn.classList.toggle("following", isNowFollowing);
+			        }
+			      });
+			    });
+			  }
+			
+			  start();
