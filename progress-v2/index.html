@@ -21,6 +21,74 @@
 #nav-root { display: none !important; }
 /* Override v1 body styles */
 body { background: var(--v2-bg); margin: 0; }
+
+/* ── Event feed card ────────────────────────────────────── */
+.event-feed-card {
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  margin-bottom: 6px;
+  animation: efc-shift 12s ease infinite;
+  position: relative;
+  min-height: 140px;
+  display: flex;
+  align-items: stretch;
+}
+@keyframes efc-shift {
+  0%,100% { background-position: 0% 50%; }
+  50%      { background-position: 100% 50%; }
+}
+.efc-inner {
+  flex: 1; display: flex; flex-direction: column; justify-content: space-between;
+  padding: 18px 20px; gap: 12px;
+  background: linear-gradient(to right, rgba(0,0,0,.28) 0%, rgba(0,0,0,.08) 100%);
+}
+.efc-row1 { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.efc-live {
+  display: flex; align-items: center; gap: 5px;
+  background: rgba(255,255,255,.18); backdrop-filter: blur(6px);
+  border-radius: 20px; padding: 3px 10px 3px 8px;
+  font-size: 11px; font-weight: 700; color: #fff;
+  letter-spacing: .04em; text-transform: uppercase;
+}
+.efc-live-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: #fff; animation: efc-pulse 1.4s ease infinite;
+}
+@keyframes efc-pulse { 0%,100% { opacity:1; } 50% { opacity:.3; } }
+.efc-emoji { font-size: 22px; line-height: 1; }
+.efc-title {
+  font-family: var(--v2-font-d); font-style: italic;
+  font-size: 22px; font-weight: 600; color: #fff;
+  text-shadow: 0 1px 6px rgba(0,0,0,.3);
+  flex: 1;
+}
+.efc-row2 { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.efc-countdown {
+  display: flex; align-items: center; gap: 6px;
+}
+.efc-unit {
+  display: flex; flex-direction: column; align-items: center;
+  min-width: 34px;
+}
+.efc-unit-num {
+  font-family: var(--v2-font-m); font-size: 20px; font-weight: 500;
+  color: #fff; line-height: 1; letter-spacing: -.02em;
+}
+.efc-unit-label {
+  font-size: 9px; font-weight: 600; color: rgba(255,255,255,.65);
+  text-transform: uppercase; letter-spacing: .06em; margin-top: 2px;
+}
+.efc-sep { color: rgba(255,255,255,.5); font-size: 18px; line-height: 1; align-self: flex-start; margin-top: 2px; }
+.efc-cta {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(255,255,255,.2); backdrop-filter: blur(8px);
+  color: #fff; font-size: 13px; font-weight: 700;
+  border: 1.5px solid rgba(255,255,255,.35);
+  border-radius: 20px; padding: 7px 16px;
+  text-decoration: none; white-space: nowrap;
+  transition: background .15s;
+}
+.efc-cta:hover { background: rgba(255,255,255,.32); }
 </style>
 </head>
 <body class="v2 mobile">
